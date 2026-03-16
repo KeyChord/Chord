@@ -217,6 +217,7 @@ gd = { name = "Go to definition", shortcut = "cmd+b" }
 rs = { name = "Rename Symbol", shortcut = "shift+f6" }
 rf = { name = "Recent Files", shortcut = "ctrl+tab" }
 cp = { name = "Command Palette", shortcut = "cmd+shift+a" }
+fc = { name = "Format Code", shortcut = "cmd+option+l" }
 ```
 
 ### Multi-modifier combinations are difficult to press and remember
