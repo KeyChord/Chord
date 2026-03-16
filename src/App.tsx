@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./global.css";
 import { ChordIndicatorWindow } from "./components/indicator";
+import { Toaster } from "./components/ui/sonner";
 import { SettingsWindow } from "./windows/settings";
 
 function App() {
@@ -26,7 +27,12 @@ function App() {
     return <ChordIndicatorWindow />;
   }
 
-  return <SettingsWindow />;
+  return (
+    <>
+      <SettingsWindow />
+      <Toaster position="top-right" />
+    </>
+  );
 }
 
 export default App;

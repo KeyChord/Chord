@@ -10,12 +10,12 @@ pub struct ChordFolder {
     pub files_map: HashMap<String, AppChordsFile>,
 }
 
-static BUNDLED_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords");
+static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords/macos");
 
 impl ChordFolder {
     pub fn load_bundled() -> Result<Self> {
         let mut files_map = HashMap::new();
-        for file in BUNDLED_CHORDS_DIR.find("**/chords.toml")? {
+        for file in BUNDLED_MACOS_CHORDS_DIR.find("**/chords.toml")? {
             let path = file.path().to_string_lossy().to_string();
             let content = file
                 .as_file()
@@ -35,8 +35,9 @@ impl ChordFolder {
             .workdir()
             .ok_or_else(|| anyhow::anyhow!("Repository has no working directory"))?;
 
-        let chords_dir = root.join("chords");
+        let chords_dir = root.join("chords").join("macos");
         if !chords_dir.exists() {
+            log::debug!("No chords/macos folder found in {:?}", root);
             return Ok(Self { files_map });
         }
 

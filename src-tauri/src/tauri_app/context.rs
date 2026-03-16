@@ -1,102 +1,30 @@
 use crate::chords::{ChordFolder, LoadedAppChords};
 use crate::feature::Chorder;
+use crate::git::load_all_app_chords;
 use crate::{
     feature::ChorderIndicatorPanel,
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use arc_swap::ArcSwap;
 use device_query::DeviceState;
+use keycode::KeyMappingCode::*;
 use objc2_app_kit::NSWorkspace;
 use parking_lot::RwLock;
 use serde::Serialize;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GitRepoInfo {
-    pub owner: String,
+pub struct ActiveChordInfo {
+    pub scope: String,
+    pub scope_kind: String,
+    pub sequence: String,
     pub name: String,
-    pub slug: String,
-    pub url: String,
-    pub local_path: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct GitHubRepoRef {
-    pub owner: String,
-    pub name: String,
-}
-
-impl GitHubRepoRef {
-    pub fn parse(input: &str) -> Result<Self> {
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            anyhow::bail!("Repository cannot be empty");
-        }
-
-        let slug = trimmed
-            .trim_end_matches('/')
-            .trim_end_matches(".git")
-            .strip_prefix("https://github.com/")
-            .or_else(|| trimmed.strip_prefix("http://github.com/"))
-            .or_else(|| trimmed.strip_prefix("git@github.com:"))
-            .or_else(|| trimmed.strip_prefix("ssh://git@github.com/"))
-            .unwrap_or(trimmed)
-            .trim_matches('/');
-
-        let mut parts = slug.split('/');
-        let owner = parts
-            .next()
-            .filter(|segment| !segment.is_empty())
-            .ok_or_else(|| anyhow::anyhow!("Repository must be in the form owner/name"))?;
-        let name = parts
-            .next()
-            .filter(|segment| !segment.is_empty())
-            .ok_or_else(|| anyhow::anyhow!("Repository must be in the form owner/name"))?;
-
-        if parts.next().is_some() {
-            anyhow::bail!("Repository must be in the form owner/name");
-        }
-
-        if owner.contains(char::is_whitespace) || name.contains(char::is_whitespace) {
-            anyhow::bail!("Repository owner and name cannot contain spaces");
-        }
-
-        Ok(Self {
-            owner: owner.to_string(),
-            name: name.to_string(),
-        })
-    }
-
-    pub fn slug(&self) -> String {
-        format!("{}/{}", self.owner, self.name)
-    }
-
-    pub fn url(&self) -> String {
-        format!("https://github.com/{}", self.slug())
-    }
-
-    pub fn local_path(&self, repos_root: &Path) -> PathBuf {
-        repos_root.join(&self.owner).join(&self.name)
-    }
-
-    pub fn into_info(self, repos_root: &Path) -> GitRepoInfo {
-        let slug = self.slug();
-        let url = self.url();
-        let local_path = self.local_path(repos_root);
-        GitRepoInfo {
-            owner: self.owner,
-            name: self.name,
-            slug,
-            url,
-            local_path: local_path.display().to_string(),
-        }
-    }
+    pub action: String,
 }
 
 pub struct AppContext {
@@ -164,83 +92,6 @@ pub fn initialize_app_context(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
-pub fn github_repos_root(app: &AppHandle) -> Result<PathBuf> {
-    Ok(app.path().app_cache_dir()?.join("repos/github.com"))
-}
-
-pub fn discover_git_repos(app: &AppHandle) -> Result<Vec<GitRepoInfo>> {
-    let repos_root = github_repos_root(app)?;
-    if !repos_root.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut repos = Vec::new();
-    for owner_entry in fs::read_dir(&repos_root)? {
-        let owner_entry = owner_entry?;
-        let owner_path = owner_entry.path();
-        if !owner_path.is_dir() {
-            continue;
-        }
-
-        for repo_entry in fs::read_dir(&owner_path)? {
-            let repo_entry = repo_entry?;
-            let repo_path = repo_entry.path();
-            if !repo_path.is_dir() || !repo_path.join(".git").exists() {
-                continue;
-            }
-
-            let Some(owner) = owner_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-            let Some(name) = repo_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-
-            repos.push(
-                GitHubRepoRef {
-                    owner: owner.to_string(),
-                    name: name.to_string(),
-                }
-                .into_info(&repos_root),
-            );
-        }
-    }
-
-    repos.sort_by(|left, right| left.slug.cmp(&right.slug));
-    Ok(repos)
-}
-
-pub fn add_git_repo(app: &AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
-    let repo_ref = GitHubRepoRef::parse(repo_input)?;
-    let repos_root = github_repos_root(app)?;
-    let repo_path = repo_ref.local_path(&repos_root);
-
-    if repo_path.join(".git").exists() {
-        reload_loaded_app_chords(app)?;
-        return Ok(repo_ref.into_info(&repos_root));
-    }
-
-    clone_repo(&repo_ref, &repo_path)?;
-    reload_loaded_app_chords(app)?;
-
-    Ok(repo_ref.into_info(&repos_root))
-}
-
-pub fn sync_git_repo(app: &AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
-    let repo_ref = GitHubRepoRef::parse(repo_input)?;
-    let repos_root = github_repos_root(app)?;
-    let repo_path = repo_ref.local_path(&repos_root);
-
-    if !repo_path.join(".git").exists() {
-        anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-    }
-
-    refresh_repo(&repo_ref, &repo_path)?;
-    reload_loaded_app_chords(app)?;
-
-    Ok(repo_ref.into_info(&repos_root))
-}
-
 pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
     let loaded_chords = load_all_app_chords(app)?;
     let context = app.state::<AppContext>();
@@ -248,58 +99,127 @@ pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-fn load_all_app_chords(app: &AppHandle) -> Result<LoadedAppChords> {
-    let mut chord_folder = ChordFolder::load_bundled()?;
-    for repo in discover_git_repos(app)? {
-        match gix::open(&repo.local_path)
-            .context(format!("failed to open repo {}", repo.slug))
-            .and_then(|repo_handle| ChordFolder::load_from_git_repo(&repo_handle))
-        {
-            Ok(repo_folder) => chord_folder.merge(repo_folder),
-            Err(error) => log::warn!("Skipping repo {}: {error}", repo.slug),
+pub fn list_active_chords(app: &AppHandle) -> Result<Vec<ActiveChordInfo>> {
+    let context = app.state::<AppContext>();
+    let loaded_app_chords = context.loaded_app_chords.read();
+    let mut chords = Vec::new();
+    let mut seen = HashSet::new();
+
+    for chord in loaded_app_chords.global_chords.values() {
+        let item = ActiveChordInfo {
+            scope: "Global".to_string(),
+            scope_kind: "global".to_string(),
+            sequence: format_sequence(&chord.keys),
+            name: chord.name.clone(),
+            action: format_action(chord),
+        };
+        let fingerprint = format!(
+            "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+            item.scope_kind, item.scope, item.sequence, item.name, item.action
+        );
+        if seen.insert(fingerprint) {
+            chords.push(item);
         }
     }
 
-    LoadedAppChords::from_folder(chord_folder)
+    for (application_id, chord_map) in &loaded_app_chords.app_specific_chords {
+        for chord in chord_map.values() {
+            let item = ActiveChordInfo {
+                scope: application_id.clone(),
+                scope_kind: "app".to_string(),
+                sequence: format_sequence(&chord.keys),
+                name: chord.name.clone(),
+                action: format_action(chord),
+            };
+            let fingerprint = format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                item.scope_kind, item.scope, item.sequence, item.name, item.action
+            );
+            if seen.insert(fingerprint) {
+                chords.push(item);
+            }
+        }
+    }
+
+    chords.sort_by(|left, right| {
+        left.scope_kind
+            .cmp(&right.scope_kind)
+            .then(left.scope.cmp(&right.scope))
+            .then(left.sequence.cmp(&right.sequence))
+            .then(left.name.cmp(&right.name))
+    });
+
+    Ok(chords)
+}
+fn format_action(chord: &crate::chords::Chord) -> String {
+    if let Some(shortcut) = &chord.shortcut {
+        return format!("Shortcut: {}", format_shortcut(shortcut));
+    }
+
+    if let Some(shell) = &chord.shell {
+        return format!("Shell: {shell}");
+    }
+
+    if let Some(command) = &chord.command {
+        return format!("Command: {command}");
+    }
+
+    "No action".to_string()
 }
 
-fn clone_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
-    if let Some(parent) = destination.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    if destination.exists() {
-        fs::remove_dir_all(destination)?;
-    }
-
-    let mut clone = gix::prepare_clone(repo_ref.url(), destination)?;
-    let (mut checkout, checkout_outcome) =
-        clone.fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-    log::debug!(
-        "Checkout outcome for {}: {:?}",
-        repo_ref.slug(),
-        checkout_outcome
-    );
-    let (_repo, worktree_outcome) =
-        checkout.main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-    log::debug!(
-        "Worktree outcome for {}: {:?}",
-        repo_ref.slug(),
-        worktree_outcome
-    );
-
-    Ok(())
+fn format_shortcut(shortcut: &crate::chords::Shortcut) -> String {
+    shortcut
+        .chords
+        .iter()
+        .map(|chord| {
+            chord
+                .keys
+                .iter()
+                .map(|key| format_key(*key))
+                .collect::<Vec<_>>()
+                .join(" + ")
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
-fn refresh_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
-    let temp_destination = destination.with_extension("syncing");
-    if temp_destination.exists() {
-        fs::remove_dir_all(&temp_destination)?;
+fn format_sequence(keys: &[crate::input::Key]) -> String {
+    keys.iter()
+        .map(|key| {
+            key.to_char(false)
+                .map(|ch| ch.to_ascii_uppercase().to_string())
+                .unwrap_or_else(|| format_key(*key))
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn format_key(key: crate::input::Key) -> String {
+    if let Some(ch) = key.to_char(false) {
+        return ch.to_ascii_uppercase().to_string();
     }
 
-    clone_repo(repo_ref, &temp_destination)?;
-    fs::remove_dir_all(destination)?;
-    fs::rename(temp_destination, destination)?;
-
-    Ok(())
+    match key.0 {
+        ShiftLeft | ShiftRight => "Shift".to_string(),
+        ControlLeft | ControlRight => "Ctrl".to_string(),
+        MetaLeft | MetaRight => "Cmd".to_string(),
+        AltLeft | AltRight => "Alt".to_string(),
+        CapsLock => "Caps Lock".to_string(),
+        Space => "Space".to_string(),
+        Enter => "Enter".to_string(),
+        Tab => "Tab".to_string(),
+        Escape => "Esc".to_string(),
+        ArrowUp => "Up".to_string(),
+        ArrowDown => "Down".to_string(),
+        ArrowLeft => "Left".to_string(),
+        ArrowRight => "Right".to_string(),
+        Backspace => "Backspace".to_string(),
+        Delete => "Delete".to_string(),
+        Home => "Home".to_string(),
+        End => "End".to_string(),
+        PageUp => "Page Up".to_string(),
+        PageDown => "Page Down".to_string(),
+        Fn => "Fn".to_string(),
+        other => format!("{other:?}"),
+    }
 }

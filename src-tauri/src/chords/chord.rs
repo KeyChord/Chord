@@ -23,6 +23,21 @@ pub struct LoadedAppChords {
 
 pub type ChordMap = HashMap<Vec<Key>, Chord>;
 
+fn application_id_from_chords_path(file_path: &Path) -> Option<String> {
+    let application_path = file_path.parent()?;
+    if application_path.as_os_str().is_empty() {
+        return None;
+    }
+
+    Some(
+        application_path
+            .iter()
+            .map(|component| component.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("."),
+    )
+}
+
 impl LoadedAppChords {
     pub fn from_folder(chord_folder: ChordFolder) -> Result<Self> {
         // Loads all the chords from all included TOML files and parses them into struct Chord
@@ -31,12 +46,9 @@ impl LoadedAppChords {
 
         let mut chords_by_application_id = HashMap::new();
         for (file_path, file) in chord_folder.files_map {
-            let Some(application_id) = Path::new(&file_path)
-                .parent()
-                .map(|p| p.to_string_lossy().replace("/", "."))
-            else {
-                continue;
-            };
+            let application_id = application_id_from_chords_path(Path::new(&file_path));
+
+            log::debug!("Loading chords from file {:?}", file_path);
 
             let mut app_chords = HashMap::new();
 
@@ -55,15 +67,15 @@ impl LoadedAppChords {
                     .is_some_and(|c| !c.is_digit() && !c.is_letter())
                 {
                     global_chords.insert(sequence.clone(), chord.clone());
+                } else {
+                    app_chords.insert(sequence.clone(), chord.clone());
                 }
             }
 
-            for (sequence, chord) in chords {
-                app_chords.insert(sequence.clone(), chord);
+            if let Some(application_id) = application_id {
+                chords_by_application_id.insert(application_id.clone(), app_chords);
+                app_chords_files.insert(application_id, file);
             }
-
-            chords_by_application_id.insert(application_id.clone(), app_chords);
-            app_chords_files.insert(application_id.clone(), file);
         }
 
         // Handle inheritance of chords by extending parent chords into children, if specified
@@ -163,6 +175,26 @@ pub fn press_chord(handle: AppHandle, chord: &Chord) -> anyhow::Result<()> {
     })?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn derives_application_id_from_app_path() {
+        let application_id =
+            application_id_from_chords_path(Path::new("com/apple/finder/chords.toml"));
+
+        assert_eq!(application_id.as_deref(), Some("com.apple.finder"));
+    }
+
+    #[test]
+    fn global_chords_file_has_no_application_id() {
+        let application_id = application_id_from_chords_path(Path::new("chords.toml"));
+
+        assert_eq!(application_id, None);
+    }
 }
 
 pub fn release_chord(handle: AppHandle, chord: &Chord) -> anyhow::Result<()> {

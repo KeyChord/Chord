@@ -1,4 +1,5 @@
-use crate::tauri_app::context::{add_git_repo, discover_git_repos, sync_git_repo, GitRepoInfo};
+use crate::git::{add_git_repo, discover_git_repos, sync_git_repo, GitRepoInfo};
+use crate::tauri_app::context::{list_active_chords, reload_loaded_app_chords, ActiveChordInfo};
 use tauri::AppHandle;
 
 fn open_system_settings(url: &str, permission_name: &str) {
@@ -30,10 +31,19 @@ pub fn list_git_repos(app: AppHandle) -> Result<Vec<GitRepoInfo>, String> {
 
 #[tauri::command]
 pub fn add_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
-    add_git_repo(&app, &repo).map_err(|error| error.to_string())
+    let repo_info = add_git_repo(&app, &repo).map_err(|error| error.to_string())?;
+    reload_loaded_app_chords(&app).map_err(|error| error.to_string())?;
+    Ok(repo_info)
 }
 
 #[tauri::command]
 pub fn sync_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
-    sync_git_repo(&app, &repo).map_err(|error| error.to_string())
+    let repo_info = sync_git_repo(&app, &repo).map_err(|error| error.to_string())?;
+    reload_loaded_app_chords(&app).map_err(|error| error.to_string())?;
+    Ok(repo_info)
+}
+
+#[tauri::command]
+pub fn list_active_chords_command(app: AppHandle) -> Result<Vec<ActiveChordInfo>, String> {
+    list_active_chords(&app).map_err(|error| error.to_string())
 }

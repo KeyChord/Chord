@@ -8,6 +8,7 @@
     "autostart:default",
     "log:default",
     "macos-permissions:default",
+    "opener:allow-open-path",
     "core:window:default",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
