@@ -1,5 +1,7 @@
-use crate::git::{add_git_repo, discover_git_repos, sync_git_repo, GitRepoInfo};
-use crate::tauri_app::context::{list_active_chords, reload_loaded_app_chords, ActiveChordInfo};
+use crate::git::{add_git_repo, discover_git_repos, load_repo_chords, sync_git_repo, GitRepoInfo};
+use crate::tauri_app::context::{
+    list_active_chords, list_loaded_chords, reload_loaded_app_chords, ActiveChordInfo,
+};
 use tauri::AppHandle;
 
 fn open_system_settings(url: &str, permission_name: &str) {
@@ -46,4 +48,13 @@ pub fn sync_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo
 #[tauri::command]
 pub fn list_active_chords_command(app: AppHandle) -> Result<Vec<ActiveChordInfo>, String> {
     list_active_chords(&app).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repo_chords_command(
+    app: AppHandle,
+    repo: String,
+) -> Result<Vec<ActiveChordInfo>, String> {
+    let loaded_chords = load_repo_chords(&app, &repo).map_err(|error| error.to_string())?;
+    Ok(list_loaded_chords(&loaded_chords))
 }

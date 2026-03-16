@@ -170,6 +170,20 @@ pub fn sync_git_repo(app: &AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
     Ok(repo_ref.into_info(&repos_root))
 }
 
+pub fn load_repo_chords(app: &AppHandle, repo_input: &str) -> Result<LoadedAppChords> {
+    let repo_ref = GitHubRepoRef::parse(repo_input)?;
+    let repos_root = github_repos_root(app)?;
+    let repo_path = repo_ref.local_path(&repos_root);
+
+    if !repo_path.join(".git").exists() {
+        anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
+    }
+
+    let repo = gix::open(&repo_path).context(format!("failed to open repo {}", repo_ref.slug()))?;
+    let chord_folder = ChordFolder::load_from_git_repo(&repo)?;
+    LoadedAppChords::from_folder(chord_folder)
+}
+
 pub fn load_all_app_chords(app: &AppHandle) -> Result<LoadedAppChords> {
     let mut chord_folder = ChordFolder::load_bundled()?;
     for repo in discover_git_repos(app)? {

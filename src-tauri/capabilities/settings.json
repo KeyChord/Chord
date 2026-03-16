@@ -8,6 +8,7 @@
     "autostart:default",
     "log:default",
     "macos-permissions:default",
+    "opener:allow-default-urls",
     "opener:allow-open-path",
     "core:window:default",
     "core:window:allow-hide",

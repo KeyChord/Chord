@@ -6,8 +6,8 @@ import {
   enable as enableAutostart,
   isEnabled as isAutostartEnabled,
 } from "@tauri-apps/plugin-autostart";
-import { openPath } from "@tauri-apps/plugin-opener";
-import { Check, ChevronRight, FolderOpen } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { Check, ChevronRight, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import {
   checkAccessibilityPermission,
@@ -47,8 +47,112 @@ type ActiveChordInfo = {
   action: string;
 };
 
+type ChordGroup = {
+  key: string;
+  scope: string;
+  scopeKind: "global" | "app";
+  chords: ActiveChordInfo[];
+};
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
+  const chordGroups: ChordGroup[] = [];
+  const chordGroupMap = new Map<string, ChordGroup>();
+
+  for (const chord of chords) {
+    const key = `${chord.scopeKind}:${chord.scope}`;
+    let group = chordGroupMap.get(key);
+    if (!group) {
+      group = { key, scope: chord.scope, scopeKind: chord.scopeKind, chords: [] };
+      chordGroupMap.set(key, group);
+      chordGroups.push(group);
+    }
+
+    group.chords.push(chord);
+  }
+
+  chordGroups.sort((left, right) => left.scopeKind.localeCompare(right.scopeKind) || left.scope.localeCompare(right.scope));
+
+  for (const group of chordGroups) {
+    group.chords.sort(
+      (left, right) =>
+        left.sequence.localeCompare(right.sequence)
+        || left.name.localeCompare(right.name)
+        || left.action.localeCompare(right.action),
+    );
+  }
+
+  return chordGroups;
+}
+
+function ChordGroupList({
+  groups,
+  forceOpen = false,
+  openGroups,
+  onGroupOpenChange,
+}: {
+  groups: ChordGroup[];
+  forceOpen?: boolean;
+  openGroups: Record<string, boolean>;
+  onGroupOpenChange: (groupKey: string, open: boolean) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {groups.map((group) => {
+        const isOpen = forceOpen || openGroups[group.key] === true;
+
+        return (
+          <Collapsible
+            key={group.key}
+            open={isOpen}
+            onOpenChange={(open) => {
+              onGroupOpenChange(group.key, open);
+            }}
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md border bg-background/80 px-2.5 py-1.5 text-left hover:bg-muted/70"
+              >
+                <ChevronRight
+                  className={`size-3.5 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                />
+                <Badge variant={group.scopeKind === "global" ? "secondary" : "outline"}>
+                  {group.scopeKind === "global" ? "Global" : "App"}
+                </Badge>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{group.scope}</span>
+                <span className="text-xs text-muted-foreground">{group.chords.length}</span>
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="pt-1">
+              <div className="overflow-hidden rounded-md border bg-background/80">
+                {group.chords.map((chord) => (
+                  <div
+                    key={`${chord.scopeKind}:${chord.scope}:${chord.sequence}:${chord.name}`}
+                    className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 border-b px-2.5 py-1.5 text-xs last:border-b-0"
+                  >
+                    <div className="truncate font-mono text-[11px] text-foreground/85">
+                      {chord.sequence}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <span className="truncate font-medium">{chord.name}</span>
+                        <span className="truncate text-muted-foreground">{chord.action}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        );
+      })}
+    </div>
+  );
 }
 
 export function SettingsWindow() {
@@ -70,6 +174,12 @@ export function SettingsWindow() {
   const [activeChordsBusy, setActiveChordsBusy] = useState(true);
   const [chordSearch, setChordSearch] = useState("");
   const [openChordGroups, setOpenChordGroups] = useState<Record<string, boolean>>({});
+  const [repoChordsByRepo, setRepoChordsByRepo] = useState<Record<string, ActiveChordInfo[]>>({});
+  const [repoChordsBusy, setRepoChordsBusy] = useState<Record<string, boolean>>({});
+  const [openRepoChords, setOpenRepoChords] = useState<Record<string, boolean>>({});
+  const [openRepoChordGroups, setOpenRepoChordGroups] = useState<
+    Record<string, Record<string, boolean>>
+  >({});
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -167,6 +277,45 @@ export function SettingsWindow() {
       return [];
     } finally {
       setActiveChordsBusy(false);
+    }
+  }
+
+  async function refreshRepoChords(
+    repoSlug: string,
+    options?: { showSuccessToast?: boolean; showErrorToast?: boolean },
+  ) {
+    const { showSuccessToast = false, showErrorToast = true } = options ?? {};
+    setRepoChordsBusy((current) => ({ ...current, [repoSlug]: true }));
+
+    try {
+      const nextChords = await invoke<ActiveChordInfo[]>("list_repo_chords_command", { repo: repoSlug });
+      setRepoChordsByRepo((current) => ({ ...current, [repoSlug]: nextChords }));
+      setOpenRepoChordGroups((current) => {
+        const next = { ...(current[repoSlug] ?? {}) };
+
+        for (const chord of nextChords) {
+          const groupKey = `${chord.scopeKind}:${chord.scope}`;
+          if (next[groupKey] === undefined) {
+            next[groupKey] = chord.scopeKind === "global";
+          }
+        }
+
+        return { ...current, [repoSlug]: next };
+      });
+
+      if (showSuccessToast) {
+        toast.success(`Loaded chords from ${repoSlug}.`);
+      }
+
+      return nextChords;
+    } catch (error) {
+      const message = `Failed to load chords from ${repoSlug}: ${getErrorMessage(error)}`;
+      if (showErrorToast) {
+        toast.error(message);
+      }
+      return [];
+    } finally {
+      setRepoChordsBusy((current) => ({ ...current, [repoSlug]: false }));
     }
   }
 
@@ -305,9 +454,22 @@ export function SettingsWindow() {
 
     try {
       const syncedRepo = await invoke<GitRepoInfo>("sync_git_repo_command", { repo: repoSlug });
+      setRepoChordsByRepo((current) => {
+        const next = { ...current };
+        delete next[repoSlug];
+        return next;
+      });
+      setOpenRepoChordGroups((current) => {
+        const next = { ...current };
+        delete next[repoSlug];
+        return next;
+      });
       await Promise.all([
         refreshRepos({ showErrorToast: false }),
         refreshActiveChords({ showErrorToast: false }),
+        openRepoChords[repoSlug]
+          ? refreshRepoChords(repoSlug, { showErrorToast: false })
+          : Promise.resolve([]),
       ]);
       const revisionLabel = syncedRepo.headShortSha ? ` @ ${syncedRepo.headShortSha}` : "";
       toast.success(`Synced ${syncedRepo.slug}${revisionLabel}.`, { id: toastId });
@@ -318,13 +480,23 @@ export function SettingsWindow() {
     }
   }
 
-  async function handleOpenRepoInFinder(repo: GitRepoInfo) {
+  async function handleOpenRepoUrl(repo: GitRepoInfo) {
     try {
-      await openPath(repo.localPath);
-      toast.info(`Opened ${repo.slug} in Finder.`);
+      await openUrl(repo.url);
+      toast.info(`Opened ${repo.slug} on GitHub.`);
     } catch (error) {
       toast.error(`Failed to open ${repo.slug}: ${getErrorMessage(error)}`);
     }
+  }
+
+  async function handleRepoChordsToggle(repoSlug: string, nextOpen: boolean) {
+    setOpenRepoChords((current) => ({ ...current, [repoSlug]: nextOpen }));
+
+    if (!nextOpen || repoChordsByRepo[repoSlug] || repoChordsBusy[repoSlug]) {
+      return;
+    }
+
+    await refreshRepoChords(repoSlug);
   }
 
   useEffect(() => {
@@ -376,39 +548,7 @@ export function SettingsWindow() {
         ),
       )
     : activeChords;
-
-  const chordGroups: Array<{
-    key: string;
-    scope: string;
-    scopeKind: "global" | "app";
-    chords: ActiveChordInfo[];
-  }> = [];
-  const chordGroupMap = new Map<string, (typeof chordGroups)[number]>();
-  for (const chord of filteredActiveChords) {
-    const key = `${chord.scopeKind}:${chord.scope}`;
-    let group = chordGroupMap.get(key);
-    if (!group) {
-      group = { key, scope: chord.scope, scopeKind: chord.scopeKind, chords: [] };
-      chordGroupMap.set(key, group);
-      chordGroups.push(group);
-    }
-    group.chords.push(chord);
-  }
-
-  chordGroups.sort((left, right) =>
-    left.scopeKind
-      .localeCompare(right.scopeKind)
-      || left.scope.localeCompare(right.scope),
-  );
-
-  for (const group of chordGroups) {
-    group.chords.sort(
-      (left, right) =>
-        left.sequence.localeCompare(right.sequence)
-        || left.name.localeCompare(right.name)
-        || left.action.localeCompare(right.action),
-    );
-  }
+  const chordGroups = buildChordGroups(filteredActiveChords);
 
   return (
     <div className="min-h-full bg-muted/30 px-5 py-4 text-sm text-foreground">
@@ -481,45 +621,85 @@ export function SettingsWindow() {
                     repos.map((repo) => (
                       <div
                         key={repo.slug}
-                        className="flex flex-col gap-3 rounded-lg border bg-background/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="rounded-lg border bg-background/80 px-3 py-3"
                       >
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium">{repo.slug}</p>
-                            <Badge variant="secondary">GitHub</Badge>
-                            {repo.headShortSha ? (
-                              <Badge variant="outline" className="font-mono text-[11px]">
-                                {repo.headShortSha}
-                              </Badge>
-                            ) : null}
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate font-medium">{repo.slug}</p>
+                              <Badge variant="secondary">GitHub</Badge>
+                              {repo.headShortSha ? (
+                                <Badge variant="outline" className="font-mono text-[11px]">
+                                  {repo.headShortSha}
+                                </Badge>
+                              ) : null}
+                            </div>
                           </div>
-                          <p className="truncate text-sm text-muted-foreground">{repo.url}</p>
+                          <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Open ${repo.slug} on GitHub`}
+                              title="Open on GitHub"
+                              onClick={() => {
+                                void handleOpenRepoUrl(repo);
+                              }}
+                            >
+                              <ExternalLink />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                void handleRepoChordsToggle(repo.slug, !openRepoChords[repo.slug]);
+                              }}
+                              disabled={repoChordsBusy[repo.slug] === true}
+                            >
+                              {openRepoChords[repo.slug] ? "Hide Chords" : "View Chords"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                void handleSyncRepo(repo.slug);
+                              }}
+                              disabled={addingRepo || syncingRepo === repo.slug}
+                            >
+                              {syncingRepo === repo.slug ? "Syncing..." : "Sync Latest"}
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Open ${repo.slug} in Finder`}
-                            title="Open in Finder"
-                            onClick={() => {
-                              void handleOpenRepoInFinder(repo);
-                            }}
-                          >
-                            <FolderOpen />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              void handleSyncRepo(repo.slug);
-                            }}
-                            disabled={addingRepo || syncingRepo === repo.slug}
-                          >
-                            {syncingRepo === repo.slug ? "Syncing..." : "Sync Latest"}
-                          </Button>
-                        </div>
+
+                        <Collapsible open={openRepoChords[repo.slug] === true}>
+                          <CollapsibleContent className="pt-3">
+                            {repoChordsBusy[repo.slug] === true ? (
+                              <p className="text-sm text-muted-foreground">
+                                Loading chords from {repo.slug}...
+                              </p>
+                            ) : (repoChordsByRepo[repo.slug]?.length ?? 0) === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                No chords found in {repo.slug}.
+                              </p>
+                            ) : (
+                              <ChordGroupList
+                                groups={buildChordGroups(repoChordsByRepo[repo.slug] ?? [])}
+                                openGroups={openRepoChordGroups[repo.slug] ?? {}}
+                                onGroupOpenChange={(groupKey, open) => {
+                                  setOpenRepoChordGroups((current) => ({
+                                    ...current,
+                                    [repo.slug]: {
+                                      ...(current[repo.slug] ?? {}),
+                                      [groupKey]: open,
+                                    },
+                                  }));
+                                }}
+                              />
+                            )}
+                          </CollapsibleContent>
+                        </Collapsible>
                       </div>
                     ))
                   )}
@@ -680,70 +860,17 @@ export function SettingsWindow() {
                 ) : filteredActiveChords.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No chords match that filter.</p>
                 ) : (
-                  <div className="space-y-2">
-                    {chordGroups.map((group) => {
-                      const forcedOpen = normalizedChordSearch.length > 0;
-                      const isOpen = forcedOpen || openChordGroups[group.key] === true;
-
-                      return (
-                        <Collapsible
-                          key={group.key}
-                          open={isOpen}
-                          onOpenChange={(open) => {
-                            setOpenChordGroups((current) => ({
-                              ...current,
-                              [group.key]: open,
-                            }));
-                          }}
-                        >
-                          <CollapsibleTrigger asChild>
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 rounded-md border bg-background/80 px-2.5 py-1.5 text-left hover:bg-muted/70"
-                            >
-                              <ChevronRight
-                                className={`size-3.5 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                              />
-                              <Badge
-                                variant={group.scopeKind === "global" ? "secondary" : "outline"}
-                              >
-                                {group.scopeKind === "global" ? "Global" : "App"}
-                              </Badge>
-                              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                {group.scope}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {group.chords.length}
-                              </span>
-                            </button>
-                          </CollapsibleTrigger>
-
-                          <CollapsibleContent className="pt-1">
-                            <div className="overflow-hidden rounded-md border bg-background/80">
-                              {group.chords.map((chord) => (
-                                <div
-                                  key={`${chord.scopeKind}:${chord.scope}:${chord.sequence}:${chord.name}`}
-                                  className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 border-b px-2.5 py-1.5 text-xs last:border-b-0"
-                                >
-                                  <div className="truncate font-mono text-[11px] text-foreground/85">
-                                    {chord.sequence}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <div className="flex items-baseline gap-2">
-                                      <span className="truncate font-medium">{chord.name}</span>
-                                      <span className="truncate text-muted-foreground">
-                                        {chord.action}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      );
-                    })}
-                  </div>
+                  <ChordGroupList
+                    groups={chordGroups}
+                    forceOpen={normalizedChordSearch.length > 0}
+                    openGroups={openChordGroups}
+                    onGroupOpenChange={(groupKey, open) => {
+                      setOpenChordGroups((current) => ({
+                        ...current,
+                        [groupKey]: open,
+                      }));
+                    }}
+                  />
                 )}
               </CardContent>
             </Card>

@@ -93,15 +93,22 @@ pub fn initialize_app_context(app: AppHandle) -> Result<()> {
 }
 
 pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
-    let loaded_chords = load_all_app_chords(app)?;
     let context = app.state::<AppContext>();
+    context.chorder.ensure_inactive(app.clone())?;
+
+    let loaded_chords = load_all_app_chords(app)?;
     *context.loaded_app_chords.write() = loaded_chords;
+
     Ok(())
 }
 
 pub fn list_active_chords(app: &AppHandle) -> Result<Vec<ActiveChordInfo>> {
     let context = app.state::<AppContext>();
     let loaded_app_chords = context.loaded_app_chords.read();
+    Ok(list_loaded_chords(&loaded_app_chords))
+}
+
+pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChordInfo> {
     let mut chords = Vec::new();
     let mut seen = HashSet::new();
 
@@ -149,7 +156,7 @@ pub fn list_active_chords(app: &AppHandle) -> Result<Vec<ActiveChordInfo>> {
             .then(left.name.cmp(&right.name))
     });
 
-    Ok(chords)
+    chords
 }
 fn format_action(chord: &crate::chords::Chord) -> String {
     if let Some(shortcut) = &chord.shortcut {

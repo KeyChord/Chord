@@ -8,9 +8,7 @@ pub fn get_settings_window(handle: AppHandle) -> Result<WebviewWindow> {
 }
 
 pub fn configure_settings_window(handle: AppHandle) -> Result<()> {
-    let window = get_settings_window(handle)?;
-    window.set_always_on_top(true)?;
-    window.set_skip_taskbar(true)?;
+    let _window = get_settings_window(handle)?;
     Ok(())
 }
 
