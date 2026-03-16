@@ -49,23 +49,79 @@ To run a chord, you need to have the **Chords** app installed and running in the
 
 _Chord Mode_ stays active as long as the `Space` key is pressed down. In _Chord Mode_, you can type a sequence of letters and/or numbers that corresponds to a defined chord. One way to run a chord is by typing the sequence followed by the `Caps Lock` key:
 
-- `/f⇪` (`/`, `f`, `Caps Lock`)
+<details>
+  <summary>`/f⇪`</summary>
+
+  1. Press(Slash)
+  2. Release(Slash)
+  3. Press(KeyF)
+  4. Release(KeyF)
+  5. Press(CapsLock)
+  6. Release(CapsLock)
+
+  > In future expansions, we use `Click` to mean a `Press` followed by a `Release`, so this expansion could've also been written as:
+
+  1. Click(Slash)
+  2. Click(KeyF)
+  3. Click(CapsLock)
+</details>
 
 You can run a chord multiple times by pressing `Caps Lock` again. Pressing the following sequence of keys in _Chord Mode_ goes up three folders in Finder:
 
-- `fu⇪⇪⇪` (`f`, `u`, `Caps Lock`)
+<details>
+  <summary>`/f⇪⇪⇪`</summary>
+
+  1. Click(Slash)
+  2. Click(F)
+  3. Click(CapsLock)
+  4. Click(CapsLock)
+  5. Click(CapsLock)
+</details>
 
 Another way to run a chord is by holding `Shift` while typing the last key of the chord:
 
-- `/F` (`/`, `Shift`, `F`)
+<details>
+  <summary>`/F`</summary>
 
-This second method is useful for running multiple chords that share a similar prefix. Unlike Caps Lock, it keeps the chord's starting letters in the input buffer so you can type out similar chords just by typing their endings. Pressing these keys in _Chord Mode_ toggles the tabs in Finder, the sidebar, and the preview:
+  1. Click(Slash)
+  2. Press(Shift)
+  3. Click(F)
+  4. Release(Shift)
+</details>
 
-- `tTSP` (`t`, `Shift`, `t`, `s`, `p`)
+This second method is useful for running multiple chords that share a similar prefix. Unlike Caps Lock, it keeps the chord's starting letters in the input buffer so you can type out similar chords just by typing their endings.
 
-Which requires a lot less keys than typing out:
+As an example, say you wanted to quickly toggle the tabs view, the sidebar view, and the preview in Finder. Instead of typing out the entirety of three separate chords:
 
-- `tTtStP` (or worse, `tt⇪ts⇪tp⇪`)
+<details>
+  <summary>`tTtStP`</summary>
+
+  1. Click(T)
+  2. Press(Shift)
+  3. Click(T)
+  4. Release(Shift)
+  5. Click(T)
+  6. Press(Shift)
+  7. Click(S)
+  8. Release(Shift)
+  9. Click(T)
+  10. Press(Shift)
+  11. Click(P)
+  12. Release(Shift)
+</details>
+
+You can just type:
+
+<details>
+  <summary>`tTSP`</summary>
+
+  1. Click(T)
+  3. Press(Shift)
+  4. Click(T)
+  5. Click(S)
+  6. Click(P)
+  4. Release(Shift)
+</details>
 
 <details>
   <summary>Why do chords require Caps Lock or Shift?</summary>
@@ -84,8 +140,86 @@ Which requires a lot less keys than typing out:
 
 While it might seem a bit tedious to press `Caps Lock` or `Shift`, it's actually a lot smoother in practice since both `Caps Lock` and `Shift` are relatively easy to reach compared to modifier keys. In addition, because chords don't use modifier keys, you're able to use any existing shortcuts while _Chord Mode_ is active. The following sequence of keys will move all the contents of your Downloads folder into a new folder:
 
-`/FgD⌘ands⇪`
+<details>
+  <summary>`/FgD⌘ands⇪`</summary>
+
+  1. Click(Slash)
+  2. Press(Shift)
+  3. Click(F)
+  4. Release(Shift)
+  5. Click(G)
+  6. Press(Shift)
+  7. Click(D)
+  8. Release(Shift)
+  9. Press(Command)
+  10. Click(A)
+  11. Release(Command)
+  11. Click(N)
+  11. Click(D)
+  11. Click(S)
+  12. Click(CapsLock)
+</details>
 
 > **Chords** ignores all inputs whenever a modifier key (other than Shift) is held down.
 
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
+
+## Comparison to keyboard shortcuts
+
+Because keyboard shortcuts must be composed of one or more modifier keys followed by a letter/number/symbol, they come with inherent limitations:
+
+### Limited key combinations
+
+Because you can only choose one of 26 letters for your shortcut, many shortcuts end up with letters that don't intuitively map to their action:
+
+```toml
+# chords/macos/com/microsoft/VSCode/chords.toml
+gf = {
+  name = "Go to File",
+  # cmd+p doesn't make you think of "File" (my best guess is that cmd+f is already taken by Find, and so it's adapted from the shortcut for the similar feature Command Palette which is cmd+shift+p (p for palette)
+  # Either way, "gf" for "goto file" is a lot easier to remember
+  shortcut = "cmd+p"
+}
+
+gd = {
+  name = "Go to Definition",
+  # Some shortcuts don't even use letters at all...
+  shortcut = "F12"
+}
+```
+
+### Differences between platforms
+
+The same app on different platforms (Windows/Linux/MacOS) often use different shortcuts for the same action (including different modifier keys), which can be a pain to deal with if you need to switch between platforms.
+
+Chords can act as an abstraction over these shortcut differences by letting you map the same chord to different shortcuts on each platform.
+
+<!-- TODO: give example -->
+
+### Differences between apps
+
+Different apps will often have different keybindings for similar actions. While you are able to set custom keymaps in certain apps, they make it harder to follow along with documentation (which often assume the default keymap) and require you to create and maintain your own keybindings files if you ever want to make changes.
+
+With chords, you can define the same chord across multiple apps which map to the corresponding shortcut for that app. This way, you can just remember one chord for an action and it'll work across all your apps without you having to memorize the specific shortcuts for each app:
+
+```toml
+# chords/macos/com/microsoft/VSCode/chords.toml
+gd = { name = "Go to definition", shortcut = "f12" }
+rs = { name = "Rename Symbol", shortcut = "f2" }
+rf = { name = "Recent Files", shortcut = "cmd+e" }
+cp = { name = "Command Palette", shortcut = "cmd+shift+p" }
+fc = { name = "Format Code", shortcut = "shift+alt+f" }
+```
+
+```toml
+# chords/macos/com/jetbrains/intellij/chords.toml
+gd = { name = "Go to definition", shortcut = "cmd+b" }
+rs = { name = "Rename Symbol", shortcut = "shift+f6" }
+rf = { name = "Recent Files", shortcut = "ctrl+tab" }
+cp = { name = "Command Palette", shortcut = "cmd+shift+a" }
+```
+
+### Multi-modifier combinations are difficult to press and remember
+```toml
+ss = { name = "Sort by Size", shortcut = "cmd+opt+cmd+6" }
+```
