@@ -1,36 +1,29 @@
 use crate::input::Key;
 use anyhow::Result;
-use enigo::Keyboard;
 use std::str::FromStr;
 
 pub fn press_shortcut(shortcut: Shortcut) -> Result<()> {
     log::debug!("Pressing shortcut: {:?}", shortcut);
-    let mut enigo = new_enigo()?;
-    apply_actions(&mut enigo, press_actions(&shortcut))?;
+    apply_actions(press_actions(&shortcut))?;
 
     Ok(())
 }
 
 pub fn release_shortcut(shortcut: Shortcut) -> Result<()> {
     log::debug!("Releasing shortcut: {:?}", shortcut);
-    let mut enigo = new_enigo()?;
-    apply_actions(&mut enigo, release_actions(&shortcut))?;
+    apply_actions(release_actions(&shortcut))?;
 
     Ok(())
 }
 
-fn new_enigo() -> Result<enigo::Enigo> {
-    let mut settings = enigo::Settings::default();
-    settings.event_source_user_data = Some(0xDEADBEEF);
-    Ok(enigo::Enigo::new(&settings)?)
-}
-
-fn apply_actions(enigo: &mut enigo::Enigo, actions: Vec<ShortcutAction>) -> Result<()> {
+fn apply_actions(actions: Vec<ShortcutAction>) -> Result<()> {
     for action in actions {
         match action {
-            ShortcutAction::Press(key) => enigo.key(key.try_into()?, enigo::Direction::Press)?,
+            ShortcutAction::Press(key) => {
+                rdev::simulate(&rdev::EventType::KeyPress(key.into()))?;
+            },
             ShortcutAction::Release(key) => {
-                enigo.key(key.try_into()?, enigo::Direction::Release)?
+                rdev::simulate(&rdev::EventType::KeyRelease(key.into()))?;
             }
         }
     }

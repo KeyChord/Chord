@@ -29,6 +29,13 @@ unsafe fn convert_native_with_source(
                         code as i64,
                     );
 
+                    // TODO: EXTRACT THIS OUT
+                    CGEvent::set_integer_value_field(
+                        Some(&event),
+                        CGEventField::EventSourceUserData,
+                        0xDEADBEEF,
+                    );
+
                     // Get current flags and update them
                     let mut new_flags = LAST_FLAGS.lock().unwrap();
                     match key {

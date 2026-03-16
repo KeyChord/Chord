@@ -666,7 +666,6 @@ dependencies = [
  "bitflags 2.11.0",
  "cc",
  "device_query",
- "enigo",
  "fix-path-env",
  "frontmost",
  "gix",
