@@ -36,6 +36,7 @@ type GitRepoInfo = {
   slug: string;
   url: string;
   localPath: string;
+  headShortSha: string | null;
 };
 
 type ActiveChordInfo = {
@@ -308,7 +309,8 @@ export function SettingsWindow() {
         refreshRepos({ showErrorToast: false }),
         refreshActiveChords({ showErrorToast: false }),
       ]);
-      toast.success(`Synced ${syncedRepo.slug}.`, { id: toastId });
+      const revisionLabel = syncedRepo.headShortSha ? ` @ ${syncedRepo.headShortSha}` : "";
+      toast.success(`Synced ${syncedRepo.slug}${revisionLabel}.`, { id: toastId });
     } catch (error) {
       toast.error(`Failed to sync ${repoSlug}: ${getErrorMessage(error)}`, { id: toastId });
     } finally {
@@ -485,6 +487,11 @@ export function SettingsWindow() {
                           <div className="flex items-center gap-2">
                             <p className="truncate font-medium">{repo.slug}</p>
                             <Badge variant="secondary">GitHub</Badge>
+                            {repo.headShortSha ? (
+                              <Badge variant="outline" className="font-mono text-[11px]">
+                                {repo.headShortSha}
+                              </Badge>
+                            ) : null}
                           </div>
                           <p className="truncate text-sm text-muted-foreground">{repo.url}</p>
                         </div>

@@ -72,7 +72,7 @@ impl LoadedAppChords {
                 }
             }
 
-            if let Some(application_id) = application_id {
+            if let Some(application_id) = application_id.filter(|_| !app_chords.is_empty()) {
                 chords_by_application_id.insert(application_id.clone(), app_chords);
                 app_chords_files.insert(application_id, file);
             }

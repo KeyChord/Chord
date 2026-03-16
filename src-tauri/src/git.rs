@@ -13,6 +13,7 @@ pub struct GitRepoInfo {
     pub slug: String,
     pub url: String,
     pub local_path: String,
+    pub head_short_sha: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,14 +79,23 @@ impl GitHubRepoRef {
         let slug = self.slug();
         let url = self.url();
         let local_path = self.local_path(repos_root);
+        let head_short_sha = repo_head_short_sha(&local_path);
         GitRepoInfo {
             owner: self.owner,
             name: self.name,
             slug,
             url,
             local_path: local_path.display().to_string(),
+            head_short_sha,
         }
     }
+}
+
+fn repo_head_short_sha(repo_path: &Path) -> Option<String> {
+    let repo = gix::open(repo_path).ok()?;
+    let mut head = repo.head().ok()?;
+    let head_id = head.try_peel_to_id().ok()??;
+    Some(head_id.shorten_or_id().to_string())
 }
 
 pub fn github_repos_root(app: &AppHandle) -> Result<PathBuf> {
