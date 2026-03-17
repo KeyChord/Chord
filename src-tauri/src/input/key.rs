@@ -571,8 +571,10 @@ impl FromStr for Key {
     }
 }
 
-impl From<Key> for rdev::Key {
-    fn from(key: Key) -> rdev::Key {
+impl TryFrom<Key> for rdev::Key {
+    type Error = anyhow::Error;
+
+    fn try_from(key: Key) -> Result<Self, Self::Error> {
         use rdev::Key as K;
         let rdev_key = match key.0 {
             AltRight => K::AltGr,
@@ -585,21 +587,6 @@ impl From<Key> for rdev::Key {
             End => K::End,
             Escape => K::Escape,
             F1 => K::F1,
-            F10 => K::F10,
-            F11 => K::F11,
-            F12 => K::F12,
-            F13 => K::F13,
-            F14 => K::F14,
-            F15 => K::F15,
-            F16 => K::F16,
-            F17 => K::F17,
-            F18 => K::F18,
-            F19 => K::F19,
-            F20 => K::F20,
-            F21 => K::F21,
-            F22 => K::F22,
-            F23 => K::F23,
-            F24 => K::F24,
             F2 => K::F2,
             F3 => K::F3,
             F4 => K::F4,
@@ -608,6 +595,22 @@ impl From<Key> for rdev::Key {
             F7 => K::F7,
             F8 => K::F8,
             F9 => K::F9,
+            F10 => K::F10,
+            F11 => K::F11,
+            F12 => K::F12,
+            // For some reason, simulate(K::F17) doesn't work on macOS
+            F13 => K::Unknown(0x69),
+            F14 => K::Unknown(0x6B),
+            F15 => K::Unknown(0x71),
+            F16 => K::Unknown(0x6A),
+            F17 => K::Unknown(0x40),
+            F18 => K::Unknown(0x4F),
+            F19 => K::Unknown(0x50),
+            F20 => K::Unknown(0x5A),
+            F21 => K::F21,
+            F22 => K::F22,
+            F23 => K::F23,
+            F24 => K::F24,
             Home => K::Home,
             ArrowLeft => K::LeftArrow,
             MetaLeft => K::MetaLeft,
@@ -700,10 +703,10 @@ impl From<Key> for rdev::Key {
             MediaPlayPause => K::PlayPause,
             MediaPlay => K::PlayCd,
             MediaTrackNext => K::NextTrack,
-            _ => K::Unknown(0)
+            _ => return Err(anyhow::anyhow!("Unknown key: {:?}", key)),
         };
 
-        rdev_key
+        Ok(rdev_key)
     }
 }
 
@@ -724,6 +727,14 @@ impl TryFrom<rdev::Key> for Key {
             K::End => End,
             K::Escape => Escape,
             K::F1 => F1,
+            K::F2 => F2,
+            K::F3 => F3,
+            K::F4 => F4,
+            K::F5 => F5,
+            K::F6 => F6,
+            K::F7 => F7,
+            K::F8 => F8,
+            K::F9 => F9,
             K::F10 => F10,
             K::F11 => F11,
             K::F12 => F12,
@@ -739,14 +750,6 @@ impl TryFrom<rdev::Key> for Key {
             K::F22 => F22,
             K::F23 => F23,
             K::F24 => F24,
-            K::F2 => F2,
-            K::F3 => F3,
-            K::F4 => F4,
-            K::F5 => F5,
-            K::F6 => F6,
-            K::F7 => F7,
-            K::F8 => F8,
-            K::F9 => F9,
             K::Home => Home,
             K::LeftArrow => ArrowLeft,
             K::MetaLeft => MetaLeft,

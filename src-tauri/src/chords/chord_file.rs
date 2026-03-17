@@ -4,15 +4,25 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize)]
 pub struct AppChordsFile {
     pub config: Option<AppChordsFileConfig>,
     pub chords: HashMap<String, AppChordMapValue>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RawAppChordsFile {
+    pub config: Option<AppChordsFileConfig>,
+    pub chords: Option<HashMap<String, AppChordMapValue>>,
+}
+
 impl AppChordsFile {
     pub fn parse(content: &str) -> Result<Self> {
-        Ok(toml::from_str(content)?)
+        let file = toml::from_str::<RawAppChordsFile>(content)?;
+        Ok(Self {
+            config: file.config,
+            chords: file.chords.unwrap_or_default(),
+        })
     }
 
     pub fn get_chords_shallow(&self) -> Result<HashMap<Vec<Key>, Chord>> {

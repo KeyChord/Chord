@@ -20,10 +20,10 @@ fn apply_actions(actions: Vec<ShortcutAction>) -> Result<()> {
     for action in actions {
         match action {
             ShortcutAction::Press(key) => {
-                rdev::simulate(&rdev::EventType::KeyPress(key.into()))?;
+                rdev::simulate(&rdev::EventType::KeyPress(key.try_into()?))?;
             },
             ShortcutAction::Release(key) => {
-                rdev::simulate(&rdev::EventType::KeyRelease(key.into()))?;
+                rdev::simulate(&rdev::EventType::KeyRelease(key.try_into()?))?;
             }
         }
     }
