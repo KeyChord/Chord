@@ -1,4 +1,4 @@
-use crate::chords::{Chord, ChordMap, Shortcut};
+use crate::chords::{Chord, Shortcut};
 use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -68,6 +68,7 @@ impl AppChordsFile {
                     .map(|s| Shortcut::parse(s))
                     .transpose()?,
                 shell: entry.shell.clone(),
+                lua: entry.lua.clone()
             };
 
             chords.insert(keys, chord);
@@ -95,6 +96,7 @@ pub struct AppChord {
     pub command: Option<String>,
     pub shortcut: Option<String>,
     pub shell: Option<String>,
+    pub lua: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

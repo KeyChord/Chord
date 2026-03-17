@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use tauri::AppHandle;
-use mlua::Lua;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Chord {
@@ -25,7 +25,7 @@ pub struct LoadedAppChords {
 
 pub struct ChordRuntime {
     pub chords: HashMap<Vec<Key>, Chord>,
-    pub lua_runtime: Option<ChordLuaRuntime>,
+    pub lua_runtime: Option<Arc<ChordLuaRuntime>>
 }
 
 impl ChordRuntime {
@@ -56,7 +56,7 @@ impl ChordRuntime {
             .collect::<Vec<_>>();
         let lua_runtime = ChordLuaRuntime::new(lua_init_scripts)?;
 
-        Ok(Self { chords, lua_runtime: Some(lua_runtime) })
+        Ok(Self { chords, lua_runtime: Some(Arc::new(lua_runtime)) })
     }
 
     pub fn extend_runtime(&mut self, base: &Self) -> Result<()> {
@@ -66,14 +66,22 @@ impl ChordRuntime {
                 .or_insert_with(|| chord.clone());
         }
 
-        let mut lua_init_scripts = base.lua_runtime.as_ref().map(|r| r.lua_init_scripts.clone()).unwrap_or_default();
-        lua_init_scripts.extend(self.lua_runtime.as_ref().map(|r| r.lua_init_scripts.clone()).unwrap_or_default());
-        self.lua_runtime = Some(ChordLuaRuntime::new(lua_init_scripts.clone())?);
+        let mut lua_init_scripts = base
+            .lua_runtime
+            .as_ref()
+            .map(|r| r.lua_init_scripts.clone())
+            .unwrap_or_default();
+
+        if let Some(r) = &self.lua_runtime {
+            lua_init_scripts.extend(r.lua_init_scripts.clone());
+        }
+        
+        self.lua_runtime = Some(Arc::new(ChordLuaRuntime::new(lua_init_scripts.clone())?));
 
         Ok(())
     }
 
-    pub fn get_chord(&self, sequence: &[&Key]) -> Option<&Chord> {
+    pub fn get_chord(&self, sequence: &[Key]) -> Option<&Chord> {
         self.chords.get(sequence)
     }
 }
@@ -211,15 +219,12 @@ pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> 
     let shortcut = chord.shortcut.clone();
     let shell = chord.shell.clone();
     let lua = chord.lua.clone();
+    let lua_runtime = runtime.lua_runtime.clone();
     handle.clone().run_on_main_thread(move || {
         // Prioritize shortcuts
         if let Some(shortcut) = shortcut {
-            if let Some(shortcut) = shortcut {
-                if let Err(e) = press_shortcut(shortcut.clone()) {
-                    log::error!("failed to press shortcut: {e}");
-                }
-            } else {
-                log::error!("no shortcut to execute");
+            if let Err(e) = press_shortcut(shortcut.clone()) {
+                log::error!("failed to press shortcut: {e}");
             }
         } else if let Some(shell) = shell {
             std::thread::spawn(move || {
@@ -261,10 +266,10 @@ pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> 
                 }
             });
         } else if let Some(lua) = lua {
-            let Some(lua_runtime) = runtime.lua_runtime else {
+            let Some(lua_runtime) = lua_runtime.as_ref() else {
                 log::error!("missing lua runtime");
+                return;
             };
-
             if let Err(e) = lua_runtime.lua.load(lua).exec() {
                 log::error!("failed to execute lua: {e}");
             }
