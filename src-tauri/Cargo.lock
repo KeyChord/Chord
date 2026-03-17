@@ -673,10 +673,12 @@ dependencies = [
  "keycode",
  "libc",
  "log",
+ "mac-keycode",
  "macos-accessibility-client 0.0.2",
  "mlua",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation",
  "observable-property",
@@ -3669,6 +3671,19 @@ name = "mac"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
+
+[[package]]
+name = "mac-keycode"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14bbf149fb592cf545e0124e62eb39523e388971ce9ae0911172c5eb6de2a867"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "macos-accessibility-client"
