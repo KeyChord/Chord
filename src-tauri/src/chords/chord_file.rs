@@ -45,7 +45,7 @@ impl AppChordsFile {
         })
     }
 
-    pub fn get_chord_map(&self) -> Result<ChordMap> {
+    pub fn get_chords_shallow(&self) -> Result<HashMap<Vec<Key>, Chord>> {
         let mut chords = HashMap::new();
 
         for (sequence, value) in &self.chords {
@@ -81,6 +81,12 @@ impl AppChordsFile {
 pub struct AppChordsFileConfig {
     pub name: Option<String>,
     pub extends: Option<String>,
+    pub lua: Option<AppChordsFileConfigLua>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppChordsFileConfigLua {
+    pub init: Option<String>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
