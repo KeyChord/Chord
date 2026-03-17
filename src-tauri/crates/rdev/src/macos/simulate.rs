@@ -14,6 +14,7 @@ use crate::macos::keycodes::code_from_key;
 unsafe fn convert_native_with_source(
     event_type: &EventType,
     source: CFRetained<CGEventSource>,
+    suppress_shift: bool,
 ) -> Option<CFRetained<CGEvent>> {
     unsafe {
         match event_type {
@@ -28,10 +29,15 @@ unsafe fn convert_native_with_source(
                         CGEventField::KeyboardEventKeycode,
                         code as i64,
                     );
+
+                    // Mark as synthetic
+                    // We have two types of synthetic:
+                    // 1. Synthetic which suppresses Shift
+                    // 2. Synthetic with passthrough Shift
                     CGEvent::set_integer_value_field(
                         Some(&event),
                         CGEventField::EventSourceUserData,
-                        0xDEADBEEF,
+                        if suppress_shift { 0xDEADDEAD } else { 0xDEADBEEF },
                     );
 
                     // Get current flags and update them
@@ -52,7 +58,6 @@ unsafe fn convert_native_with_source(
                         _ => {}
                     }
                     CGEvent::set_flags(Some(&event), *new_flags);
-                    // event.set_flags(*new_flags);
                     Some(event)
                 } else {
                     // For non-modifier keys, use regular key events
@@ -60,7 +65,7 @@ unsafe fn convert_native_with_source(
                     CGEvent::set_integer_value_field(
                         Some(&event),
                         CGEventField::EventSourceUserData,
-                        0xDEADBEEF,
+                        if suppress_shift { 0xDEADDEAD } else { 0xDEADBEEF },
                     );
                     CGEvent::set_flags(Some(&event), *LAST_FLAGS.lock().unwrap());
                     Some(event)
@@ -168,9 +173,9 @@ unsafe fn convert_native_with_source(
     }
 }
 
-unsafe fn convert_native(event_type: &EventType) -> Option<CFRetained<CGEvent>> {
+unsafe fn convert_native(event_type: &EventType, suppress_shift: bool) -> Option<CFRetained<CGEvent>> {
     let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)?;
-    unsafe { convert_native_with_source(event_type, source) }
+    unsafe { convert_native_with_source(event_type, source, suppress_shift) }
 }
 
 unsafe fn get_current_mouse_location() -> Option<CGPoint> {
@@ -196,9 +201,9 @@ fn is_modifier_key(key: Key) -> bool {
 #[link(name = "Cocoa", kind = "framework")]
 unsafe extern "C" {}
 
-pub fn simulate(event_type: &EventType) -> Result<(), SimulateError> {
+pub fn simulate(event_type: &EventType, suppress_shift: bool) -> Result<(), SimulateError> {
     unsafe {
-        if let Some(cg_event) = convert_native(event_type) {
+        if let Some(cg_event) = convert_native(event_type, suppress_shift) {
             CGEvent::post(CGEventTapLocation::HIDEventTap, Some(&cg_event));
             Ok(())
         } else {

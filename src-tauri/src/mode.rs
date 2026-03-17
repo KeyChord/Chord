@@ -2,6 +2,7 @@ use crate::input::{Key, KeyEvent};
 use device_query::{DeviceQuery, DeviceState};
 use keycode::KeyMappingCode;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use rdev::{simulate, EventType};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppMode {
@@ -33,6 +34,9 @@ pub struct AppModeStateMachine {
     device_state: Option<DeviceState>,
     mode: AtomicU8,
 
+    // We consume all shift events
+    pub is_shift_pressed: AtomicBool,
+
     caps_lock_just_pressed: AtomicBool,
 }
 
@@ -41,6 +45,8 @@ impl AppModeStateMachine {
         Self {
             device_state,
             mode: AtomicU8::new(AppMode::None.into()),
+            // macOS collapses the two shifts into one Shift
+            is_shift_pressed: AtomicBool::new(false),
             caps_lock_just_pressed: AtomicBool::new(false),
         }
     }
@@ -54,7 +60,11 @@ impl AppModeStateMachine {
         log::debug!("Handling {:?} mode event: {:?}", event, previous_mode);
         let consumed = match previous_mode {
             AppMode::None => self.handle_none_mode_event(event),
-            AppMode::Chord => self.handle_chord_mode_event(event),
+            AppMode::Chord => {
+                let consumed = self.handle_chord_mode_event(event);
+                log::debug!("is_shift_pressed: {}", self.is_shift_pressed.load(Ordering::SeqCst));
+                consumed
+            },
         };
         let new_mode = self.get_app_mode();
 
@@ -93,19 +103,26 @@ impl AppModeStateMachine {
 
     // We always consume the event in chord mode
     fn handle_chord_mode_event(&self, event: &KeyEvent) -> bool {
-        let modifiers = Key::modifiers();
         match event {
             KeyEvent::Release(Key(code)) => {
-                if code == &KeyMappingCode::Space {
-                    self.mode.store(AppMode::None.into(), Ordering::Relaxed);
+                // Consume Shift events to avoid them leaking into synthetic shortcuts
+                if code == &KeyMappingCode::ShiftLeft  || code == &KeyMappingCode::ShiftRight {
+                    self.is_shift_pressed.store(false, Ordering::SeqCst);
+                    return true;
                 }
 
-                if code == &KeyMappingCode::ShiftLeft || code == &KeyMappingCode::ShiftRight {
-                    return false;
+                if code == &KeyMappingCode::Space {
+                    self.is_shift_pressed.store(false, Ordering::SeqCst);
+                    self.mode.store(AppMode::None.into(), Ordering::Relaxed);
                 }
             }
             KeyEvent::Press(key) => {
-                // We don't consume modifier events
+                if key == &Key(KeyMappingCode::ShiftLeft) || key == &Key(KeyMappingCode::ShiftRight) {
+                    self.is_shift_pressed.store(true, Ordering::SeqCst);
+                    return true;
+                }
+
+                let modifiers = Key::non_shift_modifiers();
                 if modifiers.contains(key) {
                     return false;
                 }

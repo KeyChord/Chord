@@ -1,3 +1,4 @@
+use std::ptr::NonNull;
 use crate::input::Key;
 use crate::AppContext;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
@@ -6,7 +7,11 @@ use keycode::KeyMappingCode;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
+use device_query::DeviceQuery;
+use rdev::simulate;
 use tauri::{AppHandle, Manager};
+use objc2_core_graphics::{CGEvent, CGEventFlags};
+use crate::mode::AppMode;
 
 #[derive(Debug)]
 pub enum KeyEvent {
@@ -29,28 +34,74 @@ pub fn register_key_event_input_grabber(handle: AppHandle) {
         });
     }
 
-    let callback = move |event: rdev::Event| -> Option<rdev::Event> {
+    let callback = move |mut event: rdev::Event| -> Option<rdev::Event> {
         // Synthetic, skip processing
-        if event.source_user_data == 0xDEADBEEF {
+        if event.source_user_data == 0xDEADBEEF || event.source_user_data == 0xDEADDEAD {
             return Some(event);
         }
 
         let context = handle.state::<AppContext>();
-        let key_event = match event.event_type {
-            rdev::EventType::KeyPress(key) => Key::try_from(key)
-                .map(|mapped_key| KeyEvent::Press(mapped_key))
-                .ok(),
-            rdev::EventType::KeyRelease(key) => Key::try_from(key)
-                .map(|mapped_key| KeyEvent::Release(mapped_key))
-                .ok(),
+        let (key, key_event) = match event.event_type {
+            rdev::EventType::KeyPress(key) => {
+                let Ok(key) = Key::try_from(key) else {
+                    return Some(event);
+                };
+                (key, KeyEvent::Press(key))
+            },
+            rdev::EventType::KeyRelease(key) => {
+                let Ok(key) = Key::try_from(key) else {
+                    return Some(event);
+                };
+                (key, KeyEvent::Release(key))
+            },
             _ => return Some(event),
         };
 
-        let Some(key_event) = key_event else {
-            return Some(event);
-        };
+        let non_shift_modifiers = Key::non_shift_modifiers();
+        let is_modifier = non_shift_modifiers.contains(&key);
+        if is_modifier {
+            if let Some(device_state) = &context.device_state {
+                let device_keys = device_state.get_keys();
+
+                // // When a modifier key is pressed, we need to make sure the Shift state is propagated to the OS
+                // if matches!(key_event, KeyEvent::Press(_)) {
+                //     let is_left_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
+                //     let is_right_shift_registered = device_keys.contains(&device_query::Keycode::RShift);
+                //     let is_shift_pressed = context.key_event_state.app_mode_state_machine.is_shift_pressed.load(Ordering::SeqCst);
+                //     // If shift pressed and neither shift is registered, register left shift
+                //     if is_shift_pressed && !is_left_shift_registered && !is_right_shift_registered {
+                //         simulate(&rdev::EventType::KeyPress(rdev::Key::ShiftLeft)).ok();
+                //     }
+                //
+                //     // If shift is not pressed and a Shift is registered, register a release
+                //     if !is_shift_pressed && is_left_shift_registered {
+                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftLeft)).ok();
+                //     }
+                //
+                //     if !is_shift_pressed && is_right_shift_registered {
+                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftRight)).ok();
+                //     }
+                // }
+                // // When a modifier key is released, and no more modifier keys are pressed, we need to
+                // // tell the OS that Shift is not being pressed
+                // else {
+                //     let is_left_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
+                //     let is_right_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
+                //     let is_all_modifiers_unpressed = device_keys.into_iter().all(|key| !non_shift_modifiers.contains(&Key::from(key)));
+                //     if is_left_shift_registered && is_all_modifiers_unpressed {
+                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftLeft)).ok();
+                //     }
+                //     if is_right_shift_registered && is_all_modifiers_unpressed {
+                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftRight)).ok();
+                //     }
+                // }
+            }
+        }
 
         let action = context.key_event_state.process_event(&key_event);
+        let app_mode = context.key_event_state.app_mode_state_machine.get_app_mode();
+
+
         if let Err(e) = tx.send(key_event) {
             log::error!("Failed to send key event: {e}");
         }

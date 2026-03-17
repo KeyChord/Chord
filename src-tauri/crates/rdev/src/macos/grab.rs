@@ -2,10 +2,7 @@
 use crate::macos::common::*;
 use crate::rdev::{Event, GrabError};
 use objc2_core_foundation::{CFMachPort, CFRunLoop, kCFRunLoopCommonModes};
-use objc2_core_graphics::{
-    CGEvent, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-    CGEventTapProxy, CGEventType, kCGEventMaskForAllEvents,
-};
+use objc2_core_graphics::{CGEvent, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType, kCGEventMaskForAllEvents, CGEventFlags};
 use objc2_foundation::NSAutoreleasePool;
 use std::os::raw::c_void;
 use std::ptr::{NonNull, null_mut};
@@ -30,8 +27,17 @@ unsafe extern "C-unwind" fn raw_callback(
                 // Totally UB. but not sure there's a great alternative.
                 let ptr = &raw mut GLOBAL_CALLBACK;
                 if let Some(callback) = &mut *ptr {
-                    if callback(event).is_none() {
-                        CGEvent::set_type(Some(cg_event.as_ref()), CGEventType::Null)
+                    match callback(event) {
+                        None => CGEvent::set_type(Some(cg_event.as_ref()), CGEventType::Null),
+                        Some(event) => {
+                            // DEADDEAD is magic number to suppress Shift
+                            if event.source_user_data == 0xDEADDEAD {
+                                println!("Suppressing Shift");
+                                let flags = CGEvent::flags(Some(cg_event.as_ref()));
+                                let new_flags = flags & !CGEventFlags::MaskShift;
+                                CGEvent::set_flags(Some(cg_event.as_ref()), new_flags)
+                            }
+                        }
                     }
                 }
             }

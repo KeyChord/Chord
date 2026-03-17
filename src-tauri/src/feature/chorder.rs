@@ -149,9 +149,7 @@ impl Chorder {
                 }
 
                 self.ensure_active(handle.clone())?;
-                let is_shift_pressed = device_keys.contains(&device_query::Keycode::LShift)
-                    || device_keys.contains(&device_query::Keycode::RShift);
-
+                let is_shift_pressed = context.is_shift_pressed();
                 if is_shift_pressed {
                     self.handle_shifted_key_press(handle, key)
                 } else {

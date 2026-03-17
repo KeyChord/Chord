@@ -305,8 +305,8 @@ where
 ///     });
 /// }
 /// ```
-pub fn simulate(event_type: &EventType) -> Result<(), SimulateError> {
-    _simulate(event_type)?;
+pub fn simulate(event_type: &EventType, suppress_shift: bool) -> Result<(), SimulateError> {
+    _simulate(event_type, suppress_shift)?;
     Ok(())
 }
 

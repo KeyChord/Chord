@@ -15,6 +15,7 @@ use parking_lot::RwLock;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize)]
@@ -61,6 +62,10 @@ impl AppContext {
 
     pub fn get_app_mode(&self) -> AppMode {
         self.app_mode_state_machine.get_app_mode()
+    }
+
+    pub fn is_shift_pressed(&self) -> bool {
+        self.app_mode_state_machine.is_shift_pressed.load(Ordering::SeqCst)
     }
 }
 

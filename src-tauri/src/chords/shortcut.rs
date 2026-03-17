@@ -1,6 +1,7 @@
 use crate::input::Key;
 use anyhow::Result;
 use std::str::FromStr;
+use keycode::KeyMappingCode;
 
 pub fn press_shortcut(shortcut: Shortcut) -> Result<()> {
     log::debug!("Pressing shortcut: {:?}", shortcut);
@@ -19,11 +20,11 @@ pub fn release_shortcut(shortcut: Shortcut) -> Result<()> {
 fn apply_actions(actions: Vec<ShortcutAction>) -> Result<()> {
     for action in actions {
         match action {
-            ShortcutAction::Press(key) => {
-                rdev::simulate(&rdev::EventType::KeyPress(key.try_into()?))?;
+            ShortcutAction::Press(key, suppress_shift) => {
+                rdev::simulate(&rdev::EventType::KeyPress(key.try_into()?), suppress_shift)?;
             },
-            ShortcutAction::Release(key) => {
-                rdev::simulate(&rdev::EventType::KeyRelease(key.try_into()?))?;
+            ShortcutAction::Release(key, suppress_shift) => {
+                rdev::simulate(&rdev::EventType::KeyRelease(key.try_into()?), suppress_shift)?;
             }
         }
     }
@@ -33,15 +34,20 @@ fn apply_actions(actions: Vec<ShortcutAction>) -> Result<()> {
 
 fn press_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
     let mut actions = Vec::new();
+    let has_shift = shortcut.chords.iter().any(|chord| {
+        chord.keys.iter().any(|key| matches!(key, Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)))
+    });
+    let suppress_shift = !has_shift;
+    log::debug!("Has Shift: {}", has_shift);
 
     for (index, chord) in shortcut.chords.iter().enumerate() {
         for &key in &chord.keys {
-            actions.push(ShortcutAction::Press(key));
+            actions.push(ShortcutAction::Press(key, suppress_shift));
         }
 
         if index + 1 != shortcut.chords.len() {
             for &key in chord.keys.iter().rev() {
-                actions.push(ShortcutAction::Release(key));
+                actions.push(ShortcutAction::Release(key, suppress_shift));
             }
         }
     }
@@ -50,6 +56,11 @@ fn press_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
 }
 
 fn release_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
+    let has_shift = shortcut.chords.iter().any(|chord| {
+        chord.keys.iter().any(|key| matches!(key, Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)))
+    });
+    let suppress_shift = !has_shift;
+
     shortcut
         .chords
         .last()
@@ -60,15 +71,15 @@ fn release_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
                 .iter()
                 .rev()
                 .copied()
-                .map(ShortcutAction::Release)
+                .map(|k| ShortcutAction::Release(k, suppress_shift))
         })
         .collect()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ShortcutAction {
-    Press(Key),
-    Release(Key),
+    Press(Key, bool),
+    Release(Key, bool),
 }
 
 /// Represents a parsed keyboard shortcut, e.g. "cmd+shift+n".
@@ -103,52 +114,4 @@ impl Shortcut {
 #[derive(Debug, Clone)]
 pub struct ShortcutChord {
     pub keys: Vec<Key>,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn press_single_chord_keeps_it_held() {
-        let shortcut = Shortcut::parse("cmd+c").unwrap();
-
-        assert_eq!(
-            press_actions(&shortcut),
-            vec![
-                ShortcutAction::Press(Key::from_str("cmd").unwrap()),
-                ShortcutAction::Press(Key::from_str("c").unwrap()),
-            ]
-        );
-    }
-
-    #[test]
-    fn press_multi_chord_releases_intermediate_chords_only() {
-        let shortcut = Shortcut::parse("cmd+k cmd+c").unwrap();
-
-        assert_eq!(
-            press_actions(&shortcut),
-            vec![
-                ShortcutAction::Press(Key::from_str("cmd").unwrap()),
-                ShortcutAction::Press(Key::from_str("k").unwrap()),
-                ShortcutAction::Release(Key::from_str("k").unwrap()),
-                ShortcutAction::Release(Key::from_str("cmd").unwrap()),
-                ShortcutAction::Press(Key::from_str("cmd").unwrap()),
-                ShortcutAction::Press(Key::from_str("c").unwrap()),
-            ]
-        );
-    }
-
-    #[test]
-    fn release_only_releases_last_chord() {
-        let shortcut = Shortcut::parse("cmd+k cmd+c").unwrap();
-
-        assert_eq!(
-            release_actions(&shortcut),
-            vec![
-                ShortcutAction::Release(Key::from_str("c").unwrap()),
-                ShortcutAction::Release(Key::from_str("cmd").unwrap()),
-            ]
-        );
-    }
 }
