@@ -127,6 +127,7 @@ pub fn run() {
         })
         .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_user_input::init())
         .setup(|app| {
             if let Err(e) = tauri_app::setup::setup_app(app) {

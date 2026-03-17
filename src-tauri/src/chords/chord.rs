@@ -1,12 +1,12 @@
 use crate::chords::shortcut::{press_shortcut, release_shortcut, Shortcut};
-use crate::chords::{AppChordsFile, AppChordsFileConfig, AppChordsFileConfigLua, ChordFolder, ChordLuaRuntime};
+use crate::chords::{AppChordsFile, AppChordsFileConfig, ChordFolder, ChordLuaRuntime};
 use crate::input::Key;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
-use tauri::AppHandle;
 use std::sync::Arc;
+use tauri::AppHandle;
 
 #[derive(Debug, Clone)]
 pub struct Chord {
@@ -162,11 +162,6 @@ impl LoadedAppChords {
         let mut app_config_map = HashMap::new();
 
         for (file_path, file) in chord_folder.files_map {
-            let Some(application_id) = application_id_from_chords_path(Path::new(&file_path)) else {
-                log::error!("Invalid application ID for file {:?}", file_path);
-                continue;
-            };
-
             // Loading global chords into `global_chords`
             let chords = file.get_chords_shallow()?;
             for (sequence, chord) in &chords {
@@ -174,6 +169,10 @@ impl LoadedAppChords {
                     global_chords.insert(sequence.clone(), chord.clone());
                 }
             }
+
+            let Some(application_id) = application_id_from_chords_path(Path::new(&file_path)) else {
+                continue;
+            };
 
             let config = file.config.clone();
             let app_chord_runtime = ChordRuntime::from_file_shallow(file)?;
