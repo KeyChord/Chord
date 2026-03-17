@@ -577,7 +577,6 @@ impl TryFrom<Key> for rdev::Key {
     fn try_from(key: Key) -> Result<Self, Self::Error> {
         use rdev::Key as K;
         let rdev_key = match key.0 {
-            AltRight => K::AltGr,
             Backspace => K::Backspace,
             CapsLock => K::CapsLock,
             ControlLeft => K::ControlLeft,
@@ -621,6 +620,8 @@ impl TryFrom<Key> for rdev::Key {
             ArrowRight => K::RightArrow,
             ShiftLeft => K::ShiftLeft,
             ShiftRight => K::ShiftRight,
+            AltLeft => K::Alt,
+            AltRight => K::AltGr,
             Space => K::Space,
             Tab => K::Tab,
             ArrowUp => K::UpArrow,
