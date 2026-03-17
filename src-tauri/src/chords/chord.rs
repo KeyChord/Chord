@@ -176,6 +176,7 @@ impl LoadedAppChords {
 
             let config = file.config.clone();
             let app_chord_runtime = ChordRuntime::from_file_shallow(file)?;
+            log::debug!("Loaded {} chords for application ID {}", app_chord_runtime.chords.len(), application_id);
             app_runtime_map.insert(application_id.clone(), app_chord_runtime);
             app_config_map.insert(application_id, config);
         }

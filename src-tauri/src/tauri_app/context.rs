@@ -98,6 +98,7 @@ pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
     context.chorder.ensure_inactive(app.clone())?;
 
     let loaded_chords = load_all_app_chords(app)?;
+    log::debug!("Loaded app chords: {:?}", loaded_chords.app_runtime_map.keys());
     *context.loaded_app_chords.write() = loaded_chords;
 
     Ok(())

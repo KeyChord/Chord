@@ -58,6 +58,14 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function compareChordGroups(left: ChordGroup, right: ChordGroup) {
+  if (left.scopeKind !== right.scopeKind) {
+    return left.scopeKind === "global" ? -1 : 1;
+  }
+
+  return left.scope.localeCompare(right.scope);
+}
+
 function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
   const chordGroups: ChordGroup[] = [];
   const chordGroupMap = new Map<string, ChordGroup>();
@@ -74,7 +82,7 @@ function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
     group.chords.push(chord);
   }
 
-  chordGroups.sort((left, right) => left.scopeKind.localeCompare(right.scopeKind) || left.scope.localeCompare(right.scope));
+  chordGroups.sort(compareChordGroups);
 
   for (const group of chordGroups) {
     group.chords.sort(

@@ -191,7 +191,9 @@ pub fn load_all_app_chords(app: &AppHandle) -> Result<LoadedAppChords> {
             .context(format!("failed to open repo {}", repo.slug))
             .and_then(|repo_handle| ChordFolder::load_from_git_repo(&repo_handle))
         {
-            Ok(repo_folder) => chord_folder.merge(repo_folder),
+            Ok(repo_folder) => {
+                chord_folder.merge(repo_folder);
+            },
             Err(error) => log::warn!("Skipping repo {}: {error}", repo.slug),
         }
     }
