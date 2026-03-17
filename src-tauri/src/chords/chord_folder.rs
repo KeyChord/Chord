@@ -45,15 +45,21 @@ impl ChordFolder {
             let entry = entry?;
             if entry.file_name() == "chords.toml" {
                 let content = std::fs::read_to_string(entry.path())?;
-                let parsed = AppChordsFile::parse(&content)?;
+                match AppChordsFile::parse(&content) {
+                    Ok(parsed) => {
+                        let relative_path = entry
+                            .path()
+                            .strip_prefix(&chords_dir)?
+                            .to_string_lossy()
+                            .to_string();
 
-                let relative_path = entry
-                    .path()
-                    .strip_prefix(&chords_dir)?
-                    .to_string_lossy()
-                    .to_string();
-
-                files_map.insert(relative_path, parsed);
+                        files_map.insert(relative_path, parsed);
+                    },
+                    Err(error) => {
+                        log::warn!("Skipping invalid {:?}: {}", entry.path(), error);
+                        continue;
+                    }
+                };
             }
         }
 
