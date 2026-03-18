@@ -104,8 +104,8 @@ pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
 
     let loaded_chords = load_all_app_chords(app)?;
     log::debug!(
-        "Loaded app chords: {:?}",
-        loaded_chords.app_runtime_map.keys()
+        "Loaded chord files: {:?}",
+        loaded_chords.runtimes.keys()
     );
     *context.loaded_app_chords.write() = loaded_chords;
 
@@ -122,24 +122,7 @@ pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChor
     let mut chords = Vec::new();
     let mut seen = HashSet::new();
 
-    for chord in loaded_app_chords.global_runtime.chords.values() {
-        let item = ActiveChordInfo {
-            scope: "Global".to_string(),
-            scope_kind: "global".to_string(),
-            sequence: format_sequence(&chord.keys),
-            name: chord.name.clone(),
-            action: format_action(chord),
-        };
-        let fingerprint = format!(
-            "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
-            item.scope_kind, item.scope, item.sequence, item.name, item.action
-        );
-        if seen.insert(fingerprint) {
-            chords.push(item);
-        }
-    }
-
-    for (application_id, runtime) in &loaded_app_chords.app_runtime_map {
+    for (application_id, runtime) in &loaded_app_chords.runtimes {
         for chord in runtime.chords.values() {
             let item = ActiveChordInfo {
                 scope: application_id.clone(),

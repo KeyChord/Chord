@@ -19,8 +19,8 @@ pub struct Chord {
 }
 
 pub struct LoadedAppChords {
-    pub global_runtime: ChordRuntime,
-    pub app_runtime_map: HashMap<String, ChordRuntime>,
+    pub global_chords_to_runtime_key: HashMap<Vec<Key>, String>,
+    pub runtimes: HashMap<String, ChordRuntime>,
 }
 
 pub struct ChordRuntime {
@@ -32,6 +32,11 @@ pub struct ChordRuntime {
     // Needs to be in this struct so it can access `chords`
     pub lua: Lua,
 }
+
+const CMD: u32 = 1 << 8;
+const SHIFT: u32 = 1 << 9;
+const OPTION: u32 = 1 << 11;
+const CTRL: u32 = 1 << 12;
 
 impl ChordRuntime {
     pub fn from_chords(chords: HashMap<Vec<Key>, Chord>) -> Self {
@@ -118,6 +123,36 @@ impl ChordRuntime {
                         .map_err(|e| mlua::Error::RuntimeError(format!("{e:?}")))?;
                     Ok(release_shortcut(shortcut)
                         .map_err(|e| mlua::Error::RuntimeError(format!("{e:?}")))?)
+                })?,
+            )?;
+
+            // TODO: this should be in Lua
+            lua.globals().set(
+                "carbon_shortcut_to_string",
+                lua.create_function(|_, (keycode, modifiers): (u16, u32)| {
+                    let Some(key) = mac_keycode::Key::from_keycode(keycode).and_then(|k| Key::try_from(k).ok()) else {
+                        return Ok(None);
+                    };
+                    let Some(char) = key.to_char(false) else {
+                        return Ok(None);
+                    };
+
+                    let mut mods: Vec<String> = Vec::new();
+                    if modifiers & CMD != 0 {
+                        mods.push("cmd".to_string());
+                    }
+                    if modifiers & SHIFT != 0 {
+                        mods.push("shift".to_string());
+                    }
+                    if modifiers & OPTION != 0 {
+                        mods.push("option".to_string());
+                    }
+                    if modifiers & CTRL != 0 {
+                        mods.push("ctrl".to_string());
+                    }
+
+                    mods.push(char.to_string());
+                    Ok(Some(mods.join("+")))
                 })?,
             )?;
         }
@@ -220,14 +255,20 @@ fn resolve_runtime_extends(
 
 impl LoadedAppChords {
     pub fn from_folders(chord_folders: Vec<ChordFolder>) -> Result<Self> {
-        let mut global_chords = HashMap::new();
+        let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
 
+        // TODO: Isolate runtimes across different folders
         for chord_folder in chord_folders {
             log::debug!("Loading folder from root {:?}", chord_folder.root_dir);
 
             for (chord_file_path, file) in chord_folder.chords_files {
+                let Some(application_id) = application_id_from_chords_path(Path::new(&chord_file_path))
+                else {
+                    continue;
+                };
+
                 // Loading global chords into `global_chords`
                 let chords = file.get_chords_shallow()?;
                 for (sequence, chord) in &chords {
@@ -235,14 +276,9 @@ impl LoadedAppChords {
                         .first()
                         .is_some_and(|c| !c.is_digit() && !c.is_letter())
                     {
-                        global_chords.insert(sequence.clone(), chord.clone());
+                        global_chords_to_runtime_key.insert(sequence.clone(), application_id.clone());
                     }
                 }
-
-                let Some(application_id) = application_id_from_chords_path(Path::new(&chord_file_path))
-                else {
-                    continue;
-                };
 
                 let config = file.config.clone();
                 let app_chord_runtime = ChordRuntime::from_file_shallow(file)?;
@@ -288,11 +324,11 @@ impl LoadedAppChords {
                                     lua_dir_string, package_id, name, version
                                 );
                                 let rock_dir_so = format!(
-                                    "{}/.lux/5.4/{}-{}@{}/src/?.so",
+                                    "{}/.lux/5.4/{}-{}@{}/lib/?.so",
                                     lua_dir_string, package_id, name, version
                                 );
                                 let rock_init_so = format!(
-                                    "{}/.lux/5.4/{}-{}@{}/src/?/init.so",
+                                    "{}/.lux/5.4/{}-{}@{}/lib/?/init.so",
                                     lua_dir_string, package_id, name, version
                                 );
                                 new_paths.push(rock_dir);
@@ -305,15 +341,15 @@ impl LoadedAppChords {
                 }
 
                 // append existing path
-                let path: String = package.get("path")?;
-                new_paths.push(path);
+                let old_path: String = package.get("path")?;
+                new_paths.push(old_path);
                 let new_path = new_paths.join(";");
                 package.set("path", new_path)?;
 
                 // append existing cpath
-                let old: String = package.get("cpath")?;
-                new_paths.push(old);
-                let new_cpath = new_paths.join(";");
+                let old_cpath: String = package.get("cpath")?;
+                new_cpaths.push(old_cpath);
+                let new_cpath = new_cpaths.join(";");
                 package.set("cpath", new_cpath)?;
 
                 // Now that the require path has been updated, we can now execute the init scripts
@@ -373,8 +409,8 @@ impl LoadedAppChords {
         }
 
         Ok(LoadedAppChords {
-            global_runtime: ChordRuntime::from_chords(global_chords),
-            app_runtime_map,
+            global_chords_to_runtime_key,
+            runtimes: app_runtime_map,
         })
     }
 
@@ -383,23 +419,23 @@ impl LoadedAppChords {
         &self,
         sequence: &[Key],
         application_id: Option<String>,
-    ) -> &ChordRuntime {
+    ) -> Option<&ChordRuntime> {
         if sequence
             .first()
             .is_some_and(|c| !c.is_digit() && !c.is_letter())
         {
-            return &self.global_runtime;
-        }
+            let Some(app_id) = self.global_chords_to_runtime_key.get(sequence) else {
+                return None;
+            };
 
-        let chord_runtime = if let Some(app_id) = application_id {
-            self.app_runtime_map
-                .get(&app_id)
-                .unwrap_or(&self.global_runtime)
+            self.runtimes.get(app_id)
         } else {
-            &self.global_runtime
-        };
-
-        chord_runtime
+            if let Some(app_id) = application_id {
+                self.runtimes.get(&app_id)
+            } else {
+                None
+            }
+        }
     }
 }
 
