@@ -1,5 +1,5 @@
 use crate::chords::shortcut::{press_shortcut, release_shortcut, Shortcut};
-use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordFolder, ChordLuaRuntime};
+use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordFolder};
 use crate::input::Key;
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
@@ -224,7 +224,7 @@ impl LoadedAppChords {
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
 
-        for (file_path, file) in chord_folder.files_map {
+        for (file_path, file) in chord_folder.chords_files {
             // Loading global chords into `global_chords`
             let chords = file.get_chords_shallow()?;
             for (sequence, chord) in &chords {
@@ -239,6 +239,17 @@ impl LoadedAppChords {
 
             let config = file.config.clone();
             let app_chord_runtime = ChordRuntime::from_file_shallow(file)?;
+
+            // Load the lua modules into the runtime
+            let lua = app_chord_runtime.lua.clone();
+            let globals = lua.globals();
+            let package: mlua::Table = globals.get("package")?;
+            let preload: mlua::Table = package.get("preload")?;
+            for (name, source) in &chord_folder.lua_files {
+                let chunk = lua.load(source).into_function()?;
+                preload.set(name.as_str(), chunk)?;
+            }
+
             log::debug!("Loaded {} initial chords for application ID {}", app_chord_runtime.chords.len(), application_id);
             app_runtime_map.insert(application_id.clone(), app_chord_runtime);
             app_config_map.insert(application_id, config);
