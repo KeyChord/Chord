@@ -59,11 +59,11 @@ _Chord Mode_ stays active as long as the `Space` key is pressed down. In _Chord 
   5. Press(CapsLock)
   6. Release(CapsLock)
 
-  > In future expansions, we use `Click` to mean a `Press` followed by a `Release`, so this expansion could've also been written as:
+  > In future expansions, we use `Tap` to mean a `Press` followed by a `Release`, so this expansion could've also been written as:
 
-  1. Click(Slash)
-  2. Click(KeyF)
-  3. Click(CapsLock)
+  1. Tap(Slash)
+  2. Tap(KeyF)
+  3. Tap(CapsLock)
 </details>
 
 You can run a chord multiple times by pressing `Caps Lock` again. Pressing the following sequence of keys in _Chord Mode_ goes up three folders in Finder:
@@ -71,11 +71,11 @@ You can run a chord multiple times by pressing `Caps Lock` again. Pressing the f
 <details>
   <summary>/f⇪⇪⇪</summary>
 
-  1. Click(Slash)
-  2. Click(F)
-  3. Click(CapsLock)
-  4. Click(CapsLock)
-  5. Click(CapsLock)
+  1. Tap(Slash)
+  2. Tap(F)
+  3. Tap(CapsLock)
+  4. Tap(CapsLock)
+  5. Tap(CapsLock)
 </details>
 
 Another way to run a chord is by holding `Shift` while typing the last key of the chord:
@@ -83,9 +83,9 @@ Another way to run a chord is by holding `Shift` while typing the last key of th
 <details>
   <summary>/F</summary>
 
-  1. Click(Slash)
+  1. Tap(Slash)
   2. Press(Shift)
-  3. Click(F)
+  3. Tap(F)
   4. Release(Shift)
 </details>
 
@@ -96,17 +96,17 @@ As an example, say you wanted to quickly toggle the tabs view, the sidebar view,
 <details>
   <summary>tTtStP</summary>
 
-  1. Click(T)
+  1. Tap(T)
   2. Press(Shift)
-  3. Click(T)
+  3. Tap(T)
   4. Release(Shift)
-  5. Click(T)
+  5. Tap(T)
   6. Press(Shift)
-  7. Click(S)
+  7. Tap(S)
   8. Release(Shift)
-  9. Click(T)
+  9. Tap(T)
   10. Press(Shift)
-  11. Click(P)
+  11. Tap(P)
   12. Release(Shift)
 </details>
 
@@ -115,11 +115,11 @@ You can just type:
 <details>
   <summary>tTSP</summary>
 
-  1. Click(T)
+  1. Tap(T)
   3. Press(Shift)
-  4. Click(T)
-  5. Click(S)
-  6. Click(P)
+  4. Tap(T)
+  5. Tap(S)
+  6. Tap(P)
   4. Release(Shift)
 </details>
 
@@ -143,26 +143,113 @@ While it might seem a bit tedious to press `Caps Lock` or `Shift`, it's actually
 <details>
   <summary>/FgD⌘ands⇪</summary>
 
-  1. Click(Slash)
+  1. Tap(Slash)
   2. Press(Shift)
-  3. Click(F)
+  3. Tap(F)
   4. Release(Shift)
-  5. Click(G)
+  5. Tap(G)
   6. Press(Shift)
-  7. Click(D)
+  7. Tap(D)
   8. Release(Shift)
   9. Press(Command)
-  10. Click(A)
+  10. Tap(A)
   11. Release(Command)
-  11. Click(N)
-  11. Click(D)
-  11. Click(S)
-  12. Click(CapsLock)
+  11. Tap(N)
+  11. Tap(D)
+  11. Tap(S)
+  12. Tap(CapsLock)
 </details>
 
 > **Chords** ignores all inputs whenever a modifier key (other than Shift) is held down.
 
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
+
+<!-- TODO: This section should be introduced alongside `shell` -->
+### Lua Scripting
+
+In addition to running shortcuts and shell commands, chords can also run arbitrary Lua scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
+
+For example, this `vscode_helpers.lua` script allows us to programatically execute VSCode commands by their ID using the [Cursorless extension](https://marketplace.visualstudio.com/items?itemName=pokey.command-server):
+
+```lua
+-- vscode_helpers.lua
+local M = {}
+
+local file = require("file")
+
+local function get_uid()
+  local h = io.popen("id -u")
+  if not h then return nil end
+
+  local uid = h:read("*a")
+  h:close()
+
+  if not uid then return nil end
+  return uid:gsub("%s+", "")
+end
+
+local function json_escape(s)
+  return tostring(s)
+    :gsub("\\", "\\\\")
+    :gsub('"', '\\"')
+end
+
+-- This script allows us to execute VSCode commands directly via https://marketplace.visualstudio.com/items?itemName=pokey.command-server if it's active, and otherwise falls back to built-in shortcuts.
+function M.create_command()
+  local uid = get_uid()
+  if not uid then
+    return function() return false end
+  end
+
+  local tmp = os.getenv("TMPDIR") or "/tmp"
+  local dir = tmp .. "/vscode-command-server-" .. uid
+
+  return function(cmd)
+    -- ensure server dir exists
+    if os.rename(dir, dir) == nil then
+      return false
+    end
+
+    local request_path = dir .. "/request.json"
+    local response_path = dir .. "/response.json"
+
+    local payload = string.format(
+      '{"commandId":"%s","args":[]}',
+      json_escape(cmd)
+    )
+
+    if not file.write(request_path, payload) then
+      return false
+    end
+
+    -- remove stale response BEFORE triggering
+    os.remove(response_path)
+
+    -- trigger VSCode command server
+    tap("cmd+shift+f17")
+
+    return true
+  end
+end
+
+return M
+```
+
+```toml
+# chords/macos/com/microsoft/VSCode/chords.toml
+[config.lua]
+init = '''
+command = require("vscode_helpers").create_command()
+'''
+
+[chords]
+fh = { name = "File: Here", lua = "command('explorer.newFile')" } # doesn't have a default shortcut
+# ...
+```
+
+The Lua environment provided by Chords uses Lua 5.4 and includes the entire standard library. It provides three helper functions for simulating keypresses: `tap`, `press`, and `release` (in the future, it'll be locked down to avoid arbitrary code execution).
+
+This environment is kept intentionally minimal to avoid tying it to any app-specific functionality.
 
 ## Comparison to keyboard shortcuts
 
@@ -187,6 +274,7 @@ gd = {
   shortcut = "F12"
 }
 ```
+
 
 ### Differences between platforms
 
