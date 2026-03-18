@@ -41,14 +41,19 @@ impl AppChordsFile {
 
             let keys = Key::parse_sequence(sequence)?;
 
+            let Ok(shortcut) = entry
+                .shortcut
+                .as_ref()
+                .map(|s| Shortcut::parse(s))
+                .transpose() else {
+                log::warn!("Skipping invalid shortcut for sequence: {}", sequence);
+                continue;
+            };
+
             let chord = Chord {
                 keys: keys.clone(),
                 name: entry.name.clone(),
-                shortcut: entry
-                    .shortcut
-                    .as_ref()
-                    .map(|s| Shortcut::parse(s))
-                    .transpose()?,
+                shortcut,
                 shell: entry.shell.clone(),
                 lua: entry.lua.clone(),
             };
