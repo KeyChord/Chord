@@ -53,13 +53,8 @@ impl ChordRuntime {
     pub fn from_file_shallow(chord_file: AppChordsFile) -> Result<Self> {
         let raw_chords = Arc::new(Mutex::new(chord_file.chords.clone()));
         let config = chord_file.config.clone();
-        let mut chords = chord_file.get_chords_shallow()?;
-        // Filters out global chords
-        chords.retain(|sequence, _| {
-            sequence
-                .first()
-                .is_some_and(|c| c.is_digit() || c.is_letter())
-        });
+        // We intentionally keep in global chords because they execute in this runtime
+        let chords = chord_file.get_chords_shallow()?;
 
         let runtime = Self {
             raw_chords,
@@ -130,10 +125,18 @@ impl ChordRuntime {
             lua.globals().set(
                 "carbon_shortcut_to_string",
                 lua.create_function(|_, (keycode, modifiers): (u16, u32)| {
-                    let Some(key) = mac_keycode::Key::from_keycode(keycode).and_then(|k| Key::try_from(k).ok()) else {
+                    let Some(mac_key) = mac_keycode::Key::from_keycode(keycode) else {
+                        log::warn!("Invalid keycode: {keycode}");
                         return Ok(None);
                     };
+
+                    let Ok(key) = Key::try_from(mac_key) else {
+                        log::warn!("Invalid key: {:?}", mac_key);
+                        return Ok(None);
+                    };
+
                     let Some(char) = key.to_char(false) else {
+                        log::warn!("Invalid char for key: {:?}", key);
                         return Ok(None);
                     };
 
@@ -266,6 +269,7 @@ impl LoadedAppChords {
             for (chord_file_path, file) in chord_folder.chords_files {
                 let Some(application_id) = application_id_from_chords_path(Path::new(&chord_file_path))
                 else {
+                    log::warn!("Invalid chords path: {:?}", chord_file_path);
                     continue;
                 };
 
@@ -276,6 +280,7 @@ impl LoadedAppChords {
                         .first()
                         .is_some_and(|c| !c.is_digit() && !c.is_letter())
                     {
+                        log::debug!("Adding global chord for sequence: {:?}", sequence);
                         global_chords_to_runtime_key.insert(sequence.clone(), application_id.clone());
                     }
                 }
@@ -426,6 +431,7 @@ impl LoadedAppChords {
             .is_some_and(|c| !c.is_digit() && !c.is_letter())
         {
             let Some(runtime_key) = self.global_chords_to_runtime_key.get(sequence) else {
+                log::warn!("Invalid global chord sequence: {:?}", sequence);
                 return None;
             };
 

@@ -518,7 +518,6 @@ impl FromStr for Key {
                 "volumeup" => AudioVolumeUp,
                 "a" | "A" => KeyA,
                 "b" | "B" => KeyB,
-                "c" => KeyC,
                 "c" | "C" => KeyC,
                 "d" | "D" => KeyD,
                 "e" | "E" => KeyE,
