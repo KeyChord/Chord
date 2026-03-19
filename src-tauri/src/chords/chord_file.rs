@@ -48,7 +48,8 @@ impl AppChordsFile {
                 .shortcut
                 .as_ref()
                 .map(|s| Shortcut::parse(s))
-                .transpose() else {
+                .transpose()
+            else {
                 log::warn!("Skipping invalid shortcut for sequence: {}", sequence);
                 continue;
             };
@@ -58,7 +59,7 @@ impl AppChordsFile {
                 name: entry.name.clone(),
                 shortcut,
                 shell: entry.shell.clone(),
-                lua: entry.lua.clone(),
+                args: entry.args.clone(),
             };
 
             chords.insert(keys, chord);
@@ -72,12 +73,12 @@ impl AppChordsFile {
 pub struct AppChordsFileConfig {
     pub name: Option<String>,
     pub extends: Option<String>,
-    pub lua: Option<AppChordsFileConfigLua>,
+    pub js: Option<AppChordsFileConfigJs>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AppChordsFileConfigLua {
-    pub init: Option<String>,
+pub struct AppChordsFileConfigJs {
+    pub module: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -85,7 +86,7 @@ pub struct AppChord {
     pub name: String,
     pub shortcut: Option<String>,
     pub shell: Option<String>,
-    pub lua: Option<String>,
+    pub args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

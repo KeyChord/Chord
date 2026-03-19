@@ -838,7 +838,6 @@ impl TryFrom<mac_keycode::Key> for Key {
     }
 }
 
-
 impl TryFrom<Key> for rdev::Key {
     type Error = anyhow::Error;
 

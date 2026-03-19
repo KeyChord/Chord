@@ -1,13 +1,18 @@
-use frontmost::app::FrontmostApp;
 use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use anyhow::{Context,Result};
+use frontmost::{start_nsrunloop, Detector};
+use objc2_app_kit::NSWorkspace;
 use tauri::{AppHandle, Manager};
 pub use tauri_app::*;
 use tauri_nspanel::tauri_panel;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
+use crate::chords::{ChordFolder, LoadedAppChords};
+use crate::feature::{Chorder, ChorderIndicatorPanel};
+use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 
 mod chords;
 mod constants;
@@ -34,7 +39,8 @@ struct Frontmost {
     handle: AppHandle,
 }
 
-impl FrontmostApp for Frontmost {
+#[cfg(target_os = "macos")]
+impl frontmost::app::FrontmostApp for Frontmost {
     fn set_frontmost(&mut self, new_value: &str) {
         self.frontmost = new_value.to_string();
         let context = self.handle.state::<AppContext>();
@@ -130,10 +136,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_user_input::init())
         .setup(|app| {
-            if let Err(e) = tauri_app::setup::setup_app(app) {
+            if let Err(e) = setup(app) {
                 log::error!("Failed to set up app:\n{:#?}", e);
-
-                app.handle()
+                app
                     .dialog()
                     .message(format!("Failed to start Chords:\n\n{e}"))
                     .title("Startup Error")
@@ -146,4 +151,84 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri_app application");
+}
+
+// https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
+fn setup(app: &mut tauri::App) -> Result<()> {
+    thread::spawn(|| {
+        start_nsrunloop!();
+    });
+
+    let handle = app.handle().clone();
+    let chorder = {
+        let window = handle
+            .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
+            .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
+        Chorder::new(ChorderIndicatorPanel::from_window(window)?)
+    };
+    let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
+    let context = AppContext::new(chorder, bundled_app_chords);
+    // Setting the frontmost application immediately (the frontmost crate only detects changes)
+    let workspace = NSWorkspace::sharedWorkspace();
+    if let Some(application) = workspace.frontmostApplication() {
+        if let Some(bundle_id) = application.bundleIdentifier() {
+            context.frontmost_application_id.store(Arc::new(Some(bundle_id.to_string())));
+        }
+    }
+
+    handle.manage(context);
+
+    tauri_app::tray::create_tray(handle.clone()).context("failed to create tray")?;
+    tauri_app::settings::configure_settings_window(handle.clone())?;
+
+    let frontmost = Frontmost {
+        frontmost: String::new(),
+        handle: handle.clone(),
+    };
+    Detector::init(Box::new(frontmost));
+
+    if let Err(error) = tauri_app::settings::hide_settings_window(handle.clone()) {
+        log::error!("failed to hide settings window at startup: {error}");
+    }
+
+    {
+        let handle = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let has_permission =
+                tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
+            if has_permission {
+                log::info!("Input monitoring permission granted, registering caps lock listener");
+                if let Err(e) = register_caps_lock_input_handler(handle.clone()) {
+                    log::error!("Failed to handle caps lock input: {e}");
+                }
+            } else {
+                log::warn!("Input monitoring permission not granted, skipping caps lock listener");
+            }
+        });
+    }
+
+    {
+        let handle = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let has_permission =
+                tauri_plugin_macos_permissions::check_accessibility_permission().await;
+            if has_permission {
+                log::info!("Accessibility permission granted, registering grab listener");
+                register_key_event_input_grabber(handle.clone());
+            } else {
+                log::warn!("Accessibility permission not granted, skipping grab listener");
+            }
+        });
+    }
+
+    {
+        let handle = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(e) = reload_loaded_app_chords(handle).await {
+                log::error!("Failed to reload app chords:\n{:#?}", e);
+            }
+        });
+    }
+
+    Ok(())
 }

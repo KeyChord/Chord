@@ -28,26 +28,30 @@ pub fn open_input_monitoring_settings() {
 
 #[tauri::command]
 pub fn list_git_repos(app: AppHandle) -> Result<Vec<GitRepoInfo>, String> {
-    discover_git_repos(&app).map_err(|error| error.to_string())
+    discover_git_repos(app).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-pub fn add_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
-    let repo_info = add_git_repo(&app, &repo).map_err(|error| error.to_string())?;
-    reload_loaded_app_chords(&app).map_err(|error| error.to_string())?;
+pub async fn add_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
+    let repo_info = add_git_repo(app.clone(), &repo).map_err(|error| error.to_string())?;
+    reload_loaded_app_chords(app)
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(repo_info)
 }
 
 #[tauri::command]
-pub fn sync_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
-    let repo_info = sync_git_repo(&app, &repo).map_err(|error| error.to_string())?;
-    reload_loaded_app_chords(&app).map_err(|error| error.to_string())?;
+pub async fn sync_git_repo_command(app: AppHandle, repo: String) -> Result<GitRepoInfo, String> {
+    let repo_info = sync_git_repo(app.clone(), &repo).map_err(|error| error.to_string())?;
+    reload_loaded_app_chords(app)
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(repo_info)
 }
 
 #[tauri::command]
 pub fn list_active_chords_command(app: AppHandle) -> Result<Vec<ActiveChordInfo>, String> {
-    list_active_chords(&app).map_err(|error| error.to_string())
+    list_active_chords(app).map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -55,6 +59,6 @@ pub fn list_repo_chords_command(
     app: AppHandle,
     repo: String,
 ) -> Result<Vec<ActiveChordInfo>, String> {
-    let loaded_chords = load_repo_chords(&app, &repo).map_err(|error| error.to_string())?;
+    let loaded_chords = load_repo_chords(app, &repo).map_err(|error| error.to_string())?;
     Ok(list_loaded_chords(&loaded_chords))
 }

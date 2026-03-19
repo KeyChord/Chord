@@ -1,5 +1,5 @@
 use super::ChorderIndicatorPanel;
-use crate::chords::{press_chord, release_chord, Chord};
+use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
 use crate::{input::KeyEvent, AppContext};
 use anyhow::Result;
@@ -104,14 +104,12 @@ impl Chorder {
                     let chord_runtime =
                         loaded_app_chords.get_chord_runtime(&last_chord.keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
-                        press_chord(handle.clone(), chord_runtime, &last_chord)?;
+                        press_chord(handle.clone(), chord_runtime, &ChordPayload { chord: last_chord.clone(), num_times: 1 })?;
                         self.state.set(Arc::new(ChorderState {
                             pressed_chord: state.active_chord.clone(),
                             key_buffer: vec![],
                             active_chord: state.active_chord.clone(),
                         }))?;
-
-                        return Ok(());
                     } else {
                         // e.g. we ran it on a different app
                         log::error!("Last chord no longer applies");
@@ -120,8 +118,9 @@ impl Chorder {
                             pressed_chord: None,
                             active_chord: None,
                         }))?;
-                        return Ok(());
                     }
+
+                    return Ok(());
                 }
 
                 // A non-empty key_buffer means we should execute the chord.
@@ -131,7 +130,10 @@ impl Chorder {
                     &state.key_buffer,
                     context.frontmost_application_id.load().as_ref().clone(),
                 );
-                let (Some(chord_runtime), Some(chord)) = (chord_runtime, chord_runtime.and_then(|r| r.get_chord(&key_buffer))) else {
+                let (Some(chord_runtime), Some(chord_payload)) = (
+                    chord_runtime,
+                    chord_runtime.and_then(|r| r.get_chord(&key_buffer)),
+                ) else {
                     // If the chord is the buffer is invalid, reset it
                     log::error!(
                         "Invalid chord: {:?} for application: {:?}",
@@ -146,11 +148,11 @@ impl Chorder {
                     return Ok(());
                 };
 
-                press_chord(handle.clone(), &chord_runtime, chord)?;
+                press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
                 self.state.set(Arc::new(ChorderState {
-                    pressed_chord: Some(chord.clone()),
+                    pressed_chord: Some(chord_payload.chord.clone()),
                     key_buffer: vec![],
-                    active_chord: Some(chord.clone()),
+                    active_chord: Some(chord_payload.chord.clone()),
                 }))?;
                 Ok(())
             }
@@ -220,19 +222,22 @@ impl Chorder {
         let loaded_app_chords = context.loaded_app_chords.read();
         let chord_runtime =
             loaded_app_chords.get_chord_runtime(&sequence, frontmost_application_id);
-        let (Some(chord_runtime), Some(chord)) = (chord_runtime, chord_runtime.and_then(|r| r.get_chord(&sequence))) else {
+        let (Some(chord_runtime), Some(chord_payload)) = (
+            chord_runtime,
+            chord_runtime.and_then(|r| r.get_chord(&sequence)),
+        ) else {
             // We don't change the state for an invalid sequence
             log::debug!("Invalid sequence {:?}", sequence);
             return Ok(());
         };
 
-        log::debug!("Pressing chord: {:?}", chord);
-        press_chord(handle.clone(), &chord_runtime, chord)?;
+        log::debug!("Pressing chord: {:?}", chord_payload);
+        press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
         self.state.set(Arc::new(ChorderState {
             // We always clear the key_buffer if a chord is pressed
             key_buffer: vec![],
-            pressed_chord: Some(chord.clone()),
-            active_chord: Some(chord.clone()),
+            pressed_chord: Some(chord_payload.chord.clone()),
+            active_chord: Some(chord_payload.chord.clone()),
         }))?;
 
         Ok(())
