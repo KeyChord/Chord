@@ -10,8 +10,6 @@ use tauri::{
     AppHandle,
 };
 
-type JsFuture<'js, T> = Pin<Box<dyn Future<Output = rquickjs::Result<T>> + Send + 'js>>;
-
 struct JsEngine {
     // Keep the runtime alive for as long as the context exists.
     _rt: AsyncRuntime,
@@ -36,7 +34,8 @@ impl Resolver for ModuleResolver {
             "child_process" => Ok("child_process".into()),
             "process" => Ok("process".into()),
             "path" => Ok("path".into()),
-            _ => self.builtin_resolver.resolve(ctx, base, name),
+            _ => Ok(name.into()),
+            // _ => self.builtin_resolver.resolve(ctx, base, name),
         }
     }
 }
@@ -131,6 +130,7 @@ where
         .await
         .ok_or_else(|| "main thread task dropped".to_string())?
 }
+
 fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
     let message = message.into();
 

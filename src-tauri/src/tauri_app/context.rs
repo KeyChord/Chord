@@ -74,42 +74,19 @@ impl AppContext {
 }
 
 pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
-    let chorder = {
-        let window = handle
-            .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
-            .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
-        Chorder::new(ChorderIndicatorPanel::from_window(window)?)
-    };
-    let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
 
-    let context = AppContext::new(chorder, bundled_app_chords);
 
-    // // Setting the frontmost application immediately (the frontmost crate only detects changes)
-    // let workspace = NSWorkspace::sharedWorkspace();
-    // if let Some(application) = workspace.frontmostApplication() {
-    //     if let Some(bundle_id) = application.bundleIdentifier() {
-    //         context
-    //             .frontmost_application_id
-    //             .store(Arc::new(Some(bundle_id.to_string())));
-    //     }
-    // }
-
-    handle.manage(context);
-    if let Err(e) = reload_loaded_app_chords(&handle).await {
-        log::error!("Failed to reload app chords:\n{:#?}", e);
-    }
 
     Ok(())
 }
 
 // Also evaluates JavaScript
-pub async fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
+pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     let context = app.state::<AppContext>();
     context.chorder.ensure_inactive(app.clone())?;
 
-    let chord_folders = load_all_chord_folders(app)?;
     // Load all JS files as modules
-    let chord_folders = load_all_chord_folders(app)?;
+    let chord_folders = load_all_chord_folders(app.clone())?;
 
     // Load all JS files as modules, but keep `chord_folders` so we can use it later.
     for chord_folder in &chord_folders {
@@ -119,7 +96,10 @@ pub async fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
             Box::pin(async move {
                 for (filepath, js) in js_files {
                     let module = match Module::declare(ctx.clone(), filepath.clone(), js) {
-                        Ok(m) => m,
+                        Ok(m) => {
+                            log::debug!("Declared module {}", filepath);
+                            m
+                        },
                         Err(e) => {
                             log::error!(
                                 "Failed to declare JS module {}: {}",
@@ -234,7 +214,7 @@ pub async fn load_chord_files_runtime_modules(
     }
 }
 
-pub fn list_active_chords(app: &AppHandle) -> Result<Vec<ActiveChordInfo>> {
+pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     let context = app.state::<AppContext>();
     let loaded_app_chords = context.loaded_app_chords.read();
     Ok(list_loaded_chords(&loaded_app_chords))

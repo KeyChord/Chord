@@ -4,7 +4,6 @@ use crate::input::Key;
 use crate::js::{format_js_error, with_js};
 use anyhow::Result;
 use rquickjs::function::Args;
-use rquickjs::runtime::UserDataError;
 use rquickjs::{Ctx, Function, IntoJs, Module, Object, Promise, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -27,13 +26,14 @@ pub struct LoadedAppChords {
     pub runtimes: HashMap<String, ChordRuntime>,
 }
 
-// Each chord runtime is associated with a JS module which lives in-memory (similar to require.cache)
+// Each chord runtime is associated with a JS module which lives in-memory
+// (similar to require.cache)
 pub struct ChordRuntime {
-    // Used to as a unique module key
+    // Used as a unique module key
     pub path: String,
 
     pub chords: HashMap<Vec<Key>, Chord>,
-    // Needs to be an Arc so that the Lua runtime can access its latest value
+    // Needs to be an Arc so the JS runtime can access its latest value
     pub raw_chords: Arc<Mutex<HashMap<String, AppChordMapValue>>>,
     pub config: Option<AppChordsFileConfig>,
 }
@@ -54,7 +54,7 @@ impl ChordRuntime {
         let raw_chords = Arc::new(Mutex::new(chord_file.chords.clone()));
         let config = chord_file.config.clone();
 
-        // We intentionally keep in global chords because they execute in this runtime
+        // We intentionally keep global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow();
 
         Ok(Self {
@@ -102,6 +102,12 @@ fn application_id_from_chords_path(file_path: &Path) -> Option<String> {
             .collect::<Vec<_>>()
             .join("."),
     )
+}
+
+fn is_global_chord_sequence(sequence: &[Key]) -> bool {
+    sequence
+        .first()
+        .is_some_and(|key| !key.is_digit() && !key.is_letter())
 }
 
 fn resolve_runtime_extends(
@@ -180,13 +186,9 @@ impl LoadedAppChords {
                     continue;
                 };
 
-                // Loading global chords into `global_chords`
                 let chords = file.get_chords_shallow();
-                for (sequence, chord) in &chords {
-                    if sequence
-                        .first()
-                        .is_some_and(|c| !c.is_digit() && !c.is_letter())
-                    {
+                for sequence in chords.keys() {
+                    if is_global_chord_sequence(sequence) {
                         log::debug!("Adding global chord for sequence: {:?}", sequence);
                         global_chords_to_runtime_key
                             .insert(sequence.clone(), application_id.clone());
@@ -224,6 +226,7 @@ impl LoadedAppChords {
             "Loaded global chords: {:?}",
             global_chords_to_runtime_key.keys()
         );
+
         Ok(LoadedAppChords {
             global_chords_to_runtime_key,
             runtimes: app_runtime_map,
@@ -236,10 +239,7 @@ impl LoadedAppChords {
         sequence: &[Key],
         application_id: Option<String>,
     ) -> Option<&ChordRuntime> {
-        if sequence
-            .first()
-            .is_some_and(|c| !c.is_digit() && !c.is_letter())
-        {
+        if is_global_chord_sequence(sequence) {
             let Some(runtime_key) = self.global_chords_to_runtime_key.get(sequence) else {
                 log::warn!("Invalid global chord sequence: {:?}", sequence);
                 return None;
@@ -247,167 +247,265 @@ impl LoadedAppChords {
 
             self.runtimes.get(runtime_key)
         } else {
-            if let Some(app_id) = application_id {
-                self.runtimes.get(&app_id)
-            } else {
-                None
-            }
+            application_id.and_then(|app_id| self.runtimes.get(&app_id))
         }
     }
 }
 
-pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> Result<()> {
-    log::debug!("Pressing chord: {:?}", chord);
-    let path = runtime.path.clone();
-    let shortcut = chord.shortcut.clone();
-    let shell = chord.shell.clone();
-    let js_args = chord.args.clone();
-    let config_js = runtime.config.as_ref().and_then(|c| c.js.clone());
+fn press_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut) -> Result<()> {
+    handle.run_on_main_thread(move || {
+        if let Err(e) = press_shortcut(shortcut.clone()) {
+            log::error!("failed to press shortcut: {e}");
+        }
+    })?;
 
-    // Prioritize shortcuts
-    if let Some(shortcut) = shortcut {
-        handle.clone().run_on_main_thread(move || {
-            if let Err(e) = press_shortcut(shortcut.clone()) {
-                log::error!("failed to press shortcut: {e}");
-            }
-        })?;
-    } else if let Some(shell) = shell {
-        std::thread::spawn(move || {
-            let mut command = Command::new("sh");
-            command.arg("-c").arg(&shell);
-            log::debug!("Running shell command: {:?}", command);
+    Ok(())
+}
 
-            match command.output() {
-                Ok(output) => {
-                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    let exit_code = output.status.code();
+fn release_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut) -> Result<()> {
+    handle.run_on_main_thread(move || {
+        if let Err(e) = release_shortcut(shortcut.clone()) {
+            log::error!("failed to release shortcut: {e}");
+        }
+    })?;
 
-                    if output.status.success() {
-                        log::debug!(
-                            "shell command succeeded with exit code {:?}: {}",
-                            exit_code,
-                            shell
-                        );
-                    } else {
-                        log::error!(
-                            "shell command failed with exit code {:?}: {}",
-                            exit_code,
-                            shell
-                        );
-                    }
+    Ok(())
+}
 
-                    if !stdout.is_empty() {
-                        log::debug!("shell stdout: {stdout}");
-                    }
+fn run_shell_command_in_background(shell: String) {
+    std::thread::spawn(move || run_shell_command(shell));
+}
 
-                    if !stderr.is_empty() {
-                        log::debug!("shell stderr: {stderr}");
-                    }
-                }
-                Err(e) => {
-                    log::error!("failed to run shell command `{shell}`: {e}");
-                }
-            }
-        });
-    } else if let Some(args) = js_args {
-        tauri::async_runtime::spawn(async move {
-            // This calls the default export with the js_args
-            if let Err(e) = with_js(handle.clone(), move |ctx| {
-                Box::pin(async move {
-                    let namespace: Object = match Module::import(&ctx, path.clone()) {
-                        Ok(import_promise) => match import_promise.into_future::<Object>().await {
-                            Ok(ns) => ns,
-                            Err(e) => {
-                                log::error!("Failed to import JS module: {}", format_js_error(ctx.clone(), e));
-                                return Ok(());
-                            }
-                        },
-                        Err(e) => {
-                            log::error!("Failed to start importing JS module: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    };
+fn run_shell_command(shell: String) {
+    let mut command = Command::new("sh");
+    command.arg("-c").arg(&shell);
+    log::debug!("Running shell command: {:?}", command);
 
-                    let default: Value = match namespace.get("default") {
-                        Ok(default) => default,
-                        Err(e) => {
-                            log::error!("Failed to get default export: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    };
+    match command.output() {
+        Ok(output) => log_shell_output(&shell, output),
+        Err(e) => {
+            log::error!("failed to run shell command `{shell}`: {e}");
+        }
+    }
+}
 
-                    let Some(default_function) = default.as_function() else {
-                        log::error!("Default export is not a function: {:?}", default);
-                        return Ok(());
-                    };
+fn log_shell_output(shell: &str, output: std::process::Output) {
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let exit_code = output.status.code();
 
-                    let js_args: Vec<Value> = match args
-                        .into_iter()
-                        .map(|arg| arg.into_js(&ctx))
-                        .collect::<rquickjs::Result<_>>()
-                    {
-                        Ok(args) => args,
-                        Err(e) => {
-                            log::error!("Failed to convert arguments: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    };
+    if output.status.success() {
+        log::debug!(
+            "shell command succeeded with exit code {:?}: {}",
+            exit_code,
+            shell
+        );
+    } else {
+        log::error!(
+            "shell command failed with exit code {:?}: {}",
+            exit_code,
+            shell
+        );
+    }
 
-                    let mut args_builder = Args::new(ctx.clone(), js_args.len());
-                    log::debug!("Calling default function with arguments: {:?}", js_args);
+    if !stdout.is_empty() {
+        log::debug!("shell stdout: {stdout}");
+    }
 
-                    for value in js_args {
-                        if let Err(e) = args_builder.push_arg(value) {
-                            log::error!("Failed to push argument: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    }
+    if !stderr.is_empty() {
+        log::debug!("shell stderr: {stderr}");
+    }
+}
 
-                    let result: Value = match default_function.call_arg(args_builder) {
-                        Ok(value) => value,
-                        Err(e) => {
-                            log::error!("Failed to call default function: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    };
+fn invoke_js_chord_in_background(handle: AppHandle, module_path: String, args: Vec<String>) {
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = with_js(handle.clone(), move |ctx| {
+            Box::pin(call_js_default_export(ctx, module_path, args))
+        })
+            .await
+        {
+            log::error!("press_chord failed: {}", e);
+        }
+    });
+}
 
-                    // If the default export is async, await its returned promise.
-                    if result.is_promise() {
-                        let promise = match Promise::from_value(result) {
-                            Ok(promise) => promise,
-                            Err(e) => {
-                                log::error!("Function returned something marked as promise, but it could not be converted: {}", format_js_error(ctx.clone(), e));
-                                return Ok(());
-                            }
-                        };
+async fn call_js_default_export<'js>(
+    ctx: Ctx<'js>,
+    module_path: String,
+    args: Vec<String>,
+) -> rquickjs::Result<()> {
+    let Some(namespace) = import_js_namespace(ctx.clone(), &module_path).await else {
+        return Ok(());
+    };
 
-                        if let Err(e) = promise.into_future::<Value>().await {
-                            log::error!("Default function promise rejected: {}", format_js_error(ctx.clone(), e));
-                            return Ok(());
-                        }
-                    }
+    let Some(default_function) = get_default_export_function(ctx.clone(), &namespace).await else {
+        return Ok(());
+    };
 
-                    Ok(())
-                })
-            }).await {
-                log::error!("press_chord failed: {}", e);
-            }
-        });
+    let Some(js_args) = convert_js_args(&ctx, args) else {
+        return Ok(());
+    };
+
+    log::debug!("Calling default function with arguments: {:?}", js_args);
+
+    let result = match call_function_with_values(ctx.clone(), default_function, js_args) {
+        Ok(value) => value,
+        Err(e) => {
+            log::error!(
+                "Failed to call default function: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            return Ok(());
+        }
+    };
+
+    if let Err(e) = await_promise_if_needed(ctx.clone(), result).await {
+        log::error!(
+            "Default function promise rejected: {}",
+            format_js_error(ctx.clone(), e)
+        );
     }
 
     Ok(())
 }
 
-pub fn release_chord(handle: AppHandle, chord: &Chord) -> anyhow::Result<()> {
-    let shortcut = chord.shortcut.clone();
-    handle.clone().run_on_main_thread(move || {
-        if let Some(shortcut) = shortcut {
-            if let Err(e) = release_shortcut(shortcut.clone()) {
-                log::error!("failed to release shortcut: {e}");
-            }
+async fn import_js_namespace<'js>(ctx: Ctx<'js>, module_path: &str) -> Option<Object<'js>> {
+    let import_promise = match Module::import(&ctx, module_path.to_string()) {
+        Ok(import_promise) => import_promise,
+        Err(e) => {
+            log::error!(
+                "Failed to start importing JS module: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            return None;
         }
-    })?;
+    };
+
+    match import_promise.into_future::<Object>().await {
+        Ok(namespace) => Some(namespace),
+        Err(e) => {
+            log::error!(
+                "Failed to import JS module: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            None
+        }
+    }
+}
+
+async fn get_default_export_function<'js>(
+    ctx: Ctx<'js>,
+    namespace: &Object<'js>,
+) -> Option<Function<'js>> {
+    let default: Value<'js> = match namespace.get("default") {
+        Ok(default) => default,
+        Err(e) => {
+            log::error!(
+                "Failed to get default export: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            return None;
+        }
+    };
+
+    let default_function = if let Some(promise) = default.as_promise().cloned() {
+        let function = match promise.into_future::<Function>().await {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!(
+                    "Failed to resolve default export: {}",
+                    format_js_error(ctx.clone(), e)
+                );
+                return None;
+            }
+        };
+
+        function
+    } else {
+        let Some(default_function) = default.as_function().cloned() else {
+            log::error!("Default export is not a function: {:?}", default);
+            return None;
+        };
+
+        default_function
+    };
+
+    Some(default_function.clone())
+}
+
+fn convert_js_args<'js>(ctx: &Ctx<'js>, args: Vec<String>) -> Option<Vec<Value<'js>>> {
+    match args
+        .into_iter()
+        .map(|arg| arg.into_js(ctx))
+        .collect::<rquickjs::Result<_>>()
+    {
+        Ok(args) => Some(args),
+        Err(e) => {
+            log::error!("Failed to convert arguments: {}", format_js_error(ctx.clone(), e));
+            None
+        }
+    }
+}
+
+fn call_function_with_values<'js>(
+    ctx: Ctx<'js>,
+    function: Function<'js>,
+    values: Vec<Value<'js>>,
+) -> rquickjs::Result<Value<'js>> {
+    let mut args_builder = Args::new(ctx, values.len());
+
+    for value in values {
+        args_builder.push_arg(value)?;
+    }
+
+    function.call_arg(args_builder)
+}
+
+async fn await_promise_if_needed<'js>(
+    ctx: Ctx<'js>,
+    result: Value<'js>,
+) -> rquickjs::Result<()> {
+    if !result.is_promise() {
+        return Ok(());
+    }
+
+    let promise = match Promise::from_value(result) {
+        Ok(promise) => promise,
+        Err(e) => {
+            log::error!(
+                "Function returned something marked as promise, but it could not be converted: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            return Ok(());
+        }
+    };
+
+    promise.into_future::<Value>().await.map(|_| ())
+}
+
+pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> Result<()> {
+    log::debug!("Pressing chord: {:?}", chord);
+
+    if let Some(shortcut) = chord.shortcut.clone() {
+        return press_shortcut_on_main_thread(handle, shortcut);
+    }
+
+    if let Some(shell) = chord.shell.clone() {
+        run_shell_command_in_background(shell);
+        return Ok(());
+    }
+
+    if let Some(args) = chord.args.clone() {
+        invoke_js_chord_in_background(handle, runtime.path.clone(), args);
+    }
+
+    Ok(())
+}
+
+pub fn release_chord(handle: AppHandle, chord: &Chord) -> Result<()> {
+    if let Some(shortcut) = chord.shortcut.clone() {
+        release_shortcut_on_main_thread(handle, shortcut)?;
+    }
 
     Ok(())
 }
