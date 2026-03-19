@@ -196,8 +196,15 @@ pub async fn load_chord_files_runtime_modules(
                                 js_chord.set("name",  rquickjs::String::from_str(ctx.clone(), &entry.name))?;
                                 js_chord.set("shortcut",  rquickjs::String::from_str(ctx.clone(), &entry.shortcut.clone().unwrap_or_default()))?;
                                 js_chord.set("shell", rquickjs::String::from_str(ctx.clone(), &entry.shell.clone().unwrap_or_default()))?;
-                                let args = rquickjs::Array::new(ctx.clone())?;
-                                js_chord.set("args", args)?;
+
+                                if let Some(args) = entry.args.clone() {
+                                    let js_args = rquickjs::Array::new(ctx.clone())?;
+                                    for (i, arg) in args.clone().iter().enumerate() {
+                                        js_args.set(i, rquickjs::String::from_str(ctx.clone(), arg)?)?;
+                                    }
+                                    js_chord.set("args", js_args)?;
+                                }
+
                                 let js_key = rquickjs::String::from_str(ctx.clone(), sequence)?;
                                 js_chords.set(js_key, js_chord)?;
                             }
