@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use keycode::KeyMappingCode;
 use tauri::AppHandle;
 
 #[derive(Debug, Clone)]
@@ -36,6 +37,12 @@ pub struct ChordRuntime {
     // Needs to be an Arc so the JS runtime can access its latest value
     pub raw_chords: Arc<Mutex<HashMap<String, AppChordMapValue>>>,
     pub config: Option<AppChordsFileConfig>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChordPayload {
+    pub chord: Chord,
+    pub num_times: usize,
 }
 
 impl ChordRuntime {
@@ -83,8 +90,26 @@ impl ChordRuntime {
         Ok(())
     }
 
-    pub fn get_chord(&self, sequence: &[Key]) -> Option<&Chord> {
-        self.chords.get(sequence)
+    pub fn get_chord(&self, sequence: &[Key]) -> Option<ChordPayload> {
+        let split_idx = sequence
+            .iter()
+            .position(|k| !k.is_digit())
+            .unwrap_or(sequence.len());
+        let (digit_keys, chord_keys) = sequence.split_at(split_idx);
+        let num_times = if digit_keys.is_empty() {
+            1
+        } else {
+            let digits: String = digit_keys
+                .iter()
+                .filter_map(|k| k.to_char(false))
+                .collect();
+            let num_times = digits.parse::<usize>().unwrap_or(1);
+            num_times
+        };
+        self.chords.get(chord_keys).map(|chord| ChordPayload {
+            chord: chord.clone(),
+            num_times
+        })
     }
 }
 
@@ -252,9 +277,9 @@ impl LoadedAppChords {
     }
 }
 
-fn press_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut) -> Result<()> {
+fn press_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut, num_times: usize) -> Result<()> {
     handle.run_on_main_thread(move || {
-        if let Err(e) = press_shortcut(shortcut.clone()) {
+        if let Err(e) = press_shortcut(shortcut.clone(), num_times) {
             log::error!("failed to press shortcut: {e}");
         }
     })?;
@@ -317,10 +342,10 @@ fn log_shell_output(shell: &str, output: std::process::Output) {
     }
 }
 
-fn invoke_js_chord_in_background(handle: AppHandle, module_path: String, args: Vec<String>) {
+fn invoke_js_chord_in_background(handle: AppHandle, module_path: String, args: Vec<String>, num_times: usize) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = with_js(handle.clone(), move |ctx| {
-            Box::pin(call_js_default_export(ctx, module_path, args))
+            Box::pin(call_js_default_export(ctx, module_path, args, num_times))
         })
             .await
         {
@@ -333,47 +358,50 @@ async fn call_js_default_export<'js>(
     ctx: Ctx<'js>,
     module_path: String,
     args: Vec<String>,
+    num_times: usize,
 ) -> rquickjs::Result<()> {
-    let Some(namespace) = import_js_namespace(ctx.clone(), &module_path).await else {
-        return Ok(());
-    };
-
-    let Some(default_function) = get_default_export_function(ctx.clone(), &namespace).await else {
-        return Ok(());
-    };
-
-    let Some(js_args) = convert_js_args(&ctx, args) else {
-        return Ok(());
-    };
-
-    log::debug!("Calling default function with arguments: {:?}", js_args);
-
-    let result = match call_function_with_values(ctx.clone(), default_function, js_args) {
-        Ok(value) => value,
-        Err(e) => {
-            log::error!(
-                "Failed to call default function: {}",
-                format_js_error(ctx.clone(), e)
-            );
+    for _ in 0..num_times {
+        let Some(namespace) = import_js_namespace(ctx.clone(), &module_path).await else {
             return Ok(());
-        }
-    };
+        };
 
-    log::debug!("Return value: {:?}", result);
+        let Some(default_function) = get_default_export_function(ctx.clone(), &namespace).await else {
+            return Ok(());
+        };
 
-    match await_promise_if_needed(ctx.clone(), result).await {
-        Ok(awaited) => {
-            log::debug!("Promise awaited: {:?}", awaited);
-            Ok(())
-        }
-        Err(e) => {
-            log::error!(
-                "Default function promise rejected: {}",
-                format_js_error(ctx.clone(), e)
-            );
-            Ok(())
+        let Some(js_args) = convert_js_args(&ctx, args.clone()) else {
+            return Ok(());
+        };
+
+        log::debug!("Calling default function with arguments: {:?}", js_args);
+
+        let result = match call_function_with_values(ctx.clone(), default_function, js_args) {
+            Ok(value) => value,
+            Err(e) => {
+                log::error!(
+                    "Failed to call default function: {}",
+                    format_js_error(ctx.clone(), e)
+                );
+                return Ok(());
+            }
+        };
+
+        log::debug!("Return value: {:?}", result);
+
+        match await_promise_if_needed(ctx.clone(), result).await {
+            Ok(awaited) => {
+                log::debug!("Promise awaited: {:?}", awaited);
+            }
+            Err(e) => {
+                log::error!(
+                    "Default function promise rejected: {}",
+                    format_js_error(ctx.clone(), e)
+                );
+            }
         }
     }
+
+    Ok(())
 }
 
 async fn import_js_namespace<'js>(ctx: Ctx<'js>, module_path: &str) -> Option<Object<'js>> {
@@ -494,20 +522,20 @@ async fn await_promise_if_needed<'js>(
     result
 }
 
-pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> Result<()> {
-    log::debug!("Pressing chord: {:?}", chord);
+pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord_payload: &ChordPayload) -> Result<()> {
+    log::debug!("Pressing chord: {:?}", chord_payload);
 
-    if let Some(shortcut) = chord.shortcut.clone() {
-        return press_shortcut_on_main_thread(handle, shortcut);
+    if let Some(shortcut) = chord_payload.chord.shortcut.clone() {
+        return press_shortcut_on_main_thread(handle, shortcut, chord_payload.num_times);
     }
 
-    if let Some(shell) = chord.shell.clone() {
+    if let Some(shell) = chord_payload.chord.shell.clone() {
         run_shell_command_in_background(shell);
         return Ok(());
     }
 
-    if let Some(args) = chord.args.clone() {
-        invoke_js_chord_in_background(handle, runtime.path.clone(), args);
+    if let Some(args) = chord_payload.chord.args.clone() {
+        invoke_js_chord_in_background(handle, runtime.path.clone(), args, chord_payload.num_times);
     }
 
     Ok(())

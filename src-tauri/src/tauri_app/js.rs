@@ -165,7 +165,7 @@ fn init_globals(ctx: Ctx<'_>) -> rquickjs::Result<()> {
                     throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
                 })?;
 
-                press_shortcut(shortcut).map_err(|err| {
+                press_shortcut(shortcut, 1).map_err(|err| {
                     throw_js_error(ctx.clone(), format!("press({key:?}) failed: {err}"))
                 })?;
 
@@ -205,7 +205,7 @@ fn init_globals(ctx: Ctx<'_>) -> rquickjs::Result<()> {
                     throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
                 })?;
 
-                press_shortcut(shortcut.clone()).map_err(|err| {
+                press_shortcut(shortcut.clone(), 1).map_err(|err| {
                     throw_js_error(ctx.clone(), format!("tap({key:?}) press failed: {err}"))
                 })?;
 

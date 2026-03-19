@@ -3,9 +3,9 @@ use anyhow::Result;
 use keycode::KeyMappingCode;
 use std::str::FromStr;
 
-pub fn press_shortcut(shortcut: Shortcut) -> Result<()> {
+pub fn press_shortcut(shortcut: Shortcut, num_times: usize) -> Result<()> {
     log::debug!("Pressing shortcut: {:?}", shortcut);
-    apply_actions(press_actions(&shortcut))?;
+    apply_actions(press_actions(&shortcut, num_times))?;
 
     Ok(())
 }
@@ -37,7 +37,7 @@ fn apply_actions(actions: Vec<ShortcutAction>) -> Result<()> {
     Ok(())
 }
 
-fn press_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
+fn press_actions(shortcut: &Shortcut, num_times: usize) -> Vec<ShortcutAction> {
     let mut actions = Vec::new();
     let has_shift = shortcut.chords.iter().any(|chord| {
         chord.keys.iter().any(|key| {
@@ -50,14 +50,20 @@ fn press_actions(shortcut: &Shortcut) -> Vec<ShortcutAction> {
     let suppress_shift = !has_shift;
     log::debug!("Has Shift: {}", has_shift);
 
-    for (index, chord) in shortcut.chords.iter().enumerate() {
-        for &key in &chord.keys {
-            actions.push(ShortcutAction::Press(key, suppress_shift));
-        }
+    for i in 0..num_times {
+        for (index, chord) in shortcut.chords.iter().enumerate() {
+            for &key in &chord.keys {
+                actions.push(ShortcutAction::Press(key, suppress_shift));
+            }
 
-        if index + 1 != shortcut.chords.len() {
-            for &key in chord.keys.iter().rev() {
-                actions.push(ShortcutAction::Release(key, suppress_shift));
+            let is_last_chord = index + 1 == shortcut.chords.len();
+            let is_last_iteration = i + 1 == num_times;
+
+            // Only release if NOT the final chord of the final iteration
+            if !(is_last_chord && is_last_iteration) {
+                for &key in chord.keys.iter().rev() {
+                    actions.push(ShortcutAction::Release(key, suppress_shift));
+                }
             }
         }
     }
