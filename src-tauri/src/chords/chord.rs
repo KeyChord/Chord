@@ -10,7 +10,7 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use gix::url::expand_path::with;
 use tauri::AppHandle;
-use crate::js::with_js;
+use crate::js::{format_js_error, with_js};
 
 #[derive(Debug, Clone)]
 pub struct Chord {
@@ -36,7 +36,6 @@ pub struct ChordRuntime {
 impl ChordRuntime {
     pub fn from_chords(chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
         let raw_chords = Arc::new(Mutex::new(HashMap::new()));
-        let js_runtime = Runtime::new()?;
         Ok(Self {
             chords,
             raw_chords,
@@ -51,7 +50,6 @@ impl ChordRuntime {
         // We intentionally keep in global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow();
 
-        let js_runtime = Runtime::new()?;
         let runtime = Self {
             raw_chords,
             config,
@@ -89,6 +87,7 @@ impl ChordRuntime {
 
 fn application_id_from_chords_path(file_path: &Path) -> Option<String> {
     let application_path = file_path.parent()?;
+    let application_path = application_path.strip_prefix("chords/macos").ok()?;
     if application_path.as_os_str().is_empty() {
         return None;
     }
@@ -167,6 +166,8 @@ impl LoadedAppChords {
             log::debug!("Loading folder from root {:?}", chord_folder.root_dir);
 
             for (chord_file_path, file) in chord_folder.chords_files {
+                log::debug!("Starting to load chords file from path {:?}", chord_file_path);
+
                 let Some(application_id) = application_id_from_chords_path(Path::new(&chord_file_path))
                 else {
                     log::warn!("Invalid chords path: {:?}", chord_file_path);
@@ -190,13 +191,13 @@ impl LoadedAppChords {
 
                 // Load all JS files as modules
                 let js_files = &chord_folder.js_files;
-                with_js(|ctx| -> Result<()> {
+                with_js(|ctx| {
                     for (filepath, js) in js_files.iter() {
-                        Module::declare(ctx.clone(), filepath, js.as_str())?;
+                        if let Err(e) = Module::declare(ctx.clone(), filepath, js.as_str()) {
+                            log::error!("Failed to declare JS module: {}", format_js_error(ctx.clone(), e));
+                        }
                     }
-
-                    Ok(())
-                })?;
+                });
 
                 log::debug!(
                     "Loaded {} initial chords for application ID {}",

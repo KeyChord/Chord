@@ -1,8 +1,11 @@
-use rquickjs::{Context, Ctx, Function, Runtime};
 use crate::chords::{press_shortcut, release_shortcut, Shortcut};
+use rquickjs::{Context, Ctx, Error, Function, Object, Runtime, Value};
+use rquickjs::loader::{BuiltinLoader, BuiltinResolver};
+use rquickjs::stdlib;
 
 thread_local! {
-    static JS: std::cell::RefCell<Option<(Runtime, Context)>> = std::cell::RefCell::new(None);
+    static JS: std::cell::RefCell<Option<(Runtime, Context)>> =
+        std::cell::RefCell::new(None);
 }
 
 pub fn with_js<F, R>(f: F) -> R
@@ -15,9 +18,13 @@ where
         if opt.is_none() {
             let rt = Runtime::new().unwrap();
             let ctx = Context::full(&rt).unwrap();
+            let loader = BuiltinLoader::default();
+            let resolver = BuiltinResolver::default();
+            rt.set_loader(resolver, loader);
 
-            // 👇 initialize your globals here
             ctx.with(|ctx| {
+                // 👇 this is the key part
+
                 init_globals(ctx).unwrap();
             });
 
@@ -25,76 +32,108 @@ where
         }
 
         let (_, ctx) = opt.as_ref().unwrap();
-
         ctx.with(|ctx| f(&ctx))
     })
 }
 
-fn init_globals(ctx: Ctx) -> rquickjs::Result<()> {
-    // let get_chords = {
-    //     let ctx = ctx.clone();
-    //     Function::new(ctx.clone(), move || -> rquickjs::Result<Object> {
-    //         let chords = Object::new(ctx.clone())?;
-    //         let raw_chords = raw_chords.lock().unwrap();
-    //
-    //         for (sequence, chord) in raw_chords.iter() {
-    //             if let AppChordMapValue::Single(chord) = chord {
-    //                 let obj = Object::new(ctx.clone())?;
-    //                 obj.set("name", chord.name.clone())?;
-    //                 obj.set("shortcut", chord.shortcut.clone())?;
-    //                 obj.set("shell", chord.shell.clone())?;
-    //                 obj.set("js", chord.js.clone())?;
-    //                 chords.set(sequence.clone(), obj)?;
-    //             }
-    //         }
-    //
-    //         Ok(chords)
-    //     })?
-    // };
-    //
-    // ctx.globals().set("getChords", get_chords)?;
+fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
+    let message = message.into();
+
+    // Build a real JS Error object so QuickJS can attach a stack.
+    let thrown = (|| -> rquickjs::Result<Value<'_>> {
+        let error_ctor: Function<'_> = ctx.globals().get("Error")?;
+        error_ctor.call((message.as_str(),))
+    })();
+
+    match thrown {
+        Ok(err_value) => ctx.throw(err_value),
+        Err(_) => Error::new_into_js_message("Rust", "JavaScript", message),
+    }
+}
+
+fn init_globals(ctx: Ctx<'_>) -> rquickjs::Result<()> {
+    let globals = ctx.globals();
 
     // press
     {
-        let ctx = ctx.clone();
-        let press = Function::new(ctx.clone(), |key: String| -> rquickjs::Result<()> {
-            let shortcut = Shortcut::parse(&key)
-                .map_err(|_| rquickjs::Error::Exception)?;
-            press_shortcut(shortcut)
-                .map_err(|_| rquickjs::Error::Exception)?;
+        let press = Function::new(ctx.clone(), |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
+            let shortcut = Shortcut::parse(&key).map_err(|err| {
+                throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
+            })?;
+
+            press_shortcut(shortcut).map_err(|err| {
+                throw_js_error(ctx.clone(), format!("press({key:?}) failed: {err}"))
+            })?;
+
             Ok(())
-        })?;
-        ctx.globals().set("press", press)?;
+        })?
+            .with_name("press")?;
+
+        globals.set("press", press)?;
     }
 
     // release
     {
-        let ctx = ctx.clone();
-        let release = Function::new(ctx.clone(), |key: String| -> rquickjs::Result<()> {
-            let shortcut = Shortcut::parse(&key)
-                .map_err(|_| rquickjs::Error::Exception)?;
-            release_shortcut(shortcut)
-                .map_err(|_| rquickjs::Error::Exception)?;
-            Ok(())
-        })?;
-        ctx.globals().set("release", release)?;
+        let release =
+            Function::new(ctx.clone(), |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
+                let shortcut = Shortcut::parse(&key).map_err(|err| {
+                    throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
+                })?;
+
+                release_shortcut(shortcut).map_err(|err| {
+                    throw_js_error(ctx.clone(), format!("release({key:?}) failed: {err}"))
+                })?;
+
+                Ok(())
+            })?
+                .with_name("release")?;
+
+        globals.set("release", release)?;
     }
 
     // tap
     {
-        let ctx = ctx.clone();
-        let tap = Function::new(ctx.clone(), |key: String| -> rquickjs::Result<()> {
-            let shortcut = Shortcut::parse(&key)
-                .map_err(|_| rquickjs::Error::Exception)?;
-            press_shortcut(shortcut.clone())
-                .map_err(|_| rquickjs::Error::Exception)?;
-            release_shortcut(shortcut)
-                .map_err(|_| rquickjs::Error::Exception)?;
+        let tap = Function::new(ctx.clone(), |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
+            let shortcut = Shortcut::parse(&key).map_err(|err| {
+                throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
+            })?;
+
+            press_shortcut(shortcut.clone()).map_err(|err| {
+                throw_js_error(ctx.clone(), format!("tap({key:?}) press failed: {err}"))
+            })?;
+
+            release_shortcut(shortcut).map_err(|err| {
+                throw_js_error(ctx.clone(), format!("tap({key:?}) release failed: {err}"))
+            })?;
+
             Ok(())
-        })?;
-        ctx.globals().set("tap", tap)?;
+        })?
+            .with_name("tap")?;
+
+        globals.set("tap", tap)?;
     }
 
     Ok(())
 }
 
+pub fn format_js_error(ctx: Ctx, err: Error) -> String {
+    match err {
+        Error::Exception => {
+            let exception: Value = ctx.catch();
+
+            if let Ok(obj) = Object::from_value(exception.clone()) {
+                let message: Option<String> = obj.get("message").ok();
+                let stack: Option<String> = obj.get("stack").ok();
+
+                match (message, stack) {
+                    (Some(msg), Some(stack)) => format!("{}\n{}", msg, stack),
+                    (Some(msg), None) => msg,
+                    _ => format!("{:?}", exception),
+                }
+            } else {
+                format!("{:?}", exception)
+            }
+        }
+        _ => err.to_string(),
+    }
+}

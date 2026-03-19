@@ -94,7 +94,7 @@ pub fn initialize_app_context(app: AppHandle) -> Result<()> {
 
     app.manage(context);
     if let Err(e) = reload_loaded_app_chords(&app) {
-        log::error!("Failed to reload app chords: {e}");
+        log::error!("Failed to reload app chords:\n{:#?}", e);
     }
 
     Ok(())
