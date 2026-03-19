@@ -57,24 +57,6 @@ impl ChordRuntime {
         // We intentionally keep in global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow();
 
-        if let Some(js) = config.as_ref().and_then(|c| c.js.as_ref()) {
-            if let Some(content) = js.module.as_ref() {
-                with_js(|ctx| {
-                    let module = match Module::declare(ctx.clone(), path.clone(), content.as_bytes()) {
-                        Ok(m) => m,
-                        Err(e) => {
-                            log::error!("Failed to declare module: {:?}", e);
-                            return;
-                        }
-                    };
-
-                    if let Err(e) = module.eval() {
-                        log::error!("Failed to load module: {:?}", e);
-                        return;
-                    }
-                });
-            }
-        }
 
         Ok(Self {
             path,
@@ -82,6 +64,27 @@ impl ChordRuntime {
             config,
             chords,
         })
+    }
+
+    pub fn load_module(&self) {
+        if let Some(js) = self.config.as_ref().and_then(|c| c.js.as_ref()) {
+            if let Some(content) = js.module.as_ref() {
+                with_js(|ctx| {
+                    let module = match Module::declare(ctx.clone(), self.path.clone(), content.as_bytes()) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!("Failed to declare module: {:?}", format_js_error(ctx.clone(), e));
+                            return;
+                        }
+                    };
+
+                    if let Err(e) = module.eval() {
+                        log::error!("Failed to evaluate module: {:?}", e);
+                        return;
+                    }
+                });
+            }
+        }
     }
 
     pub fn extend_runtime(&mut self, base: &Self) -> Result<()> {
@@ -215,11 +218,22 @@ impl LoadedAppChords {
                 let js_files = &chord_folder.js_files;
                 with_js(|ctx| {
                     for (filepath, js) in js_files.iter() {
-                        if let Err(e) = Module::declare(ctx.clone(), filepath, js.as_str()) {
-                            log::error!("Failed to declare JS module: {}", format_js_error(ctx.clone(), e));
+                        let module = match Module::declare(ctx.clone(), filepath.clone(), js.as_str()) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                log::error!("Failed to declare JS module {}: {}", filepath, format_js_error(ctx.clone(), e));
+                                continue;
+                            }
+                        };
+
+                        if let Err(e) = module.eval() {
+                            log::error!("Failed to evaluate JS module {}: {}", filepath, format_js_error(ctx.clone(), e));
                         }
                     }
                 });
+
+                // We should only load the module AFTER the js files have been loaded
+                app_chord_runtime.load_module();
 
                 log::debug!(
                     "Loaded {} initial chords for application ID {}",
@@ -352,7 +366,7 @@ pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> 
             };
 
             let Some(default_function) = default.as_function() else {
-                log::error!("Default export is not a function");
+                log::error!("Default export is not a function: {:?}", default);
                 return;
             };
 
