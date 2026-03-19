@@ -45,7 +45,7 @@ bijective-enum-map = "0.1.0"
 walkdir = "2.5.0"
 gix = {  version = "0.80.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-rquickjs = {  version = "0.11.0", features = ["loader"] }
+rquickjs = {  version = "0.11.0", features = ["loader", "futures"] }
 mac-keycode = "0.0.2"
 fast_radix_trie = "1.1.0"
 llrt_path = { git = "https://github.com/awslabs/llrt", package = "llrt_path" }

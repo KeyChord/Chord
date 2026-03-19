@@ -48,7 +48,8 @@ impl AppChordsFile {
                 .shortcut
                 .as_ref()
                 .map(|s| Shortcut::parse(s))
-                .transpose() else {
+                .transpose()
+            else {
                 log::warn!("Skipping invalid shortcut for sequence: {}", sequence);
                 continue;
             };

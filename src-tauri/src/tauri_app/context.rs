@@ -1,6 +1,7 @@
-use crate::chords::{ChordFolder, LoadedAppChords};
+use crate::chords::{ChordFolder, ChordRuntime, LoadedAppChords};
 use crate::feature::Chorder;
-use crate::git::load_all_app_chords;
+use crate::git::load_all_chord_folders;
+use crate::js::{format_js_error, with_js};
 use crate::{
     feature::ChorderIndicatorPanel,
     input::KeyEventState,
@@ -12,6 +13,7 @@ use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
 use objc2_app_kit::NSWorkspace;
 use parking_lot::RwLock;
+use rquickjs::Module;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -71,9 +73,9 @@ impl AppContext {
     }
 }
 
-pub fn initialize_app_context(app: AppHandle) -> Result<()> {
+pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
     let chorder = {
-        let window = app
+        let window = handle
             .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
             .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
         Chorder::new(ChorderIndicatorPanel::from_window(window)?)
@@ -82,36 +84,154 @@ pub fn initialize_app_context(app: AppHandle) -> Result<()> {
 
     let context = AppContext::new(chorder, bundled_app_chords);
 
-    // Setting the frontmost application immediately (the frontmost crate only detects changes)
-    let workspace = NSWorkspace::sharedWorkspace();
-    if let Some(application) = workspace.frontmostApplication() {
-        if let Some(bundle_id) = application.bundleIdentifier() {
-            context
-                .frontmost_application_id
-                .store(Arc::new(Some(bundle_id.to_string())));
-        }
-    }
+    // // Setting the frontmost application immediately (the frontmost crate only detects changes)
+    // let workspace = NSWorkspace::sharedWorkspace();
+    // if let Some(application) = workspace.frontmostApplication() {
+    //     if let Some(bundle_id) = application.bundleIdentifier() {
+    //         context
+    //             .frontmost_application_id
+    //             .store(Arc::new(Some(bundle_id.to_string())));
+    //     }
+    // }
 
-    app.manage(context);
-    if let Err(e) = reload_loaded_app_chords(&app) {
+    handle.manage(context);
+    if let Err(e) = reload_loaded_app_chords(&handle).await {
         log::error!("Failed to reload app chords:\n{:#?}", e);
     }
 
     Ok(())
 }
 
-pub fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
+// Also evaluates JavaScript
+pub async fn reload_loaded_app_chords(app: &AppHandle) -> Result<()> {
     let context = app.state::<AppContext>();
     context.chorder.ensure_inactive(app.clone())?;
 
-    let loaded_chords = load_all_app_chords(app)?;
-    log::debug!(
-        "Loaded chord files: {:?}",
-        loaded_chords.runtimes.keys()
-    );
+    let chord_folders = load_all_chord_folders(app)?;
+    // Load all JS files as modules
+    let chord_folders = load_all_chord_folders(app)?;
+
+    // Load all JS files as modules, but keep `chord_folders` so we can use it later.
+    for chord_folder in &chord_folders {
+        let js_files = chord_folder.js_files.clone();
+
+        with_js(app.clone(), move |ctx| {
+            Box::pin(async move {
+                for (filepath, js) in js_files {
+                    let module = match Module::declare(ctx.clone(), filepath.clone(), js) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to declare JS module {}: {}",
+                                filepath,
+                                format_js_error(ctx.clone(), e)
+                            );
+                            continue;
+                        }
+                    };
+
+                    let (_evaluated, promise) = match module.eval() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to start evaluating JS module {}: {}",
+                                filepath,
+                                format_js_error(ctx.clone(), e)
+                            );
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = promise.into_future::<()>().await {
+                        log::error!(
+                            "Failed to evaluate JS module {}: {}",
+                            filepath,
+                            format_js_error(ctx.clone(), e)
+                        );
+                    }
+                }
+
+                Ok(())
+            })
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
+    }
+
+    let loaded_chords = LoadedAppChords::from_folders(chord_folders)?;
+    // We should only load `chords.toml` modules AFTER the js files have been loaded
+    load_chord_files_runtime_modules(app.clone(), &loaded_chords).await;
+
+    log::debug!("Loaded chord files: {:?}", loaded_chords.runtimes.keys());
     *context.loaded_app_chords.write() = loaded_chords;
 
     Ok(())
+}
+
+// Load all the modules specified in the config.js.module of the `chords.toml` files.
+pub async fn load_chord_files_runtime_modules(
+    handle: AppHandle,
+    loaded_app_chords: &LoadedAppChords,
+) {
+    for (id, runtime) in loaded_app_chords.runtimes.iter() {
+        let handle = handle.clone();
+
+        let Some(js) = runtime.config.as_ref().and_then(|c| c.js.as_ref()) else {
+            continue;
+        };
+
+        let Some(content) = js.module.clone() else {
+            continue;
+        };
+
+        let path = runtime.path.clone();
+
+        tauri::async_runtime::spawn(async move {
+            let path_ = path.clone();
+            let result = with_js(handle, move |ctx| {
+                Box::pin(async move {
+                    let module = match Module::declare(ctx.clone(), path.clone(), content) {
+                        Ok(m) => m,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to declare module {}: {}",
+                                path,
+                                format_js_error(ctx.clone(), e)
+                            );
+                            return Ok(());
+                        }
+                    };
+
+                    let (_evaluated, promise) = match module.eval() {
+                        Ok(v) => v,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to start evaluating module {}: {}",
+                                path,
+                                format_js_error(ctx.clone(), e)
+                            );
+                            return Ok(());
+                        }
+                    };
+
+                    if let Err(e) = promise.into_future::<()>().await {
+                        log::error!(
+                            "Failed to evaluate module {}: {}",
+                            path,
+                            format_js_error(ctx.clone(), e)
+                        );
+                    }
+
+                    Ok(())
+                })
+            })
+            .await;
+
+            if let Err(err) = result {
+                log::error!("load_module failed for {}: {}", path_, err);
+            }
+        });
+    }
 }
 
 pub fn list_active_chords(app: &AppHandle) -> Result<Vec<ActiveChordInfo>> {

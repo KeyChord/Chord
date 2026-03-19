@@ -3,13 +3,13 @@ use crate::{initialize_app_context, tauri_app, Frontmost};
 use anyhow::{Context, Result};
 use frontmost::{start_nsrunloop, Detector};
 use std::thread;
-use tauri::App;
+use tauri::{App, AppHandle};
 
-pub fn setup_app(app: &mut App) -> Result<()> {
-    let handle = app.handle();
-
+pub async fn setup_app(handle: AppHandle) -> Result<()> {
     // We want to initialize this as early as possible because code usually assumes that context is available.
-    initialize_app_context(handle.clone()).context("failed to initialize app context")?;
+    initialize_app_context(handle.clone())
+        .await
+        .context("failed to initialize app context")?;
 
     let frontmost = Frontmost {
         frontmost: String::new(),

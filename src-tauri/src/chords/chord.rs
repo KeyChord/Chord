@@ -1,16 +1,16 @@
 use crate::chords::shortcut::{press_shortcut, release_shortcut, Shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordFolder};
 use crate::input::Key;
+use crate::js::{format_js_error, with_js};
 use anyhow::Result;
-use rquickjs::{Ctx, Function, IntoJs, Module, Object};
-use rquickjs::runtime::{UserDataError};
+use rquickjs::function::Args;
+use rquickjs::runtime::UserDataError;
+use rquickjs::{Ctx, Function, IntoJs, Module, Object, Promise, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use rquickjs::function::Args;
 use tauri::AppHandle;
-use crate::js::{format_js_error, with_js};
 
 #[derive(Debug, Clone)]
 pub struct Chord {
@@ -57,34 +57,12 @@ impl ChordRuntime {
         // We intentionally keep in global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow();
 
-
         Ok(Self {
             path,
             raw_chords,
             config,
             chords,
         })
-    }
-
-    pub fn load_module(&self) {
-        if let Some(js) = self.config.as_ref().and_then(|c| c.js.as_ref()) {
-            if let Some(content) = js.module.as_ref() {
-                with_js(|ctx| {
-                    let module = match Module::declare(ctx.clone(), self.path.clone(), content.as_bytes()) {
-                        Ok(m) => m,
-                        Err(e) => {
-                            log::error!("Failed to declare module: {:?}", format_js_error(ctx.clone(), e));
-                            return;
-                        }
-                    };
-
-                    if let Err(e) = module.eval() {
-                        log::error!("Failed to evaluate module: {:?}", e);
-                        return;
-                    }
-                });
-            }
-        }
     }
 
     pub fn extend_runtime(&mut self, base: &Self) -> Result<()> {
@@ -186,14 +164,17 @@ impl LoadedAppChords {
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
 
-
         for chord_folder in chord_folders {
             log::debug!("Loading folder from root {:?}", chord_folder.root_dir);
 
             for (chord_file_path, file) in chord_folder.chords_files {
-                log::debug!("Starting to load chords file from path {:?}", chord_file_path);
+                log::debug!(
+                    "Starting to load chords file from path {:?}",
+                    chord_file_path
+                );
 
-                let Some(application_id) = application_id_from_chords_path(Path::new(&chord_file_path))
+                let Some(application_id) =
+                    application_id_from_chords_path(Path::new(&chord_file_path))
                 else {
                     log::warn!("Invalid chords path: {:?}", chord_file_path);
                     continue;
@@ -207,33 +188,13 @@ impl LoadedAppChords {
                         .is_some_and(|c| !c.is_digit() && !c.is_letter())
                     {
                         log::debug!("Adding global chord for sequence: {:?}", sequence);
-                        global_chords_to_runtime_key.insert(sequence.clone(), application_id.clone());
+                        global_chords_to_runtime_key
+                            .insert(sequence.clone(), application_id.clone());
                     }
                 }
 
                 let config = file.config.clone();
                 let app_chord_runtime = ChordRuntime::from_file_shallow(chord_file_path, file)?;
-
-                // Load all JS files as modules
-                let js_files = &chord_folder.js_files;
-                with_js(|ctx| {
-                    for (filepath, js) in js_files.iter() {
-                        let module = match Module::declare(ctx.clone(), filepath.clone(), js.as_str()) {
-                            Ok(m) => m,
-                            Err(e) => {
-                                log::error!("Failed to declare JS module {}: {}", filepath, format_js_error(ctx.clone(), e));
-                                continue;
-                            }
-                        };
-
-                        if let Err(e) = module.eval() {
-                            log::error!("Failed to evaluate JS module {}: {}", filepath, format_js_error(ctx.clone(), e));
-                        }
-                    }
-                });
-
-                // We should only load the module AFTER the js files have been loaded
-                app_chord_runtime.load_module();
 
                 log::debug!(
                     "Loaded {} initial chords for application ID {}",
@@ -259,7 +220,10 @@ impl LoadedAppChords {
             }
         }
 
-        log::debug!("Loaded global chords: {:?}", global_chords_to_runtime_key.keys());
+        log::debug!(
+            "Loaded global chords: {:?}",
+            global_chords_to_runtime_key.keys()
+        );
         Ok(LoadedAppChords {
             global_chords_to_runtime_key,
             runtimes: app_runtime_map,
@@ -347,58 +311,87 @@ pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> 
             }
         });
     } else if let Some(args) = js_args {
-        // This calls the default export with the js_args
-        with_js(|ctx| {
-            let module = match Module::import(ctx, path) {
-                Ok(module) => module,
-                Err(e) => {
-                    log::error!("Failed to import JS module: {}", format_js_error(ctx.clone(), e));
-                    return;
-                }
-            };
+        tauri::async_runtime::spawn(async move {
+            // This calls the default export with the js_args
+            if let Err(e) = with_js(handle.clone(), move |ctx| {
+                Box::pin(async move {
+                    let namespace: Object = match Module::import(&ctx, path.clone()) {
+                        Ok(import_promise) => match import_promise.into_future::<Object>().await {
+                            Ok(ns) => ns,
+                            Err(e) => {
+                                log::error!("Failed to import JS module: {}", format_js_error(ctx.clone(), e));
+                                return Ok(());
+                            }
+                        },
+                        Err(e) => {
+                            log::error!("Failed to start importing JS module: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
+                    };
 
-            let default: rquickjs::Value = match module.get("default") {
-                Ok(default) => default,
-                Err(e) => {
-                    log::error!("Failed to get default export: {}", format_js_error(ctx.clone(), e));
-                    return;
-                }
-            };
+                    let default: Value = match namespace.get("default") {
+                        Ok(default) => default,
+                        Err(e) => {
+                            log::error!("Failed to get default export: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
+                    };
 
-            let Some(default_function) = default.as_function() else {
-                log::error!("Default export is not a function: {:?}", default);
-                return;
-            };
+                    let Some(default_function) = default.as_function() else {
+                        log::error!("Default export is not a function: {:?}", default);
+                        return Ok(());
+                    };
 
-            let js_args: Vec<rquickjs::Value> = match args
-                .into_iter()
-                .map(|arg| arg.into_js(&ctx))
-                .collect::<rquickjs::Result<_>>() {
-                    Ok(args) => args,
-                    Err(e) => {
-                        log::error!("Failed to convert arguments: {}", format_js_error(ctx.clone(), e));
-                        return;
+                    let js_args: Vec<Value> = match args
+                        .into_iter()
+                        .map(|arg| arg.into_js(&ctx))
+                        .collect::<rquickjs::Result<_>>()
+                    {
+                        Ok(args) => args,
+                        Err(e) => {
+                            log::error!("Failed to convert arguments: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
+                    };
+
+                    let mut args_builder = Args::new(ctx.clone(), js_args.len());
+                    log::debug!("Calling default function with arguments: {:?}", js_args);
+
+                    for value in js_args {
+                        if let Err(e) = args_builder.push_arg(value) {
+                            log::error!("Failed to push argument: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
                     }
-                };
 
+                    let result: Value = match default_function.call_arg(args_builder) {
+                        Ok(value) => value,
+                        Err(e) => {
+                            log::error!("Failed to call default function: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
+                    };
 
-            let mut args_builder = Args::new(ctx.clone(), js_args.len());
-            log::debug!("Calling default function with arguments: {:?}", js_args);
-            for value in js_args {
-                if let Err(e) = args_builder.push_arg(value) {
-                    log::error!("Failed to push argument: {}", format_js_error(ctx.clone(), e));
-                    return;
-                }
-            }
+                    // If the default export is async, await its returned promise.
+                    if result.is_promise() {
+                        let promise = match Promise::from_value(result) {
+                            Ok(promise) => promise,
+                            Err(e) => {
+                                log::error!("Function returned something marked as promise, but it could not be converted: {}", format_js_error(ctx.clone(), e));
+                                return Ok(());
+                            }
+                        };
 
-            match default_function.call_arg::<()>(args_builder) {
-                Ok(_) => {
-                    // TODO: check if value is false
-                }
-                Err(e) => {
-                    log::error!("Failed to call default function: {}", format_js_error(ctx.clone(), e));
-                    return;
-                }
+                        if let Err(e) = promise.into_future::<Value>().await {
+                            log::error!("Default function promise rejected: {}", format_js_error(ctx.clone(), e));
+                            return Ok(());
+                        }
+                    }
+
+                    Ok(())
+                })
+            }).await {
+                log::error!("press_chord failed: {}", e);
             }
         });
     }

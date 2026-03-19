@@ -129,21 +129,28 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_user_input::init())
-        .setup(|app| {
-            if let Err(e) = tauri_app::setup::setup_app(app) {
-                log::error!("Failed to set up app:\n{:#?}", e);
-
-                app.handle()
-                    .dialog()
-                    .message(format!("Failed to start Chords:\n\n{e}"))
-                    .title("Startup Error")
-                    .blocking_show();
-
-                std::process::exit(1);
-            }
-
-            Ok(())
-        })
+        .setup(setup)
         .run(tauri::generate_context!())
         .expect("error while running tauri_app application");
+}
+
+// https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
+fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let handle = app.handle().clone();
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = tauri_app::setup::setup_app(handle.clone()).await {
+            log::error!("Failed to set up app:\n{:#?}", e);
+
+            handle
+                .dialog()
+                .message(format!("Failed to start Chords:\n\n{e}"))
+                .title("Startup Error")
+                .blocking_show();
+
+            std::process::exit(1);
+        }
+    });
+
+    Ok(())
 }

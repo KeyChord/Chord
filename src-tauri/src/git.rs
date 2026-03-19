@@ -184,7 +184,7 @@ pub fn load_repo_chords(app: &AppHandle, repo_input: &str) -> Result<LoadedAppCh
     LoadedAppChords::from_folders(vec![chord_folder])
 }
 
-pub fn load_all_app_chords(app: &AppHandle) -> Result<LoadedAppChords> {
+pub fn load_all_chord_folders(app: &AppHandle) -> Result<Vec<ChordFolder>> {
     let mut chord_folders = Vec::new();
 
     for repo in discover_git_repos(app)? {
@@ -199,7 +199,7 @@ pub fn load_all_app_chords(app: &AppHandle) -> Result<LoadedAppChords> {
         }
     }
 
-    LoadedAppChords::from_folders(chord_folders)
+    Ok(chord_folders)
 }
 
 fn clone_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {

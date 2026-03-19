@@ -65,10 +65,8 @@ impl ChordFolder {
 
                         match AppChordsFile::parse(&content) {
                             Ok(parsed) => {
-                                chords_files.insert(
-                                    relative_path.to_string_lossy().to_string(),
-                                    parsed,
-                                );
+                                chords_files
+                                    .insert(relative_path.to_string_lossy().to_string(), parsed);
                             }
                             Err(error) => {
                                 log::warn!("Skipping invalid {:?}: {}", path, error);
@@ -84,10 +82,7 @@ impl ChordFolder {
                 if path.extension().and_then(|s| s.to_str()) == Some("js") {
                     let content = std::fs::read_to_string(path)?;
 
-                    js_files.insert(
-                        relative_path.to_string_lossy().to_string(),
-                        content,
-                    );
+                    js_files.insert(relative_path.to_string_lossy().to_string(), content);
                 }
             }
         } else {
