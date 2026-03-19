@@ -361,14 +361,19 @@ async fn call_js_default_export<'js>(
 
     log::debug!("Return value: {:?}", result);
 
-    if let Err(e) = await_promise_if_needed(ctx.clone(), result).await {
-        log::error!(
-            "Default function promise rejected: {}",
-            format_js_error(ctx.clone(), e)
-        );
+    match await_promise_if_needed(ctx.clone(), result).await {
+        Ok(awaited) => {
+            log::debug!("Promise awaited: {:?}", awaited);
+            Ok(())
+        }
+        Err(e) => {
+            log::error!(
+                "Default function promise rejected: {}",
+                format_js_error(ctx.clone(), e)
+            );
+            Ok(())
+        }
     }
-
-    Ok(())
 }
 
 async fn import_js_namespace<'js>(ctx: Ctx<'js>, module_path: &str) -> Option<Object<'js>> {
@@ -484,7 +489,9 @@ async fn await_promise_if_needed<'js>(
         }
     };
 
-    promise.into_future::<Value>().await.map(|_| ())
+    let result = promise.into_future::<Value>().await.map(|_| ());
+    log::debug!("Promise result: {:?}", result);
+    result
 }
 
 pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord: &Chord) -> Result<()> {
