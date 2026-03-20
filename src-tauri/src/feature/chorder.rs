@@ -104,7 +104,14 @@ impl Chorder {
                     let chord_runtime =
                         loaded_app_chords.get_chord_runtime(&last_chord.keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
-                        press_chord(handle.clone(), chord_runtime, &ChordPayload { chord: last_chord.clone(), num_times: 1 })?;
+                        press_chord(
+                            handle.clone(),
+                            chord_runtime,
+                            &ChordPayload {
+                                chord: last_chord.clone(),
+                                num_times: 1,
+                            },
+                        )?;
                         self.state.set(Arc::new(ChorderState {
                             pressed_chord: state.active_chord.clone(),
                             key_buffer: vec![],

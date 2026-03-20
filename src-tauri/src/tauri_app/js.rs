@@ -1,10 +1,7 @@
 use crate::chords::{press_shortcut, release_shortcut, Shortcut};
-use rquickjs::{
-    loader::{BuiltinLoader, BuiltinResolver, Loader, Resolver},
-    module::Declared,
-    AsyncContext, AsyncRuntime, Ctx, Error, Function, Module, Object, Value,
-};
+use rquickjs::{loader::{BuiltinLoader, BuiltinResolver, Loader, Resolver}, module::Declared, AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value};
 use std::{cell::RefCell, future::Future, pin::Pin};
+use rquickjs::class::{Trace, Tracer};
 use tauri::{
     async_runtime::{block_on, channel},
     AppHandle,
@@ -18,6 +15,20 @@ struct JsEngine {
 
 thread_local! {
     static JS_ENGINE: RefCell<Option<JsEngine>> = RefCell::new(None);
+}
+
+pub struct AppUserData {
+    pub handle: AppHandle,
+}
+
+// This tells rquickjs "this type does not contain JS references"
+unsafe impl<'js> JsLifetime<'js> for AppUserData {
+    type Changed<'to> = AppUserData;
+}
+
+// Usually safe because AppHandle doesn't hold JS values
+impl<'js> Trace<'js> for AppUserData {
+    fn trace(&self, _tracer: Tracer<'_, 'js>) {}
 }
 
 #[derive(Debug, Default)]
@@ -36,6 +47,7 @@ impl Resolver for ModuleResolver {
             "path" => Ok("path".into()),
             "console" => Ok("console".into()),
             "buffer" => Ok("buffer".into()),
+            "chordsapp" => Ok("chordsapp".into()),
             // "crypto" => Ok("crypto".into())
             _ => Ok(name.into()),
             // _ => self.builtin_resolver.resolve(ctx, base, name),
@@ -62,15 +74,23 @@ impl Loader for ModuleLoader {
                 Module::declare_def::<llrt_process::ProcessModule, _>(ctx.clone(), "process")
             }
             "path" => Module::declare_def::<llrt_path::PathModule, _>(ctx.clone(), "path"),
-            "console" => Module::declare_def::<llrt_console::ConsoleModule, _>(ctx.clone(), "console"),
+            "console" => {
+                Module::declare_def::<llrt_console::ConsoleModule, _>(ctx.clone(), "console")
+            }
             "buffer" => Module::declare_def::<llrt_buffer::BufferModule, _>(ctx.clone(), "buffer"),
+            "chordsapp" => {
+                Module::declare_def::<crate::tauri_app::js_chordsapp::ChordsappModule, _>(
+                    ctx.clone(),
+                    "chordsapp",
+                )
+            }
             // "crypto" => Module::declare_def::<llrt_crypto::CryptoModule, _>(ctx.clone(), "crypto"),
             _ => self.builtin_loader.load(ctx, name),
         }
     }
 }
 
-async fn ensure_engine() -> Result<AsyncContext, String> {
+async fn ensure_engine(handle: AppHandle) -> Result<AsyncContext, String> {
     let existing = JS_ENGINE.with(|cell| cell.borrow().as_ref().map(|engine| engine.ctx.clone()));
     if let Some(ctx) = existing {
         return Ok(ctx);
@@ -84,7 +104,7 @@ async fn ensure_engine() -> Result<AsyncContext, String> {
         .await
         .map_err(|err| err.to_string())?;
 
-    ctx.with(init_globals)
+    ctx.with(|ctx| init_globals(ctx, handle.clone()))
         .await
         .map_err(|err| format_js_error_fallback(err))?;
 
@@ -111,10 +131,10 @@ where
 {
     let (tx, mut rx) = channel(1);
 
-    handle
+    handle.clone()
         .run_on_main_thread(move || {
             let result = block_on(async move {
-                let async_ctx: AsyncContext = ensure_engine().await?;
+                let async_ctx: AsyncContext = ensure_engine(handle).await?;
 
                 async_ctx
                     .async_with(|ctx| {
@@ -137,7 +157,7 @@ where
         .ok_or_else(|| "main thread task dropped".to_string())?
 }
 
-fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
+pub fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
     let message = message.into();
 
     let thrown = (|| -> rquickjs::Result<Value<'_>> {
@@ -151,75 +171,12 @@ fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
     }
 }
 
-fn init_globals(ctx: Ctx<'_>) -> rquickjs::Result<()> {
-    let globals = ctx.globals();
+fn init_globals(ctx: Ctx<'_>, handle: AppHandle) -> rquickjs::Result<()> {
     llrt_process::init(&ctx)?;
     llrt_console::init(&ctx)?;
     llrt_buffer::init(&ctx)?;
 
-    {
-        let press = Function::new(
-            ctx.clone(),
-            |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
-                let shortcut = Shortcut::parse(&key).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
-                })?;
-
-                press_shortcut(shortcut, 1).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("press({key:?}) failed: {err}"))
-                })?;
-
-                Ok(())
-            },
-        )?
-        .with_name("press")?;
-
-        globals.set("press", press)?;
-    }
-
-    {
-        let release = Function::new(
-            ctx.clone(),
-            |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
-                let shortcut = Shortcut::parse(&key).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
-                })?;
-
-                release_shortcut(shortcut).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("release({key:?}) failed: {err}"))
-                })?;
-
-                Ok(())
-            },
-        )?
-        .with_name("release")?;
-
-        globals.set("release", release)?;
-    }
-
-    {
-        let tap = Function::new(
-            ctx.clone(),
-            |ctx: Ctx<'_>, key: String| -> rquickjs::Result<()> {
-                let shortcut = Shortcut::parse(&key).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("Invalid shortcut {key:?}: {err}"))
-                })?;
-
-                press_shortcut(shortcut.clone(), 1).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("tap({key:?}) press failed: {err}"))
-                })?;
-
-                release_shortcut(shortcut).map_err(|err| {
-                    throw_js_error(ctx.clone(), format!("tap({key:?}) release failed: {err}"))
-                })?;
-
-                Ok(())
-            },
-        )?
-        .with_name("tap")?;
-
-        globals.set("tap", tap)?;
-    }
+    ctx.store_userdata(AppUserData { handle })?;
 
     Ok(())
 }

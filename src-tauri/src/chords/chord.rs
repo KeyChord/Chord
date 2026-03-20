@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use keycode::KeyMappingCode;
 use tauri::AppHandle;
 
 #[derive(Debug, Clone)]
@@ -44,6 +43,8 @@ pub struct ChordPayload {
     pub chord: Chord,
     pub num_times: usize,
 }
+
+const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
 
 impl ChordRuntime {
     pub fn from_chords(path: String, chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
@@ -99,25 +100,25 @@ impl ChordRuntime {
         let num_times = if digit_keys.is_empty() {
             1
         } else {
-            let digits: String = digit_keys
-                .iter()
-                .filter_map(|k| k.to_char(false))
-                .collect();
+            let digits: String = digit_keys.iter().filter_map(|k| k.to_char(false)).collect();
             let num_times = digits.parse::<usize>().unwrap_or(1);
             num_times
         };
         self.chords.get(chord_keys).map(|chord| ChordPayload {
             chord: chord.clone(),
-            num_times
+            num_times,
         })
     }
 }
 
-fn application_id_from_chords_path(file_path: &Path) -> Option<String> {
-    let application_path = file_path.parent()?;
-    let application_path = application_path.strip_prefix("chords/macos").ok()?;
-    if application_path.as_os_str().is_empty() {
+fn runtime_id_from_chords_path(file_path: &Path) -> Option<String> {
+    if file_path.file_name()? != "macos.toml" {
         return None;
+    }
+
+    let application_path = file_path.parent()?.strip_prefix("chords").ok()?;
+    if application_path.as_os_str().is_empty() {
+        return Some(GLOBAL_CHORD_RUNTIME_ID.to_string());
     }
 
     Some(
@@ -204,8 +205,7 @@ impl LoadedAppChords {
                     chord_file_path
                 );
 
-                let Some(application_id) =
-                    application_id_from_chords_path(Path::new(&chord_file_path))
+                let Some(runtime_id) = runtime_id_from_chords_path(Path::new(&chord_file_path))
                 else {
                     log::warn!("Invalid chords path: {:?}", chord_file_path);
                     continue;
@@ -215,8 +215,7 @@ impl LoadedAppChords {
                 for sequence in chords.keys() {
                     if is_global_chord_sequence(sequence) {
                         log::debug!("Adding global chord for sequence: {:?}", sequence);
-                        global_chords_to_runtime_key
-                            .insert(sequence.clone(), application_id.clone());
+                        global_chords_to_runtime_key.insert(sequence.clone(), runtime_id.clone());
                     }
                 }
 
@@ -224,12 +223,12 @@ impl LoadedAppChords {
                 let app_chord_runtime = ChordRuntime::from_file_shallow(chord_file_path, file)?;
 
                 log::debug!(
-                    "Loaded {} initial chords for application ID {}",
+                    "Loaded {} initial chords for runtime {}",
                     app_chord_runtime.chords.len(),
-                    application_id
+                    runtime_id
                 );
-                app_runtime_map.insert(application_id.clone(), app_chord_runtime);
-                app_config_map.insert(application_id, config);
+                app_runtime_map.insert(runtime_id.clone(), app_chord_runtime);
+                app_config_map.insert(runtime_id, config);
             }
 
             let application_ids = app_runtime_map.keys().cloned().collect::<Vec<_>>();
@@ -277,7 +276,41 @@ impl LoadedAppChords {
     }
 }
 
-fn press_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut, num_times: usize) -> Result<()> {
+#[cfg(test)]
+mod tests {
+    use super::{runtime_id_from_chords_path, GLOBAL_CHORD_RUNTIME_ID};
+    use std::path::Path;
+
+    #[test]
+    fn maps_root_macos_file_to_global_runtime() {
+        assert_eq!(
+            runtime_id_from_chords_path(Path::new("chords/macos.toml")).as_deref(),
+            Some(GLOBAL_CHORD_RUNTIME_ID)
+        );
+    }
+
+    #[test]
+    fn maps_nested_macos_file_to_bundle_identifier_style_runtime() {
+        assert_eq!(
+            runtime_id_from_chords_path(Path::new("chords/com/apple/finder/macos.toml")).as_deref(),
+            Some("com.apple.finder")
+        );
+    }
+
+    #[test]
+    fn rejects_non_macos_toml_paths() {
+        assert_eq!(
+            runtime_id_from_chords_path(Path::new("chords/com/apple/finder/chords.toml")),
+            None
+        );
+    }
+}
+
+fn press_shortcut_on_main_thread(
+    handle: AppHandle,
+    shortcut: Shortcut,
+    num_times: usize,
+) -> Result<()> {
     handle.run_on_main_thread(move || {
         if let Err(e) = press_shortcut(shortcut.clone(), num_times) {
             log::error!("failed to press shortcut: {e}");
@@ -342,12 +375,17 @@ fn log_shell_output(shell: &str, output: std::process::Output) {
     }
 }
 
-fn invoke_js_chord_in_background(handle: AppHandle, module_path: String, args: Vec<String>, num_times: usize) {
+fn invoke_js_chord_in_background(
+    handle: AppHandle,
+    module_path: String,
+    args: Vec<String>,
+    num_times: usize,
+) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = with_js(handle.clone(), move |ctx| {
             Box::pin(call_js_default_export(ctx, module_path, args, num_times))
         })
-            .await
+        .await
         {
             log::error!("press_chord failed: {}", e);
         }
@@ -365,7 +403,8 @@ async fn call_js_default_export<'js>(
             return Ok(());
         };
 
-        let Some(default_function) = get_default_export_function(ctx.clone(), &namespace).await else {
+        let Some(default_function) = get_default_export_function(ctx.clone(), &namespace).await
+        else {
             return Ok(());
         };
 
@@ -478,7 +517,10 @@ fn convert_js_args<'js>(ctx: &Ctx<'js>, args: Vec<String>) -> Option<Vec<Value<'
     {
         Ok(args) => Some(args),
         Err(e) => {
-            log::error!("Failed to convert arguments: {}", format_js_error(ctx.clone(), e));
+            log::error!(
+                "Failed to convert arguments: {}",
+                format_js_error(ctx.clone(), e)
+            );
             None
         }
     }
@@ -498,10 +540,7 @@ fn call_function_with_values<'js>(
     function.call_arg(args_builder)
 }
 
-async fn await_promise_if_needed<'js>(
-    ctx: Ctx<'js>,
-    result: Value<'js>,
-) -> rquickjs::Result<()> {
+async fn await_promise_if_needed<'js>(ctx: Ctx<'js>, result: Value<'js>) -> rquickjs::Result<()> {
     if !result.is_promise() {
         return Ok(());
     }
@@ -522,7 +561,11 @@ async fn await_promise_if_needed<'js>(
     result
 }
 
-pub fn press_chord(handle: AppHandle, runtime: &ChordRuntime, chord_payload: &ChordPayload) -> Result<()> {
+pub fn press_chord(
+    handle: AppHandle,
+    runtime: &ChordRuntime,
+    chord_payload: &ChordPayload,
+) -> Result<()> {
     log::debug!("Pressing chord: {:?}", chord_payload);
 
     if let Some(shortcut) = chord_payload.chord.shortcut.clone() {

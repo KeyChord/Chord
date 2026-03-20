@@ -1,24 +1,23 @@
-use crate::chords::{AppChordMapValue, ChordFolder, ChordRuntime, LoadedAppChords};
+use crate::chords::LoadedAppChords;
 use crate::feature::Chorder;
 use crate::git::load_all_chord_folders;
 use crate::js::{format_js_error, with_js};
 use crate::{
-    feature::ChorderIndicatorPanel,
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use arc_swap::ArcSwap;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
-use objc2_app_kit::NSWorkspace;
 use parking_lot::RwLock;
-use rquickjs::{Module, Object};
+use rquickjs::Module;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use crate::tauri_app::store::GlobalHotkeyStore;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,9 +73,6 @@ impl AppContext {
 }
 
 pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
-
-
-
     Ok(())
 }
 
@@ -99,7 +95,7 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
                         Ok(m) => {
                             log::debug!("Declared module {}", filepath);
                             m
-                        },
+                        }
                         Err(e) => {
                             log::error!(
                                 "Failed to declare JS module {}: {}",
@@ -139,7 +135,7 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     }
 
     let loaded_chords = LoadedAppChords::from_folders(chord_folders)?;
-    // We should only load `chords.toml` modules AFTER the js files have been loaded
+    // We should only load `macos.toml` modules AFTER the js files have been loaded
     load_chord_files_runtime_modules(app.clone(), &loaded_chords).await;
 
     log::debug!("Loaded chord files: {:?}", loaded_chords.runtimes.keys());
@@ -148,12 +144,12 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
-// Load all the modules specified in the config.js.module of the `chords.toml` files.
+// Load all the modules specified in the config.js.module of the `macos.toml` files.
 pub async fn load_chord_files_runtime_modules(
     handle: AppHandle,
     loaded_app_chords: &LoadedAppChords,
 ) {
-    for (id, runtime) in loaded_app_chords.runtimes.iter() {
+    for (bundle_id, runtime) in loaded_app_chords.runtimes.iter() {
         let handle = handle.clone();
 
         let Some(js) = runtime.config.as_ref().and_then(|c| c.js.as_ref()) else {
@@ -166,6 +162,7 @@ pub async fn load_chord_files_runtime_modules(
 
         let path = runtime.path.clone();
         let raw_chords = runtime.raw_chords.lock().unwrap().clone();
+        let bundle_id = bundle_id.clone();
 
         tauri::async_runtime::spawn(async move {
             let path_ = path.clone();
@@ -187,7 +184,7 @@ pub async fn load_chord_files_runtime_modules(
                         Ok(value) => value,
                         Err(e) => {
                             log::error!("Failed to serialize chords");
-                            return Ok(())
+                            return Ok(());
                         }
                     };
 
@@ -195,13 +192,30 @@ pub async fn load_chord_files_runtime_modules(
                         Some(value) => value,
                         None => {
                             log::error!("Failed to convert chords to object");
+                            return Ok(());
+                        }
+                    };
+
+                    let meta = match module.meta() {
+                        Ok(meta) => meta,
+                        Err(e) => {
+                            log::error!("Failed to get import.meta for module {}", path);
                             return Ok(())
                         }
                     };
 
-                    if let Err(e) = module.meta().unwrap().set("chords", chords_obj) {
+                    if let Err(e) = meta.set("chords", chords_obj) {
                         log::error!(
-                            "Failed to set chords object for module {}: {}",
+                            "Failed to set `import.meta.chords` for module {}: {}",
+                            path,
+                            format_js_error(ctx.clone(), e)
+                        );
+                        return Ok(());
+                    }
+
+                    if let Err(e) = meta.set("bundleId", bundle_id) {
+                        log::error!(
+                            "Failed to set `import.meta.bundleId` for module {}: {}",
                             path,
                             format_js_error(ctx.clone(), e)
                         );

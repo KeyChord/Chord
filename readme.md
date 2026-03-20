@@ -12,7 +12,7 @@ Chords are sequences of letters and/or numbers that correspond to actions. Usual
 
 For example, here are some example chords for the macOS Finder app:
 ```toml
-# chords/macos/com/apple/finder/chords.toml
+# chords/com/apple/finder/macos.toml
 gd = { name = "Go to Downloads", shortcut = "opt+cmd+l" }
 fu = { name = "Folder Up", shortcut = "cmd+up" }
 tt = { name = "Toggle Tabs", shortcut = "cmd+shift+t" }
@@ -24,7 +24,7 @@ nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
 These chords will only be enabled when the Finder app (which has the bundle identifier `com.apple.finder`) is focused. In addition to application-specific chords, you're also able to define global chords by starting the key sequence with a non-alphanumeric character:
 
 ```toml
-# chords/macos/chords.toml
+# chords/macos.toml
 "/q" = { name = "Force Quit", command = "Force Quit", shortcut = "cmd+opt+esc" }
 ```
 
@@ -128,7 +128,7 @@ You can just type:
 
   While the extra keypress does make it more verbose, it's necessary for distinguishing between certain chords. For example, let's say we have the following chords defined:
   ```toml
-  # chords/macos/com/apple/finder/chords.toml
+  # chords/com/apple/finder/macos.toml
   nd = { name = "New Directory", shortcut = "cmd+shift+n" }
   nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
   ```
@@ -165,91 +165,39 @@ While it might seem a bit tedious to press `Caps Lock` or `Shift`, it's actually
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
 
 <!-- TODO: This section should be introduced alongside `shell` -->
-### Lua Scripting
+## JavaScript Scripting
 
-In addition to running shortcuts and shell commands, chords can also run arbitrary Lua scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
-
-For example, this `vscode_helpers.lua` script allows us to programatically execute VSCode commands by their ID using the [Cursorless extension](https://marketplace.visualstudio.com/items?itemName=pokey.command-server):
-
-```lua
--- lua/vscode_helpers.lua
-local M = {}
-
-local file = require("file")
-
-local function get_uid()
-  local h = io.popen("id -u")
-  if not h then return nil end
-
-  local uid = h:read("*a")
-  h:close()
-
-  if not uid then return nil end
-  return uid:gsub("%s+", "")
-end
-
-local function json_escape(s)
-  return tostring(s)
-    :gsub("\\", "\\\\")
-    :gsub('"', '\\"')
-end
-
--- This script allows us to execute VSCode commands directly via https://marketplace.visualstudio.com/items?itemName=pokey.command-server if it's active, and otherwise falls back to built-in shortcuts.
-function M.create_command()
-  local uid = get_uid()
-  if not uid then
-    return function() return false end
-  end
-
-  local tmp = os.getenv("TMPDIR") or "/tmp"
-  local dir = tmp .. "/vscode-command-server-" .. uid
-
-  return function(cmd)
-    -- ensure server dir exists
-    if os.rename(dir, dir) == nil then
-      return false
-    end
-
-    local request_path = dir .. "/request.json"
-    local response_path = dir .. "/response.json"
-
-    local payload = string.format(
-      '{"commandId":"%s","args":[]}',
-      json_escape(cmd)
-    )
-
-    if not file.write(request_path, payload) then
-      return false
-    end
-
-    -- remove stale response BEFORE triggering
-    os.remove(response_path)
-
-    -- trigger VSCode command server
-    tap("cmd+shift+f17")
-
-    return true
-  end
-end
-
-return M
-```
+In addition to running shortcuts and shell commands, chords can also run arbitrary JavaScript scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
-[config.lua]
-init = '''
-command = require("vscode_helpers").create_command()
+# chords/com/microsoft/VSCode/macos.toml
+[config.js]
+module = '''
+export default (commandId: string) => {
+  // ...
+}
 '''
 
 [chords]
-fh = { name = "File: Here", lua = "command('explorer.newFile')" } # doesn't have a default shortcut
+# `explorer.newFile` doesn't have a default shortcut in VSCode
+fh = { name = "File: Here", args = ["explorer.newFile"] }
 # ...
 ```
 
-The Lua environment provided by Chords uses Lua 5.4 and includes the entire standard library. It provides three helper functions for simulating keypresses: `tap`, `press`, and `release` (in the future, it'll be locked down to avoid arbitrary code execution).
+Chords embeds the QuickJS JavaScript environment (excluding its standard library) as well as certain LLRT modules (which are based on the Node APIs). Module resolution is currently only implemented for root imports (e.g. if you have a `src/file.js` at the root of your repo, you have to write `import file from "src/file.js"`).
 
-This environment is kept intentionally minimal to avoid tying it to any app-specific functionality.
+## Global Hotkeys
+
+Many macOS apps can only be activated through a global hotkey. We thus use a synthetic hotkey pool:
+- `cmd+ctrl+f{13..20}`
+- `cmd+ctrl+2`
+- `cmd+ctrl+3`
+- `cmd+ctrl+4`
+- `cmd+ctrl+5`
+- `cmd+ctrl+6`
+- `cmd+ctrl+7`
+- `cmd+ctrl+8`
+- `cmd+ctrl+9`
 
 ## Comparison to keyboard shortcuts
 
@@ -260,7 +208,7 @@ Because keyboard shortcuts must be composed of one or more modifier keys followe
 Because you can only choose one of 26 letters for your shortcut, many shortcuts end up with letters that don't intuitively map to their action:
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
+# chords/com/microsoft/VSCode/macos.toml
 gf = {
   name = "Go to File",
   # cmd+p doesn't make you think of "File" (my best guess is that cmd+f is already taken by Find, and so it's adapted from the shortcut for the similar feature Command Palette which is cmd+shift+p (p for palette)
@@ -291,7 +239,7 @@ Different apps will often have different keybindings for similar actions. While 
 With chords, you can define the same chord across multiple apps which map to the corresponding shortcut for that app. This way, you can just remember one chord for an action and it'll work across all your apps without you having to memorize the specific shortcuts for each app:
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
+# chords/com/microsoft/VSCode/macos.toml
 gd = { name = "Go to definition", shortcut = "f12" }
 rs = { name = "Rename Symbol", shortcut = "f2" }
 rf = { name = "Recent Files", shortcut = "cmd+e" }
@@ -300,7 +248,7 @@ fc = { name = "Format Code", shortcut = "shift+alt+f" }
 ```
 
 ```toml
-# chords/macos/com/jetbrains/intellij/chords.toml
+# chords/com/jetbrains/intellij/macos.toml
 gd = { name = "Go to definition", shortcut = "cmd+b" }
 rs = { name = "Rename Symbol", shortcut = "shift+f6" }
 rf = { name = "Recent Files", shortcut = "ctrl+tab" }

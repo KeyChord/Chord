@@ -2,7 +2,6 @@ use crate::chords::AppChordsFile;
 use anyhow::Result;
 use fast_radix_trie::StringRadixMap;
 use include_dir::{include_dir, Dir};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -15,13 +14,13 @@ pub struct ChordFolder {
     pub js_files: StringRadixMap<String>,
 }
 
-static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords/macos");
+static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords");
 
 impl ChordFolder {
     pub fn load_bundled() -> Result<Self> {
         let mut chords_files = StringRadixMap::new();
-        for file in BUNDLED_MACOS_CHORDS_DIR.find("**/chords.toml")? {
-            let path = file.path().to_string_lossy().to_string();
+        for file in BUNDLED_MACOS_CHORDS_DIR.find("**/macos.toml")? {
+            let path = format!("chords/{}", file.path().to_string_lossy());
             let content = file
                 .as_file()
                 .and_then(|f| f.contents_utf8())
@@ -57,10 +56,10 @@ impl ChordFolder {
                 let relative_path = path.strip_prefix(&root)?.to_path_buf();
 
                 // ------------------------
-                // Handle chords/*
+                // Handle chords/**/macos.toml
                 // ------------------------
                 if relative_path.starts_with("chords") {
-                    if entry.file_name() == "chords.toml" {
+                    if entry.file_name() == "macos.toml" {
                         let content = std::fs::read_to_string(path)?;
 
                         match AppChordsFile::parse(&content) {
