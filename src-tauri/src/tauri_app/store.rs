@@ -21,7 +21,8 @@ impl GlobalHotkeyStore {
         Self { store }
     }
 
-    pub fn get_all(&self) -> HashMap<String, GlobalHotkeyStoreEntry> {
+    pub fn entries(&self) -> HashMap<String, GlobalHotkeyStoreEntry> {
+        // We clone it to avoid deadlocks (since .entries() calls a lock)
         self.store
             .entries()
             .into_iter()

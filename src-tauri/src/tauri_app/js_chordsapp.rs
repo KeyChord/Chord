@@ -98,7 +98,7 @@ impl ModuleDef for ChordsappModule {
         let register_global_hotkey = Function::new(
             ctx.clone(),
             move |_ctx: Ctx<'_>, bundle_id: String, hotkey_id: String| -> rquickjs::Result<Option<String>> {
-                let all = register_global_hotkey_store.get_all();
+                let all = register_global_hotkey_store.entries();
 
                 // idempotent: if this hotkey is already registered, return the existing shortcut
                 if let Some(existing) = all.iter().find_map(|(shortcut, entry)| {
@@ -139,7 +139,7 @@ impl ModuleDef for ChordsappModule {
             ctx.clone(),
             move |_ctx: Ctx<'_>, bundle_id: String, hotkey_id: String| -> rquickjs::Result<Option<String>> {
                 let shortcut = get_global_hotkey_store
-                    .get_all()
+                    .entries()
                     .into_iter()
                     .find_map(|(shortcut, entry)| {
                         (entry.bundle_id == bundle_id && entry.hotkey_id == hotkey_id)
