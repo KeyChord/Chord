@@ -28,6 +28,10 @@ pub struct ActiveChordInfo {
     pub action: String,
 }
 
+static GLOBAL_HOTKEYS_POOL: Vec<String> = vec![
+    "cmd+opt+a"
+];
+
 pub struct AppContext {
     pub chorder: Chorder,
 

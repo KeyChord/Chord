@@ -165,91 +165,39 @@ While it might seem a bit tedious to press `Caps Lock` or `Shift`, it's actually
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
 
 <!-- TODO: This section should be introduced alongside `shell` -->
-### Lua Scripting
+## JavaScript Scripting
 
-In addition to running shortcuts and shell commands, chords can also run arbitrary Lua scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
-
-For example, this `vscode_helpers.lua` script allows us to programatically execute VSCode commands by their ID using the [Cursorless extension](https://marketplace.visualstudio.com/items?itemName=pokey.command-server):
-
-```lua
--- lua/vscode_helpers.lua
-local M = {}
-
-local file = require("file")
-
-local function get_uid()
-  local h = io.popen("id -u")
-  if not h then return nil end
-
-  local uid = h:read("*a")
-  h:close()
-
-  if not uid then return nil end
-  return uid:gsub("%s+", "")
-end
-
-local function json_escape(s)
-  return tostring(s)
-    :gsub("\\", "\\\\")
-    :gsub('"', '\\"')
-end
-
--- This script allows us to execute VSCode commands directly via https://marketplace.visualstudio.com/items?itemName=pokey.command-server if it's active, and otherwise falls back to built-in shortcuts.
-function M.create_command()
-  local uid = get_uid()
-  if not uid then
-    return function() return false end
-  end
-
-  local tmp = os.getenv("TMPDIR") or "/tmp"
-  local dir = tmp .. "/vscode-command-server-" .. uid
-
-  return function(cmd)
-    -- ensure server dir exists
-    if os.rename(dir, dir) == nil then
-      return false
-    end
-
-    local request_path = dir .. "/request.json"
-    local response_path = dir .. "/response.json"
-
-    local payload = string.format(
-      '{"commandId":"%s","args":[]}',
-      json_escape(cmd)
-    )
-
-    if not file.write(request_path, payload) then
-      return false
-    end
-
-    -- remove stale response BEFORE triggering
-    os.remove(response_path)
-
-    -- trigger VSCode command server
-    tap("cmd+shift+f17")
-
-    return true
-  end
-end
-
-return M
-```
+In addition to running shortcuts and shell commands, chords can also run arbitrary JavaScript scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
-[config.lua]
-init = '''
-command = require("vscode_helpers").create_command()
+[config.js]
+module = '''
+export default (commandId: string) => {
+  // ...
+}
 '''
 
 [chords]
-fh = { name = "File: Here", lua = "command('explorer.newFile')" } # doesn't have a default shortcut
+# `explorer.newFile` doesn't have a default shortcut in VSCode
+fh = { name = "File: Here", args = ["explorer.newFile"] }
 # ...
 ```
 
-The Lua environment provided by Chords uses Lua 5.4 and includes the entire standard library. It provides three helper functions for simulating keypresses: `tap`, `press`, and `release` (in the future, it'll be locked down to avoid arbitrary code execution).
+Chords embeds the QuickJS JavaScript environment (excluding its standard library) as well as certain LLRT modules (which are based on the Node APIs). Module resolution is currently only implemented for root imports (e.g. if you have a `src/file.js` at the root of your repo, you have to write `import file from "src/file.js"`).
 
-This environment is kept intentionally minimal to avoid tying it to any app-specific functionality.
+## Global Hotkeys
+
+Many macOS apps can only be activated through a global hotkey. We thus use a synthetic hotkey pool:
+- `cmd+ctrl+f{13..20}`
+- `cmd+ctrl+2`
+- `cmd+ctrl+3`
+- `cmd+ctrl+4`
+- `cmd+ctrl+5`
+- `cmd+ctrl+6`
+- `cmd+ctrl+7`
+- `cmd+ctrl+8`
+- `cmd+ctrl+9`
 
 ## Comparison to keyboard shortcuts
 
