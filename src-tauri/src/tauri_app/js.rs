@@ -5,6 +5,19 @@ use tauri::{
     async_runtime::{block_on, channel},
     AppHandle,
 };
+use include_json::include_json;
+use minijinja::context;
+use std::sync::LazyLock;
+use rquickjs::module::{Declarations, Exports, ModuleDef};
+use crate::tauri_app::js_chordsapp::ChordsappModule;
+
+const BUILTIN_MODULES: LazyLock<Vec<String>> = LazyLock::new(|| {
+  let json: serde_json::Value = include_json!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../data/builtin-modules.json"
+  ));
+  serde_json::from_value(json).expect("failed to parse builtin-modules.json")
+});
 
 struct JsEngine {
     // Keep the runtime alive for as long as the context exists.
@@ -38,20 +51,14 @@ struct ModuleResolver {
 
 impl Resolver for ModuleResolver {
     fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base: &str, name: &str) -> rquickjs::Result<String> {
-        match name {
-            "fs" => Ok("fs".into()),
-            "os" => Ok("os".into()),
-            "util" => Ok("util".into()),
-            "child_process" => Ok("child_process".into()),
-            "process" => Ok("process".into()),
-            "path" => Ok("path".into()),
-            "console" => Ok("console".into()),
-            "buffer" => Ok("buffer".into()),
-            "chordsapp" => Ok("chordsapp".into()),
-            // "crypto" => Ok("crypto".into())
-            _ => Ok(name.into()),
-            // _ => self.builtin_resolver.resolve(ctx, base, name),
-        }
+      if BUILTIN_MODULES.contains(&name.to_string()) {
+        return Ok(name.into());
+      }
+
+      match name {
+        "chordsapp" => Ok("chordsapp".into()),
+        _ => self.builtin_resolver.resolve(ctx, base, name),
+      }
     }
 }
 
@@ -60,33 +67,57 @@ struct ModuleLoader {
     builtin_loader: BuiltinLoader,
 }
 
+
+pub struct ModuleModule;
+
+impl ModuleDef for ModuleModule {
+    fn declare(declare: &Declarations) -> rquickjs::Result<()> {
+        declare.declare("createRequire")?;
+        Ok(())
+    }
+
+    fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> rquickjs::Result<()> {
+        let global = ctx.globals();
+        let create_require: Value<'js> = global.get("createRequire")?;
+        exports.export("createRequire", create_require)?;
+        Ok(())
+    }
+}
+
+fn get_module<'js>(ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
+    let name = name.trim_start_matches("node:").trim_end_matches("/");
+    let module = match name {
+        "fs" => Module::declare_def::<llrt_fs::FsModule, _>(ctx.clone(), "fs"),
+        "os" => Module::declare_def::<llrt_os::OsModule, _>(ctx.clone(), "os"),
+        "util" => Module::declare_def::<llrt_util::UtilModule, _>(ctx.clone(), "util"),
+        "child_process" => Module::declare_def::<llrt_child_process::ChildProcessModule, _>(
+            ctx.clone(),
+            "child_process",
+        ),
+        "process" => {
+            Module::declare_def::<llrt_process::ProcessModule, _>(ctx.clone(), "process")
+        }
+        "path" => Module::declare_def::<llrt_path::PathModule, _>(ctx.clone(), "path"),
+        "console" => {
+            Module::declare_def::<llrt_console::ConsoleModule, _>(ctx.clone(), "console")
+        }
+        "buffer" => Module::declare_def::<llrt_buffer::BufferModule, _>(ctx.clone(), "buffer"),
+        "module" => Module::declare_def::<ModuleModule, _>(ctx.clone(), "module"),
+        "chordsapp" => Module::declare_def::<ChordsappModule, _>( ctx.clone(), "chordsapp"),
+        // "crypto" => Module::declare_def::<llrt_crypto::CryptoModule, _>(ctx.clone(), "crypto"),
+        _ => return Ok(None)
+    };
+
+    Some(module).transpose()
+}
+
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
-        match name {
-            "fs" => Module::declare_def::<llrt_fs::FsModule, _>(ctx.clone(), "fs"),
-            "os" => Module::declare_def::<llrt_os::OsModule, _>(ctx.clone(), "os"),
-            "util" => Module::declare_def::<llrt_util::UtilModule, _>(ctx.clone(), "util"),
-            "child_process" => Module::declare_def::<llrt_child_process::ChildProcessModule, _>(
-                ctx.clone(),
-                "child_process",
-            ),
-            "process" => {
-                Module::declare_def::<llrt_process::ProcessModule, _>(ctx.clone(), "process")
-            }
-            "path" => Module::declare_def::<llrt_path::PathModule, _>(ctx.clone(), "path"),
-            "console" => {
-                Module::declare_def::<llrt_console::ConsoleModule, _>(ctx.clone(), "console")
-            }
-            "buffer" => Module::declare_def::<llrt_buffer::BufferModule, _>(ctx.clone(), "buffer"),
-            "chordsapp" => {
-                Module::declare_def::<crate::tauri_app::js_chordsapp::ChordsappModule, _>(
-                    ctx.clone(),
-                    "chordsapp",
-                )
-            }
-            // "crypto" => Module::declare_def::<llrt_crypto::CryptoModule, _>(ctx.clone(), "crypto"),
-            _ => self.builtin_loader.load(ctx, name),
-        }
+        let module = get_module(ctx, name)?;
+        Ok(match module {
+            Some(module) => module,
+            None => self.builtin_loader.load(ctx, name)?
+        })
     }
 }
 
@@ -162,7 +193,38 @@ where
         .ok_or_else(|| "main thread task dropped".to_string())?
 }
 
+pub fn throw_any_js_error(ctx: Ctx<'_>, err: Error) -> Error {
+    match err {
+        Error::Exception => {
+            let value = ctx.catch();
+
+            if let Some(ex) = value.as_exception() {
+                let name = ex.get::<_, String>("name").unwrap_or_else(|_| "Error".into());
+                let message = ex
+                    .get::<_, String>("message")
+                    .unwrap_or_else(|_| "Unknown JS error".into());
+                let stack = ex
+                    .get::<_, String>("stack")
+                    .unwrap_or_else(|_| "No stack".into());
+
+                throw_js_error(ctx, format!("{name}: {message}\n{stack}"))
+            } else {
+                let rendered = ctx
+                    .json_stringify(value.clone())
+                    .ok()
+                    .flatten()
+                    .and_then(|s| s.to_string().ok())
+                    .unwrap_or_else(|| "<non-serializable thrown value>".to_string());
+
+                throw_js_error(ctx, format!("Thrown JS value: {rendered}"))
+            }
+        }
+        _ => throw_js_error(ctx, err.to_string()),
+    }
+}
+
 pub fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
+
     let message = message.into();
 
     let thrown = (|| -> rquickjs::Result<Value<'_>> {
@@ -180,6 +242,17 @@ fn init_globals(ctx: Ctx<'_>, handle: AppHandle) -> rquickjs::Result<()> {
     llrt_process::init(&ctx)?;
     llrt_console::init(&ctx)?;
     llrt_buffer::init(&ctx)?;
+
+    let quickjs_require_template = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/quickjs-require.jinja.js"));
+    let env = minijinja::Environment::new();
+    let quickjs_require_js = env.render_str(
+        quickjs_require_template,
+        context!(builtinModules => &*BUILTIN_MODULES),
+    ).map_err(|err| throw_js_error(ctx.clone(), err.to_string()))?;
+    log::debug!("Evaluating quickjs-require.js:\n{}", quickjs_require_js);
+    if let Err(err) = Module::evaluate(ctx.clone(), "require", quickjs_require_js.as_bytes()) {
+        log::error!("Failed to evaluate quickjs-require.js: {}", format_js_error(ctx.clone(), err));
+    }
 
     ctx.store_userdata(AppUserData { handle })?;
 

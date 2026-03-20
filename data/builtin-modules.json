@@ -1,0 +1,10 @@
+[
+  "fs",
+  "os",
+  "util",
+  "child_process",
+  "process",
+  "path",
+  "console",
+  "buffer"
+]
