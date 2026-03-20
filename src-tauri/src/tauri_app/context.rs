@@ -1,19 +1,17 @@
-use crate::chords::{AppChordMapValue, ChordFolder, ChordRuntime, LoadedAppChords};
+use crate::chords::LoadedAppChords;
 use crate::feature::Chorder;
 use crate::git::load_all_chord_folders;
 use crate::js::{format_js_error, with_js};
 use crate::{
-    feature::ChorderIndicatorPanel,
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
 };
-use anyhow::{Context, Result};
+use anyhow::Result;
 use arc_swap::ArcSwap;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
-use objc2_app_kit::NSWorkspace;
 use parking_lot::RwLock;
-use rquickjs::{Module, Object};
+use rquickjs::Module;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::atomic::Ordering;
@@ -74,9 +72,6 @@ impl AppContext {
 }
 
 pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
-
-
-
     Ok(())
 }
 
@@ -99,7 +94,7 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
                         Ok(m) => {
                             log::debug!("Declared module {}", filepath);
                             m
-                        },
+                        }
                         Err(e) => {
                             log::error!(
                                 "Failed to declare JS module {}: {}",
@@ -139,7 +134,7 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     }
 
     let loaded_chords = LoadedAppChords::from_folders(chord_folders)?;
-    // We should only load `chords.toml` modules AFTER the js files have been loaded
+    // We should only load `macos.toml` modules AFTER the js files have been loaded
     load_chord_files_runtime_modules(app.clone(), &loaded_chords).await;
 
     log::debug!("Loaded chord files: {:?}", loaded_chords.runtimes.keys());
@@ -148,7 +143,7 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
-// Load all the modules specified in the config.js.module of the `chords.toml` files.
+// Load all the modules specified in the config.js.module of the `macos.toml` files.
 pub async fn load_chord_files_runtime_modules(
     handle: AppHandle,
     loaded_app_chords: &LoadedAppChords,
@@ -187,7 +182,7 @@ pub async fn load_chord_files_runtime_modules(
                         Ok(value) => value,
                         Err(e) => {
                             log::error!("Failed to serialize chords");
-                            return Ok(())
+                            return Ok(());
                         }
                     };
 
@@ -195,7 +190,7 @@ pub async fn load_chord_files_runtime_modules(
                         Some(value) => value,
                         None => {
                             log::error!("Failed to convert chords to object");
-                            return Ok(())
+                            return Ok(());
                         }
                     };
 

@@ -1,18 +1,18 @@
+use crate::chords::{ChordFolder, LoadedAppChords};
+use crate::feature::{Chorder, ChorderIndicatorPanel};
+use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
+use anyhow::{Context, Result};
+use frontmost::{start_nsrunloop, Detector};
+use objc2_app_kit::NSWorkspace;
 use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use anyhow::{Context,Result};
-use frontmost::{start_nsrunloop, Detector};
-use objc2_app_kit::NSWorkspace;
 use tauri::{AppHandle, Manager};
 pub use tauri_app::*;
 use tauri_nspanel::tauri_panel;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
-use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorPanel};
-use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 
 mod chords;
 mod constants;
@@ -100,6 +100,7 @@ pub fn run() {
         .build();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             tauri_app::commands::list_git_repos,
             tauri_app::commands::add_git_repo_command,
@@ -110,6 +111,7 @@ pub fn run() {
             tauri_app::commands::open_input_monitoring_settings,
         ])
         .plugin(log_plugin)
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
             if let Err(error) = tauri_app::settings::show_settings_window(handle.clone()) {
                 log::error!("Failed to show settings window for existing instance: {error}");
@@ -138,8 +140,7 @@ pub fn run() {
         .setup(|app| {
             if let Err(e) = setup(app) {
                 log::error!("Failed to set up app:\n{:#?}", e);
-                app
-                    .dialog()
+                app.dialog()
                     .message(format!("Failed to start Chords:\n\n{e}"))
                     .title("Startup Error")
                     .blocking_show();
@@ -172,7 +173,9 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let workspace = NSWorkspace::sharedWorkspace();
     if let Some(application) = workspace.frontmostApplication() {
         if let Some(bundle_id) = application.bundleIdentifier() {
-            context.frontmost_application_id.store(Arc::new(Some(bundle_id.to_string())));
+            context
+                .frontmost_application_id
+                .store(Arc::new(Some(bundle_id.to_string())));
         }
     }
 
@@ -180,6 +183,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
 
     tauri_app::tray::create_tray(handle.clone()).context("failed to create tray")?;
     tauri_app::settings::configure_settings_window(handle.clone())?;
+
 
     let frontmost = Frontmost {
         frontmost: String::new(),

@@ -12,7 +12,7 @@ Chords are sequences of letters and/or numbers that correspond to actions. Usual
 
 For example, here are some example chords for the macOS Finder app:
 ```toml
-# chords/macos/com/apple/finder/chords.toml
+# chords/com/apple/finder/macos.toml
 gd = { name = "Go to Downloads", shortcut = "opt+cmd+l" }
 fu = { name = "Folder Up", shortcut = "cmd+up" }
 tt = { name = "Toggle Tabs", shortcut = "cmd+shift+t" }
@@ -24,7 +24,7 @@ nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
 These chords will only be enabled when the Finder app (which has the bundle identifier `com.apple.finder`) is focused. In addition to application-specific chords, you're also able to define global chords by starting the key sequence with a non-alphanumeric character:
 
 ```toml
-# chords/macos/chords.toml
+# chords/macos.toml
 "/q" = { name = "Force Quit", command = "Force Quit", shortcut = "cmd+opt+esc" }
 ```
 
@@ -128,7 +128,7 @@ You can just type:
 
   While the extra keypress does make it more verbose, it's necessary for distinguishing between certain chords. For example, let's say we have the following chords defined:
   ```toml
-  # chords/macos/com/apple/finder/chords.toml
+  # chords/com/apple/finder/macos.toml
   nd = { name = "New Directory", shortcut = "cmd+shift+n" }
   nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
   ```
@@ -236,7 +236,7 @@ return M
 ```
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
+# chords/com/microsoft/VSCode/macos.toml
 [config.lua]
 init = '''
 command = require("vscode_helpers").create_command()
@@ -260,7 +260,7 @@ Because keyboard shortcuts must be composed of one or more modifier keys followe
 Because you can only choose one of 26 letters for your shortcut, many shortcuts end up with letters that don't intuitively map to their action:
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
+# chords/com/microsoft/VSCode/macos.toml
 gf = {
   name = "Go to File",
   # cmd+p doesn't make you think of "File" (my best guess is that cmd+f is already taken by Find, and so it's adapted from the shortcut for the similar feature Command Palette which is cmd+shift+p (p for palette)
@@ -291,7 +291,7 @@ Different apps will often have different keybindings for similar actions. While 
 With chords, you can define the same chord across multiple apps which map to the corresponding shortcut for that app. This way, you can just remember one chord for an action and it'll work across all your apps without you having to memorize the specific shortcuts for each app:
 
 ```toml
-# chords/macos/com/microsoft/VSCode/chords.toml
+# chords/com/microsoft/VSCode/macos.toml
 gd = { name = "Go to definition", shortcut = "f12" }
 rs = { name = "Rename Symbol", shortcut = "f2" }
 rf = { name = "Recent Files", shortcut = "cmd+e" }
@@ -300,7 +300,7 @@ fc = { name = "Format Code", shortcut = "shift+alt+f" }
 ```
 
 ```toml
-# chords/macos/com/jetbrains/intellij/chords.toml
+# chords/com/jetbrains/intellij/macos.toml
 gd = { name = "Go to definition", shortcut = "cmd+b" }
 rs = { name = "Rename Symbol", shortcut = "shift+f6" }
 rf = { name = "Recent Files", shortcut = "ctrl+tab" }
