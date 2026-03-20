@@ -57,8 +57,11 @@ impl Resolver for ModuleResolver {
       }
 
       match name {
-        "chordsapp" => Ok("chordsapp".into()),
-        _ => self.builtin_resolver.resolve(ctx, base, name),
+      // Special-cased to prevent a cycle
+          "module" => Ok("module".into()),
+          "chordsapp" => Ok("chordsapp".into()),
+          _ => Ok(name.into()),
+        // _ => self.builtin_resolver.resolve(ctx, base, name),
       }
     }
 }
@@ -78,8 +81,15 @@ impl ModuleDef for ModuleModule {
     }
 
     fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> rquickjs::Result<()> {
-        let global = ctx.globals();
-        let create_require: Value<'js> = global.get("createRequire")?;
+        println!("ModuleModule::evaluate");
+        let create_require = Function::new(
+            ctx.clone(),
+            |ctx: Ctx<'js>| -> rquickjs::Result<Function<'js>> {
+                ctx.eval("(function() { globalThis.require })")
+            },
+        )?
+            .with_name("createRequire")?;
+
         exports.export("createRequire", create_require)?;
         Ok(())
     }
@@ -251,10 +261,25 @@ fn init_globals(ctx: Ctx<'_>, handle: AppHandle) -> rquickjs::Result<()> {
         quickjs_require_template,
         context!(builtinModules => &*BUILTIN_MODULES),
     ).map_err(|err| throw_js_error(ctx.clone(), err.to_string()))?;
+
     log::debug!("Evaluating quickjs-require.js:\n{}", quickjs_require_js);
-    if let Err(err) = Module::evaluate(ctx.clone(), "require", quickjs_require_js.as_bytes()) {
-        log::error!("Failed to evaluate quickjs-require.js: {}", format_js_error(ctx.clone(), err));
-    }
+    match Module::evaluate(ctx.clone(), "require", quickjs_require_js.as_bytes()) {
+        Ok(promise) => {
+            // if let Err(err) = promise.into_future::<()>().await {
+            //     log::error!(
+            //         "Failed to await quickjs-require.js: {}",
+            //         err
+            //     );
+            // }
+        },
+        Err(err) => {
+            log::error!(
+                "Failed to evaluate quickjs-require.js: {}",
+                throw_any_js_error(ctx.clone(), err)
+            );
+        }
+    };
+
 
     ctx.store_userdata(AppUserData { handle })?;
 
