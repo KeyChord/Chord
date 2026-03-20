@@ -42,7 +42,7 @@ index 6e660ea..9b04d80 100644
 -llrt_test = { path = "../libs/llrt_test" }
 +llrt_test = { git = "https://github.com/awslabs/llrt", package = "llrt_test" }
 diff --git a/build.rs b/build.rs
-index ee3ca09..ef1fd4b 100644
+index ee3ca09..e227039 100644
 --- a/build.rs
 +++ b/build.rs
 @@ -17,7 +17,7 @@ use std::{
@@ -54,6 +54,15 @@ index ee3ca09..ef1fd4b 100644
  
  include!("src/bytecode.rs");
  
+@@ -45,7 +45,7 @@ fn main() -> StdResult<(), Box<dyn Error>> {
+ 
+     // #[cfg(feature = "lambda")]
+     // {
+-    generate_sdk_client_endpoint_map(&out_dir)?;
++    // generate_sdk_client_endpoint_map(&out_dir)?;
+     //}
+ 
+     generate_bytecode_cache(&out_dir)?;
 diff --git a/bundle/js/@llrt/test/index.js b/bundle/js/@llrt/test/index.js
 new file mode 100644
 index 0000000..c5f8c0a
