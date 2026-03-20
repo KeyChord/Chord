@@ -2,7 +2,6 @@ use anyhow::Result;
 use keycode::KeyMappingCode;
 use keycode::KeyMappingCode::*;
 use std::str::FromStr;
-use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyCombination {
@@ -20,24 +19,24 @@ pub struct KeyCombinationModifiers {
 
 impl KeyCombination {
     pub fn serialize(&self) -> String {
-        let mut parts: Vec<&str> = Vec::new();
+        let mut parts: Vec<String> = Vec::new();
 
         // Sorted alphabetically for storage stability
         if self.modifiers.alt {
-            parts.push("alt");
+            parts.push(AltLeft.to_string());
         }
         if self.modifiers.ctrl {
-            parts.push("ctrl");
+            parts.push(ControlLeft.to_string());
         }
         if self.modifiers.meta {
-            parts.push("meta");
+            parts.push(MetaLeft.to_string());
         }
         if self.modifiers.shift {
-            parts.push("shift");
+            parts.push(ShiftLeft.to_string());
         }
 
-        let key = self.key.to_char(false).unwrap_or_default().to_string();
-        parts.push(&key);
+        let key = self.key.0.to_string();
+        parts.push(key);
 
         parts.join("+")
     }
