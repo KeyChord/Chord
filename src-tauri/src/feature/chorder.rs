@@ -133,17 +133,22 @@ impl Chorder {
                 // A non-empty key_buffer means we should execute the chord.
                 log::debug!("Executing key_buffer {:?}", key_buffer);
 
-                let chord_runtime = loaded_app_chords.get_chord_runtime(
+                let Some(chord_runtime) = loaded_app_chords.get_chord_runtime(
                     &state.key_buffer,
                     context.frontmost_application_id.load().as_ref().clone(),
-                );
-                let (Some(chord_runtime), Some(chord_payload)) = (
-                    chord_runtime,
-                    chord_runtime.and_then(|r| r.get_chord(&key_buffer)),
                 ) else {
+                    log::error!(
+                        "Missing chord runtime for chord {:?} in application: {:?}",
+                        state.key_buffer,
+                        context.frontmost_application_id.load().as_ref().clone()
+                    );
+                    return Ok(())
+                };
+
+                let Some(chord_payload) = chord_runtime.get_chord(&key_buffer) else {
                     // If the chord is the buffer is invalid, reset it
                     log::error!(
-                        "Invalid chord: {:?} for application: {:?}",
+                        "Invalid chord {:?} in application: {:?}",
                         state.key_buffer,
                         context.frontmost_application_id.load().as_ref().clone()
                     );
