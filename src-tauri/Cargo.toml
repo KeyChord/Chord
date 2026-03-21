@@ -83,5 +83,5 @@ rdev = { path = "./crates/rdev" }
 frontmost = { path = "./crates/frontmost" }
 
 [patch."https://github.com/awslabs/llrt"]
-llrt_core = { path = "./target/patch/llrt_core" }
+llrt_core = { path = "./crates/llrt_core" }
 
