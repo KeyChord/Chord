@@ -114,14 +114,14 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
     let module_resolver = ModuleResolver::new(llrt_module_resolver);
     let resolver = (
         module_resolver,
-        llrt_core::embedded::resolver::EmbeddedResolver,
-        llrt_core::package::resolver::PackageResolver,
+        llrt_core::modules::embedded::resolver::EmbeddedResolver,
+        llrt_core::modules::package::resolver::PackageResolver,
     );
     let module_loader = ModuleLoader::new(llrt_module_loader);
     let loader = (
         module_loader,
-        llrt_core::embedded::loader::EmbeddedLoader,
-        llrt_core::package::loader::PackageLoader,
+        llrt_core::modules::embedded::loader::EmbeddedLoader,
+        llrt_core::modules::package::loader::PackageLoader,
     );
 
     rt.set_loader(resolver, loader).await;
