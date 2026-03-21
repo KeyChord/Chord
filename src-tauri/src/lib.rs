@@ -10,7 +10,6 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 pub use tauri_app::*;
-use tauri_nspanel::tauri_panel;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
@@ -24,6 +23,7 @@ mod input;
 mod mode;
 mod tauri_app;
 
+use tauri_nspanel::tauri_panel;
 tauri_panel! {
     panel!(IndicatorPanel {
         config: {
