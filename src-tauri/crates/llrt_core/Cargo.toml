@@ -37,17 +37,17 @@ hyper = { version = "1", default-features = false }
 itoa = { version = "1", default-features = false }
 jiff = { version = "0.2" }
 libc = { version = "0.2", default-features = false }
-llrt_context = { path = "../libs/llrt_context" }
-llrt_encoding = { path = "../libs/llrt_encoding" }
-llrt_hooking = { path = "../libs/llrt_hooking" }
-llrt_json = { path = "../libs/llrt_json" }
-llrt_logging = { path = "../libs/llrt_logging" }
-llrt_modules = { path = "../llrt_modules", default-features = false, features = [
+llrt_context = { git = "https://github.com/awslabs/llrt", package = "llrt_context" }
+llrt_encoding = { git = "https://github.com/awslabs/llrt", package = "llrt_encoding" }
+llrt_hooking = { git = "https://github.com/awslabs/llrt", package = "llrt_hooking" }
+llrt_json = { git = "https://github.com/awslabs/llrt", package = "llrt_json" }
+llrt_logging = { git = "https://github.com/awslabs/llrt", package = "llrt_logging" }
+llrt_modules = { git = "https://github.com/awslabs/llrt", package = "llrt_modules", default-features = false, features = [
   "base",
   "console",
 ] }
-llrt_numbers = { path = "../libs/llrt_numbers" }
-llrt_utils = { path = "../libs/llrt_utils", features = ["all"] }
+llrt_numbers = { git = "https://github.com/awslabs/llrt", package = "llrt_numbers" }
+llrt_utils = { git = "https://github.com/awslabs/llrt", package = "llrt_utils", features = ["all"] }
 once_cell = { version = "1", features = ["std"], default-features = false }
 phf = { version = "0.13", default-features = false }
 quick-xml = { version = "0.39", default-features = false }
@@ -78,10 +78,10 @@ md-5 = { version = "0.11.0-rc.5", default-features = false }
 [build-dependencies]
 rquickjs = { version = "0.11", default-features = false }
 phf_codegen = { version = "0.13", default-features = false }
-llrt_build = { path = "../libs/llrt_build" }
+llrt_build = { git = "https://github.com/awslabs/llrt", package = "llrt_build" }
 uuid = { version = "1", features = ["v4"], default-features = false }
 walkdir = { version = "2", default-features = false }
 
 [dev-dependencies]
 wiremock = { version = "0.6", default-features = false }
-llrt_test = { path = "../libs/llrt_test" }
+llrt_test = { git = "https://github.com/awslabs/llrt", package = "llrt_test" }
