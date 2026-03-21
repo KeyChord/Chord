@@ -59,12 +59,6 @@ jobs:
 
       - name: Import Apple Developer Certificate
         uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_BASE64 }}
-          p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
-
-      - name: Import Apple Developer Certificate
-        uses: apple-actions/import-codesign-certs@v3
         if: startsWith(matrix.platform, 'macos')
         with:
           p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
@@ -98,7 +92,7 @@ jobs:
 
       - name: Build and publish Tauri app (non-macOS)
         if: ${{ !startsWith(matrix.platform, 'macos') }}
-        uses: tauri-apps/tauri-action@v1
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
