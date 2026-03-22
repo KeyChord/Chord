@@ -68,8 +68,8 @@ impl ChorderIndicatorUi {
                 let visible_frame = screen.visibleFrame();
                 let x = visible_frame.origin.x
                     + ((visible_frame.size.width - INDICATOR_WIDTH as f64) / 2.0).max(0.0);
-                let y = visible_frame.origin.y
-                    + ((visible_frame.size.height - INDICATOR_HEIGHT as f64) / 2.0).max(0.0);
+                let y =
+                    visible_frame.origin.y + visible_frame.size.height - INDICATOR_HEIGHT as f64;
                 native_panel.setFrameOrigin(tauri_nspanel::objc2_foundation::NSPoint::new(x, y));
             }
 

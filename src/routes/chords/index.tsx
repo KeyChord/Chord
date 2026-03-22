@@ -10,6 +10,7 @@ import {
 import { Kbd, KbdGroup } from "#/components/ui/kbd.tsx";
 import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
+import getPrettyKey from "pretty-key";
 
 export const Route = createFileRoute('/chords/')({
   component: Chords,
@@ -35,7 +36,7 @@ export function Chords() {
   const [state] = useChorderState();
   const hasBuffer = state.keyBuffer.length > 0;
   const hasActive = state.activeChord !== undefined;
-  const displayKeys = hasBuffer ? state.keyBuffer : state.activeChord?.keys ?? [];
+  const displayKeys = hasBuffer ? state.keyBuffer : state.activeChord?.keys.map(key => getPrettyKey(key)) ?? [];
   const helperLabel = hasBuffer
     ? "Buffer"
     : hasActive
