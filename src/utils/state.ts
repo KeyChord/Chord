@@ -3,7 +3,11 @@ import type { ChorderState } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 
 export function useChorderState() {
-  const [state, setState] = useState<ChorderState | null>(null);
+  const [state, setState] = useState<ChorderState>({
+    keyBuffer: [],
+    activeChord: undefined,
+    pressedChord: undefined
+  });
 
   useEffect(() => {
     const unlistenPromise = listen<ChorderState>(

@@ -13,7 +13,6 @@ use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use typeshare::typeshare;
 
-
 #[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", content = "value")]

@@ -22,8 +22,8 @@ impl ChorderIndicatorUi {
         let panel = window.to_panel::<IndicatorPanel>()?;
         panel.set_level(PanelLevel::ScreenSaver.into());
         panel.set_has_shadow(false);
-        panel.set_opaque(true);
-        panel.set_transparent(false);
+        panel.set_opaque(false);
+        panel.set_transparent(true);
         panel.set_ignores_mouse_events(true);
         panel.set_becomes_key_only_if_needed(false);
         panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().into());

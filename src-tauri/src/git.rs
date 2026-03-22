@@ -171,7 +171,10 @@ pub fn sync_git_repo<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<
     Ok(repo_ref.into_info(&repos_root))
 }
 
-pub fn load_repo_chords<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<LoadedAppChords> {
+pub fn load_repo_chords<R: Runtime>(
+    app: AppHandle<R>,
+    repo_input: &str,
+) -> Result<LoadedAppChords> {
     let repo_ref = GitHubRepoRef::parse(repo_input)?;
     let repos_root = github_repos_root(app)?;
     let repo_path = repo_ref.local_path(&repos_root);

@@ -76,7 +76,9 @@ fn load_local_chord_folder(folder_path: &str) -> Result<ChordFolder> {
     ChordFolder::load_from_local_folder(&canonical_path)
 }
 
-pub fn list_local_chord_folders<R: Runtime>(app: AppHandle<R>) -> Result<Vec<LocalChordFolderInfo>> {
+pub fn list_local_chord_folders<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Vec<LocalChordFolderInfo>> {
     let mut folders = read_local_folder_paths(&app)?
         .into_iter()
         .map(PathBuf::from)

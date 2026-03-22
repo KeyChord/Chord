@@ -1,6 +1,6 @@
+use crate::constants::{CHORD_WINDOW_LABEL, SETTINGS_WINDOW_LABEL};
 use anyhow::Result;
 use tauri::{AppHandle, Manager, WebviewWindow};
-use crate::constants::{CHORD_WINDOW_LABEL, SETTINGS_WINDOW_LABEL};
 
 pub fn get_settings_window(handle: AppHandle) -> Result<WebviewWindow> {
     handle
@@ -46,7 +46,6 @@ pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
     window.open_devtools();
     Ok(())
 }
-
 
 pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
     let window = get_settings_window(handle)?;

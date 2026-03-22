@@ -1,3 +1,4 @@
+use crate::api::{Api, ApiImpl};
 use crate::chords::{ChordFolder, LoadedAppChords};
 use crate::feature::{Chorder, ChorderIndicatorUi, ChorderState};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
@@ -5,6 +6,7 @@ use anyhow::{Context, Result};
 use frontmost::{start_nsrunloop, Detector};
 use objc2_app_kit::NSWorkspace;
 use parking_lot::deadlock;
+use specta_typescript::Typescript;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -14,8 +16,6 @@ pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
-use specta_typescript::Typescript;
-use crate::api::{Api, ApiImpl};
 
 mod api;
 mod chords;

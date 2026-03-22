@@ -30,6 +30,10 @@ impl Chorder {
             log::error!("Failed to subscribe chorder state observer: {e}");
         };
 
+        if let Err(e) = state.set(Arc::new(ChorderState::new())) {
+            log::error!("Failed to trigger initial state change: {e}");
+        }
+
         Self { state, ui }
     }
 

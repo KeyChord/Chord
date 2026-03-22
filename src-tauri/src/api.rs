@@ -3,11 +3,11 @@ use crate::sources::{
     add_local_chord_folder, list_local_chord_folders, load_local_chord_folder_chords,
     pick_local_chord_folder, LocalChordFolderInfo,
 };
+use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_apps_needing_relaunch, list_loaded_chords, relaunch_app,
     reload_loaded_app_chords, ActiveChordInfo, AppNeedsRelaunchInfo,
 };
-use crate::tauri_app::store::GlobalHotkeyStore;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -44,14 +44,10 @@ pub trait Api {
     async fn sync_git_repo(repo: String) -> Result<GitRepoInfo, String>;
     async fn list_local_chord_folders() -> Result<Vec<LocalChordFolderInfo>, String>;
     async fn pick_local_chord_folder() -> Result<Option<String>, String>;
-    async fn add_local_chord_folder(
-        path: String,
-    ) -> Result<LocalChordFolderInfo, String>;
+    async fn add_local_chord_folder(path: String) -> Result<LocalChordFolderInfo, String>;
     async fn list_active_chords() -> Result<Vec<ActiveChordInfo>, String>;
     async fn list_repo_chords(repo: String) -> Result<Vec<ActiveChordInfo>, String>;
-    async fn list_local_chord_folder_chords(
-        path: String,
-    ) -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_local_chord_folder_chords(path: String) -> Result<Vec<ActiveChordInfo>, String>;
     async fn list_global_shortcut_mappings() -> Result<Vec<GlobalShortcutMappingInfo>, String>;
     async fn remove_global_shortcut_mapping(shortcut: String) -> Result<(), String>;
     async fn list_apps_needing_relaunch() -> Result<Vec<AppNeedsRelaunchInfo>, String>;
@@ -127,10 +123,7 @@ impl Api for ApiImpl {
         pick_local_chord_folder(app_handle).map_err(|error| error.to_string())
     }
 
-    async fn add_local_chord_folder(
-        self,
-        path: String,
-    ) -> Result<LocalChordFolderInfo, String> {
+    async fn add_local_chord_folder(self, path: String) -> Result<LocalChordFolderInfo, String> {
         let app_handle = self.app_handle()?;
         let folder_info =
             add_local_chord_folder(app_handle.clone(), &path).map_err(|error| error.to_string())?;

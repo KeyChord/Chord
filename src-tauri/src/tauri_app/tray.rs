@@ -1,11 +1,11 @@
 #[cfg(debug_assertions)]
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
+use crate::settings::open_chords_inspector;
 use crate::tauri_app::context::reload_loaded_app_chords;
 #[cfg(debug_assertions)]
 use crate::tauri_app::settings::show_settings_window;
 use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle};
-use crate::settings::open_chords_inspector;
 
 pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
     let mut menu = MenuBuilder::new(&handle)
