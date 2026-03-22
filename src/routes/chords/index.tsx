@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listMatchingChords, type ActiveChordInfo } from "#/api/settings.ts";
+import { taurpc, type ActiveChordInfo } from "#/api/taurpc.ts";
 import { Input } from "#/components/ui/input.tsx";
 import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
@@ -34,7 +34,7 @@ export function Chords() {
       };
     }
 
-    void listMatchingChords()
+    void taurpc.listMatchingChords()
       .then((items) => {
         if (!cancelled) {
           setSuggestions(items);

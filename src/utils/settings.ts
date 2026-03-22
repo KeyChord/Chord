@@ -1,7 +1,7 @@
 import type {
   ActiveChordInfo,
   AppMetadataInfo,
-} from "#/api/settings.ts";
+} from "#/api/taurpc.ts";
 
 export type ChordGroup = {
   key: string;

@@ -15,27 +15,13 @@ import {
   requestInputMonitoringPermission,
 } from "tauri-plugin-macos-permissions-api";
 import {
-  addGitRepo,
-  addLocalChordFolder,
-  listActiveChords,
-  listAppsNeedingRelaunch,
-  listGitRepos,
-  listGlobalShortcutMappings,
-  listLocalChordFolderChords,
-  listLocalChordFolders,
-  listRepoChords,
-  openAccessibilitySettings,
-  openInputMonitoringSettings,
-  pickLocalChordFolder,
-  relaunchApp,
-  removeGlobalShortcutMapping,
-  syncGitRepo,
   type ActiveChordInfo,
   type AppNeedsRelaunchInfo,
   type GitRepoInfo,
   type GlobalShortcutMappingInfo,
   type LocalChordFolderInfo,
-} from "#/api/settings.ts";
+  taurpc,
+} from "#/api/taurpc.ts";
 import {
   buildChordGroups,
   getAppLabel,
@@ -165,7 +151,7 @@ export function useSettingsPage() {
     setReposBusy(true);
 
     try {
-      const nextRepos = await listGitRepos();
+      const nextRepos = await taurpc.listGitRepos();
       setRepos(nextRepos);
 
       if (showSuccessToast) {
@@ -189,7 +175,7 @@ export function useSettingsPage() {
     setLocalChordFoldersBusy(true);
 
     try {
-      const nextFolders = await listLocalChordFolders();
+      const nextFolders = await taurpc.listLocalChordFolders();
       setLocalChordFolders(nextFolders);
 
       if (showSuccessToast) {
@@ -213,7 +199,7 @@ export function useSettingsPage() {
     setActiveChordsBusy(true);
 
     try {
-      const nextChords = await listActiveChords();
+      const nextChords = await taurpc.listActiveChords();
       setActiveChords(nextChords);
 
       if (showSuccessToast) {
@@ -237,7 +223,7 @@ export function useSettingsPage() {
     setGlobalShortcutMappingsBusy(true);
 
     try {
-      const nextMappings = await listGlobalShortcutMappings();
+      const nextMappings = await taurpc.listGlobalShortcutMappings();
       setGlobalShortcutMappings(nextMappings);
 
       if (showSuccessToast) {
@@ -261,7 +247,7 @@ export function useSettingsPage() {
     setAppsNeedingRelaunchBusy(true);
 
     try {
-      const nextApps = await listAppsNeedingRelaunch();
+      const nextApps = await taurpc.listAppsNeedingRelaunch();
       setAppsNeedingRelaunch(nextApps);
 
       if (showSuccessToast) {
@@ -285,7 +271,7 @@ export function useSettingsPage() {
     setRepoChordsBusy((current) => ({ ...current, [repoSlug]: true }));
 
     try {
-      const nextChords = await listRepoChords(repoSlug);
+      const nextChords = await taurpc.listRepoChords(repoSlug);
       setRepoChordsByRepo((current) => ({ ...current, [repoSlug]: nextChords }));
       setOpenRepoChordGroups((current) => {
         const next = { ...(current[repoSlug] ?? {}) };
@@ -321,7 +307,7 @@ export function useSettingsPage() {
     setLocalFolderChordsBusy((current) => ({ ...current, [folderPath]: true }));
 
     try {
-      const nextChords = await listLocalChordFolderChords(folderPath);
+      const nextChords = await taurpc.listLocalChordFolderChords(folderPath);
       setLocalFolderChordsByPath((current) => ({ ...current, [folderPath]: nextChords }));
       setOpenLocalFolderChordGroups((current) => {
         const next = { ...(current[folderPath] ?? {}) };
@@ -420,7 +406,7 @@ export function useSettingsPage() {
   async function handleAccessibilityButtonClick() {
     try {
       if (hasAccessibilityPermission) {
-        await openAccessibilitySettings();
+        await taurpc.openAccessibilitySettings();
         toast.info("Opened Accessibility settings.");
         return;
       }
@@ -439,7 +425,7 @@ export function useSettingsPage() {
   async function handleInputMonitoringButtonClick() {
     try {
       if (hasInputMonitoringPermission) {
-        await openInputMonitoringSettings();
+        await taurpc.openInputMonitoringSettings();
         toast.info("Opened Input Monitoring settings.");
         return;
       }
@@ -467,7 +453,7 @@ export function useSettingsPage() {
     const toastId = toast.loading(`Adding ${repoInput.trim()}...`);
 
     try {
-      const addedRepo = await addGitRepo(repoInput);
+      const addedRepo = await taurpc.addGitRepo(repoInput);
       setRepoInput("");
       await Promise.all([
         refreshRepos({ showErrorToast: false }),
@@ -485,7 +471,7 @@ export function useSettingsPage() {
     let selectedPath: string | null = null;
 
     try {
-      selectedPath = await pickLocalChordFolder();
+      selectedPath = await taurpc.pickLocalChordFolder();
       if (!selectedPath) {
         return;
       }
@@ -499,7 +485,7 @@ export function useSettingsPage() {
 
     try {
       await validateLocalChordFolder(selectedPath);
-      const addedFolder = await addLocalChordFolder(selectedPath);
+      const addedFolder = await taurpc.addLocalChordFolder(selectedPath);
       await Promise.all([
         refreshLocalChordFolders({ showErrorToast: false }),
         refreshActiveChords({ showErrorToast: false }),
@@ -517,7 +503,7 @@ export function useSettingsPage() {
     const toastId = toast.loading(`Syncing ${repoSlug}...`);
 
     try {
-      const syncedRepo = await syncGitRepo(repoSlug);
+      const syncedRepo = await taurpc.syncGitRepo(repoSlug);
       setRepoChordsByRepo((current) => {
         const next = { ...current };
         delete next[repoSlug];
@@ -577,7 +563,7 @@ export function useSettingsPage() {
     setRemovingGlobalShortcut(shortcut);
 
     try {
-      await removeGlobalShortcutMapping(shortcut);
+      await taurpc.removeGlobalShortcutMapping(shortcut);
       setGlobalShortcutMappings((current) =>
         current.filter((mapping) => mapping.shortcut !== shortcut),
       );
@@ -595,7 +581,7 @@ export function useSettingsPage() {
     setRelaunchingApp(bundleId);
 
     try {
-      await relaunchApp(bundleId);
+      await taurpc.relaunchApp(bundleId);
       toast.success(`Requested relaunch for ${appLabel}.`);
     } catch (error) {
       toast.error(`Failed to relaunch ${appLabel}: ${getErrorMessage(error)}`);

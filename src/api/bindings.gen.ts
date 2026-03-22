@@ -16,24 +16,24 @@ export type GlobalShortcutMappingInfo = { shortcut: string; bundleId: string; ho
 
 export type LocalChordFolderInfo = { name: string; localPath: string }
 
-const ARGS_MAP = { '':'{"add_git_repo":["repo"],"add_local_chord_folder":["path"],"list_active_chords":[],"list_app_metadata":["bundle_ids"],"list_apps_needing_relaunch":[],"list_git_repos":[],"list_global_shortcut_mappings":[],"list_local_chord_folder_chords":["path"],"list_local_chord_folders":[],"list_matching_chords":[],"list_repo_chords":["repo"],"open_accessibility_settings":[],"open_input_monitoring_settings":[],"pick_local_chord_folder":[],"relaunch_app":["bundle_id"],"remove_global_shortcut_mapping":["shortcut"],"sync_git_repo":["repo"]}' }
-export type Router = { "": {add_git_repo: (repo: string) => Promise<GitRepoInfo>, 
-add_local_chord_folder: (path: string) => Promise<LocalChordFolderInfo>, 
-list_active_chords: () => Promise<ActiveChordInfo[]>, 
-list_app_metadata: (bundleIds: string[]) => Promise<AppMetadataInfo[]>, 
-list_apps_needing_relaunch: () => Promise<AppNeedsRelaunchInfo[]>, 
-list_git_repos: () => Promise<GitRepoInfo[]>, 
-list_global_shortcut_mappings: () => Promise<GlobalShortcutMappingInfo[]>, 
-list_local_chord_folder_chords: (path: string) => Promise<ActiveChordInfo[]>, 
-list_local_chord_folders: () => Promise<LocalChordFolderInfo[]>, 
-list_matching_chords: () => Promise<ActiveChordInfo[]>, 
-list_repo_chords: (repo: string) => Promise<ActiveChordInfo[]>, 
-open_accessibility_settings: () => Promise<void>, 
-open_input_monitoring_settings: () => Promise<void>, 
-pick_local_chord_folder: () => Promise<string | null>, 
-relaunch_app: (bundleId: string) => Promise<null>, 
-remove_global_shortcut_mapping: (shortcut: string) => Promise<null>, 
-sync_git_repo: (repo: string) => Promise<GitRepoInfo>} };
+const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"listActiveChords":[],"listAppMetadata":["bundle_ids"],"listAppsNeedingRelaunch":[],"listGitRepos":[],"listGlobalShortcutMappings":[],"listLocalChordFolderChords":["path"],"listLocalChordFolders":[],"listMatchingChords":[],"listRepoChords":["repo"],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"syncGitRepo":["repo"]}' }
+export type Router = { "": {addGitRepo: (repo: string) => Promise<GitRepoInfo>, 
+addLocalChordFolder: (path: string) => Promise<LocalChordFolderInfo>, 
+listActiveChords: () => Promise<ActiveChordInfo[]>, 
+listAppMetadata: (bundleIds: string[]) => Promise<AppMetadataInfo[]>, 
+listAppsNeedingRelaunch: () => Promise<AppNeedsRelaunchInfo[]>, 
+listGitRepos: () => Promise<GitRepoInfo[]>, 
+listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>, 
+listLocalChordFolderChords: (path: string) => Promise<ActiveChordInfo[]>, 
+listLocalChordFolders: () => Promise<LocalChordFolderInfo[]>, 
+listMatchingChords: () => Promise<ActiveChordInfo[]>, 
+listRepoChords: (repo: string) => Promise<ActiveChordInfo[]>, 
+openAccessibilitySettings: () => Promise<void>, 
+openInputMonitoringSettings: () => Promise<void>, 
+pickLocalChordFolder: () => Promise<string | null>, 
+relaunchApp: (bundleId: string) => Promise<null>, 
+removeGlobalShortcutMapping: (shortcut: string) => Promise<null>, 
+syncGitRepo: (repo: string) => Promise<GitRepoInfo>} };
 
 
 export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)

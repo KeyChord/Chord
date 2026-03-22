@@ -1,4 +1,4 @@
-import type { AppMetadataInfo } from "#/api/settings.ts";
+import type { AppMetadataInfo } from "#/api/taurpc.ts";
 
 export function AppIcon({
   appMetadata,

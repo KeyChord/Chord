@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listAppMetadata, type AppMetadataInfo } from "#/api/settings.ts";
+import { taurpc, type AppMetadataInfo } from "#/api/taurpc.ts";
 import type { AppMetadataByBundleId } from "#/utils/settings.ts";
 
 export function useAppMetadata(bundleIds: string[]) {
@@ -16,7 +16,7 @@ export function useAppMetadata(bundleIds: string[]) {
       };
     }
 
-    void listAppMetadata(bundleIds)
+    void taurpc.listAppMetadata(bundleIds)
       .then((items: AppMetadataInfo[]) => {
         if (cancelled) {
           return;

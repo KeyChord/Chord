@@ -38,22 +38,39 @@ fn open_system_settings(url: &str, permission_name: &str) {
 
 #[taurpc::procedures(export_to = "../src/api/bindings.gen.ts")]
 pub trait Api {
+    #[taurpc(alias = "openAccessibilitySettings")]
     async fn open_accessibility_settings();
+    #[taurpc(alias = "openInputMonitoringSettings")]
     async fn open_input_monitoring_settings();
+    #[taurpc(alias = "listGitRepos")]
     async fn list_git_repos() -> Result<Vec<GitRepoInfo>, String>;
+    #[taurpc(alias = "addGitRepo")]
     async fn add_git_repo(repo: String) -> Result<GitRepoInfo, String>;
+    #[taurpc(alias = "syncGitRepo")]
     async fn sync_git_repo(repo: String) -> Result<GitRepoInfo, String>;
+    #[taurpc(alias = "listLocalChordFolders")]
     async fn list_local_chord_folders() -> Result<Vec<LocalChordFolderInfo>, String>;
+    #[taurpc(alias = "pickLocalChordFolder")]
     async fn pick_local_chord_folder() -> Result<Option<String>, String>;
+    #[taurpc(alias = "addLocalChordFolder")]
     async fn add_local_chord_folder(path: String) -> Result<LocalChordFolderInfo, String>;
+    #[taurpc(alias = "listActiveChords")]
     async fn list_active_chords() -> Result<Vec<ActiveChordInfo>, String>;
+    #[taurpc(alias = "listMatchingChords")]
     async fn list_matching_chords() -> Result<Vec<ActiveChordInfo>, String>;
+    #[taurpc(alias = "listAppMetadata")]
     async fn list_app_metadata(bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>, String>;
+    #[taurpc(alias = "listRepoChords")]
     async fn list_repo_chords(repo: String) -> Result<Vec<ActiveChordInfo>, String>;
+    #[taurpc(alias = "listLocalChordFolderChords")]
     async fn list_local_chord_folder_chords(path: String) -> Result<Vec<ActiveChordInfo>, String>;
+    #[taurpc(alias = "listGlobalShortcutMappings")]
     async fn list_global_shortcut_mappings() -> Result<Vec<GlobalShortcutMappingInfo>, String>;
+    #[taurpc(alias = "removeGlobalShortcutMapping")]
     async fn remove_global_shortcut_mapping(shortcut: String) -> Result<(), String>;
+    #[taurpc(alias = "listAppsNeedingRelaunch")]
     async fn list_apps_needing_relaunch() -> Result<Vec<AppNeedsRelaunchInfo>, String>;
+    #[taurpc(alias = "relaunchApp")]
     async fn relaunch_app(bundle_id: String) -> Result<(), String>;
 }
 
