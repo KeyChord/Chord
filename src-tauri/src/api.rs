@@ -36,7 +36,7 @@ fn open_system_settings(url: &str, permission_name: &str) {
     }
 }
 
-#[taurpc::procedures(export_to = "../src/api/bindings.ts")]
+#[taurpc::procedures(export_to = "../src/api/bindings.gen.ts")]
 pub trait Api {
     async fn open_accessibility_settings();
     async fn open_input_monitoring_settings();

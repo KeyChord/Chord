@@ -7,7 +7,9 @@ use device_query::DeviceQuery;
 use keycode::KeyMappingCode;
 use keycode::KeyMappingCode::*;
 use observable_property::ObservableProperty;
+use parking_lot::Mutex;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 use typeshare::typeshare;
@@ -15,6 +17,7 @@ use typeshare::typeshare;
 pub struct Chorder {
     pub state: ObservableProperty<Arc<ChorderState>>,
     pub ui: ChorderIndicatorUi,
+    held_keys: Mutex<HashSet<Key>>,
 }
 
 impl Chorder {
@@ -34,7 +37,11 @@ impl Chorder {
             log::error!("Failed to trigger initial state change: {e}");
         }
 
-        Self { state, ui }
+        Self {
+            state,
+            ui,
+            held_keys: Mutex::new(HashSet::new()),
+        }
     }
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
@@ -43,6 +50,8 @@ impl Chorder {
     }
 
     pub fn ensure_inactive(&self, handle: AppHandle) -> Result<()> {
+        self.held_keys.lock().clear();
+
         let state = self.state.get()?;
         if !self.ui.is_visible() && state.is_idle() {
             return Ok(());
@@ -55,6 +64,11 @@ impl Chorder {
 
     // If `handle_key_event` is called, the state is guaranteed to be active
     pub fn handle_key_event(&self, handle: AppHandle, key_event: &KeyEvent) -> Result<()> {
+        if !self.track_held_key_event(key_event) {
+            log::debug!("Ignoring repeated chord-mode key press: {:?}", key_event);
+            return Ok(());
+        }
+
         // Don't handle any modifier key events
         let modifiers = Key::modifiers();
         let (KeyEvent::Press(key) | KeyEvent::Release(key)) = key_event;
@@ -191,6 +205,11 @@ impl Chorder {
                 }
             }
         }
+    }
+
+    fn track_held_key_event(&self, key_event: &KeyEvent) -> bool {
+        let mut held_keys = self.held_keys.lock();
+        should_handle_held_key_event(&mut held_keys, key_event)
     }
 
     fn execute_key_buffer(
@@ -339,6 +358,16 @@ fn format_keys(keys: &[Key]) -> Vec<String> {
     keys.iter().map(|key| format_key(*key)).collect()
 }
 
+fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
+    match key_event {
+        KeyEvent::Press(key) => held_keys.insert(*key),
+        KeyEvent::Release(key) => {
+            held_keys.remove(key);
+            true
+        }
+    }
+}
+
 fn format_key(key: Key) -> String {
     if let Some(ch) = key.to_char(false) {
         return ch.to_ascii_uppercase().to_string();
@@ -406,6 +435,29 @@ mod tests {
         let empty_state = ChorderState::new();
         assert!(!Chorder::should_execute_key_buffer_on_space_release(
             &empty_state
+        ));
+    }
+
+    #[test]
+    fn repeated_presses_are_ignored_until_release() {
+        let mut held_keys = HashSet::new();
+        let key = Key(KeyA);
+
+        assert!(should_handle_held_key_event(
+            &mut held_keys,
+            &KeyEvent::Press(key)
+        ));
+        assert!(!should_handle_held_key_event(
+            &mut held_keys,
+            &KeyEvent::Press(key)
+        ));
+        assert!(should_handle_held_key_event(
+            &mut held_keys,
+            &KeyEvent::Release(key)
+        ));
+        assert!(should_handle_held_key_event(
+            &mut held_keys,
+            &KeyEvent::Press(key)
         ));
     }
 }
