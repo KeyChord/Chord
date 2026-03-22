@@ -138,7 +138,9 @@ You can just type:
   You might have also noticed that all chords are a minimum of two keys, and this is an intentional rule or else it'd be ambiguous whether pressing `Shift` means starting a new chord or re-using the existing prefix.
 </details>
 
-While it might seem a bit tedious to press `Caps Lock` or `Shift`, it's actually a lot smoother in practice since both `Caps Lock` and `Shift` are relatively easy to reach compared to modifier keys. In addition, because chords don't use modifier keys, you're able to use any existing shortcuts while _Chord Mode_ is active. The following sequence of keys will move all the contents of your Downloads folder into a new folder:
+While it might seem a bit tedious to press `Caps Lock` or `Shift` to trigger chords, it's actually a lot smoother in practice since both `Caps Lock` and `Shift` are relatively easy to reach compared to modifier keys. For one-off chords, you can also simply lift `Space` and Chord will automatically execute whatever you have in the input buffer.
+
+In addition, because chords don't use modifier keys, you're able to use any existing shortcuts while _Chord Mode_ is active. The following sequence of keys will move all the contents of your Downloads folder into a new folder:
 
 <details>
   <summary>/FgD⌘ands⇪</summary>
@@ -185,29 +187,24 @@ export const menu = (...segments: string[]) => {
 [chords]
 # `explorer.newFile` doesn't have a default shortcut in VSCode
 fh = { name = "File: Here", args = ["explorer.newFile"] }
-# `menu:args` calls the named `menu` export instead of `default`
-mc = { name = "Menu: Columns", 'menu:args' = ["View", "Columns"] }
+# `args:menu` calls the named `menu` export instead of `default`
+mc = { name = "Menu: Columns", 'args:menu' = ["View", "Columns"] }
 # String args are evaluated as JavaScript and must return an array
 df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()]' }
 # ...
 ```
 
-`args` and `*:args` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
+`args` and `args:*` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
 
 Chords embeds the QuickJS JavaScript environment (excluding its standard library) as well as certain LLRT modules (which are based on the Node APIs). Module resolution is currently only implemented for root imports (e.g. if you have a `src/file.js` at the root of your repo, you have to write `import file from "src/file.js"`).
 
 ## Global Hotkeys
 
 Many macOS apps can only be activated through a global hotkey. We thus use a synthetic hotkey pool:
-- `cmd+ctrl+f{13..20}`
-- `cmd+ctrl+2`
-- `cmd+ctrl+3`
-- `cmd+ctrl+4`
-- `cmd+ctrl+5`
-- `cmd+ctrl+6`
-- `cmd+ctrl+7`
-- `cmd+ctrl+8`
-- `cmd+ctrl+9`
+- `cmd+ctrl+alt+shift+{a-z}`
+- `cmd+ctrl+alt+shift+{0..9}`
+- `cmd+ctrl+alt+shift+f{1..12}`
+- `cmd+ctrl+alt+f{1..12}`
 
 ## Comparison to keyboard shortcuts
 

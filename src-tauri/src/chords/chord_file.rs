@@ -117,7 +117,7 @@ impl AppChord {
             });
 
         for (key, value) in &self.extra {
-            let Some(export_name) = key.strip_suffix(":args") else {
+            let Some(export_name) = key.strip_prefix("args:") else {
                 continue;
             };
 
@@ -197,7 +197,7 @@ mod tests {
         let file = AppChordsFile::parse(
             r#"
 [chords]
-a = { name = "Menu", 'menu:args' = ["View", "Columns"] }
+a = { name = "Menu", 'args:menu' = ["View", "Columns"] }
 "#,
         )
         .unwrap();
@@ -248,7 +248,7 @@ a = { name = "Dynamic", args = '["View", "Columns".toLowerCase()]' }
         let file = AppChordsFile::parse(
             r#"
 [chords]
-a = { name = "Conflict", args = ["default"], 'menu:args' = ["View"] }
+a = { name = "Conflict", args = ["default"], 'args:menu' = ["View"] }
 "#,
         )
         .unwrap();
