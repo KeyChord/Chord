@@ -24,8 +24,8 @@
       {
         "label": "indicator",
         "title": "Chord Mode Indicator",
-        "width": 240,
-        "height": 44,
+        "width": 640,
+        "height": 180,
         "visible": false,
         "transparent": false,
         "decorations": false,

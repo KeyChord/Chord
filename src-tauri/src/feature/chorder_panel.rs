@@ -6,9 +6,8 @@ use std::sync::Arc;
 use tauri::{AppHandle, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 
-const INDICATOR_WIDTH: u32 = 240;
-const INDICATOR_HEIGHT: u32 = 44;
-const INDICATOR_TOP_INSET: i32 = 38;
+const INDICATOR_WIDTH: u32 = 640;
+const INDICATOR_HEIGHT: u32 = 180;
 
 pub struct ChorderIndicatorPanel {
     pub is_visible: Arc<AtomicBool>,
@@ -25,7 +24,7 @@ impl ChorderIndicatorPanel {
         panel.set_opaque(true);
         panel.set_transparent(false);
         panel.set_ignores_mouse_events(true);
-        panel.set_becomes_key_only_if_needed(true);
+        panel.set_becomes_key_only_if_needed(false);
         panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().into());
         panel.set_floating_panel(true);
         panel.set_hides_on_deactivate(false);
@@ -47,30 +46,33 @@ impl ChorderIndicatorPanel {
         })
     }
 
+    pub fn is_visible(&self) -> bool {
+        self.is_visible.load(Ordering::Relaxed)
+    }
+
     fn show(&self, handle: AppHandle) -> Result<()> {
-        return Ok(());
         log::debug!("Showing chorder panel");
         let panel = self.panel.clone();
         let is_visible = self.is_visible.clone();
 
         handle.clone().run_on_main_thread(move || {
-            if let Ok(Some(monitor)) = handle.primary_monitor() {
-                let position = monitor.position();
-                let size = monitor.size();
-                let x = position.x + ((size.width.saturating_sub(INDICATOR_WIDTH)) / 2) as i32;
-                let y = position.y + size.height as i32 - INDICATOR_TOP_INSET;
+            let native_panel = panel.as_panel();
+            native_panel.setContentSize(tauri_nspanel::objc2_foundation::NSSize::new(
+                INDICATOR_WIDTH as f64,
+                INDICATOR_HEIGHT as f64,
+            ));
 
-                let native_panel = panel.as_panel();
-                native_panel.setContentSize(tauri_nspanel::objc2_foundation::NSSize::new(
-                    INDICATOR_WIDTH as f64,
-                    INDICATOR_HEIGHT as f64,
-                ));
-                native_panel.setFrameTopLeftPoint(tauri_nspanel::objc2_foundation::NSPoint::new(
-                    x as f64, y as f64,
-                ));
+            if let Some(screen) = native_panel.screen() {
+                let visible_frame = screen.visibleFrame();
+                let x = visible_frame.origin.x
+                    + ((visible_frame.size.width - INDICATOR_WIDTH as f64) / 2.0).max(0.0);
+                let y = visible_frame.origin.y
+                    + ((visible_frame.size.height - INDICATOR_HEIGHT as f64) / 2.0).max(0.0);
+                native_panel
+                    .setFrameOrigin(tauri_nspanel::objc2_foundation::NSPoint::new(x, y));
             }
 
-            panel.show_and_make_key();
+            panel.show();
             panel.order_front_regardless();
             is_visible.store(true, Ordering::Relaxed);
         })?;
@@ -92,7 +94,7 @@ impl ChorderIndicatorPanel {
     }
 
     pub fn ensure_hidden(&self, handle: AppHandle) -> Result<()> {
-        if self.is_visible.load(Ordering::Relaxed) {
+        if self.is_visible() {
             self.hide(handle)?;
         }
 
@@ -100,7 +102,7 @@ impl ChorderIndicatorPanel {
     }
 
     pub fn ensure_visible(&self, handle: AppHandle) -> Result<()> {
-        if !self.is_visible.load(Ordering::Relaxed) {
+        if !self.is_visible() {
             self.show(handle)?;
         }
 
