@@ -1,5 +1,5 @@
 use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorPanel};
+use crate::feature::{Chorder, ChorderIndicatorUi};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use anyhow::{Context, Result};
 use frontmost::{start_nsrunloop, Detector};
@@ -177,7 +177,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         let window = handle
             .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
             .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
-        Chorder::new(ChorderIndicatorPanel::from_window(window)?)
+        Chorder::new(ChorderIndicatorUi::from_window(window)?)
     };
     let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
     let context = AppContext::new(chorder, bundled_app_chords);

@@ -53,7 +53,7 @@ export function ChordIndicatorWindow() {
 
     const setup = async () => {
       const unlisten = await listen<ChorderIndicatorState>(
-        "chorder-indicator-state-changed",
+        "chorder-state-changed",
         (event) => {
           if (!cancelled) {
             setState(event.payload);

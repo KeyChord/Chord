@@ -1,4 +1,4 @@
-use super::ChorderIndicatorPanel;
+use super::ChorderIndicatorUi;
 use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
 use crate::{input::KeyEvent, AppContext};
@@ -11,47 +11,43 @@ use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager};
 
-const CHORDER_INDICATOR_STATE_CHANGED_EVENT: &str = "chorder-indicator-state-changed";
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ChorderIndicatorStatePayload {
-    visible: bool,
-    buffer_keys: Vec<String>,
-    active_keys: Vec<String>,
-    shift_pressed: bool,
-}
-
 pub struct Chorder {
     pub state: ObservableProperty<Arc<ChorderState>>,
-    panel: ChorderIndicatorPanel,
+    pub ui: ChorderIndicatorUi
 }
 
 impl Chorder {
-    pub fn new(panel: ChorderIndicatorPanel) -> Self {
+    pub fn new(ui: ChorderIndicatorUi) -> Self {
+        let state =ObservableProperty::new(Arc::new(ChorderState::new()));
+
+        let window = ui.window.clone();
+        if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
+           if let Err(e) = window.emit("chorder-state-changed", new_state) {
+               log::error!("Failed to emit chorder state change: {e}");
+           }
+        })) {
+            log::error!("Failed to subscribe chorder state observer: {e}");
+        };
+
         Self {
-            state: ObservableProperty::new(Arc::new(ChorderState::new())),
-            panel,
+            state,
+            ui,
         }
     }
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
-        self.panel.ensure_visible(handle.clone())?;
-        let state = self.state.get()?;
-        self.emit_indicator_state(&handle, true, state.as_ref())?;
+        self.ui.ensure_visible(handle.clone())?;
         Ok(())
     }
 
     pub fn ensure_inactive(&self, handle: AppHandle) -> Result<()> {
         let state = self.state.get()?;
-        if !self.panel.is_visible() && state.is_idle() {
+        if !self.ui.is_visible() && state.is_idle() {
             return Ok(());
         }
 
-        let next_state = ChorderState::new();
-        self.state.set(Arc::new(next_state.clone()))?;
-        self.panel.ensure_hidden(handle.clone())?;
-        self.emit_indicator_state(&handle, false, &next_state)?;
+        self.state.set(Arc::new(ChorderState::new()))?;
+        self.ui.ensure_hidden(handle.clone())?;
         Ok(())
     }
 
@@ -98,7 +94,7 @@ impl Chorder {
                 }
 
                 if code == &KeyMappingCode::Space {
-                    self.replace_state(&handle, ChorderState::new())?;
+                    self.state.set(Arc::new(ChorderState::new()))?;
                 }
 
                 Ok(())
@@ -134,24 +130,26 @@ impl Chorder {
                                 num_times: 1,
                             },
                         )?;
-                        self.replace_state(
-                            &handle,
-                            ChorderState {
-                            pressed_chord: state.active_chord.clone(),
-                            key_buffer: vec![],
-                            active_chord: state.active_chord.clone(),
-                        },
+                        self.state.set(
+                            Arc::new(
+                                ChorderState {
+                                    pressed_chord: state.active_chord.clone(),
+                                    key_buffer: vec![],
+                                    active_chord: state.active_chord.clone(),
+                                },
+                            ),
                         )?;
                     } else {
                         // e.g. we ran it on a different app
                         log::error!("Last chord no longer applies");
-                        self.replace_state(
-                            &handle,
-                            ChorderState {
-                            key_buffer: vec![],
-                            pressed_chord: None,
-                            active_chord: None,
-                        },
+                        self.state.set(
+                            Arc::new(
+                                ChorderState {
+                                    key_buffer: vec![],
+                                    pressed_chord: None,
+                                    active_chord: None,
+                                },
+                            ),
                         )?;
                     }
 
@@ -180,25 +178,27 @@ impl Chorder {
                         state.key_buffer,
                         context.frontmost_application_id.load().as_ref().clone()
                     );
-                    self.replace_state(
-                        &handle,
-                        ChorderState {
-                        key_buffer: vec![],
-                        pressed_chord: None,
-                        active_chord: None,
-                    },
+                    self.state.set(
+                        Arc::new(
+                            ChorderState {
+                                key_buffer: vec![],
+                                pressed_chord: None,
+                                active_chord: None,
+                            },
+                        ),
                     )?;
                     return Ok(());
                 };
 
                 press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
-                self.replace_state(
-                    &handle,
-                    ChorderState {
-                    pressed_chord: Some(chord_payload.chord.clone()),
-                    key_buffer: vec![],
-                    active_chord: Some(chord_payload.chord.clone()),
-                },
+                self.state.set(
+                    Arc::new(
+                        ChorderState {
+                            pressed_chord: Some(chord_payload.chord.clone()),
+                            key_buffer: vec![],
+                            active_chord: Some(chord_payload.chord.clone()),
+                        },
+                    ),
                 )?;
                 Ok(())
             }
@@ -227,13 +227,14 @@ impl Chorder {
         let mut next_key_buffer = state.key_buffer.clone();
         next_key_buffer.push(key.clone());
         log::debug!("New key buffer: {:?}", next_key_buffer);
-        self.replace_state(
-            &handle,
-            ChorderState {
-            key_buffer: next_key_buffer,
-            pressed_chord: None,
-            active_chord: None,
-        },
+        self.state.set(
+            Arc::new(
+                ChorderState {
+                    key_buffer: next_key_buffer,
+                    pressed_chord: None,
+                    active_chord: None,
+                },
+            ),
         )?;
         Ok(())
     }
@@ -283,51 +284,22 @@ impl Chorder {
 
         log::debug!("Pressing chord: {:?}", chord_payload);
         press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
-        self.replace_state(
-            &handle,
+        self.state.set(
+            Arc::new(
             ChorderState {
-            // We always clear the key_buffer if a chord is pressed
-            key_buffer: vec![],
-            pressed_chord: Some(chord_payload.chord.clone()),
-            active_chord: Some(chord_payload.chord.clone()),
-        },
+                // We always clear the key_buffer if a chord is pressed
+                key_buffer: vec![],
+                pressed_chord: Some(chord_payload.chord.clone()),
+                active_chord: Some(chord_payload.chord.clone()),
+            },
+            )
         )?;
-
-        Ok(())
-    }
-
-    fn replace_state(&self, handle: &AppHandle, next_state: ChorderState) -> Result<()> {
-        self.state.set(Arc::new(next_state.clone()))?;
-        self.emit_indicator_state(handle, self.panel.is_visible(), &next_state)?;
-        Ok(())
-    }
-
-    fn emit_indicator_state(
-        &self,
-        handle: &AppHandle,
-        visible: bool,
-        state: &ChorderState,
-    ) -> Result<()> {
-        let payload = ChorderIndicatorStatePayload {
-            visible,
-            buffer_keys: format_keys(&state.key_buffer),
-            active_keys: state
-                .active_chord
-                .as_ref()
-                .map(|chord| format_keys(&chord.keys))
-                .unwrap_or_default(),
-            shift_pressed: handle.state::<AppContext>().is_shift_pressed(),
-        };
-
-        if let Some(window) = handle.get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL) {
-            window.emit(CHORDER_INDICATOR_STATE_CHANGED_EVENT, payload)?;
-        }
 
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ChorderState {
     // The key buffer represents the pending letters for a not-yet created chord.
     // When a chord is executed, the key buffer is always cleared.

@@ -9,12 +9,13 @@ use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWin
 const INDICATOR_WIDTH: u32 = 640;
 const INDICATOR_HEIGHT: u32 = 180;
 
-pub struct ChorderIndicatorPanel {
+pub struct ChorderIndicatorUi {
     pub is_visible: Arc<AtomicBool>,
     pub panel: Arc<dyn Panel>,
+    pub window: WebviewWindow,
 }
 
-impl ChorderIndicatorPanel {
+impl ChorderIndicatorUi {
     pub fn from_window(window: WebviewWindow) -> Result<Self> {
         let _ = window.set_ignore_cursor_events(true);
 
@@ -42,6 +43,7 @@ impl ChorderIndicatorPanel {
 
         Ok(Self {
             is_visible: Arc::new(AtomicBool::new(false)),
+            window,
             panel,
         })
     }

@@ -9,21 +9,22 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
+use serde::Serialize;
 use tauri::AppHandle;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum ChordJsArgs {
     Values(Vec<toml::Value>),
     Eval(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChordJsInvocation {
     pub export_name: Option<String>,
     pub args: ChordJsArgs,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Chord {
     pub keys: Vec<Key>,
     pub name: String,

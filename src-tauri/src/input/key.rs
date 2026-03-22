@@ -2,6 +2,7 @@ use anyhow::Result;
 use keycode::KeyMappingCode;
 use keycode::KeyMappingCode::*;
 use std::str::FromStr;
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyCombination {
@@ -44,6 +45,13 @@ impl KeyCombination {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Key(pub KeyMappingCode);
+
+impl serde::Serialize for Key {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        self.0.to_string().serialize(serializer)
+    }
+}
 
 impl Key {
     pub fn modifiers() -> Vec<Self> {
