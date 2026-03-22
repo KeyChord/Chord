@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   disable as disableAutostart,
@@ -56,6 +57,11 @@ type GlobalShortcutMappingInfo = {
   shortcut: string;
   bundleId: string;
   hotkeyId: string;
+};
+
+type AppNeedsRelaunchInfo = {
+  bundleId: string;
+  displayName: string | null;
 };
 
 type ChordGroup = {
@@ -217,6 +223,9 @@ export function SettingsWindow() {
   const [globalShortcutMappingsBusy, setGlobalShortcutMappingsBusy] = useState(true);
   const [globalShortcutSearch, setGlobalShortcutSearch] = useState("");
   const [removingGlobalShortcut, setRemovingGlobalShortcut] = useState<string | null>(null);
+  const [appsNeedingRelaunch, setAppsNeedingRelaunch] = useState<AppNeedsRelaunchInfo[]>([]);
+  const [appsNeedingRelaunchBusy, setAppsNeedingRelaunchBusy] = useState(true);
+  const [relaunchingApp, setRelaunchingApp] = useState<string | null>(null);
   const [openChordGroups, setOpenChordGroups] = useState<Record<string, boolean>>({});
   const [repoChordsByRepo, setRepoChordsByRepo] = useState<Record<string, ActiveChordInfo[]>>({});
   const [repoChordsBusy, setRepoChordsBusy] = useState<Record<string, boolean>>({});
@@ -249,6 +258,28 @@ export function SettingsWindow() {
       unlisten?.();
     };
   }, [currentWindow]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    void listen<AppNeedsRelaunchInfo[]>("apps-needing-relaunch-changed", (event) => {
+      setAppsNeedingRelaunch(event.payload);
+      setAppsNeedingRelaunchBusy(false);
+      setRelaunchingApp((current) =>
+        current && event.payload.some((app) => app.bundleId === current) ? current : null,
+      );
+    })
+      .then((callback) => {
+        unlisten = callback;
+      })
+      .catch((error) => {
+        console.error("Failed to listen for relaunch updates", error);
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   async function refreshAccessibilityPermissionState() {
     if (!isMacOS) {
@@ -385,6 +416,33 @@ export function SettingsWindow() {
       return [];
     } finally {
       setGlobalShortcutMappingsBusy(false);
+    }
+  }
+
+  async function refreshAppsNeedingRelaunch(options?: {
+    showSuccessToast?: boolean;
+    showErrorToast?: boolean;
+  }) {
+    const { showSuccessToast = false, showErrorToast = true } = options ?? {};
+    setAppsNeedingRelaunchBusy(true);
+
+    try {
+      const nextApps = await invoke<AppNeedsRelaunchInfo[]>("list_apps_needing_relaunch_command");
+      setAppsNeedingRelaunch(nextApps);
+
+      if (showSuccessToast) {
+        toast.success("Relaunch list refreshed.");
+      }
+
+      return nextApps;
+    } catch (error) {
+      const message = `Failed to load relaunch list: ${getErrorMessage(error)}`;
+      if (showErrorToast) {
+        toast.error(message);
+      }
+      return [];
+    } finally {
+      setAppsNeedingRelaunchBusy(false);
     }
   }
 
@@ -707,6 +765,20 @@ export function SettingsWindow() {
     }
   }
 
+  async function handleRelaunchApp(bundleId: string) {
+    const appLabel = appsNeedingRelaunch.find((app) => app.bundleId === bundleId)?.displayName ?? bundleId;
+    setRelaunchingApp(bundleId);
+
+    try {
+      await invoke("relaunch_app_command", { bundleId });
+      toast.success(`Requested relaunch for ${appLabel}.`);
+    } catch (error) {
+      toast.error(`Failed to relaunch ${appLabel}: ${getErrorMessage(error)}`);
+    } finally {
+      setRelaunchingApp((current) => (current === bundleId ? null : current));
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -720,6 +792,7 @@ export function SettingsWindow() {
           refreshLocalChordFolders({ showErrorToast: true }),
           refreshActiveChords({ showErrorToast: true }),
           refreshGlobalShortcutMappings({ showErrorToast: true }),
+          refreshAppsNeedingRelaunch({ showErrorToast: true }),
         ]);
       } catch (error) {
         if (!cancelled) {
@@ -1035,6 +1108,72 @@ export function SettingsWindow() {
                     ))
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card size="sm">
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Apps Needing Relaunch</CardTitle>
+                    <CardDescription>
+                      Scripts can flag apps that should be restarted after they change app state.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void refreshAppsNeedingRelaunch({ showSuccessToast: true });
+                    }}
+                    disabled={appsNeedingRelaunchBusy || relaunchingApp !== null}
+                  >
+                    {appsNeedingRelaunchBusy ? "Refreshing..." : "Refresh"}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 pt-0">
+                {appsNeedingRelaunchBusy ? (
+                  <p className="text-sm text-muted-foreground">Loading relaunch requests...</p>
+                ) : appsNeedingRelaunch.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No apps are currently marked as needing a relaunch.
+                  </p>
+                ) : (
+                  appsNeedingRelaunch.map((app) => {
+                    const isRelaunching = relaunchingApp === app.bundleId;
+
+                    return (
+                      <div
+                        key={app.bundleId}
+                        className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate font-medium">{app.displayName ?? app.bundleId}</p>
+                            <Badge variant="secondary">Needs relaunch</Badge>
+                          </div>
+                          {app.displayName ? (
+                            <p className="truncate text-xs text-muted-foreground">{app.bundleId}</p>
+                          ) : null}
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            void handleRelaunchApp(app.bundleId);
+                          }}
+                          disabled={isRelaunching}
+                        >
+                          {isRelaunching ? "Relaunching..." : "Relaunch"}
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
               </CardContent>
             </Card>
 

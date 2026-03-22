@@ -2,7 +2,6 @@ use crate::chords::LoadedAppChords;
 use crate::feature::Chorder;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::sources::load_all_chord_folders;
-use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
@@ -14,11 +13,20 @@ use keycode::KeyMappingCode::*;
 use parking_lot::RwLock;
 use rquickjs::Module;
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
+
+#[cfg(target_os = "macos")]
+use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
+#[cfg(target_os = "macos")]
+use objc2_foundation::NSString;
+#[cfg(target_os = "macos")]
+use std::time::{Duration, Instant};
+
+const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,11 +38,19 @@ pub struct ActiveChordInfo {
     pub action: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppNeedsRelaunchInfo {
+    pub bundle_id: String,
+    pub display_name: Option<String>,
+}
+
 pub struct AppContext {
     pub chorder: Chorder,
 
     pub device_state: Option<DeviceState>,
     pub loaded_app_chords: RwLock<LoadedAppChords>,
+    pub apps_needing_relaunch: RwLock<BTreeSet<String>>,
     pub frontmost_application_id: ArcSwap<Option<String>>,
     pub key_event_state: KeyEventState,
 
@@ -54,6 +70,7 @@ impl AppContext {
 
         Self {
             device_state,
+            apps_needing_relaunch: RwLock::new(BTreeSet::new()),
             frontmost_application_id: ArcSwap::new(Arc::new(None)),
             key_event_state: KeyEventState::new(app_mode_state_machine.clone()),
             loaded_app_chords: RwLock::new(bundled_app_chords),
@@ -75,6 +92,134 @@ impl AppContext {
 
 pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
     Ok(())
+}
+
+fn normalize_bundle_id(bundle_id: &str) -> Result<String> {
+    let bundle_id = bundle_id.trim();
+    if bundle_id.is_empty() {
+        anyhow::bail!("bundle id cannot be empty");
+    }
+
+    Ok(bundle_id.to_string())
+}
+
+fn apps_needing_relaunch_payload(bundle_ids: &BTreeSet<String>) -> Vec<AppNeedsRelaunchInfo> {
+    bundle_ids
+        .iter()
+        .map(|bundle_id| AppNeedsRelaunchInfo {
+            bundle_id: bundle_id.clone(),
+            display_name: resolve_app_display_name(bundle_id),
+        })
+        .collect()
+}
+
+fn emit_apps_needing_relaunch_changed(app: &AppHandle, bundle_ids: &BTreeSet<String>) -> Result<()> {
+    let payload = apps_needing_relaunch_payload(bundle_ids);
+    app.emit(APPS_NEEDING_RELAUNCH_CHANGED_EVENT, payload)?;
+    Ok(())
+}
+
+pub fn set_app_needs_relaunch(app: &AppHandle, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
+    let bundle_id = normalize_bundle_id(bundle_id)?;
+    let context = app.state::<AppContext>();
+
+    let (changed, snapshot) = {
+        let mut apps_needing_relaunch = context.apps_needing_relaunch.write();
+        let changed = if needs_relaunch {
+            apps_needing_relaunch.insert(bundle_id.clone())
+        } else {
+            apps_needing_relaunch.remove(bundle_id.as_str())
+        };
+
+        (changed, apps_needing_relaunch.clone())
+    };
+
+    if changed {
+        emit_apps_needing_relaunch_changed(app, &snapshot)?;
+    }
+
+    Ok(())
+}
+
+pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunchInfo>> {
+    let context = app.state::<AppContext>();
+    let apps_needing_relaunch = context.apps_needing_relaunch.read();
+    Ok(apps_needing_relaunch_payload(&apps_needing_relaunch))
+}
+
+pub fn relaunch_app(app: AppHandle, bundle_id: &str) -> Result<()> {
+    let bundle_id = normalize_bundle_id(bundle_id)?;
+    relaunch_bundle_id(&bundle_id)?;
+    set_app_needs_relaunch(&app, &bundle_id, false)?;
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_app_display_name(bundle_id: &str) -> Option<String> {
+    let bundle_id = NSString::from_str(bundle_id);
+    let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+
+    if let Some(app) = running_apps.iter().next() {
+        if let Some(name) = app.localizedName() {
+            return Some(name.to_string());
+        }
+    }
+
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app_url = workspace.URLForApplicationWithBundleIdentifier(&bundle_id)?;
+    let app_name = app_url.lastPathComponent()?;
+    let app_name = app_name.to_string();
+    Some(app_name.strip_suffix(".app").unwrap_or(&app_name).to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resolve_app_display_name(_bundle_id: &str) -> Option<String> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
+    let bundle_id_string = bundle_id.to_string();
+    let bundle_id = NSString::from_str(bundle_id);
+    let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+
+    for app in running_apps.iter() {
+        app.terminate();
+    }
+
+    // NSRunningApplication::terminate is async, so give the app a brief window to exit
+    // before asking LaunchServices to start it again.
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < deadline {
+        let still_running =
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        if still_running.is_empty() {
+            break;
+        }
+
+        std::thread::sleep(Duration::from_millis(50));
+    }
+
+    let workspace = NSWorkspace::sharedWorkspace();
+    #[allow(deprecated)]
+    let launched =
+        workspace.launchAppWithBundleIdentifier_options_additionalEventParamDescriptor_launchIdentifier(
+            &bundle_id,
+            NSWorkspaceLaunchOptions::Default,
+            None,
+            None,
+        );
+
+    if !launched {
+        anyhow::bail!("failed to relaunch app with bundle id {bundle_id_string}");
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
+    anyhow::bail!("relaunching apps is not supported on this platform: {bundle_id}");
 }
 
 fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {

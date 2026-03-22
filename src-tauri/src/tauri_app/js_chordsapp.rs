@@ -24,7 +24,7 @@ fn on_app_terminate<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
     callback: Function<'js>,
-) -> rquickjs::Result<()> {
+) -> rquickjs::Result<Function<'js>> {
     register_app_terminate_handler(ctx, bundle_id, callback)
 }
 
@@ -35,6 +35,7 @@ impl ModuleDef for ChordsappModule {
         declare.declare("tap")?;
         declare.declare("getGlobalHotkey")?;
         declare.declare("registerGlobalHotkey")?;
+        declare.declare("setAppNeedsRelaunch")?;
         declare.declare("onAppLaunch")?;
         declare.declare("onAppTerminate")?;
         Ok(())
@@ -180,6 +181,33 @@ impl ModuleDef for ChordsappModule {
             )?
             .with_name("getGlobalHotkey")?;
         exports.export("getGlobalHotkey", get_global_hotkey)?;
+
+        let set_app_needs_relaunch_handle = handle.clone();
+        let set_app_needs_relaunch = Function::new(
+            ctx.clone(),
+            move |ctx: Ctx<'_>,
+                  bundle_id: String,
+                  needs_relaunch: bool|
+                  -> rquickjs::Result<()> {
+                crate::tauri_app::context::set_app_needs_relaunch(
+                    &set_app_needs_relaunch_handle,
+                    &bundle_id,
+                    needs_relaunch,
+                )
+                .map_err(|err| {
+                    throw_js_error(
+                        ctx.clone(),
+                        format!(
+                            "setAppNeedsRelaunch({bundle_id:?}, {needs_relaunch}) failed: {err}"
+                        ),
+                    )
+                })?;
+
+                Ok(())
+            },
+        )?
+        .with_name("setAppNeedsRelaunch")?;
+        exports.export("setAppNeedsRelaunch", set_app_needs_relaunch)?;
 
         let on_app_launch = Function::new(ctx.clone(), on_app_launch)?.with_name("onAppLaunch")?;
         exports.export("onAppLaunch", on_app_launch)?;

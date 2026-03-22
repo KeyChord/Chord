@@ -4,7 +4,8 @@ use crate::sources::{
     pick_local_chord_folder, LocalChordFolderInfo,
 };
 use crate::tauri_app::context::{
-    list_active_chords, list_loaded_chords, reload_loaded_app_chords, ActiveChordInfo,
+    list_active_chords, list_apps_needing_relaunch, list_loaded_chords, relaunch_app,
+    reload_loaded_app_chords, ActiveChordInfo, AppNeedsRelaunchInfo,
 };
 use crate::tauri_app::store::GlobalHotkeyStore;
 use serde::Serialize;
@@ -157,4 +158,16 @@ pub fn remove_global_shortcut_mapping_command(
     let store = global_hotkeys_store(&app)?;
     store.remove(trimmed_shortcut);
     Ok(())
+}
+
+#[tauri::command]
+pub fn list_apps_needing_relaunch_command(
+    app: AppHandle,
+) -> Result<Vec<AppNeedsRelaunchInfo>, String> {
+    list_apps_needing_relaunch(app).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn relaunch_app_command(app: AppHandle, bundle_id: String) -> Result<(), String> {
+    relaunch_app(app, &bundle_id).map_err(|error| error.to_string())
 }

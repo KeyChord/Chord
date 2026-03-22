@@ -4,12 +4,13 @@ use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::AppHandle;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static HAS_LAUNCH_CALLBACKS: AtomicBool = AtomicBool::new(false);
 static HAS_TERMINATE_CALLBACKS: AtomicBool = AtomicBool::new(false);
+static NEXT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
 
 thread_local! {
     static APP_LIFECYCLE_CALLBACKS: RefCell<AppLifecycleCallbacks> =
@@ -24,6 +25,7 @@ struct AppLifecycleCallbacks {
 
 #[derive(Clone)]
 struct AppLifecycleCallbackEntry {
+    id: u64,
     bundle_id: String,
     callback: Persistent<Function<'static>>,
 }
@@ -47,8 +49,11 @@ pub fn register_app_launch_handler<'js>(
     bundle_id: String,
     callback: Function<'js>,
 ) -> rquickjs::Result<()> {
+    let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::SeqCst);
+
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
         callbacks.borrow_mut().launch.push(AppLifecycleCallbackEntry {
+            id,
             bundle_id,
             callback: Persistent::save(&ctx, callback),
         });
@@ -62,19 +67,34 @@ pub fn register_app_terminate_handler<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
     callback: Function<'js>,
-) -> rquickjs::Result<()> {
+) -> rquickjs::Result<Function<'js>> {
+    let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::SeqCst);
+
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
         callbacks
             .borrow_mut()
             .terminate
             .push(AppLifecycleCallbackEntry {
+                id,
                 bundle_id,
                 callback: Persistent::save(&ctx, callback),
             });
     });
     HAS_TERMINATE_CALLBACKS.store(true, Ordering::SeqCst);
 
-    Ok(())
+    Function::new(ctx.clone(), move || -> rquickjs::Result<()> {
+        unregister_app_terminate_handler(id);
+        Ok(())
+    })?
+    .with_name("off")
+}
+
+fn unregister_app_terminate_handler(id: u64) {
+    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
+        let mut callbacks = callbacks.borrow_mut();
+        callbacks.terminate.retain(|entry| entry.id != id);
+        HAS_TERMINATE_CALLBACKS.store(!callbacks.terminate.is_empty(), Ordering::SeqCst);
+    });
 }
 
 pub fn clear_callbacks() {
