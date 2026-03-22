@@ -15,6 +15,7 @@ use parking_lot::RwLock;
 use rquickjs::Module;
 use serde::Serialize;
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -76,6 +77,14 @@ pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
     Ok(())
 }
 
+fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
+    root_dir
+        .map(|root_dir| root_dir.join(module_path))
+        .unwrap_or_else(|| PathBuf::from(module_path))
+        .display()
+        .to_string()
+}
+
 // Also evaluates JavaScript
 pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     let context = app.state::<AppContext>();
@@ -88,10 +97,12 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     // Load all JS files as modules, but keep `chord_folders` so we can use it later.
     for chord_folder in &chord_folders {
         let js_files = chord_folder.js_files.clone();
+        let root_dir = chord_folder.root_dir.clone();
 
         with_js(app.clone(), move |ctx| {
             Box::pin(async move {
                 for (filepath, js) in js_files {
+                    let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
                     let module = match Module::declare(ctx.clone(), filepath.clone(), js) {
                         Ok(m) => {
                             log::debug!("Declared module {}", filepath);
@@ -106,6 +117,27 @@ pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
                             continue;
                         }
                     };
+
+                    let meta = match module.meta() {
+                        Ok(meta) => meta,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to get import.meta for JS module {}: {}",
+                                filepath,
+                                format_js_error(ctx.clone(), e)
+                            );
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = meta.set("url", module_disk_path) {
+                        log::error!(
+                            "Failed to set import.meta.url for JS module {}: {}",
+                            filepath,
+                            format_js_error(ctx.clone(), e)
+                        );
+                        continue;
+                    }
 
                     let (_evaluated, promise) = match module.eval() {
                         Ok(v) => v,
@@ -305,7 +337,11 @@ fn format_action(chord: &crate::chords::Chord) -> String {
 
     if let Some(js) = &chord.js {
         let export_name = js.export_name.as_deref().unwrap_or("default");
-        return format!("JS: {}({:?})", export_name, js.args);
+        let args = match &js.args {
+            crate::chords::ChordJsArgs::Values(values) => format!("{values:?}"),
+            crate::chords::ChordJsArgs::Eval(source) => format!("<eval: {source}>"),
+        };
+        return format!("JS: {}({})", export_name, args);
     }
 
     "No action".to_string()

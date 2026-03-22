@@ -187,8 +187,12 @@ export const menu = (...segments: string[]) => {
 fh = { name = "File: Here", args = ["explorer.newFile"] }
 # `menu:args` calls the named `menu` export instead of `default`
 mc = { name = "Menu: Columns", 'menu:args' = ["View", "Columns"] }
+# String args are evaluated as JavaScript and must return an array
+df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()]' }
 # ...
 ```
+
+`args` and `*:args` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
 
 Chords embeds the QuickJS JavaScript environment (excluding its standard library) as well as certain LLRT modules (which are based on the Node APIs). Module resolution is currently only implemented for root imports (e.g. if you have a `src/file.js` at the root of your repo, you have to write `import file from "src/file.js"`).
 

@@ -4,17 +4,23 @@ use crate::input::Key;
 use crate::js::{format_js_error, with_js};
 use anyhow::Result;
 use rquickjs::function::Args;
-use rquickjs::{Ctx, Function, IntoJs, Module, Object, Promise, Value};
+use rquickjs::{Array, Ctx, Function, Module, Object, Promise, Value};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ChordJsArgs {
+    Values(Vec<toml::Value>),
+    Eval(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ChordJsInvocation {
     pub export_name: Option<String>,
-    pub args: Vec<String>,
+    pub args: ChordJsArgs,
 }
 
 #[derive(Debug, Clone)]
@@ -527,21 +533,77 @@ async fn get_export_function<'js>(
     Some(function)
 }
 
-fn convert_js_args<'js>(ctx: &Ctx<'js>, args: Vec<String>) -> Option<Vec<Value<'js>>> {
-    match args
-        .into_iter()
-        .map(|arg| arg.into_js(ctx))
-        .collect::<rquickjs::Result<_>>()
-    {
-        Ok(args) => Some(args),
+fn convert_js_args<'js>(ctx: &Ctx<'js>, args: ChordJsArgs) -> Option<Vec<Value<'js>>> {
+    match args {
+        ChordJsArgs::Values(values) => toml_values_to_js_args(ctx, values),
+        ChordJsArgs::Eval(source) => evaluate_js_args(ctx, &source),
+    }
+}
+
+fn toml_values_to_js_args<'js>(ctx: &Ctx<'js>, values: Vec<toml::Value>) -> Option<Vec<Value<'js>>> {
+    let mut js_args = Vec::with_capacity(values.len());
+
+    for value in values {
+        match rquickjs_serde::to_value(ctx.clone(), value) {
+            Ok(value) => js_args.push(value),
+            Err(e) => {
+                log::error!("Failed to convert TOML arguments: {}", e);
+                return None;
+            }
+        }
+    }
+
+    Some(js_args)
+}
+
+fn evaluate_js_args<'js>(ctx: &Ctx<'js>, source: &str) -> Option<Vec<Value<'js>>> {
+    let evaluated: Value<'js> = match ctx.eval(source) {
+        Ok(value) => value,
         Err(e) => {
             log::error!(
-                "Failed to convert arguments: {}",
+                "Failed to evaluate JS args `{}`: {}",
+                source,
                 format_js_error(ctx.clone(), e)
             );
             None
         }
+    }?;
+
+    let Some(array) = value_to_array(ctx, evaluated, source) else {
+        return None;
+    };
+
+    array_to_values(ctx, array, source)
+}
+
+fn value_to_array<'js>(_ctx: &Ctx<'js>, value: Value<'js>, source: &str) -> Option<Array<'js>> {
+    let Some(array) = value.as_array().cloned() else {
+        log::error!("JS args `{}` must evaluate to an array", source);
+        return None;
+    };
+
+    Some(array)
+}
+
+fn array_to_values<'js>(ctx: &Ctx<'js>, array: Array<'js>, source: &str) -> Option<Vec<Value<'js>>> {
+    let mut values = Vec::with_capacity(array.len());
+
+    for index in 0..array.len() {
+        match array.get(index) {
+            Ok(value) => values.push(value),
+            Err(e) => {
+                log::error!(
+                    "Failed to read JS args `{}` at index {}: {}",
+                    source,
+                    index,
+                    format_js_error(ctx.clone(), e)
+                );
+                return None;
+            }
+        }
     }
+
+    Some(values)
 }
 
 fn call_function_with_values<'js>(

@@ -90,11 +90,18 @@ pub struct AppChordsFileConfigJs {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum AppChordArgs {
+    Values(Vec<toml::Value>),
+    Eval(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppChord {
     pub name: String,
     pub shortcut: Option<String>,
     pub shell: Option<String>,
-    pub args: Option<Vec<String>>,
+    pub args: Option<AppChordArgs>,
     #[serde(default, flatten)]
     pub extra: HashMap<String, toml::Value>,
 }
@@ -106,7 +113,7 @@ impl AppChord {
             .clone()
             .map(|args| crate::chords::ChordJsInvocation {
                 export_name: None,
-                args,
+                args: parse_js_args(args),
             });
 
         for (key, value) in &self.extra {
@@ -118,7 +125,7 @@ impl AppChord {
                 anyhow::bail!("Invalid JS export key: {key}");
             }
 
-            let args = parse_string_args(key, value)?;
+            let args = parse_js_args_value(key, value)?;
             let next_invocation = crate::chords::ChordJsInvocation {
                 export_name: Some(export_name.to_string()),
                 args,
@@ -133,18 +140,19 @@ impl AppChord {
     }
 }
 
-fn parse_string_args(key: &str, value: &toml::Value) -> Result<Vec<String>> {
-    let toml::Value::Array(items) = value else {
-        anyhow::bail!("{key} must be an array");
-    };
+fn parse_js_args(args: AppChordArgs) -> crate::chords::ChordJsArgs {
+    match args {
+        AppChordArgs::Values(values) => crate::chords::ChordJsArgs::Values(values),
+        AppChordArgs::Eval(source) => crate::chords::ChordJsArgs::Eval(source),
+    }
+}
 
-    items
-        .iter()
-        .map(|item| match item {
-            toml::Value::String(value) => Ok(value.clone()),
-            _ => anyhow::bail!("{key} must contain only strings"),
-        })
-        .collect()
+fn parse_js_args_value(key: &str, value: &toml::Value) -> Result<crate::chords::ChordJsArgs> {
+    match value {
+        toml::Value::Array(items) => Ok(crate::chords::ChordJsArgs::Values(items.clone())),
+        toml::Value::String(source) => Ok(crate::chords::ChordJsArgs::Eval(source.clone())),
+        _ => anyhow::bail!("{key} must be an array or string"),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -156,8 +164,8 @@ pub enum AppChordMapValue {
 
 #[cfg(test)]
 mod tests {
-    use super::{AppChord, AppChordsFile};
-    use crate::chords::ChordJsInvocation;
+    use super::{AppChord, AppChordArgs, AppChordsFile};
+    use crate::chords::{ChordJsArgs, ChordJsInvocation};
 
     #[test]
     fn parses_default_export_args() {
@@ -165,7 +173,10 @@ mod tests {
             name: "Test".to_string(),
             shortcut: None,
             shell: None,
-            args: Some(vec!["one".to_string(), "two".to_string()]),
+            args: Some(AppChordArgs::Values(vec![
+                toml::Value::String("one".to_string()),
+                toml::Value::String("two".to_string()),
+            ])),
             extra: Default::default(),
         };
 
@@ -173,7 +184,10 @@ mod tests {
             chord.js_invocation().unwrap(),
             Some(ChordJsInvocation {
                 export_name: None,
-                args: vec!["one".to_string(), "two".to_string()],
+                args: ChordJsArgs::Values(vec![
+                    toml::Value::String("one".to_string()),
+                    toml::Value::String("two".to_string()),
+                ]),
             })
         );
     }
@@ -197,7 +211,34 @@ a = { name = "Menu", 'menu:args' = ["View", "Columns"] }
             entry.js_invocation().unwrap(),
             Some(ChordJsInvocation {
                 export_name: Some("menu".to_string()),
-                args: vec!["View".to_string(), "Columns".to_string()],
+                args: ChordJsArgs::Values(vec![
+                    toml::Value::String("View".to_string()),
+                    toml::Value::String("Columns".to_string()),
+                ]),
+            })
+        );
+    }
+
+    #[test]
+    fn parses_eval_args() {
+        let file = AppChordsFile::parse(
+            r#"
+[chords]
+a = { name = "Dynamic", args = '["View", "Columns".toLowerCase()]' }
+"#,
+        )
+        .unwrap();
+
+        let entry = match file.chords.get("a").unwrap() {
+            super::AppChordMapValue::Single(entry) => entry,
+            super::AppChordMapValue::Multiple(_) => unreachable!(),
+        };
+
+        assert_eq!(
+            entry.js_invocation().unwrap(),
+            Some(ChordJsInvocation {
+                export_name: None,
+                args: ChordJsArgs::Eval(r#"["View", "Columns".toLowerCase()]"#.to_string()),
             })
         );
     }
