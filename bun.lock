@@ -28,7 +28,7 @@
         "input-otp": "^1.4.2",
         "lucide-react": "^0.577.0",
         "next-themes": "^0.4.6",
-        "pretty-key": "^0.1.0",
+        "pretty-key": "^0.1.1",
         "radix-ui": "^1.4.3",
         "react": "^18.3.1",
         "react-day-picker": "^9.14.0",
@@ -1089,7 +1089,7 @@
 
     "prettier": ["prettier@3.8.1", "", { "bin": { "prettier": "bin/prettier.cjs" } }, "sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg=="],
 
-    "pretty-key": ["pretty-key@0.1.0", "", { "dependencies": { "keycode-ts2": "^0.1.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eEawz+2VmmSh8ChFafZgQhnViu8/KtO/kuRZNlFgSPiFVnxDtF8wh+/2g/Cs7HSc+d/Sig+IiDhdlJlRvdc8xg=="],
+    "pretty-key": ["pretty-key@0.1.1", "", { "dependencies": { "keycode-ts2": "^0.1.1" }, "peerDependencies": { "typescript": "^5" } }, "sha512-N2vvUwLIvoD3+gh+3DDUtTbfmYxyIqnktKVUtOvwyNMLccmEdj2Ck4aeAuIK3W2ygZxfLnzfaNc+zD77piQSdQ=="],
 
     "pretty-ms": ["pretty-ms@9.3.0", "", { "dependencies": { "parse-ms": "^4.0.0" } }, "sha512-gjVS5hOP+M3wMm5nmNOucbIrqudzs9v/57bWRHQWLYklXqoXKrVfYW2W9+glfGsqtPgpiz5WwyEEB+ksXIx3gQ=="],
 

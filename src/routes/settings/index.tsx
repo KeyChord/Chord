@@ -52,6 +52,9 @@ import { Input } from "#/components/ui/input.tsx";
 import { Label } from "#/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
 import { createFileRoute } from '@tanstack/react-router'
+import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+import { TanStackDevtools } from '@tanstack/react-devtools'
+import { Toaster } from '#/components/ui/sonner.tsx'
 
 export const Route = createFileRoute('/settings/')({
   component: Settings,
@@ -1436,6 +1439,18 @@ function Settings() {
           </TabsContent>
         </Tabs>
       </div>
+      <Toaster position="top-right" />
+      <TanStackDevtools
+        config={{
+          position: 'bottom-right',
+        }}
+        plugins={[
+          {
+            name: 'TanStack Router',
+            render: <TanStackRouterDevtoolsPanel />,
+          },
+        ]}
+      />
     </div>
   );
 }
