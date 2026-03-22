@@ -1,20 +1,4 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import {attachConsole, debug} from '@tauri-apps/plugin-log'
-
-type ChorderIndicatorState = {
-  visible: boolean;
-  bufferKeys: string[];
-  activeKeys: string[];
-  shiftPressed: boolean;
-};
-
-const INITIAL_STATE: ChorderIndicatorState = {
-  visible: false,
-  bufferKeys: [],
-  activeKeys: [],
-  shiftPressed: false,
-};
+import { useChorderState } from "../utils/state.ts";
 
 function KeyCapsRow({
   keys,
@@ -47,45 +31,16 @@ function KeyCapsRow({
 }
 
 export function ChordIndicatorWindow() {
-  const [state, setState] = useState<ChorderIndicatorState>(INITIAL_STATE);
-  debug('here')
+  const [state] = useChorderState()
 
-  useEffect(() => {
-    let cancelled = false;
+  if (state === null) {
+    return null;
+  }
 
-    const setup = async () => {
-      const unlisten = await listen<ChorderIndicatorState>(
-        "chorder-state-changed",
-        (event) => {
-          debug("event");
-          debug(JSON.stringify(event));
-          if (!cancelled) {
-            // setState(event.payload);
-          }
-        },
-      );
-
-      if (cancelled) {
-        unlisten();
-      }
-
-      return unlisten;
-    };
-
-    const cleanupPromise = setup();
-
-    return () => {
-      cancelled = true;
-      void cleanupPromise.then((cleanup) => cleanup?.());
-    };
-  }, []);
-
-  const hasBuffer = state.bufferKeys.length > 0;
-  const hasActive = state.activeKeys.length > 0;
+  const hasBuffer = state.keyBuffer.length > 0;
+  const hasActive = state.activeChord !== undefined;
   const helperLabel = hasBuffer
-    ? state.shiftPressed
-      ? "Shift pressed"
-      : "Buffer"
+    ?  "Buffer"
     : hasActive
       ? "Active chord"
       : "Ready";
@@ -103,9 +58,9 @@ export function ChordIndicatorWindow() {
         </div>
 
         {hasBuffer ? (
-          <KeyCapsRow keys={state.bufferKeys} />
+          <KeyCapsRow keys={state.keyBuffer} />
         ) : hasActive ? (
-          <KeyCapsRow keys={state.activeKeys} dimmed />
+          <KeyCapsRow keys={state.keyBuffer} dimmed />
         ) : (
           <div className="text-center text-lg font-medium tracking-[0.08em] text-white/55">
             Start typing a chord

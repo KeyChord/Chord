@@ -274,7 +274,8 @@ impl Chorder {
 }
 
 #[typeshare]
-#[derive(Debug, Clone, Serialize, Type)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChorderState {
     // The key buffer represents the pending letters for a not-yet created chord.
     // When a chord is executed, the key buffer is always cleared.

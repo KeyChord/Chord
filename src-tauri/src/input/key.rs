@@ -44,7 +44,7 @@ impl KeyCombination {
     }
 }
 
-#[typeshare]
+#[typeshare(serialized_as = "String")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Key(pub KeyMappingCode);
 
