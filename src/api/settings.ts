@@ -29,6 +29,10 @@ export function listActiveChords() {
   return taurpc.list_active_chords();
 }
 
+export function listMatchingChords() {
+  return taurpc.list_matching_chords();
+}
+
 export function listGlobalShortcutMappings() {
   return taurpc.list_global_shortcut_mappings();
 }

@@ -55,6 +55,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { Toaster } from '#/components/ui/sonner.tsx'
+import getPrettyKey from "pretty-key";
 
 export const Route = createFileRoute('/settings/')({
   component: Settings,
@@ -67,8 +68,29 @@ type ChordGroup = {
   chords: ActiveChordInfo[];
 };
 
+type MutableChordTreeNode = {
+  prefix: string;
+  chords: ActiveChordInfo[];
+  children: Map<string, MutableChordTreeNode>;
+};
+
+type ChordTreeNode = {
+  key: string;
+  prefix: string;
+  chords: ActiveChordInfo[];
+  children: ChordTreeNode[];
+  chordCount: number;
+};
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function formatShortcut(shortcut: string) {
+  return shortcut
+    .split(" ")
+    .map((chord) => chord.split("+").map((key) => getPrettyKey(key)).join(""))
+    .join(" ");
 }
 
 async function validateLocalChordFolder(path: string) {
@@ -133,6 +155,118 @@ function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
   return chordGroups;
 }
 
+function createMutableChordTreeNode(prefix: string): MutableChordTreeNode {
+  return {
+    prefix,
+    chords: [],
+    children: new Map(),
+  };
+}
+
+function compressChordTreeNode(node: MutableChordTreeNode): ChordTreeNode {
+  let current = node;
+
+  while (current.chords.length === 0 && current.children.size === 1) {
+    current = current.children.values().next().value as MutableChordTreeNode;
+  }
+
+  const children = [...current.children.values()]
+    .sort((left, right) => left.prefix.localeCompare(right.prefix))
+    .map((child) => compressChordTreeNode(child));
+  const chordCount = current.chords.length + children.reduce((count, child) => count + child.chordCount, 0);
+
+  return {
+    key: current.prefix,
+    prefix: current.prefix,
+    chords: current.chords,
+    children,
+    chordCount,
+  };
+}
+
+function buildChordTree(chords: ActiveChordInfo[]): ChordTreeNode[] {
+  const root = createMutableChordTreeNode("");
+
+  for (const chord of chords) {
+    let current = root;
+
+    for (const key of chord.sequence) {
+      let child = current.children.get(key);
+      if (!child) {
+        child = createMutableChordTreeNode(`${current.prefix}${key}`);
+        current.children.set(key, child);
+      }
+
+      current = child;
+    }
+
+    current.chords.push(chord);
+  }
+
+  return [...root.children.values()]
+    .sort((left, right) => left.prefix.localeCompare(right.prefix))
+    .map((node) => compressChordTreeNode(node));
+}
+
+function getTreeGuide(ancestorHasNextSiblings: boolean[], isLast: boolean) {
+  return `${ancestorHasNextSiblings.map((hasNext) => (hasNext ? "│  " : "   ")).join("")}${isLast ? "└─ " : "├─ "}`;
+}
+
+function ChordTreeRows({
+  nodes,
+  ancestorHasNextSiblings = [],
+}: {
+  nodes: ChordTreeNode[];
+  ancestorHasNextSiblings?: boolean[];
+}) {
+  return (
+    <div className="space-y-1">
+      {nodes.map((node, index) => {
+        const isLast = index + 1 === nodes.length;
+        const guide = getTreeGuide(ancestorHasNextSiblings, isLast);
+        const nextAncestors = [...ancestorHasNextSiblings, !isLast];
+
+        return (
+          <div key={node.key} className="space-y-1">
+            <div className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)] gap-x-3 rounded-sm px-2.5 py-1 text-xs">
+              <div className="truncate font-mono text-[11px] text-foreground/85">
+                <span className="whitespace-pre text-muted-foreground">{guide}</span>
+                <span className={node.chords.length === 0 ? "text-muted-foreground" : undefined}>
+                  {node.prefix}
+                </span>
+              </div>
+              <div className="min-w-0">
+                {node.chords.length === 0 ? (
+                  <span className="text-[11px] text-muted-foreground">{node.chordCount} chords</span>
+                ) : (
+                  <div className="space-y-1">
+                    {node.chords.map((chord) => (
+                      <div
+                        key={`${chord.scopeKind}:${chord.scope}:${chord.sequence}:${chord.name}:${chord.action}`}
+                        className="flex items-baseline gap-2"
+                      >
+                        <span className="truncate font-medium">{chord.name}</span>
+                        <span className="truncate text-muted-foreground">{chord.action}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {node.children.length > 0 ? (
+              <ChordTreeRows
+                nodes={node.children}
+                ancestorHasNextSiblings={nextAncestors}
+              />
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ChordGroupList({
   groups,
   forceOpen = false,
@@ -148,6 +282,7 @@ function ChordGroupList({
     <div className="space-y-2">
       {groups.map((group) => {
         const isOpen = forceOpen || openGroups[group.key] === true;
+        const tree = buildChordTree(group.chords);
 
         return (
           <Collapsible
@@ -174,23 +309,8 @@ function ChordGroupList({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="pt-1">
-              <div className="overflow-hidden rounded-md border bg-background/80">
-                {group.chords.map((chord) => (
-                  <div
-                    key={`${chord.scopeKind}:${chord.scope}:${chord.sequence}:${chord.name}`}
-                    className="grid grid-cols-[86px_minmax(0,1fr)] gap-x-3 border-b px-2.5 py-1.5 text-xs last:border-b-0"
-                  >
-                    <div className="truncate font-mono text-[11px] text-foreground/85">
-                      {chord.sequence}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <span className="truncate font-medium">{chord.name}</span>
-                        <span className="truncate text-muted-foreground">{chord.action}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-hidden rounded-md border bg-background/80 px-1.5 py-2">
+                <ChordTreeRows nodes={tree} />
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -1400,7 +1520,7 @@ function Settings() {
                           <div className="min-w-0 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="outline" className="font-mono text-[11px]">
-                                {mapping.shortcut}
+                                {formatShortcut(mapping.shortcut)}
                               </Badge>
                             </div>
                             <div className="space-y-1 text-xs text-muted-foreground">

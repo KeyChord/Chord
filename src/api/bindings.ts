@@ -14,10 +14,11 @@ export type GlobalShortcutMappingInfo = { shortcut: string; bundleId: string; ho
 
 export type LocalChordFolderInfo = { name: string; localPath: string }
 
-const ARGS_MAP = { '':'{"add_git_repo":["repo"],"add_local_chord_folder":["path"],"list_active_chords":[],"list_apps_needing_relaunch":[],"list_git_repos":[],"list_global_shortcut_mappings":[],"list_local_chord_folder_chords":["path"],"list_local_chord_folders":[],"list_repo_chords":["repo"],"open_accessibility_settings":[],"open_input_monitoring_settings":[],"pick_local_chord_folder":[],"relaunch_app":["bundle_id"],"remove_global_shortcut_mapping":["shortcut"],"sync_git_repo":["repo"]}' }
+const ARGS_MAP = { '':'{"add_git_repo":["repo"],"add_local_chord_folder":["path"],"list_active_chords":[],"list_apps_needing_relaunch":[],"list_git_repos":[],"list_global_shortcut_mappings":[],"list_local_chord_folder_chords":["path"],"list_local_chord_folders":[],"list_matching_chords":[],"list_repo_chords":["repo"],"open_accessibility_settings":[],"open_input_monitoring_settings":[],"pick_local_chord_folder":[],"relaunch_app":["bundle_id"],"remove_global_shortcut_mapping":["shortcut"],"sync_git_repo":["repo"]}' }
 export type Router = { "": {add_git_repo: (repo: string) => Promise<GitRepoInfo>, 
 add_local_chord_folder: (path: string) => Promise<LocalChordFolderInfo>, 
 list_active_chords: () => Promise<ActiveChordInfo[]>, 
+list_matching_chords: () => Promise<ActiveChordInfo[]>, 
 list_apps_needing_relaunch: () => Promise<AppNeedsRelaunchInfo[]>, 
 list_git_repos: () => Promise<GitRepoInfo[]>, 
 list_global_shortcut_mappings: () => Promise<GlobalShortcutMappingInfo[]>, 

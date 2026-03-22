@@ -1,4 +1,4 @@
-use crate::chords::LoadedAppChords;
+use crate::chords::{Chord, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::Chorder;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::sources::load_all_chord_folders;
@@ -453,19 +453,31 @@ pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     Ok(list_loaded_chords(&loaded_app_chords))
 }
 
+pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
+    let context = app.state::<AppContext>();
+    let state = context.chorder.state.get()?;
+    let frontmost_application_id = context.frontmost_application_id.load();
+    let loaded_app_chords = context.loaded_app_chords.read();
+
+    Ok(list_matching_loaded_chords(
+        &loaded_app_chords,
+        &state.key_buffer,
+        frontmost_application_id.as_ref().as_deref(),
+    ))
+}
+
 pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChordInfo> {
     let mut chords = Vec::new();
     let mut seen = HashSet::new();
 
     for (application_id, runtime) in &loaded_app_chords.runtimes {
         for chord in runtime.chords.values() {
-            let item = ActiveChordInfo {
-                scope: application_id.clone(),
-                scope_kind: "app".to_string(),
-                sequence: format_sequence(&chord.keys),
-                name: chord.name.clone(),
-                action: format_action(chord),
-            };
+            let item = build_active_chord_info(
+                application_scope(application_id),
+                application_scope_kind(application_id),
+                &chord.keys,
+                chord,
+            );
             let fingerprint = format!(
                 "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
                 item.scope_kind, item.scope, item.sequence, item.name, item.action
@@ -486,6 +498,50 @@ pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChor
 
     chords
 }
+
+pub fn list_matching_loaded_chords(
+    loaded_app_chords: &LoadedAppChords,
+    key_buffer: &[crate::input::Key],
+    application_id: Option<&str>,
+) -> Vec<ActiveChordInfo> {
+    loaded_app_chords
+        .list_matching_chords(key_buffer, application_id)
+        .into_iter()
+        .map(|item| build_active_chord_info(&item.scope, item.scope_kind, &item.sequence, &item.chord))
+        .collect()
+}
+
+fn application_scope(application_id: &str) -> &str {
+    if application_id == GLOBAL_CHORD_RUNTIME_ID {
+        "Global"
+    } else {
+        application_id
+    }
+}
+
+fn application_scope_kind(application_id: &str) -> &'static str {
+    if application_id == GLOBAL_CHORD_RUNTIME_ID {
+        "global"
+    } else {
+        "app"
+    }
+}
+
+fn build_active_chord_info(
+    scope: &str,
+    scope_kind: &str,
+    sequence: &[crate::input::Key],
+    chord: &Chord,
+) -> ActiveChordInfo {
+    ActiveChordInfo {
+        scope: scope.to_string(),
+        scope_kind: scope_kind.to_string(),
+        sequence: format_sequence(sequence),
+        name: chord.name.clone(),
+        action: format_action(chord),
+    }
+}
+
 fn format_action(chord: &crate::chords::Chord) -> String {
     if let Some(shortcut) = &chord.shortcut {
         return format!("Shortcut: {}", format_shortcut(shortcut));

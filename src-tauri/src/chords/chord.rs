@@ -44,6 +44,14 @@ pub struct LoadedAppChords {
     pub runtimes: HashMap<String, ChordRuntime>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MatchingChordInfo {
+    pub scope: String,
+    pub scope_kind: &'static str,
+    pub sequence: Vec<Key>,
+    pub chord: Chord,
+}
+
 // Each chord runtime is associated with a JS module which lives in-memory
 // (similar to require.cache)
 pub struct ChordRuntime {
@@ -62,7 +70,7 @@ pub struct ChordPayload {
     pub num_times: usize,
 }
 
-const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
+pub(crate) const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
 
 impl ChordRuntime {
     pub fn from_chords(path: String, chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
@@ -152,6 +160,36 @@ fn is_global_chord_sequence(sequence: &[Key]) -> bool {
     sequence
         .first()
         .is_some_and(|key| !key.is_digit() && !key.is_letter())
+}
+
+fn split_repeat_prefix(sequence: &[Key]) -> (&[Key], &[Key]) {
+    let split_idx = sequence
+        .iter()
+        .position(|key| !key.is_digit())
+        .unwrap_or(sequence.len());
+
+    sequence.split_at(split_idx)
+}
+
+fn push_runtime_matches(
+    matches: &mut Vec<MatchingChordInfo>,
+    scope: &str,
+    scope_kind: &'static str,
+    runtime: &ChordRuntime,
+    chord_prefix: &[Key],
+) {
+    for (sequence, chord) in &runtime.chords {
+        if !sequence.starts_with(chord_prefix) {
+            continue;
+        }
+
+        matches.push(MatchingChordInfo {
+            scope: scope.to_string(),
+            scope_kind,
+            sequence: sequence.clone(),
+            chord: chord.clone(),
+        });
+    }
 }
 
 fn resolve_runtime_extends(
@@ -292,11 +330,85 @@ impl LoadedAppChords {
             application_id.and_then(|app_id| self.runtimes.get(&app_id))
         }
     }
+
+    pub fn list_matching_chords(
+        &self,
+        key_buffer: &[Key],
+        application_id: Option<&str>,
+    ) -> Vec<MatchingChordInfo> {
+        let (_, chord_prefix) = split_repeat_prefix(key_buffer);
+        let mut matches = Vec::new();
+
+        if chord_prefix.is_empty() {
+            if let Some(application_id) = application_id {
+                if let Some(runtime) = self.runtimes.get(application_id) {
+                    push_runtime_matches(&mut matches, application_id, "app", runtime, chord_prefix);
+                }
+            }
+
+            for (sequence, runtime_id) in &self.global_chords_to_runtime_key {
+                let Some(runtime) = self.runtimes.get(runtime_id) else {
+                    continue;
+                };
+                let Some(chord) = runtime.chords.get(sequence) else {
+                    continue;
+                };
+
+                matches.push(MatchingChordInfo {
+                    scope: "Global".to_string(),
+                    scope_kind: "global",
+                    sequence: sequence.clone(),
+                    chord: chord.clone(),
+                });
+            }
+        } else if is_global_chord_sequence(chord_prefix) {
+            for (sequence, runtime_id) in &self.global_chords_to_runtime_key {
+                if !sequence.starts_with(chord_prefix) {
+                    continue;
+                }
+
+                let Some(runtime) = self.runtimes.get(runtime_id) else {
+                    continue;
+                };
+                let Some(chord) = runtime.chords.get(sequence) else {
+                    continue;
+                };
+
+                matches.push(MatchingChordInfo {
+                    scope: "Global".to_string(),
+                    scope_kind: "global",
+                    sequence: sequence.clone(),
+                    chord: chord.clone(),
+                });
+            }
+        } else if let Some(application_id) = application_id {
+            if let Some(runtime) = self.runtimes.get(application_id) {
+                push_runtime_matches(&mut matches, application_id, "app", runtime, chord_prefix);
+            }
+        }
+
+        matches.sort_by(|left, right| {
+            let left_scope_rank = if left.scope_kind == "app" { 0 } else { 1 };
+            let right_scope_rank = if right.scope_kind == "app" { 0 } else { 1 };
+
+            left_scope_rank
+                .cmp(&right_scope_rank)
+                .then(left.sequence.len().cmp(&right.sequence.len()))
+                .then(left.scope.cmp(&right.scope))
+                .then(left.chord.name.cmp(&right.chord.name))
+        });
+
+        matches
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{runtime_id_from_chords_path, GLOBAL_CHORD_RUNTIME_ID};
+    use super::{runtime_id_from_chords_path, ChordRuntime, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
+    use crate::chords::Chord;
+    use crate::input::Key;
+    use keycode::KeyMappingCode::{ArrowUp, Digit2, KeyA, KeyB, KeyC, KeyD};
+    use std::collections::HashMap;
     use std::path::Path;
 
     #[test]
@@ -321,6 +433,91 @@ mod tests {
             runtime_id_from_chords_path(Path::new("chords/com/apple/finder/chords.toml")),
             None
         );
+    }
+
+    #[test]
+    fn matches_app_chords_for_prefix_after_repeat_digits() {
+        let chords = HashMap::from([
+            (
+                vec![Key(KeyA), Key(KeyB)],
+                Chord {
+                    keys: vec![Key(KeyA), Key(KeyB)],
+                    name: "Alpha".to_string(),
+                    shortcut: None,
+                    shell: None,
+                    js: None,
+                },
+            ),
+            (
+                vec![Key(KeyA), Key(KeyC)],
+                Chord {
+                    keys: vec![Key(KeyA), Key(KeyC)],
+                    name: "Alpine".to_string(),
+                    shortcut: None,
+                    shell: None,
+                    js: None,
+                },
+            ),
+            (
+                vec![Key(KeyD)],
+                Chord {
+                    keys: vec![Key(KeyD)],
+                    name: "Delta".to_string(),
+                    shortcut: None,
+                    shell: None,
+                    js: None,
+                },
+            ),
+        ]);
+
+        let loaded = LoadedAppChords {
+            global_chords_to_runtime_key: HashMap::new(),
+            runtimes: HashMap::from([(
+                "com.example.app".to_string(),
+                ChordRuntime::from_chords("app".to_string(), chords).expect("runtime"),
+            )]),
+        };
+
+        let matches =
+            loaded.list_matching_chords(&[Key(Digit2), Key(KeyA)], Some("com.example.app"));
+
+        assert_eq!(matches.len(), 2);
+        assert!(matches.iter().all(|item| item.scope_kind == "app"));
+        assert_eq!(matches[0].sequence, vec![Key(KeyA), Key(KeyB)]);
+        assert_eq!(matches[1].sequence, vec![Key(KeyA), Key(KeyC)]);
+    }
+
+    #[test]
+    fn matches_global_chords_for_global_prefix() {
+        let global_sequence = vec![Key(ArrowUp), Key(KeyA)];
+        let chords = HashMap::from([(
+            global_sequence.clone(),
+            Chord {
+                keys: global_sequence.clone(),
+                name: "Move up".to_string(),
+                shortcut: None,
+                shell: None,
+                js: None,
+            },
+        )]);
+
+        let loaded = LoadedAppChords {
+            global_chords_to_runtime_key: HashMap::from([(
+                global_sequence.clone(),
+                GLOBAL_CHORD_RUNTIME_ID.to_string(),
+            )]),
+            runtimes: HashMap::from([(
+                GLOBAL_CHORD_RUNTIME_ID.to_string(),
+                ChordRuntime::from_chords("global".to_string(), chords).expect("runtime"),
+            )]),
+        };
+
+        let matches = loaded.list_matching_chords(&[Key(ArrowUp)], Some("com.example.app"));
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].scope_kind, "global");
+        assert_eq!(matches[0].scope, "Global");
+        assert_eq!(matches[0].sequence, global_sequence);
     }
 }
 

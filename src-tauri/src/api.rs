@@ -5,8 +5,8 @@ use crate::sources::{
 };
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
-    list_active_chords, list_apps_needing_relaunch, list_loaded_chords, relaunch_app,
-    reload_loaded_app_chords, ActiveChordInfo, AppNeedsRelaunchInfo,
+    list_active_chords, list_apps_needing_relaunch, list_loaded_chords, list_matching_chords,
+    relaunch_app, reload_loaded_app_chords, ActiveChordInfo, AppNeedsRelaunchInfo,
 };
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -46,6 +46,7 @@ pub trait Api {
     async fn pick_local_chord_folder() -> Result<Option<String>, String>;
     async fn add_local_chord_folder(path: String) -> Result<LocalChordFolderInfo, String>;
     async fn list_active_chords() -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_matching_chords() -> Result<Vec<ActiveChordInfo>, String>;
     async fn list_repo_chords(repo: String) -> Result<Vec<ActiveChordInfo>, String>;
     async fn list_local_chord_folder_chords(path: String) -> Result<Vec<ActiveChordInfo>, String>;
     async fn list_global_shortcut_mappings() -> Result<Vec<GlobalShortcutMappingInfo>, String>;
@@ -136,6 +137,11 @@ impl Api for ApiImpl {
     async fn list_active_chords(self) -> Result<Vec<ActiveChordInfo>, String> {
         let app_handle = self.app_handle()?;
         list_active_chords(app_handle).map_err(|error| error.to_string())
+    }
+
+    async fn list_matching_chords(self) -> Result<Vec<ActiveChordInfo>, String> {
+        let app_handle = self.app_handle()?;
+        list_matching_chords(app_handle).map_err(|error| error.to_string())
     }
 
     async fn list_repo_chords(self, repo: String) -> Result<Vec<ActiveChordInfo>, String> {
