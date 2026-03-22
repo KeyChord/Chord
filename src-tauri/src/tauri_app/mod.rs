@@ -1,5 +1,4 @@
 mod app_lifecycle;
-pub mod commands;
 mod context;
 pub mod js;
 mod js_chordsapp;

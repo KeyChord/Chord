@@ -12,12 +12,11 @@ use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
 use parking_lot::RwLock;
 use rquickjs::Module;
-use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
@@ -28,8 +27,10 @@ use std::time::{Duration, Instant};
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct ActiveChordInfo {
     pub scope: String,
     pub scope_kind: String,
@@ -38,8 +39,10 @@ pub struct ActiveChordInfo {
     pub action: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct AppNeedsRelaunchInfo {
     pub bundle_id: String,
     pub display_name: Option<String>,
@@ -113,8 +116,8 @@ fn apps_needing_relaunch_payload(bundle_ids: &BTreeSet<String>) -> Vec<AppNeedsR
         .collect()
 }
 
-fn emit_apps_needing_relaunch_changed(
-    app: &AppHandle,
+fn emit_apps_needing_relaunch_changed<R: Runtime>(
+    app: &AppHandle<R>,
     bundle_ids: &BTreeSet<String>,
 ) -> Result<()> {
     let payload = apps_needing_relaunch_payload(bundle_ids);
@@ -122,8 +125,8 @@ fn emit_apps_needing_relaunch_changed(
     Ok(())
 }
 
-pub fn set_app_needs_relaunch(
-    app: &AppHandle,
+pub fn set_app_needs_relaunch<R: Runtime>(
+    app: &AppHandle<R>,
     bundle_id: &str,
     needs_relaunch: bool,
 ) -> Result<()> {

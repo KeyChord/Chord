@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -16,6 +15,28 @@ import {
   requestAccessibilityPermission,
   requestInputMonitoringPermission,
 } from "tauri-plugin-macos-permissions-api";
+import {
+  addGitRepo,
+  addLocalChordFolder,
+  listActiveChords,
+  listAppsNeedingRelaunch,
+  listGitRepos,
+  listGlobalShortcutMappings,
+  listLocalChordFolderChords,
+  listLocalChordFolders,
+  listRepoChords,
+  openAccessibilitySettings,
+  openInputMonitoringSettings,
+  pickLocalChordFolder,
+  relaunchApp,
+  removeGlobalShortcutMapping,
+  syncGitRepo,
+  type ActiveChordInfo,
+  type AppNeedsRelaunchInfo,
+  type GitRepoInfo,
+  type GlobalShortcutMappingInfo,
+  type LocalChordFolderInfo,
+} from "#/api/settings.ts";
 import { Badge } from "#/components/ui/badge.tsx";
 import { Button } from "#/components/ui/button.tsx";
 import {
@@ -30,39 +51,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "#/component
 import { Input } from "#/components/ui/input.tsx";
 import { Label } from "#/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
+import { createFileRoute } from '@tanstack/react-router'
 
-type GitRepoInfo = {
-  owner: string;
-  name: string;
-  slug: string;
-  url: string;
-  localPath: string;
-  headShortSha: string | null;
-};
-
-type LocalChordFolderInfo = {
-  name: string;
-  localPath: string;
-};
-
-type ActiveChordInfo = {
-  scope: string;
-  scopeKind: "global" | "app";
-  sequence: string;
-  name: string;
-  action: string;
-};
-
-type GlobalShortcutMappingInfo = {
-  shortcut: string;
-  bundleId: string;
-  hotkeyId: string;
-};
-
-type AppNeedsRelaunchInfo = {
-  bundleId: string;
-  displayName: string | null;
-};
+export const Route = createFileRoute('/settings')({
+  component: Settings,
+})
 
 type ChordGroup = {
   key: string;
@@ -198,7 +191,7 @@ function ChordGroupList({
   );
 }
 
-export function SettingsWindow() {
+function Settings() {
   const currentWindow = getCurrentWindow();
   const isMacOS = navigator.userAgent.includes("Mac");
   const [accessibilityBusy, setAccessibilityBusy] = useState(false);
@@ -317,7 +310,7 @@ export function SettingsWindow() {
     setReposBusy(true);
 
     try {
-      const nextRepos = await invoke<GitRepoInfo[]>("list_git_repos");
+      const nextRepos = await listGitRepos();
       setRepos(nextRepos);
 
       if (showSuccessToast) {
@@ -344,7 +337,7 @@ export function SettingsWindow() {
     setLocalChordFoldersBusy(true);
 
     try {
-      const nextFolders = await invoke<LocalChordFolderInfo[]>("list_local_chord_folders_command");
+      const nextFolders = await listLocalChordFolders();
       setLocalChordFolders(nextFolders);
 
       if (showSuccessToast) {
@@ -371,7 +364,7 @@ export function SettingsWindow() {
     setActiveChordsBusy(true);
 
     try {
-      const nextChords = await invoke<ActiveChordInfo[]>("list_active_chords_command");
+      const nextChords = await listActiveChords();
       setActiveChords(nextChords);
 
       if (showSuccessToast) {
@@ -398,9 +391,7 @@ export function SettingsWindow() {
     setGlobalShortcutMappingsBusy(true);
 
     try {
-      const nextMappings = await invoke<GlobalShortcutMappingInfo[]>(
-        "list_global_shortcut_mappings_command",
-      );
+      const nextMappings = await listGlobalShortcutMappings();
       setGlobalShortcutMappings(nextMappings);
 
       if (showSuccessToast) {
@@ -427,7 +418,7 @@ export function SettingsWindow() {
     setAppsNeedingRelaunchBusy(true);
 
     try {
-      const nextApps = await invoke<AppNeedsRelaunchInfo[]>("list_apps_needing_relaunch_command");
+      const nextApps = await listAppsNeedingRelaunch();
       setAppsNeedingRelaunch(nextApps);
 
       if (showSuccessToast) {
@@ -454,7 +445,7 @@ export function SettingsWindow() {
     setRepoChordsBusy((current) => ({ ...current, [repoSlug]: true }));
 
     try {
-      const nextChords = await invoke<ActiveChordInfo[]>("list_repo_chords_command", { repo: repoSlug });
+      const nextChords = await listRepoChords(repoSlug);
       setRepoChordsByRepo((current) => ({ ...current, [repoSlug]: nextChords }));
       setOpenRepoChordGroups((current) => {
         const next = { ...(current[repoSlug] ?? {}) };
@@ -493,9 +484,7 @@ export function SettingsWindow() {
     setLocalFolderChordsBusy((current) => ({ ...current, [folderPath]: true }));
 
     try {
-      const nextChords = await invoke<ActiveChordInfo[]>("list_local_chord_folder_chords_command", {
-        path: folderPath,
-      });
+      const nextChords = await listLocalChordFolderChords(folderPath);
       setLocalFolderChordsByPath((current) => ({ ...current, [folderPath]: nextChords }));
       setOpenLocalFolderChordGroups((current) => {
         const next = { ...(current[folderPath] ?? {}) };
@@ -594,7 +583,7 @@ export function SettingsWindow() {
   async function handleAccessibilityButtonClick() {
     try {
       if (hasAccessibilityPermission) {
-        await invoke("open_accessibility_settings");
+        await openAccessibilitySettings();
         toast.info("Opened Accessibility settings.");
         return;
       }
@@ -613,7 +602,7 @@ export function SettingsWindow() {
   async function handleInputMonitoringButtonClick() {
     try {
       if (hasInputMonitoringPermission) {
-        await invoke("open_input_monitoring_settings");
+        await openInputMonitoringSettings();
         toast.info("Opened Input Monitoring settings.");
         return;
       }
@@ -641,7 +630,7 @@ export function SettingsWindow() {
     const toastId = toast.loading(`Adding ${repoInput.trim()}...`);
 
     try {
-      const addedRepo = await invoke<GitRepoInfo>("add_git_repo_command", { repo: repoInput });
+      const addedRepo = await addGitRepo(repoInput);
       setRepoInput("");
       await Promise.all([
         refreshRepos({ showErrorToast: false }),
@@ -659,7 +648,7 @@ export function SettingsWindow() {
     let selectedPath: string | null = null;
 
     try {
-      selectedPath = await invoke<string | null>("pick_local_chord_folder_command");
+      selectedPath = await pickLocalChordFolder();
       if (!selectedPath) {
         return;
       }
@@ -673,9 +662,7 @@ export function SettingsWindow() {
 
     try {
       await validateLocalChordFolder(selectedPath);
-      const addedFolder = await invoke<LocalChordFolderInfo>("add_local_chord_folder_command", {
-        path: selectedPath,
-      });
+      const addedFolder = await addLocalChordFolder(selectedPath);
       await Promise.all([
         refreshLocalChordFolders({ showErrorToast: false }),
         refreshActiveChords({ showErrorToast: false }),
@@ -693,7 +680,7 @@ export function SettingsWindow() {
     const toastId = toast.loading(`Syncing ${repoSlug}...`);
 
     try {
-      const syncedRepo = await invoke<GitRepoInfo>("sync_git_repo_command", { repo: repoSlug });
+      const syncedRepo = await syncGitRepo(repoSlug);
       setRepoChordsByRepo((current) => {
         const next = { ...current };
         delete next[repoSlug];
@@ -753,7 +740,7 @@ export function SettingsWindow() {
     setRemovingGlobalShortcut(shortcut);
 
     try {
-      await invoke("remove_global_shortcut_mapping_command", { shortcut });
+      await removeGlobalShortcutMapping(shortcut);
       setGlobalShortcutMappings((current) =>
         current.filter((mapping) => mapping.shortcut !== shortcut),
       );
@@ -770,7 +757,7 @@ export function SettingsWindow() {
     setRelaunchingApp(bundleId);
 
     try {
-      await invoke("relaunch_app_command", { bundleId });
+      await relaunchApp(bundleId);
       toast.success(`Requested relaunch for ${appLabel}.`);
     } catch (error) {
       toast.error(`Failed to relaunch ${appLabel}: ${getErrorMessage(error)}`);

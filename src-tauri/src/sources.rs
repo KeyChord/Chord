@@ -1,29 +1,30 @@
 use crate::chords::{ChordFolder, LoadedAppChords};
 use crate::git;
 use anyhow::{Context, Result};
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::{Store, StoreExt};
 
 const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 const LOCAL_FOLDERS_KEY: &str = "localFolders";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct LocalChordFolderInfo {
     pub name: String,
     pub local_path: String,
 }
 
-fn sources_store(app: &AppHandle) -> Result<Arc<Store<tauri::Wry>>> {
+fn sources_store<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<Store<R>>> {
     app.store(CHORD_SOURCES_STORE_PATH)
         .context("failed to open chord sources store")
 }
 
-fn read_local_folder_paths(app: &AppHandle) -> Result<Vec<String>> {
+fn read_local_folder_paths<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<String>> {
     let store = sources_store(app)?;
     let Some(value) = store.get(LOCAL_FOLDERS_KEY) else {
         return Ok(Vec::new());
@@ -32,7 +33,7 @@ fn read_local_folder_paths(app: &AppHandle) -> Result<Vec<String>> {
     serde_json::from_value(value).context("failed to parse local chord folder list")
 }
 
-fn write_local_folder_paths(app: &AppHandle, paths: &[String]) -> Result<()> {
+fn write_local_folder_paths<R: Runtime>(app: &AppHandle<R>, paths: &[String]) -> Result<()> {
     let store = sources_store(app)?;
     let value =
         serde_json::to_value(paths).context("failed to serialize local chord folder list")?;
@@ -75,7 +76,7 @@ fn load_local_chord_folder(folder_path: &str) -> Result<ChordFolder> {
     ChordFolder::load_from_local_folder(&canonical_path)
 }
 
-pub fn list_local_chord_folders(app: AppHandle) -> Result<Vec<LocalChordFolderInfo>> {
+pub fn list_local_chord_folders<R: Runtime>(app: AppHandle<R>) -> Result<Vec<LocalChordFolderInfo>> {
     let mut folders = read_local_folder_paths(&app)?
         .into_iter()
         .map(PathBuf::from)
@@ -86,7 +87,7 @@ pub fn list_local_chord_folders(app: AppHandle) -> Result<Vec<LocalChordFolderIn
     Ok(folders)
 }
 
-pub fn pick_local_chord_folder(app: AppHandle) -> Result<Option<String>> {
+pub fn pick_local_chord_folder<R: Runtime>(app: AppHandle<R>) -> Result<Option<String>> {
     Ok(app
         .dialog()
         .file()
@@ -96,7 +97,10 @@ pub fn pick_local_chord_folder(app: AppHandle) -> Result<Option<String>> {
         .map(|folder_path| folder_path.display().to_string()))
 }
 
-pub fn add_local_chord_folder(app: AppHandle, folder_path: &str) -> Result<LocalChordFolderInfo> {
+pub fn add_local_chord_folder<R: Runtime>(
+    app: AppHandle<R>,
+    folder_path: &str,
+) -> Result<LocalChordFolderInfo> {
     let canonical_path = canonicalize_local_folder_path(folder_path)?;
     let canonical_path_string = canonical_path.display().to_string();
     let mut local_folder_paths = read_local_folder_paths(&app)?;
@@ -111,14 +115,14 @@ pub fn add_local_chord_folder(app: AppHandle, folder_path: &str) -> Result<Local
 }
 
 pub fn load_local_chord_folder_chords(
-    _app: AppHandle,
+    _app: AppHandle<impl Runtime>,
     folder_path: &str,
 ) -> Result<LoadedAppChords> {
     let chord_folder = load_local_chord_folder(folder_path)?;
     LoadedAppChords::from_folders(vec![chord_folder])
 }
 
-pub fn load_all_chord_folders(app: AppHandle) -> Result<Vec<ChordFolder>> {
+pub fn load_all_chord_folders<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ChordFolder>> {
     let mut chord_folders = vec![ChordFolder::load_bundled()?];
     chord_folders.extend(git::load_all_chord_folders(app.clone())?);
 

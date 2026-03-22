@@ -1,7 +1,5 @@
 import { useEffect } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import "./global.css";
-import { ChordIndicatorWindow } from "./components/indicator";
+import { ChordIndicatorWindow } from "./routes/chords";
 import { Toaster } from "./components/ui/sonner";
 import { SettingsWindow } from "./windows/settings";
 
