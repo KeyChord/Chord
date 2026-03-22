@@ -1,6 +1,7 @@
 import {
   createTauRPCProxy,
   type ActiveChordInfo,
+  type AppMetadataInfo,
   type AppNeedsRelaunchInfo,
   type GitRepoInfo,
   type GlobalShortcutMappingInfo,
@@ -11,6 +12,7 @@ const taurpc = createTauRPCProxy();
 
 export type {
   ActiveChordInfo,
+  AppMetadataInfo,
   AppNeedsRelaunchInfo,
   GitRepoInfo,
   GlobalShortcutMappingInfo,
@@ -31,6 +33,10 @@ export function listActiveChords() {
 
 export function listMatchingChords() {
   return taurpc.list_matching_chords();
+}
+
+export function listAppMetadata(bundleIds: string[]) {
+  return taurpc.list_app_metadata(bundleIds);
 }
 
 export function listGlobalShortcutMappings() {

@@ -87,7 +87,9 @@ impl Chorder {
 
         match key_event {
             KeyEvent::Release(Key(code)) => {
-                if let Some(pressed_chord) = &self.state.get()?.pressed_chord {
+                let state = self.state.get()?;
+
+                if let Some(pressed_chord) = &state.pressed_chord {
                     if code == &KeyMappingCode::CapsLock {
                         release_chord(handle.clone(), pressed_chord)?;
                     } else if pressed_chord.keys.last().is_some_and(|k| &k.0 == code) {
@@ -96,6 +98,10 @@ impl Chorder {
                 }
 
                 if code == &KeyMappingCode::Space {
+                    if Self::should_execute_key_buffer_on_space_release(&state) {
+                        let _ = self.execute_key_buffer(handle.clone(), state.key_buffer.clone(), true)?;
+                    }
+
                     self.state.set(Arc::new(ChorderState::new()))?;
                 }
 
@@ -152,26 +158,8 @@ impl Chorder {
 
                 // A non-empty key_buffer means we should execute the chord.
                 log::debug!("Executing key_buffer {:?}", key_buffer);
-
-                let Some(chord_runtime) = loaded_app_chords.get_chord_runtime(
-                    &state.key_buffer,
-                    context.frontmost_application_id.load().as_ref().clone(),
-                ) else {
-                    log::error!(
-                        "Missing chord runtime for chord {:?} in application: {:?}",
-                        state.key_buffer,
-                        context.frontmost_application_id.load().as_ref().clone()
-                    );
-                    return Ok(());
-                };
-
-                let Some(chord_payload) = chord_runtime.get_chord(&key_buffer) else {
-                    // If the chord is the buffer is invalid, reset it
-                    log::error!(
-                        "Invalid chord {:?} in application: {:?}",
-                        state.key_buffer,
-                        context.frontmost_application_id.load().as_ref().clone()
-                    );
+                let Some(chord) = self.execute_key_buffer(handle.clone(), key_buffer.clone(), false)?
+                else {
                     self.state.set(Arc::new(ChorderState {
                         key_buffer: vec![],
                         pressed_chord: None,
@@ -180,11 +168,10 @@ impl Chorder {
                     return Ok(());
                 };
 
-                press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
                 self.state.set(Arc::new(ChorderState {
-                    pressed_chord: Some(chord_payload.chord.clone()),
+                    pressed_chord: Some(chord.clone()),
                     key_buffer: vec![],
-                    active_chord: Some(chord_payload.chord.clone()),
+                    active_chord: Some(chord),
                 }))?;
                 Ok(())
             }
@@ -204,6 +191,48 @@ impl Chorder {
                 }
             }
         }
+    }
+
+    fn execute_key_buffer(
+        &self,
+        handle: AppHandle,
+        key_buffer: Vec<Key>,
+        release_immediately: bool,
+    ) -> Result<Option<Chord>> {
+        let context = handle.state::<AppContext>();
+        let frontmost_application_id = context.frontmost_application_id.load().as_ref().clone();
+        let loaded_app_chords = context.loaded_app_chords.read();
+        let Some(chord_runtime) =
+            loaded_app_chords.get_chord_runtime(&key_buffer, frontmost_application_id.clone())
+        else {
+            log::error!(
+                "Missing chord runtime for chord {:?} in application: {:?}",
+                key_buffer,
+                frontmost_application_id
+            );
+            return Ok(None);
+        };
+
+        let Some(chord_payload) = chord_runtime.get_chord(&key_buffer) else {
+            log::error!(
+                "Invalid chord {:?} in application: {:?}",
+                key_buffer,
+                frontmost_application_id
+            );
+            return Ok(None);
+        };
+
+        press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
+
+        if release_immediately {
+            release_chord(handle.clone(), &chord_payload.chord)?;
+        }
+
+        Ok(Some(chord_payload.chord.clone()))
+    }
+
+    fn should_execute_key_buffer_on_space_release(state: &ChorderState) -> bool {
+        !state.key_buffer.is_empty() && state.active_chord.is_none()
     }
 
     // If an unshifted key is pressed, we append it to the key buffer, which always clears
@@ -337,5 +366,46 @@ fn format_key(key: Key) -> String {
         PageDown => "PgDn".to_string(),
         Fn => "Fn".to_string(),
         other => format!("{other:?}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_chord() -> Chord {
+        Chord {
+            keys: vec![Key(KeyA)],
+            name: "Test".to_string(),
+            shortcut: None,
+            shell: None,
+            js: None,
+        }
+    }
+
+    #[test]
+    fn space_release_executes_only_when_buffered_chord_has_not_run_yet() {
+        let buffered_state = ChorderState {
+            key_buffer: vec![Key(KeyA)],
+            pressed_chord: None,
+            active_chord: None,
+        };
+        assert!(Chorder::should_execute_key_buffer_on_space_release(
+            &buffered_state
+        ));
+
+        let executed_state = ChorderState {
+            key_buffer: vec![Key(KeyA)],
+            pressed_chord: Some(test_chord()),
+            active_chord: Some(test_chord()),
+        };
+        assert!(!Chorder::should_execute_key_buffer_on_space_release(
+            &executed_state
+        ));
+
+        let empty_state = ChorderState::new();
+        assert!(!Chorder::should_execute_key_buffer_on_space_release(
+            &empty_state
+        ));
     }
 }

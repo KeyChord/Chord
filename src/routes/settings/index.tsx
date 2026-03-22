@@ -9,6 +9,8 @@ import {
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Check, ChevronRight, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
+import { hotkeysCoreFeature, syncDataLoaderFeature, type Updater } from "@headless-tree/core";
+import { useTree } from "@headless-tree/react";
 import {
   checkAccessibilityPermission,
   checkInputMonitoringPermission,
@@ -19,6 +21,7 @@ import {
   addGitRepo,
   addLocalChordFolder,
   listActiveChords,
+  listAppMetadata,
   listAppsNeedingRelaunch,
   listGitRepos,
   listGlobalShortcutMappings,
@@ -32,6 +35,7 @@ import {
   removeGlobalShortcutMapping,
   syncGitRepo,
   type ActiveChordInfo,
+  type AppMetadataInfo,
   type AppNeedsRelaunchInfo,
   type GitRepoInfo,
   type GlobalShortcutMappingInfo,
@@ -49,6 +53,7 @@ import {
 import { Checkbox } from "#/components/ui/checkbox.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "#/components/ui/collapsible.tsx";
 import { Input } from "#/components/ui/input.tsx";
+import { Kbd, KbdGroup } from "#/components/ui/kbd.tsx";
 import { Label } from "#/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
 import { createFileRoute } from '@tanstack/react-router'
@@ -56,6 +61,7 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { Toaster } from '#/components/ui/sonner.tsx'
 import getPrettyKey from "pretty-key";
+import { cn } from "#/utils/style.ts";
 
 export const Route = createFileRoute('/settings/')({
   component: Settings,
@@ -82,6 +88,33 @@ type ChordTreeNode = {
   chordCount: number;
 };
 
+type AppMetadataByBundleId = Record<string, AppMetadataInfo>;
+
+type ActiveChordTreeItem = {
+  id: string;
+  kind: "group" | "prefix" | "root";
+  label: string;
+  childIds: string[];
+  chords: ActiveChordInfo[];
+  chordCount: number;
+  prefix?: string;
+  groupKey?: string;
+  scope?: string;
+  scopeKind?: "global" | "app";
+  appLabel?: string;
+  showsBundleId?: boolean;
+  appMetadata?: AppMetadataInfo;
+};
+
+type ActiveChordTreeModel = {
+  rootItemId: string;
+  itemsById: Record<string, ActiveChordTreeItem>;
+  groupItemIds: string[];
+  groupKeyByItemId: Record<string, string>;
+  folderItemIds: string[];
+  prefixFolderItemIds: string[];
+};
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -91,6 +124,58 @@ function formatShortcut(shortcut: string) {
     .split(" ")
     .map((chord) => chord.split("+").map((key) => getPrettyKey(key)).join(""))
     .join(" ");
+}
+
+function ShortcutKeys({ shortcut }: { shortcut: string }) {
+  const chords = shortcut.split(" ").map((chord) => chord.split("+"));
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {chords.map((keys, chordIndex) => (
+        <div key={`${shortcut}:${keys.join("+")}:${chordIndex}`} className="flex items-center gap-1.5">
+          <KbdGroup>
+            {keys.map((key) => (
+              <Kbd key={key} className="font-mono text-[11px]">
+                {getPrettyKey(key)}
+              </Kbd>
+            ))}
+          </KbdGroup>
+          {chordIndex + 1 < chords.length ? (
+            <span className="text-xs text-muted-foreground">then</span>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function getAppLabel(
+  bundleId: string,
+  appMetadata?: AppMetadataInfo,
+  fallbackDisplayName?: string | null,
+) {
+  return appMetadata?.displayName ?? fallbackDisplayName ?? bundleId;
+}
+
+function AppIcon({
+  appMetadata,
+  label,
+}: {
+  appMetadata?: AppMetadataInfo;
+  label: string;
+}) {
+  const fallback = label.trim().charAt(0).toUpperCase() || "?";
+
+  return (
+    <div className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted text-[10px] font-medium text-muted-foreground">
+      {appMetadata?.iconDataUrl ? (
+        <img src={appMetadata.iconDataUrl} alt="" className="size-full object-contain" />
+      ) : (
+        <span aria-hidden="true">{fallback}</span>
+      )}
+      <span className="sr-only">{label}</span>
+    </div>
+  );
 }
 
 async function validateLocalChordFolder(path: string) {
@@ -270,11 +355,13 @@ function ChordTreeRows({
 function ChordGroupList({
   groups,
   forceOpen = false,
+  appMetadataByBundleId,
   openGroups,
   onGroupOpenChange,
 }: {
   groups: ChordGroup[];
   forceOpen?: boolean;
+  appMetadataByBundleId: AppMetadataByBundleId;
   openGroups: Record<string, boolean>;
   onGroupOpenChange: (groupKey: string, open: boolean) => void;
 }) {
@@ -283,6 +370,9 @@ function ChordGroupList({
       {groups.map((group) => {
         const isOpen = forceOpen || openGroups[group.key] === true;
         const tree = buildChordTree(group.chords);
+        const appMetadata = group.scopeKind === "app" ? appMetadataByBundleId[group.scope] : undefined;
+        const appLabel = getAppLabel(group.scope, appMetadata);
+        const showsBundleId = group.scopeKind === "app" && appLabel !== group.scope;
 
         return (
           <Collapsible
@@ -303,7 +393,17 @@ function ChordGroupList({
                 <Badge variant={group.scopeKind === "global" ? "secondary" : "outline"}>
                   {group.scopeKind === "global" ? "Global" : "App"}
                 </Badge>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{group.scope}</span>
+                {group.scopeKind === "app" ? (
+                  <AppIcon appMetadata={appMetadata} label={appLabel} />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {group.scopeKind === "global" ? group.scope : appLabel}
+                  </div>
+                  {showsBundleId ? (
+                    <div className="truncate text-xs text-muted-foreground">{group.scope}</div>
+                  ) : null}
+                </div>
                 <span className="text-xs text-muted-foreground">{group.chords.length}</span>
               </button>
             </CollapsibleTrigger>
@@ -316,6 +416,227 @@ function ChordGroupList({
           </Collapsible>
         );
       })}
+    </div>
+  );
+}
+
+function buildActiveChordTreeModel(
+  groups: ChordGroup[],
+  appMetadataByBundleId: AppMetadataByBundleId,
+): ActiveChordTreeModel {
+  const rootItemId = "__active-chords_root__";
+  const itemsById: Record<string, ActiveChordTreeItem> = {
+    [rootItemId]: {
+      id: rootItemId,
+      kind: "root",
+      label: "Registered chords",
+      childIds: [],
+      chords: [],
+      chordCount: groups.reduce((count, group) => count + group.chords.length, 0),
+    },
+  };
+  const groupItemIds: string[] = [];
+  const groupKeyByItemId: Record<string, string> = {};
+
+  const registerPrefixNode = (groupKey: string, node: ChordTreeNode): string => {
+    const itemId = `prefix:${groupKey}:${node.key}`;
+    const childIds = node.children.map((child) => registerPrefixNode(groupKey, child));
+
+    itemsById[itemId] = {
+      id: itemId,
+      kind: "prefix",
+      label: node.prefix,
+      childIds,
+      chords: node.chords,
+      chordCount: node.chordCount,
+      prefix: node.prefix,
+    };
+
+    return itemId;
+  };
+
+  for (const group of groups) {
+    const appMetadata = group.scopeKind === "app" ? appMetadataByBundleId[group.scope] : undefined;
+    const appLabel = getAppLabel(group.scope, appMetadata);
+    const showsBundleId = group.scopeKind === "app" && appLabel !== group.scope;
+    const groupItemId = `group:${group.key}`;
+    const childIds = buildChordTree(group.chords).map((node) => registerPrefixNode(group.key, node));
+
+    itemsById[groupItemId] = {
+      id: groupItemId,
+      kind: "group",
+      label: group.scopeKind === "global" ? group.scope : appLabel,
+      childIds,
+      chords: [],
+      chordCount: group.chords.length,
+      groupKey: group.key,
+      scope: group.scope,
+      scopeKind: group.scopeKind,
+      appLabel,
+      showsBundleId,
+      appMetadata,
+    };
+
+    itemsById[rootItemId].childIds.push(groupItemId);
+    groupItemIds.push(groupItemId);
+    groupKeyByItemId[groupItemId] = group.key;
+  }
+
+  const folderItemIds = Object.values(itemsById)
+    .filter((item) => item.kind !== "root" && item.childIds.length > 0)
+    .map((item) => item.id);
+  const prefixFolderItemIds = folderItemIds.filter((itemId) => itemsById[itemId]?.kind === "prefix");
+
+  return {
+    rootItemId,
+    itemsById,
+    groupItemIds,
+    groupKeyByItemId,
+    folderItemIds,
+    prefixFolderItemIds,
+  };
+}
+
+function ActiveChordTree({
+  groups,
+  forceExpandAll = false,
+  appMetadataByBundleId,
+  openGroups,
+  onGroupOpenChange,
+}: {
+  groups: ChordGroup[];
+  forceExpandAll?: boolean;
+  appMetadataByBundleId: AppMetadataByBundleId;
+  openGroups: Record<string, boolean>;
+  onGroupOpenChange: (groupKey: string, open: boolean) => void;
+}) {
+  const treeModel = buildActiveChordTreeModel(groups, appMetadataByBundleId);
+  const defaultExpandedItems = forceExpandAll
+    ? treeModel.folderItemIds
+    : [
+        ...treeModel.prefixFolderItemIds,
+        ...treeModel.groupItemIds.filter((itemId) => {
+          const groupKey = treeModel.groupKeyByItemId[itemId];
+          return openGroups[groupKey] === true;
+        }),
+      ];
+  const defaultExpandedSignature = defaultExpandedItems.join("\u001f");
+  const [expandedItems, setExpandedItems] = useState<string[]>(defaultExpandedItems);
+
+  useEffect(() => {
+    setExpandedItems(defaultExpandedItems);
+  }, [defaultExpandedSignature]);
+
+  const tree = useTree<ActiveChordTreeItem>({
+    rootItemId: treeModel.rootItemId,
+    getItemName: (item) => item.getItemData().label,
+    isItemFolder: (item) => item.getItemData().childIds.length > 0,
+    dataLoader: {
+      getItem: (itemId) => {
+        const item = treeModel.itemsById[itemId];
+        if (!item) {
+          throw new Error(`Missing active chord tree item: ${itemId}`);
+        }
+
+        return item;
+      },
+      getChildren: (itemId) => treeModel.itemsById[itemId]?.childIds ?? [],
+    },
+    state: { expandedItems },
+    setExpandedItems: (updaterOrValue: Updater<string[]>) => {
+      setExpandedItems((current) => {
+        const next = typeof updaterOrValue === "function" ? updaterOrValue(current) : updaterOrValue;
+        const nextSet = new Set(next);
+
+        for (const groupItemId of treeModel.groupItemIds) {
+          const groupKey = treeModel.groupKeyByItemId[groupItemId];
+          onGroupOpenChange(groupKey, nextSet.has(groupItemId));
+        }
+
+        return next;
+      });
+    },
+    features: [syncDataLoaderFeature, hotkeysCoreFeature],
+  });
+
+  return (
+    <div className="overflow-hidden rounded-md border bg-background/80">
+      <div
+        {...tree.getContainerProps("Registered chords")}
+        className="divide-y divide-border/60 outline-none"
+      >
+        {tree.getItems().map((item) => {
+          const data = item.getItemData();
+
+          return (
+            <div
+              {...item.getProps()}
+              key={item.getId()}
+              className={cn(
+                "flex items-start gap-2 px-2.5 py-2 outline-none transition-colors",
+                "hover:bg-muted/60",
+                item.isFocused() ? "bg-accent/70" : undefined,
+              )}
+              style={{ paddingLeft: `${item.getItemMeta().level * 18 + 10}px` }}
+            >
+              <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+                {data.childIds.length > 0 ? (
+                  <ChevronRight
+                    className={cn("size-3.5 transition-transform", item.isExpanded() ? "rotate-90" : undefined)}
+                  />
+                ) : (
+                  <span className="size-1.5 rounded-full bg-border" />
+                )}
+              </span>
+
+              {data.kind === "group" ? (
+                <div className="flex min-w-0 flex-1 items-start gap-2">
+                  <Badge variant={data.scopeKind === "global" ? "secondary" : "outline"}>
+                    {data.scopeKind === "global" ? "Global" : "App"}
+                  </Badge>
+                  {data.scopeKind === "app" && data.appLabel ? (
+                    <AppIcon appMetadata={data.appMetadata} label={data.appLabel} />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {data.scopeKind === "global" ? data.scope : data.appLabel}
+                    </div>
+                    {data.showsBundleId ? (
+                      <div className="truncate text-xs text-muted-foreground">{data.scope}</div>
+                    ) : null}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">{data.chordCount}</span>
+                </div>
+              ) : (
+                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,140px)_minmax(0,1fr)] gap-x-3">
+                  <div className="truncate font-mono text-[11px] text-foreground/85">
+                    <span className={data.chords.length === 0 ? "text-muted-foreground" : undefined}>
+                      {data.prefix}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    {data.chords.length === 0 ? (
+                      <span className="text-[11px] text-muted-foreground">{data.chordCount} chords</span>
+                    ) : (
+                      <div className="space-y-1">
+                        {data.chords.map((chord) => (
+                          <div
+                            key={`${chord.scopeKind}:${chord.scope}:${chord.sequence}:${chord.name}:${chord.action}`}
+                            className="flex items-baseline gap-2"
+                          >
+                            <span className="truncate font-medium">{chord.name}</span>
+                            <span className="truncate text-muted-foreground">{chord.action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -347,6 +668,7 @@ function Settings() {
   const [removingGlobalShortcut, setRemovingGlobalShortcut] = useState<string | null>(null);
   const [appsNeedingRelaunch, setAppsNeedingRelaunch] = useState<AppNeedsRelaunchInfo[]>([]);
   const [appsNeedingRelaunchBusy, setAppsNeedingRelaunchBusy] = useState(true);
+  const [appMetadataByBundleId, setAppMetadataByBundleId] = useState<AppMetadataByBundleId>({});
   const [relaunchingApp, setRelaunchingApp] = useState<string | null>(null);
   const [openChordGroups, setOpenChordGroups] = useState<Record<string, boolean>>({});
   const [repoChordsByRepo, setRepoChordsByRepo] = useState<Record<string, ActiveChordInfo[]>>({});
@@ -882,7 +1204,8 @@ function Settings() {
   }
 
   async function handleRelaunchApp(bundleId: string) {
-    const appLabel = appsNeedingRelaunch.find((app) => app.bundleId === bundleId)?.displayName ?? bundleId;
+    const app = appsNeedingRelaunch.find((item) => item.bundleId === bundleId);
+    const appLabel = getAppLabel(bundleId, appMetadataByBundleId[bundleId], app?.displayName);
     setRelaunchingApp(bundleId);
 
     try {
@@ -939,10 +1262,58 @@ function Settings() {
     });
   }, [activeChords]);
 
+  const appMetadataBundleIds = [
+    ...new Set([
+      ...activeChords
+        .filter((chord) => chord.scopeKind === "app")
+        .map((chord) => chord.scope),
+      ...globalShortcutMappings.map((mapping) => mapping.bundleId),
+      ...appsNeedingRelaunch.map((app) => app.bundleId),
+    ]),
+  ].sort();
+  const appMetadataKey = appMetadataBundleIds.join("\u001f");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (appMetadataBundleIds.length === 0) {
+      setAppMetadataByBundleId({});
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void listAppMetadata(appMetadataBundleIds)
+      .then((items) => {
+        if (cancelled) {
+          return;
+        }
+
+        setAppMetadataByBundleId(
+          Object.fromEntries(items.map((item) => [item.bundleId, item])),
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load app metadata", error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appMetadataKey]);
+
   const normalizedChordSearch = chordSearch.trim().toLowerCase();
   const filteredActiveChords = normalizedChordSearch
     ? activeChords.filter((chord) =>
-        [chord.scope, chord.sequence, chord.name, chord.action].some((value) =>
+        [
+          chord.scope,
+          appMetadataByBundleId[chord.scope]?.displayName ?? "",
+          chord.sequence,
+          chord.name,
+          chord.action,
+        ].some((value) =>
           value.toLowerCase().includes(normalizedChordSearch),
         ),
       )
@@ -951,7 +1322,12 @@ function Settings() {
   const normalizedGlobalShortcutSearch = globalShortcutSearch.trim().toLowerCase();
   const filteredGlobalShortcutMappings = normalizedGlobalShortcutSearch
     ? globalShortcutMappings.filter((mapping) =>
-        [mapping.shortcut, mapping.bundleId, mapping.hotkeyId].some((value) =>
+        [
+          mapping.shortcut,
+          mapping.bundleId,
+          appMetadataByBundleId[mapping.bundleId]?.displayName ?? "",
+          mapping.hotkeyId,
+        ].some((value) =>
           value.toLowerCase().includes(normalizedGlobalShortcutSearch),
         ),
       )
@@ -1095,6 +1471,7 @@ function Settings() {
                             ) : (
                               <ChordGroupList
                                 groups={buildChordGroups(repoChordsByRepo[repo.slug] ?? [])}
+                                appMetadataByBundleId={appMetadataByBundleId}
                                 openGroups={openRepoChordGroups[repo.slug] ?? {}}
                                 onGroupOpenChange={(groupKey, open) => {
                                   setOpenRepoChordGroups((current) => ({
@@ -1206,6 +1583,7 @@ function Settings() {
                             ) : (
                               <ChordGroupList
                                 groups={buildChordGroups(localFolderChordsByPath[folder.localPath] ?? [])}
+                                appMetadataByBundleId={appMetadataByBundleId}
                                 openGroups={openLocalFolderChordGroups[folder.localPath] ?? {}}
                                 onGroupOpenChange={(groupKey, open) => {
                                   setOpenLocalFolderChordGroups((current) => ({
@@ -1259,20 +1637,25 @@ function Settings() {
                 ) : (
                   appsNeedingRelaunch.map((app) => {
                     const isRelaunching = relaunchingApp === app.bundleId;
+                    const appMetadata = appMetadataByBundleId[app.bundleId];
+                    const appLabel = getAppLabel(app.bundleId, appMetadata, app.displayName);
 
                     return (
                       <div
                         key={app.bundleId}
                         className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-2"
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-medium">{app.displayName ?? app.bundleId}</p>
-                            <Badge variant="secondary">Needs relaunch</Badge>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <AppIcon appMetadata={appMetadata} label={appLabel} />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="truncate font-medium">{appLabel}</p>
+                              <Badge variant="secondary">Needs relaunch</Badge>
+                            </div>
+                            {appLabel !== app.bundleId ? (
+                              <p className="truncate text-xs text-muted-foreground">{app.bundleId}</p>
+                            ) : null}
                           </div>
-                          {app.displayName ? (
-                            <p className="truncate text-xs text-muted-foreground">{app.bundleId}</p>
-                          ) : null}
                         </div>
 
                         <Button
@@ -1446,9 +1829,10 @@ function Settings() {
                 ) : filteredActiveChords.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No chords match that filter.</p>
                 ) : (
-                  <ChordGroupList
+                  <ActiveChordTree
                     groups={chordGroups}
-                    forceOpen={normalizedChordSearch.length > 0}
+                    forceExpandAll={normalizedChordSearch.length > 0}
+                    appMetadataByBundleId={appMetadataByBundleId}
                     openGroups={openChordGroups}
                     onGroupOpenChange={(groupKey, open) => {
                       setOpenChordGroups((current) => ({
@@ -1492,7 +1876,7 @@ function Settings() {
                     onChange={(event) => {
                       setGlobalShortcutSearch(event.target.value);
                     }}
-                    placeholder="Filter by shortcut, app bundle ID, or hotkey ID"
+                    placeholder="Filter by shortcut, app, bundle ID, or hotkey ID"
                   />
                   <Badge variant="outline" className="self-start sm:self-center">
                     {filteredGlobalShortcutMappings.length} mappings
@@ -1511,6 +1895,8 @@ function Settings() {
                   <div className="space-y-2">
                     {filteredGlobalShortcutMappings.map((mapping) => {
                       const isRemoving = removingGlobalShortcut === mapping.shortcut;
+                      const appMetadata = appMetadataByBundleId[mapping.bundleId];
+                      const appLabel = getAppLabel(mapping.bundleId, appMetadata);
 
                       return (
                         <div
@@ -1518,16 +1904,17 @@ function Settings() {
                           className="flex items-start justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
                         >
                           <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="font-mono text-[11px]">
-                                {formatShortcut(mapping.shortcut)}
-                              </Badge>
+                            <ShortcutKeys shortcut={mapping.shortcut} />
+                            <div className="flex items-center gap-2">
+                              <AppIcon appMetadata={appMetadata} label={appLabel} />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">{appLabel}</p>
+                                {appLabel !== mapping.bundleId ? (
+                                  <p className="truncate text-xs text-muted-foreground">{mapping.bundleId}</p>
+                                ) : null}
+                              </div>
                             </div>
                             <div className="space-y-1 text-xs text-muted-foreground">
-                              <p className="break-all">
-                                <span className="font-medium text-foreground">App:</span>{" "}
-                                {mapping.bundleId}
-                              </p>
                               <p className="break-all">
                                 <span className="font-medium text-foreground">Hotkey:</span>{" "}
                                 {mapping.hotkeyId}

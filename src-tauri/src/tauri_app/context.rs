@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use arc_swap::ArcSwap;
+use base64::Engine;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
 use parking_lot::RwLock;
@@ -19,9 +20,14 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
+use objc2::runtime::AnyObject;
 #[cfg(target_os = "macos")]
-use objc2_foundation::NSString;
+use objc2_app_kit::{
+    NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
+    NSWorkspaceLaunchOptions,
+};
+#[cfg(target_os = "macos")]
+use objc2_foundation::{NSDictionary, NSString, NSSize};
 #[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
 
@@ -46,6 +52,16 @@ pub struct ActiveChordInfo {
 pub struct AppNeedsRelaunchInfo {
     pub bundle_id: String,
     pub display_name: Option<String>,
+}
+
+#[derive(Debug)]
+#[taurpc::ipc_type]
+#[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
+pub struct AppMetadataInfo {
+    pub bundle_id: String,
+    pub display_name: Option<String>,
+    pub icon_data_url: Option<String>,
 }
 
 pub struct AppContext {
@@ -157,6 +173,22 @@ pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunch
     Ok(apps_needing_relaunch_payload(&apps_needing_relaunch))
 }
 
+pub fn list_app_metadata(bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>> {
+    let bundle_ids = bundle_ids
+        .into_iter()
+        .map(|bundle_id| normalize_bundle_id(&bundle_id))
+        .collect::<Result<BTreeSet<_>>>()?;
+
+    Ok(bundle_ids
+        .into_iter()
+        .map(|bundle_id| AppMetadataInfo {
+            display_name: resolve_app_display_name(&bundle_id),
+            icon_data_url: resolve_app_icon_data_url(&bundle_id),
+            bundle_id,
+        })
+        .collect())
+}
+
 pub fn relaunch_app(app: AppHandle, bundle_id: &str) -> Result<()> {
     let bundle_id = normalize_bundle_id(bundle_id)?;
     relaunch_bundle_id(&bundle_id)?;
@@ -187,8 +219,39 @@ fn resolve_app_display_name(bundle_id: &str) -> Option<String> {
     )
 }
 
+#[cfg(target_os = "macos")]
+fn resolve_app_path(bundle_id: &str) -> Option<String> {
+    let bundle_id = NSString::from_str(bundle_id);
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app_url = workspace.URLForApplicationWithBundleIdentifier(&bundle_id)?;
+    let app_path = app_url.path()?;
+    Some(app_path.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_app_icon_data_url(bundle_id: &str) -> Option<String> {
+    let app_path = resolve_app_path(bundle_id)?;
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app_path = NSString::from_str(&app_path);
+    let icon = workspace.iconForFile(&app_path);
+    icon.setSize(NSSize::new(20.0, 20.0));
+
+    let tiff = icon.TIFFRepresentation()?;
+    let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)?;
+    let properties = NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
+    let png_data =
+        unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties) }?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(png_data.to_vec());
+    Some(format!("data:image/png;base64,{encoded}"))
+}
+
 #[cfg(not(target_os = "macos"))]
 fn resolve_app_display_name(_bundle_id: &str) -> Option<String> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resolve_app_icon_data_url(_bundle_id: &str) -> Option<String> {
     None
 }
 
