@@ -1,5 +1,5 @@
 use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorUi};
+use crate::feature::{Chorder, ChorderIndicatorUi, ChorderState};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use anyhow::{Context, Result};
 use frontmost::{start_nsrunloop, Detector};
@@ -8,12 +8,14 @@ use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use specta::ts::ExportConfiguration;
 use tauri::{AppHandle, Manager};
 use tauri_app::store::GlobalHotkeyStore;
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
+use specta_typescript::Typescript;
 
 mod chords;
 mod constants;
@@ -175,7 +177,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let handle = app.handle().clone();
     let chorder = {
         let window = handle
-            .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
+            .get_webview_window(crate::constants::CHORD_WINDOW_LABEL)
             .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
         Chorder::new(ChorderIndicatorUi::from_window(window)?)
     };

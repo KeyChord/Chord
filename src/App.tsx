@@ -23,7 +23,8 @@ function App() {
 
   const windowLabel = getCurrentWindow().label;
 
-  if (windowLabel === "indicator") {
+  if (windowLabel === "chords") {
+    console.log('rendering chords window')
     return <ChordIndicatorWindow />;
   }
 

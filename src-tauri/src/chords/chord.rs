@@ -5,25 +5,32 @@ use crate::js::{format_js_error, with_js};
 use anyhow::Result;
 use rquickjs::function::Args;
 use rquickjs::{Array, Ctx, Function, Module, Object, Promise, Value};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
-use serde::Serialize;
 use tauri::AppHandle;
+use typeshare::typeshare;
 
+
+#[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "type", content = "value")]
 pub enum ChordJsArgs {
+    #[typeshare(typescript(type = "any"))]
     Values(Vec<toml::Value>),
     Eval(String),
 }
 
+#[typeshare]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChordJsInvocation {
     pub export_name: Option<String>,
     pub args: ChordJsArgs,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct Chord {
     pub keys: Vec<Key>,
@@ -541,7 +548,10 @@ fn convert_js_args<'js>(ctx: &Ctx<'js>, args: ChordJsArgs) -> Option<Vec<Value<'
     }
 }
 
-fn toml_values_to_js_args<'js>(ctx: &Ctx<'js>, values: Vec<toml::Value>) -> Option<Vec<Value<'js>>> {
+fn toml_values_to_js_args<'js>(
+    ctx: &Ctx<'js>,
+    values: Vec<toml::Value>,
+) -> Option<Vec<Value<'js>>> {
     let mut js_args = Vec::with_capacity(values.len());
 
     for value in values {
@@ -586,7 +596,11 @@ fn value_to_array<'js>(_ctx: &Ctx<'js>, value: Value<'js>, source: &str) -> Opti
     Some(array)
 }
 
-fn array_to_values<'js>(ctx: &Ctx<'js>, array: Array<'js>, source: &str) -> Option<Vec<Value<'js>>> {
+fn array_to_values<'js>(
+    ctx: &Ctx<'js>,
+    array: Array<'js>,
+    source: &str,
+) -> Option<Vec<Value<'js>>> {
     let mut values = Vec::with_capacity(array.len());
 
     for index in 0..array.len() {

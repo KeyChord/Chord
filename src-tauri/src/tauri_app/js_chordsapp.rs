@@ -1,10 +1,10 @@
-use crate::tauri_app::app_lifecycle::{
-    init as init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
-};
 use crate::chords::{press_shortcut, release_shortcut, Shortcut};
 use crate::constants::GLOBAL_HOTKEYS_POOL;
 use crate::js::{throw_js_error, AppUserData};
 use crate::store::{GlobalHotkeyStore, GlobalHotkeyStoreEntry};
+use crate::tauri_app::app_lifecycle::{
+    init as init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
+};
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::{Ctx, Function};
 use std::collections::HashSet;
@@ -185,10 +185,7 @@ impl ModuleDef for ChordsappModule {
         let set_app_needs_relaunch_handle = handle.clone();
         let set_app_needs_relaunch = Function::new(
             ctx.clone(),
-            move |ctx: Ctx<'_>,
-                  bundle_id: String,
-                  needs_relaunch: bool|
-                  -> rquickjs::Result<()> {
+            move |ctx: Ctx<'_>, bundle_id: String, needs_relaunch: bool| -> rquickjs::Result<()> {
                 crate::tauri_app::context::set_app_needs_relaunch(
                     &set_app_needs_relaunch_handle,
                     &bundle_id,

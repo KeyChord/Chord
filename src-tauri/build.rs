@@ -7,6 +7,6 @@ fn main() {
         .file("native/hid.c")
         .file("native/caps.c")
         .compile("hid_caps");
-
+    
     tauri_build::build();
 }

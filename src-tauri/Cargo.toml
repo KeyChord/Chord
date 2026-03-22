@@ -5,9 +5,6 @@ description = "shortcuts reimagined"
 authors = ["you"]
 edition = "2021"
 
-[package.metadata.patch]
-crates = ["llrt_core"]
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
@@ -20,8 +17,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 cc = "1.0"
-# Latest version (0.1.13) is broken because it has a bad dependency on gix-url
-patch-crate = "0.1.9"
 
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
@@ -63,6 +58,10 @@ tauri-plugin-store = "2"
 jsonc-parser = "0.31.0"
 minijinja = "2.18.0"
 include_json = "*"
+ts-rs = "12.0"
+specta = "1.0.5"
+specta-typescript = "0.0.10"
+typeshare = "1.0.5"
 
 # Deno makes input methods super laggy for some reason, might debug in future, but not worth right now
 #deno_runtime = {  version = "0.248.0", features = ["transpile"] }

@@ -113,13 +113,20 @@ fn apps_needing_relaunch_payload(bundle_ids: &BTreeSet<String>) -> Vec<AppNeedsR
         .collect()
 }
 
-fn emit_apps_needing_relaunch_changed(app: &AppHandle, bundle_ids: &BTreeSet<String>) -> Result<()> {
+fn emit_apps_needing_relaunch_changed(
+    app: &AppHandle,
+    bundle_ids: &BTreeSet<String>,
+) -> Result<()> {
     let payload = apps_needing_relaunch_payload(bundle_ids);
     app.emit(APPS_NEEDING_RELAUNCH_CHANGED_EVENT, payload)?;
     Ok(())
 }
 
-pub fn set_app_needs_relaunch(app: &AppHandle, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
+pub fn set_app_needs_relaunch(
+    app: &AppHandle,
+    bundle_id: &str,
+    needs_relaunch: bool,
+) -> Result<()> {
     let bundle_id = normalize_bundle_id(bundle_id)?;
     let context = app.state::<AppContext>();
 
@@ -169,7 +176,12 @@ fn resolve_app_display_name(bundle_id: &str) -> Option<String> {
     let app_url = workspace.URLForApplicationWithBundleIdentifier(&bundle_id)?;
     let app_name = app_url.lastPathComponent()?;
     let app_name = app_name.to_string();
-    Some(app_name.strip_suffix(".app").unwrap_or(&app_name).to_string())
+    Some(
+        app_name
+            .strip_suffix(".app")
+            .unwrap_or(&app_name)
+            .to_string(),
+    )
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -202,8 +214,8 @@ fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
 
     let workspace = NSWorkspace::sharedWorkspace();
     #[allow(deprecated)]
-    let launched =
-        workspace.launchAppWithBundleIdentifier_options_additionalEventParamDescriptor_launchIdentifier(
+    let launched = workspace
+        .launchAppWithBundleIdentifier_options_additionalEventParamDescriptor_launchIdentifier(
             &bundle_id,
             NSWorkspaceLaunchOptions::Default,
             None,

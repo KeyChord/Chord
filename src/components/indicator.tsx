@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import {attachConsole, debug} from '@tauri-apps/plugin-log'
 
 type ChorderIndicatorState = {
   visible: boolean;
@@ -47,6 +48,7 @@ function KeyCapsRow({
 
 export function ChordIndicatorWindow() {
   const [state, setState] = useState<ChorderIndicatorState>(INITIAL_STATE);
+  debug('here')
 
   useEffect(() => {
     let cancelled = false;
@@ -55,8 +57,10 @@ export function ChordIndicatorWindow() {
       const unlisten = await listen<ChorderIndicatorState>(
         "chorder-state-changed",
         (event) => {
+          debug("event");
+          debug(JSON.stringify(event));
           if (!cancelled) {
-            setState(event.payload);
+            // setState(event.payload);
           }
         },
       );
