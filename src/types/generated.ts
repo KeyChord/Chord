@@ -3,6 +3,7 @@
 */
 
 export type Key = string;
+export type Value = unknown;
 
 export interface ShortcutChord {
 	keys: Key[];
@@ -35,4 +36,3 @@ export interface ChorderState {
 	pressedChord?: Chord;
 	activeChord?: Chord;
 }
-

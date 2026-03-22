@@ -53,7 +53,7 @@ import { Label } from "#/components/ui/label.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/settings')({
+export const Route = createFileRoute('/settings/')({
   component: Settings,
 })
 
@@ -100,14 +100,20 @@ function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
 
   for (const chord of chords) {
     const key = `${chord.scopeKind}:${chord.scope}`;
-    let group = chordGroupMap.get(key);
-    if (!group) {
-      group = { key, scope: chord.scope, scopeKind: chord.scopeKind, chords: [] };
-      chordGroupMap.set(key, group);
-      chordGroups.push(group);
+    const existingGroup = chordGroupMap.get(key);
+    if (existingGroup) {
+      existingGroup.chords.push(chord);
+      continue;
     }
 
-    group.chords.push(chord);
+    const group: ChordGroup = {
+      key,
+      scope: chord.scope,
+      scopeKind: chord.scopeKind as "global" | "app",
+      chords: [chord],
+    };
+    chordGroupMap.set(key, group);
+    chordGroups.push(group);
   }
 
   chordGroups.sort(compareChordGroups);

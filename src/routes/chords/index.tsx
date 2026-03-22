@@ -8,10 +8,10 @@ import {
 } from "#/components/ui/card.tsx";
 import { Kbd, KbdGroup } from "#/components/ui/kbd.tsx";
 import { cn } from "#/utils/style.ts";
-import { useChorderState } from "../../utils/state.ts";
+import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/chords')({
+export const Route = createFileRoute('/chords/')({
   component: Chords,
 })
 
