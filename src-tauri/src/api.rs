@@ -12,10 +12,11 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use crate::get_app_metadata;
-use crate::tauri_app::git::{GitRepo, LocalChordPackage};
+use crate::tauri_app::git::{LocalChordPackage};
 use specta::Type;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::observables::GitRepo;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]

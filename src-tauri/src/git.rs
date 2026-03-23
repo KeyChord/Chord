@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-use crate::tauri_app::git::GitRepo;
+use crate::observables::GitRepo;
 
 #[derive(Debug, Clone)]
 pub struct GitHubRepoRef {

@@ -9,6 +9,7 @@ use serde::Serialize;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
 use crate::feature::app_handle_ext::AppManaged;
+use crate::observables::get_all_observable_defaults;
 
 type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
 
@@ -99,9 +100,12 @@ impl SafeAppHandle {
         &self,
         label: L,
         url: WebviewUrl,
-    ) -> WebviewWindowBuilder<'_, Wry, AppHandle> {
+    ) -> Result<WebviewWindowBuilder<'_, Wry, AppHandle>> {
         let label = label.into();
-        WebviewWindowBuilder::new(self.handle(), label, url)
+        let defaults = get_all_observable_defaults()?;
+        Ok(WebviewWindowBuilder::new(self.handle(), label, url).initialization_script(format!(r#"
+          window.__INITIAL_STATES__ = {}
+        "#, &serde_json::to_string(&defaults)?)))
     }
 
     delegate! {

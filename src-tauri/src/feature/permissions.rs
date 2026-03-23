@@ -1,44 +1,13 @@
 use anyhow::Result;
-use observable_property::ObservableProperty;
-use serde::Serialize;
 use std::sync::Arc;
-use typeshare::typeshare;
 use crate::feature::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
+use crate::observables::{AppPermissionsObservable, AppPermissionsState};
 
 pub struct AppPermissions {
     _observable: AppPermissionsObservable,
     _input_monitoring: AppPermissionsInputMonitoring,
     _accessibility: AppPermissionsAccessibility
-}
-
-pub struct AppPermissionsObservable {
-    state: ObservableProperty<Arc<AppPermissionsState>>,
-}
-
-impl AppPermissionsObservable {
-    fn new(handle: SafeAppHandle, state: AppPermissionsState) -> Self {
-        let state = ObservableProperty::new(Arc::new(state));
-
-        if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("state:permissions", new_state) {
-                log::error!("Failed to emit app settings state change: {e}");
-            }
-        })) {
-            log::error!("Failed to subscribe app settings state observer: {e}");
-        };
-
-        Self { state }
-    }
-}
-
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppPermissionsState {
-    pub is_autostart_enabled: bool,
-    pub is_input_monitoring_enabled: bool,
-    pub is_accessibility_enabled: bool,
 }
 
 impl AppPermissions {
@@ -48,7 +17,7 @@ impl AppPermissions {
             is_input_monitoring_enabled: tauri_plugin_macos_permissions::check_input_monitoring_permission().await,
             is_accessibility_enabled: tauri_plugin_macos_permissions::check_accessibility_permission().await,
         };
-        let observable = AppPermissionsObservable::new(safe_handle.clone(), state);
+        let observable = AppPermissionsObservable::new(safe_handle.clone(), state)?;
         let input_monitoring = AppPermissionsInputMonitoring::new_from_observable(safe_handle.clone(), &observable)?;
         let accessibility = AppPermissionsAccessibility::new_from_observable(safe_handle.clone(), &observable)?;
         Ok(Self {
@@ -71,11 +40,11 @@ impl AppPermissionsInputMonitoring {
             });
         };
 
-        let state = observable.state.get()?;
+        let state = observable.get_state()?;
         if state.is_input_monitoring_enabled {
             on_input_monitoring_enabled();
         } else {
-            observable.state.subscribe(Arc::new(move |_, state| {
+            observable.subscribe(Arc::new(move |_, state| {
                 if state.is_input_monitoring_enabled {
                     on_input_monitoring_enabled();
                 }
@@ -97,15 +66,15 @@ impl AppPermissionsAccessibility {
             });
         };
 
-        let state = observable.state.get()?;
+        let state = observable.get_state()?;
         if state.is_accessibility_enabled {
             on_accessibility_enabled();
         } else {
-            let _ = observable.state.subscribe(Arc::new(move |_, state| {
+            observable.subscribe(Arc::new(move |_, state| {
                 if state.is_accessibility_enabled {
                     on_accessibility_enabled();
                 }
-            }));
+            }))?;
         }
 
         Ok(Self {})

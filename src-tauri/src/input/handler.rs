@@ -17,7 +17,7 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
         AppMode::None => {
             let should_finalize_chord_mode =
                 matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space)))
-                    && chorder.observable.state.get()?.is_idle();
+                    && chorder.observable.get_state()?.is_idle();
 
             if should_finalize_chord_mode {
                     chorder

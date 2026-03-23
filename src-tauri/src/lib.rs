@@ -21,6 +21,7 @@ pub mod git;
 mod input;
 mod mode;
 mod tauri_app;
+mod observables;
 
 use tauri_nspanel::tauri_panel;
 use crate::feature::app_handle_ext::AppManaged;

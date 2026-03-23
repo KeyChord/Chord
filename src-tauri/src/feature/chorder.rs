@@ -5,16 +5,13 @@ use crate::input::KeyEvent;
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
-use observable_property::ObservableProperty;
 use parking_lot::Mutex;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener};
-use typeshare::typeshare;
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::observables::{ChorderObservable, ChorderState};
 
 pub struct AppChorder {
     pub observable: ChorderObservable,
@@ -22,27 +19,10 @@ pub struct AppChorder {
     held_keys: Mutex<HashSet<Key>>,
 }
 
-pub struct ChorderObservable {
-    pub state: ObservableProperty<Arc<ChorderState>>
-}
-
-impl ChorderObservable {
-    fn new(ui: &ChorderIndicatorUi, state: ChorderState) -> Result<Self> {
-        let state = ObservableProperty::new(Arc::new(state));
-        let window = ui.window.clone();
-        state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = window.emit("state:chorder", new_state) {
-                log::error!("Failed to emit chorder state change: {e}");
-            }
-        }))?;
-        Ok(Self { state })
-    }
-}
-
 impl AppChorder {
-    pub fn new(safe_handle: SafeAppHandle, state: ChorderState) -> Result<Self> {
-        let ui = ChorderIndicatorUi::new(safe_handle.clone(), &state)?;
-        let observable = ChorderObservable::new(&ui, state)?;
+    pub fn new(handle: SafeAppHandle, state: ChorderState) -> Result<Self> {
+        let ui = ChorderIndicatorUi::new(handle.clone(), &state)?;
+        let observable = ChorderObservable::new(handle, state)?;
         let surface_window = ui.window.clone();
         let surface_handle = ui.handle.clone();
         let listener_window = surface_window.clone();
@@ -125,12 +105,12 @@ impl AppChorder {
     pub fn ensure_inactive(&self) -> Result<()> {
         self.held_keys.lock().clear();
 
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         if !self.ui.is_visible() && state.is_idle() {
             return Ok(());
         }
 
-        self.observable.state.set(Arc::new(ChorderState::default()))?;
+        self.observable.set_state(ChorderState::default())?;
         if self.ui.ensure_hidden()? {
             self.emit_visibility_changed(false);
         }
@@ -176,7 +156,7 @@ impl AppChorder {
 
         match key_event {
             KeyEvent::Release(Key(code)) => {
-                let state = self.observable.state.get()?;
+                let state = self.observable.get_state()?;
 
                 if let Some(pressed_chord) = &state.pressed_chord {
                     if code == &KeyMappingCode::CapsLock {
@@ -195,7 +175,7 @@ impl AppChorder {
                         )?;
                     }
 
-                    self.observable.state.set(Arc::new(ChorderState::default()))?;
+                    self.observable.set_state(ChorderState::default())?;
                 }
 
                 Ok(())
@@ -209,7 +189,7 @@ impl AppChorder {
                 let context = handle.app_context();
                 let frontmost = handle.app_frontmost();
                 let loaded_app_chords = context.loaded_app_chords.read();
-                let state = self.observable.state.get()?;
+                let state = self.observable.get_state()?;
                 let key_buffer = state.key_buffer.clone();
 
                 // An empty `key_buffer` means we should execute the last executed chord
@@ -232,19 +212,19 @@ impl AppChorder {
                                 num_times: 1,
                             },
                         )?;
-                        self.observable.state.set(Arc::new(ChorderState {
+                        self.observable.set_state(ChorderState {
                             pressed_chord: state.active_chord.clone(),
                             key_buffer: vec![],
                             active_chord: state.active_chord.clone(),
-                        }))?;
+                        })?;
                     } else {
                         // e.g. we ran it on a different app
                         log::error!("Last chord no longer applies");
-                        self.observable.state.set(Arc::new(ChorderState {
+                        self.observable.set_state(ChorderState {
                             key_buffer: vec![],
                             pressed_chord: None,
                             active_chord: None,
-                        }))?;
+                        })?;
                     }
 
                     return Ok(());
@@ -255,19 +235,19 @@ impl AppChorder {
                 let Some(chord) =
                     self.execute_key_buffer(handle.clone(), key_buffer.clone(), false)?
                 else {
-                    self.observable.state.set(Arc::new(ChorderState {
+                    self.observable.set_state(ChorderState {
                         key_buffer: vec![],
                         pressed_chord: None,
                         active_chord: None,
-                    }))?;
+                    })?;
                     return Ok(());
                 };
 
-                self.observable.state.set(Arc::new(ChorderState {
+                self.observable.set_state(ChorderState {
                     pressed_chord: Some(chord.clone()),
                     key_buffer: vec![],
                     active_chord: Some(chord),
-                }))?;
+                })?;
                 Ok(())
             }
             KeyEvent::Press(key) => {
@@ -339,22 +319,22 @@ impl AppChorder {
     // If an unshifted key is pressed, we append it to the key buffer, which always clears
     // our `active_chord`
     fn handle_unshifted_key_press(&self, _handle: AppHandle, key: &Key) -> Result<()> {
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         let mut next_key_buffer = state.key_buffer.clone();
         next_key_buffer.push(key.clone());
         log::debug!("New key buffer: {:?}", next_key_buffer);
-        self.observable.state.set(Arc::new(ChorderState {
+        self.observable.set_state(ChorderState {
             key_buffer: next_key_buffer,
             pressed_chord: None,
             active_chord: None,
-        }))?;
+        })?;
         Ok(())
     }
 
     // If shift is pressed, it means the user is trying to execute a chord.
     // If a chord is executed, we always reset `key_buffer`.
     fn handle_shifted_key_press(&self, handle: AppHandle, key: &Key) -> Result<()> {
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         let key_buffer = state.key_buffer.clone();
 
         let sequence = {
@@ -397,47 +377,17 @@ impl AppChorder {
 
         log::debug!("Pressing chord: {:?}", chord_payload);
         press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
-        self.observable.state.set(Arc::new(ChorderState {
+        self.observable.set_state(ChorderState {
             // We always clear the key_buffer if a chord is pressed
             key_buffer: vec![],
             pressed_chord: Some(chord_payload.chord.clone()),
             active_chord: Some(chord_payload.chord.clone()),
-        }))?;
+        })?;
 
         Ok(())
     }
 }
 
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChorderState {
-    // The key buffer represents the pending letters for a not-yet created chord.
-    // When a chord is executed, the key buffer is always cleared.
-    pub key_buffer: Vec<Key>,
-
-    // The chord currently being pressed down.
-    pub pressed_chord: Option<Chord>,
-
-    // The chord that is "active"
-    pub active_chord: Option<Chord>,
-}
-
-impl Default for ChorderState {
-    fn default() -> Self {
-        Self {
-            key_buffer: Vec::new(),
-            pressed_chord: None,
-            active_chord: None,
-        }
-    }
-}
-
-impl ChorderState {
-    pub fn is_idle(&self) -> bool {
-        self.key_buffer.is_empty() && self.pressed_chord.is_none() && self.active_chord.is_none()
-    }
-}
 
 fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
     match key_event {

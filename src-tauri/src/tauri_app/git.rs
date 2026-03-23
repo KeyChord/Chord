@@ -9,54 +9,18 @@ use tauri::Wry;
 use tauri_plugin_store::Store;
 use typeshare::typeshare;
 use crate::chords::{ChordPackage, LoadedAppChords};
-use crate::feature::{AppPermissionsObservable, AppPermissionsState, SafeAppHandle};
+use crate::feature::SafeAppHandle;
 use crate::git::{clone_repo, GitHubRepoRef};
+use crate::observables::{GitPackageRegistryObservable, GitPackageRegistryState, GitRepo};
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
 
 pub struct GitPackageRegistry {
     pub dir: PathBuf,
-
     pub observable: GitPackageRegistryObservable
 }
 
-
-pub struct GitPackageRegistryObservable {
-    state: ObservableProperty<Arc<GitPackageRegistryState>>,
-}
-
-impl GitPackageRegistryObservable {
-    fn new(handle: SafeAppHandle, state: GitPackageRegistryState) -> Result<Self> {
-        let state = ObservableProperty::new(Arc::new(state));
-        state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("state:git-package-registry", new_state) {
-                log::error!("Failed to emit app settings state change: {e}");
-            }
-        }))?;
-        Ok(Self { state })
-    }
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GitPackageRegistryState {
-    pub git_repos: Vec<GitRepo>
-}
-
-#[taurpc::ipc_type]
-#[typeshare]
-#[derive(Debug)]
-#[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
-pub struct GitRepo {
-    pub owner: String,
-    pub name: String,
-    pub slug: String,
-    pub url: String,
-    pub local_path: String,
-    pub head_short_sha: Option<String>
-}
 
 fn discover_repos(repos_root: PathBuf) -> Result<Vec<GitRepo>> {
     if !repos_root.exists() {
@@ -119,7 +83,7 @@ impl GitPackageRegistry {
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
         let repos_root = self.github_repos_dir();
         let repo_path = repo_ref.local_path(&repos_root);
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         let mut git_repos = state.git_repos.clone();
 
         let repo = if repo_path.join(".git").exists() {
@@ -130,7 +94,7 @@ impl GitPackageRegistry {
         };
         git_repos.push(repo);
 
-        self.observable.state.set(Arc::new(GitPackageRegistryState { git_repos }))?;
+        self.observable.set_state(GitPackageRegistryState { git_repos })?;
         Ok(())
     }
 
@@ -144,20 +108,20 @@ impl GitPackageRegistry {
 
         crate::git::refresh_repo(&repo_ref, &repo_path)?;
         let repo = repo_ref.into_repo(&repos_root);
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         let mut git_repos = state.git_repos.clone();
         match git_repos.iter_mut().find(|r| r.owner == repo.owner && r.slug == r.owner) {
             Some(existing) => *existing = repo,
             None => git_repos.push(repo),
         }
 
-        self.observable.state.set(Arc::new(GitPackageRegistryState { git_repos }))?;
+        self.observable.set_state(GitPackageRegistryState { git_repos })?;
         Ok(())
     }
 
     pub fn load_all_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {
         let mut packages = Vec::new();
-        let state = self.observable.state.get()?;
+        let state = self.observable.get_state()?;
         for repo in state.git_repos.iter() {
             match gix::open(&repo.local_path)
                 .context(format!("failed to open repo {}", repo.slug))

@@ -503,7 +503,7 @@ pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     let context = app.app_context();
     let chorder = app.app_chorder();
     let frontmost = app.app_frontmost();
-    let state = chorder.observable.state.get()?;
+    let state = chorder.observable.get_state()?;
     let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
     let loaded_app_chords = context.loaded_app_chords.read();
 

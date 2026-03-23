@@ -339,6 +339,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "automoduse"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0e47ca9aa586264a8e82938f9fdcedb35b95ffb7b14bdd5f871501377d0920d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "aws-lc-rs"
 version = "1.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -796,6 +807,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arc-swap",
+ "automoduse",
  "base64 0.22.1",
  "bijective-enum-map",
  "bitflags 2.11.0",
@@ -809,6 +821,7 @@ dependencies = [
  "gix",
  "include_dir",
  "include_json",
+ "inventory",
  "jsonc-parser",
  "keycode",
  "libc",
@@ -3829,6 +3842,15 @@ checksum = "4250ce6452e92010fdf7268ccc5d14faa80bb12fc741938534c58f16804e03c7"
 dependencies = [
  "block-padding",
  "hybrid-array",
+]
+
+[[package]]
+name = "inventory"
+version = "0.3.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "009ae045c87e7082cb72dab0ccd01ae075dd00141ddc108f43a0ea150a9e7227"
+dependencies = [
+ "rustversion",
 ]
 
 [[package]]

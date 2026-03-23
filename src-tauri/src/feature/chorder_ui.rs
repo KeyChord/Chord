@@ -12,7 +12,8 @@ use std::sync::Arc;
 use tauri::{WebviewUrl, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
-use crate::feature::{ChorderState, SafeAppHandle};
+use crate::feature::{SafeAppHandle};
+use crate::observables::ChorderState;
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -41,7 +42,7 @@ impl ChorderIndicatorUi {
             .new_webview_window_builder(
                 "chords",
                 WebviewUrl::App("index.html".into()),
-            )
+            )?
             .title("Chords")
             .initialization_script(format!(r#"
               window.__CHORDS_STATE__ = {}

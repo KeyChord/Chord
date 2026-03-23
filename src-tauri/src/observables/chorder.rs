@@ -1,0 +1,31 @@
+use serde::Serialize;
+use typeshare::typeshare;
+use crate::chords::Chord;
+use crate::define_observable;
+use crate::input::Key;
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChorderState {
+    // The key buffer represents the pending letters for a not-yet created chord.
+    // When a chord is executed, the key buffer is always cleared.
+    pub key_buffer: Vec<Key>,
+
+    // The chord currently being pressed down.
+    pub pressed_chord: Option<Chord>,
+
+    // The chord that is "active"
+    pub active_chord: Option<Chord>,
+}
+
+impl ChorderState {
+    pub fn is_idle(&self) -> bool {
+        self.key_buffer.is_empty() && self.pressed_chord.is_none() && self.active_chord.is_none()
+    }
+}
+
+define_observable!(
+    pub struct ChorderObservable(ChorderState);
+    id: "chorder";
+);
