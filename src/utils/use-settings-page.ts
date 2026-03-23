@@ -1,36 +1,18 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  disable as disableAutostart,
-  enable as enableAutostart,
-  isEnabled as isAutostartEnabled,
-} from "@tauri-apps/plugin-autostart";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import {
-  checkAccessibilityPermission,
-  checkInputMonitoringPermission,
-  requestAccessibilityPermission,
-  requestInputMonitoringPermission,
-} from "tauri-plugin-macos-permissions-api";
-import {
   type ActiveChordInfo,
-  type AppNeedsRelaunchInfo,
-  type GitRepoInfo,
   type GlobalShortcutMappingInfo,
   type LocalChordFolderInfo,
-  type StartupStatusInfo,
   taurpc,
 } from "#/api/taurpc.ts";
 import {
   buildChordGroups,
-  getAppLabel,
   getErrorMessage,
-  type AppMetadataByBundleId,
   validateLocalChordFolder,
 } from "#/utils/settings.ts";
-import { useAppMetadata } from "#/utils/use-app-metadata.ts";
+import { useMutation } from '@tanstack/react-query'
 
 type RefreshOptions = {
   showSuccessToast?: boolean;
@@ -39,21 +21,6 @@ type RefreshOptions = {
 
 export function useSettingsPage() {
   const currentWindow = getCurrentWindow();
-  const isMacOS = navigator.userAgent.includes("Mac");
-  const [accessibilityBusy, setAccessibilityBusy] = useState(false);
-  const [inputMonitoringBusy, setInputMonitoringBusy] = useState(false);
-  const [startupBusy, setStartupBusy] = useState(true);
-  const [autostartBusy, setAutostartBusy] = useState(false);
-  const [hasAccessibilityPermission, setHasAccessibilityPermission] = useState(!isMacOS);
-  const [hasInputMonitoringPermission, setHasInputMonitoringPermission] = useState(!isMacOS);
-  const [startupStatus, setStartupStatus] = useState<StartupStatusInfo | null>(null);
-  const [autostartEnabled, setAutostartEnabled] = useState(false);
-  const [autostartStatus, setAutostartStatus] = useState("Checking launch on login...");
-  const [repos, setRepos] = useState<GitRepoInfo[]>([]);
-  const [reposBusy, setReposBusy] = useState(true);
-  const [repoInput, setRepoInput] = useState("");
-  const [addingRepo, setAddingRepo] = useState(false);
-  const [syncingRepo, setSyncingRepo] = useState<string | null>(null);
   const [localChordFolders, setLocalChordFolders] = useState<LocalChordFolderInfo[]>([]);
   const [localChordFoldersBusy, setLocalChordFoldersBusy] = useState(true);
   const [addingLocalChordFolder, setAddingLocalChordFolder] = useState(false);
@@ -64,8 +31,6 @@ export function useSettingsPage() {
   const [globalShortcutMappingsBusy, setGlobalShortcutMappingsBusy] = useState(true);
   const [globalShortcutSearch, setGlobalShortcutSearch] = useState("");
   const [removingGlobalShortcut, setRemovingGlobalShortcut] = useState<string | null>(null);
-  const [appsNeedingRelaunch, setAppsNeedingRelaunch] = useState<AppNeedsRelaunchInfo[]>([]);
-  const [appsNeedingRelaunchBusy, setAppsNeedingRelaunchBusy] = useState(true);
   const [relaunchingApp, setRelaunchingApp] = useState<string | null>(null);
   const [openChordGroups, setOpenChordGroups] = useState<Record<string, boolean>>({});
   const [repoChordsByRepo, setRepoChordsByRepo] = useState<Record<string, ActiveChordInfo[]>>({});
@@ -95,95 +60,6 @@ export function useSettingsPage() {
       unlisten?.();
     };
   }, [currentWindow]);
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-
-    void listen<AppNeedsRelaunchInfo[]>("apps-needing-relaunch-changed", (event) => {
-      setAppsNeedingRelaunch(event.payload);
-      setAppsNeedingRelaunchBusy(false);
-      setRelaunchingApp((current) =>
-        current && event.payload.some((app) => app.bundleId === current) ? current : null,
-      );
-    })
-      .then((callback) => {
-        unlisten = callback;
-      })
-      .catch((error) => {
-        console.error("Failed to listen for relaunch updates", error);
-      });
-
-    return () => {
-      unlisten?.();
-    };
-  }, []);
-
-  async function refreshAccessibilityPermissionState() {
-    if (!isMacOS) {
-      setHasAccessibilityPermission(true);
-      return true;
-    }
-
-    const granted = await checkAccessibilityPermission();
-    setHasAccessibilityPermission(granted);
-    return granted;
-  }
-
-  async function refreshInputMonitoringPermissionState() {
-    if (!isMacOS) {
-      setHasInputMonitoringPermission(true);
-      return true;
-    }
-
-    const granted = await checkInputMonitoringPermission();
-    setHasInputMonitoringPermission(granted);
-    return granted;
-  }
-
-  async function refreshAutostartState() {
-    const enabled = await isAutostartEnabled();
-    setAutostartEnabled(enabled);
-    setAutostartStatus(
-      enabled ? "Chords launches automatically when you log in." : "Chords will not launch on login.",
-    );
-    return enabled;
-  }
-
-  async function refreshStartupStatus() {
-    setStartupBusy(true);
-
-    try {
-      const nextStatus = await taurpc.getStartupStatus();
-      setStartupStatus(nextStatus);
-      return nextStatus;
-    } finally {
-      setStartupBusy(false);
-    }
-  }
-
-  async function refreshRepos(options?: RefreshOptions) {
-    const { showSuccessToast = false, showErrorToast = true } = options ?? {};
-    setReposBusy(true);
-
-    try {
-      const nextRepos = await taurpc.listGitRepos();
-      setRepos(nextRepos);
-
-      if (showSuccessToast) {
-        toast.success("Repo list refreshed.");
-      }
-
-      return nextRepos;
-    } catch (error) {
-      const message = `Failed to load repos: ${getErrorMessage(error)}`;
-      if (showErrorToast) {
-        toast.error(message);
-      }
-      return [];
-    } finally {
-      setReposBusy(false);
-    }
-  }
 
   async function refreshLocalChordFolders(options?: RefreshOptions) {
     const { showSuccessToast = false, showErrorToast = true } = options ?? {};
@@ -254,30 +130,6 @@ export function useSettingsPage() {
       return [];
     } finally {
       setGlobalShortcutMappingsBusy(false);
-    }
-  }
-
-  async function refreshAppsNeedingRelaunch(options?: RefreshOptions) {
-    const { showSuccessToast = false, showErrorToast = true } = options ?? {};
-    setAppsNeedingRelaunchBusy(true);
-
-    try {
-      const nextApps = await taurpc.listAppsNeedingRelaunch();
-      setAppsNeedingRelaunch(nextApps);
-
-      if (showSuccessToast) {
-        toast.success("Relaunch list refreshed.");
-      }
-
-      return nextApps;
-    } catch (error) {
-      const message = `Failed to load relaunch list: ${getErrorMessage(error)}`;
-      if (showErrorToast) {
-        toast.error(message);
-      }
-      return [];
-    } finally {
-      setAppsNeedingRelaunchBusy(false);
     }
   }
 
@@ -353,156 +205,13 @@ export function useSettingsPage() {
     }
   }
 
-  async function ensureAccessibilityPermission() {
-    const granted = await refreshAccessibilityPermissionState();
+  const openAccessibilitySettingsMutation = useMutation({
+    mutationFn: taurpc.openAccessibilitySettings,
+  })
+  const openInputMonitoringSettingsMutation = useMutation({
+    mutationFn: taurpc.openInputMonitoringSettings,
+  })
 
-    if (granted) {
-      return true;
-    }
-
-    setAccessibilityBusy(true);
-    let updated = false;
-
-    try {
-      await requestAccessibilityPermission();
-    } finally {
-      updated = await refreshAccessibilityPermissionState();
-      setAccessibilityBusy(false);
-    }
-
-    return updated;
-  }
-
-  async function ensureInputMonitoringPermission() {
-    const granted = await refreshInputMonitoringPermissionState();
-
-    if (granted) {
-      return true;
-    }
-
-    setInputMonitoringBusy(true);
-    let updated = false;
-
-    try {
-      await requestInputMonitoringPermission();
-    } finally {
-      updated = await refreshInputMonitoringPermissionState();
-      setInputMonitoringBusy(false);
-    }
-
-    return updated;
-  }
-
-  async function handleAutostartChange(nextValue: boolean) {
-    setAutostartBusy(true);
-
-    try {
-      if (nextValue) {
-        await enableAutostart();
-      } else {
-        await disableAutostart();
-      }
-
-      setAutostartEnabled(nextValue);
-      setAutostartStatus(
-        nextValue ? "Chords launches automatically when you log in." : "Chords will not launch on login.",
-      );
-      toast.success(nextValue ? "Launch on login enabled." : "Launch on login disabled.");
-    } catch (error) {
-      const message = getErrorMessage(error);
-      setAutostartStatus(`Launch on login update failed: ${message}`);
-      toast.error(`Launch on login update failed: ${message}`);
-      await refreshAutostartState();
-    } finally {
-      setAutostartBusy(false);
-    }
-  }
-
-  async function handleAccessibilityButtonClick() {
-    try {
-      if (hasAccessibilityPermission) {
-        await taurpc.openAccessibilitySettings();
-        toast.info("Opened Accessibility settings.");
-        return;
-      }
-
-      const granted = await ensureAccessibilityPermission();
-      if (granted) {
-        toast.success("Accessibility permission granted.");
-      } else {
-        toast.error("Accessibility permission was not granted.");
-      }
-    } catch (error) {
-      toast.error(`Accessibility action failed: ${getErrorMessage(error)}`);
-    }
-  }
-
-  async function handleInputMonitoringButtonClick() {
-    try {
-      if (hasInputMonitoringPermission) {
-        await taurpc.openInputMonitoringSettings();
-        toast.info("Opened Input Monitoring settings.");
-        return;
-      }
-
-      const granted = await ensureInputMonitoringPermission();
-      if (granted) {
-        toast.success("Input Monitoring permission granted.");
-      } else {
-        toast.error("Input Monitoring permission was not granted.");
-      }
-    } catch (error) {
-      toast.error(`Input Monitoring action failed: ${getErrorMessage(error)}`);
-    }
-  }
-
-  async function handleCompleteOnboarding() {
-    try {
-      await taurpc.completeOnboarding();
-      setStartupStatus((current: StartupStatusInfo | null) =>
-        current
-          ? {
-              ...current,
-              onboardingCompleted: true,
-              shouldShowOnboarding: false,
-            }
-          : {
-              launchedViaAutostart: false,
-              onboardingCompleted: true,
-              shouldShowOnboarding: false,
-            },
-      );
-      toast.success("Setup complete.");
-    } catch (error) {
-      toast.error(`Failed to finish setup: ${getErrorMessage(error)}`);
-    }
-  }
-
-  async function handleAddRepo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!repoInput.trim()) {
-      toast.error("Enter a GitHub repo like owner/name or https://github.com/owner/name.");
-      return;
-    }
-
-    setAddingRepo(true);
-    const toastId = toast.loading(`Adding ${repoInput.trim()}...`);
-
-    try {
-      const addedRepo = await taurpc.addGitRepo(repoInput);
-      setRepoInput("");
-      await Promise.all([
-        refreshRepos({ showErrorToast: false }),
-        refreshActiveChords({ showErrorToast: false }),
-      ]);
-      toast.success(`Added ${addedRepo.slug}.`, { id: toastId });
-    } catch (error) {
-      toast.error(`Failed to add repo: ${getErrorMessage(error)}`, { id: toastId });
-    } finally {
-      setAddingRepo(false);
-    }
-  }
 
   async function handleAddLocalChordFolder() {
     let selectedPath: string | null = null;
@@ -535,46 +244,7 @@ export function useSettingsPage() {
     }
   }
 
-  async function handleSyncRepo(repoSlug: string) {
-    setSyncingRepo(repoSlug);
-    const toastId = toast.loading(`Syncing ${repoSlug}...`);
 
-    try {
-      const syncedRepo = await taurpc.syncGitRepo(repoSlug);
-      setRepoChordsByRepo((current) => {
-        const next = { ...current };
-        delete next[repoSlug];
-        return next;
-      });
-      setOpenRepoChordGroups((current) => {
-        const next = { ...current };
-        delete next[repoSlug];
-        return next;
-      });
-      await Promise.all([
-        refreshRepos({ showErrorToast: false }),
-        refreshActiveChords({ showErrorToast: false }),
-        openRepoChords[repoSlug]
-          ? refreshRepoChords(repoSlug, { showErrorToast: false })
-          : Promise.resolve([]),
-      ]);
-      const revisionLabel = syncedRepo.headShortSha ? ` @ ${syncedRepo.headShortSha}` : "";
-      toast.success(`Synced ${syncedRepo.slug}${revisionLabel}.`, { id: toastId });
-    } catch (error) {
-      toast.error(`Failed to sync ${repoSlug}: ${getErrorMessage(error)}`, { id: toastId });
-    } finally {
-      setSyncingRepo(null);
-    }
-  }
-
-  async function handleOpenRepoUrl(repo: GitRepoInfo) {
-    try {
-      await openUrl(repo.url);
-      toast.info(`Opened ${repo.slug} on GitHub.`);
-    } catch (error) {
-      toast.error(`Failed to open ${repo.slug}: ${getErrorMessage(error)}`);
-    }
-  }
 
   async function handleRepoChordsToggle(repoSlug: string, nextOpen: boolean) {
     setOpenRepoChords((current) => ({ ...current, [repoSlug]: nextOpen }));
@@ -600,7 +270,6 @@ export function useSettingsPage() {
     setRemovingGlobalShortcut(shortcut);
 
     try {
-      await taurpc.removeGlobalShortcutMapping(shortcut);
       setGlobalShortcutMappings((current) =>
         current.filter((mapping) => mapping.shortcut !== shortcut),
       );
@@ -612,177 +281,13 @@ export function useSettingsPage() {
     }
   }
 
-  async function handleRelaunchApp(bundleId: string) {
-    const app = appsNeedingRelaunch.find((item) => item.bundleId === bundleId);
-    const appLabel = getAppLabel(bundleId, appMetadataByBundleId[bundleId], app?.displayName);
-    setRelaunchingApp(bundleId);
-
-    try {
-      await taurpc.relaunchApp(bundleId);
-      toast.success(`Requested relaunch for ${appLabel}.`);
-    } catch (error) {
-      toast.error(`Failed to relaunch ${appLabel}: ${getErrorMessage(error)}`);
-    } finally {
-      setRelaunchingApp((current) => (current === bundleId ? null : current));
-    }
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function configureWindow() {
-      try {
-        await Promise.all([
-          refreshStartupStatus(),
-          refreshAccessibilityPermissionState(),
-          refreshInputMonitoringPermissionState(),
-          refreshAutostartState(),
-          refreshRepos({ showErrorToast: true }),
-          refreshLocalChordFolders({ showErrorToast: true }),
-          refreshActiveChords({ showErrorToast: true }),
-          refreshGlobalShortcutMappings({ showErrorToast: true }),
-          refreshAppsNeedingRelaunch({ showErrorToast: true }),
-        ]);
-      } catch (error) {
-        if (!cancelled) {
-          toast.error(`Failed to finish loading settings: ${getErrorMessage(error)}`);
-        }
-      }
-    }
-
-    void configureWindow();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isMacOS) {
-      return;
-    }
-
-    const refreshPermissions = () => {
-      void refreshAccessibilityPermissionState();
-      void refreshInputMonitoringPermissionState();
-    };
-
-    refreshPermissions();
-    window.addEventListener("focus", refreshPermissions);
-
-    return () => {
-      window.removeEventListener("focus", refreshPermissions);
-    };
-  }, [isMacOS]);
-
-  useEffect(() => {
-    setOpenChordGroups((current) => {
-      const next = { ...current };
-
-      for (const chord of activeChords) {
-        const groupKey = `${chord.scopeKind}:${chord.scope}`;
-        if (next[groupKey] === undefined) {
-          next[groupKey] = chord.scopeKind === "global";
-        }
-      }
-
-      return next;
-    });
-  }, [activeChords]);
-
-  const appMetadataBundleIds = [
-    ...new Set([
-      ...activeChords
-        .filter((chord) => chord.scopeKind === "app")
-        .map((chord) => chord.scope),
-      ...globalShortcutMappings.map((mapping) => mapping.bundleId),
-      ...appsNeedingRelaunch.map((app) => app.bundleId),
-    ]),
-  ].sort();
-  const appMetadataByBundleId: AppMetadataByBundleId = useAppMetadata(appMetadataBundleIds);
-
-  const normalizedChordSearch = chordSearch.trim().toLowerCase();
-  const filteredActiveChords = normalizedChordSearch
-    ? activeChords.filter((chord) =>
-        [
-          chord.scope,
-          appMetadataByBundleId[chord.scope]?.displayName ?? "",
-          chord.sequence,
-          chord.name,
-          chord.action,
-        ].some((value) => value.toLowerCase().includes(normalizedChordSearch))
-      )
-    : activeChords;
-  const chordGroups = buildChordGroups(filteredActiveChords);
-
-  const normalizedGlobalShortcutSearch = globalShortcutSearch.trim().toLowerCase();
-  const filteredGlobalShortcutMappings = normalizedGlobalShortcutSearch
-    ? globalShortcutMappings.filter((mapping) =>
-        [
-          mapping.shortcut,
-          mapping.bundleId,
-          appMetadataByBundleId[mapping.bundleId]?.displayName ?? "",
-          mapping.hotkeyId,
-        ].some((value) => value.toLowerCase().includes(normalizedGlobalShortcutSearch))
-      )
-    : globalShortcutMappings;
-  const showOnboarding =
-    currentWindow.label === "settings" && startupStatus?.shouldShowOnboarding === true;
-
   return {
-    summary: {
-      sourceCount: repos.length + localChordFolders.length,
-      chordCount: activeChords.length,
-      shortcutCount: globalShortcutMappings.length,
-    },
-    appMetadataByBundleId,
-    onboarding: {
-      startupBusy,
-      showOnboarding,
-      canFinish: hasAccessibilityPermission && hasInputMonitoringPermission,
-      isMacOS,
-      handleCompleteOnboarding,
-      permissionSteps: [
-        {
-          id: "accessibility",
-          title: "Grant Accessibility",
-          description: "Required for UI automation and executing chords inside other apps.",
-          granted: hasAccessibilityPermission,
-          busy: accessibilityBusy,
-          buttonLabel: hasAccessibilityPermission ? "Open Settings" : "Grant Access",
-          onClick: () => {
-            void handleAccessibilityButtonClick();
-          },
-        },
-        {
-          id: "input-monitoring",
-          title: "Grant Input Monitoring",
-          description: "Required for detecting the global trigger before Chord can activate in the background.",
-          granted: hasInputMonitoringPermission,
-          busy: inputMonitoringBusy,
-          buttonLabel: hasInputMonitoringPermission ? "Open Settings" : "Grant Access",
-          onClick: () => {
-            void handleInputMonitoringButtonClick();
-          },
-        },
-      ],
-    },
     settingsTab: {
-      repos,
-      reposBusy,
-      repoInput,
-      setRepoInput,
-      addingRepo,
-      syncingRepo,
       repoChordsByRepo,
       repoChordsBusy,
       openRepoChords,
       openRepoChordGroups,
-      refreshRepos,
-      handleAddRepo,
-      handleOpenRepoUrl,
       handleRepoChordsToggle,
-      handleSyncRepo,
       setRepoChordGroupOpen: (repoSlug: string, groupKey: string, open: boolean) => {
         setOpenRepoChordGroups((current) => ({
           ...current,
@@ -811,31 +316,13 @@ export function useSettingsPage() {
           },
         }));
       },
-      appsNeedingRelaunch,
-      appsNeedingRelaunchBusy,
       relaunchingApp,
-      refreshAppsNeedingRelaunch,
-      handleRelaunchApp,
-      hasAccessibilityPermission,
-      hasInputMonitoringPermission,
-      accessibilityBusy,
-      inputMonitoringBusy,
-      startupBusy,
-      handleAccessibilityButtonClick,
-      handleInputMonitoringButtonClick,
-      autostartEnabled,
-      autostartBusy,
-      autostartStatus,
-      handleAutostartChange,
     },
     activeChordsTab: {
       activeChords,
       activeChordsBusy,
       chordSearch,
       setChordSearch,
-      filteredActiveChords,
-      chordGroups,
-      normalizedChordSearch,
       openChordGroups,
       refreshActiveChords,
       setChordGroupOpen: (groupKey: string, open: boolean) => {
@@ -850,7 +337,6 @@ export function useSettingsPage() {
       globalShortcutMappingsBusy,
       globalShortcutSearch,
       setGlobalShortcutSearch,
-      filteredGlobalShortcutMappings,
       removingGlobalShortcut,
       refreshGlobalShortcutMappings,
       handleRemoveGlobalShortcutMapping,

@@ -49,7 +49,7 @@ If you want to trigger a chord without exiting _Chord Mode_, you can press `Caps
 <details>
   <summary>Why `Caps Lock`?</summary>
 
-  `Caps Lock` is a key that's significantly more comfortable to press after many chord sequences, especially ones containing symbols. To try it yourself, compare pressing `[o` followed by `Caps Lock`, and then compare it to pressing `Enter` afterwards. 
+  `Caps Lock` is a key that's significantly more comfortable to press after many chord sequences, especially ones containing symbols. To try it yourself, compare pressing `[o` followed by `Caps Lock`, and then compare it to pressing `Enter` afterwards.
 </details>
 
 You can run a chord multiple times by pressing `Caps Lock` again. Pressing the following sequence of keys in _Chord Mode_ goes up three folders in Finder:
@@ -135,9 +135,6 @@ Actions can also take the form of shell commands, which is useful when certain f
 "/f" = { name = "Finder", command = "Finder", shell = "open -a Finder" }
 ```
 
-
-
-
 > **Chords** ignores all inputs whenever a modifier key (other than Shift) is held down.
 
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
@@ -172,7 +169,7 @@ df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()
 
 `args` and `args:*` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
 
-Chords embeds the QuickJS JavaScript environment (excluding its standard library) as well as certain LLRT modules (which are based on the Node APIs). Module resolution is currently only implemented for root imports (e.g. if you have a `src/file.js` at the root of your repo, you have to write `import file from "src/file.js"`).
+Chord embeds the [LLRT runtime](https://github.com/awslabs/llrt), a QuickJS-based JavaScript environment which provides partial compatibility with the Node.js APIs. For more information, see [scripting.md](./scripting.md).
 
 ## Global Hotkeys
 
@@ -184,11 +181,11 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 
 ## Comparison to keyboard shortcuts
 
-Because keyboard shortcuts must be composed of one or more modifier keys followed by a letter/number/symbol, they come with inherent limitations:
+Because keyboard shortcuts must be composed of one or more modifier keys followed by a single character, they come with inherent limitations:
 
 ### Limited key combinations
 
-Because you can only choose one of 26 letters for your shortcut, many shortcuts end up with letters that don't intuitively map to their action:
+Because there are only a limited amount of modifier+key combinations available, many shortcuts don't intuitively map to their action:
 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
@@ -206,12 +203,11 @@ gd = {
 }
 ```
 
-
 ### Differences between platforms
 
-The same app on different platforms (Windows/Linux/MacOS) often use different shortcuts for the same action (including different modifier keys), which can be a pain to deal with if you need to switch between platforms.
+The same app on different platforms (Windows/Linux/MacOS) often use different shortcuts or modifiers for the same action, which can be a pain to deal with if you need to switch between platforms.
 
-Chords can act as an abstraction over these shortcut differences by letting you map the same chord to different shortcuts on each platform.
+Chord can act as an abstraction over these shortcut differences by letting you map the same chord to different shortcuts on each platform.
 
 <!-- TODO: give example -->
 

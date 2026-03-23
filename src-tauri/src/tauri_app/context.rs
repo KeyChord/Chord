@@ -1,5 +1,5 @@
 use crate::chords::{Chord, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
-use crate::feature::Chorder;
+use crate::feature::{AppSettings, Chorder};
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::sources::load_all_chord_folders;
 use crate::{
@@ -68,6 +68,7 @@ pub struct AppMetadataInfo {
 
 pub struct AppContext {
     pub chorder: Chorder,
+    pub settings: AppSettings,
 
     pub device_state: Option<DeviceState>,
     pub loaded_app_chords: RwLock<LoadedAppChords>,
@@ -80,7 +81,7 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new(chorder: Chorder, bundled_app_chords: LoadedAppChords) -> Self {
+    pub fn new(chorder: Chorder, settings: AppSettings, bundled_app_chords: LoadedAppChords) -> Self {
         let device_state = if macos_accessibility_client::accessibility::application_is_trusted() {
             Some(DeviceState {})
         } else {
@@ -90,6 +91,7 @@ impl AppContext {
         let app_mode_state_machine = Arc::new(AppModeStateMachine::new(device_state.clone()));
 
         Self {
+            settings,
             device_state,
             apps_needing_relaunch: RwLock::new(BTreeSet::new()),
             frontmost_application_id: ArcSwap::new(Arc::new(None)),
@@ -175,20 +177,12 @@ pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunch
     Ok(apps_needing_relaunch_payload(&apps_needing_relaunch))
 }
 
-pub fn list_app_metadata(bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>> {
-    let bundle_ids = bundle_ids
-        .into_iter()
-        .map(|bundle_id| normalize_bundle_id(&bundle_id))
-        .collect::<Result<BTreeSet<_>>>()?;
-
-    Ok(bundle_ids
-        .into_iter()
-        .map(|bundle_id| AppMetadataInfo {
-            display_name: resolve_app_display_name(&bundle_id),
-            icon_data_url: resolve_app_icon_data_url(&bundle_id),
-            bundle_id,
-        })
-        .collect())
+pub fn get_app_metadata(bundle_id: String) -> Result<AppMetadataInfo> {
+    Ok( AppMetadataInfo {
+        display_name: resolve_app_display_name(&bundle_id),
+        icon_data_url: resolve_app_icon_data_url(&bundle_id),
+        bundle_id,
+    })
 }
 
 pub fn relaunch_app(app: AppHandle, bundle_id: &str) -> Result<()> {

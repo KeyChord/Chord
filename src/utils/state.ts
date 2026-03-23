@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ChorderState } from "../types/generated.ts";
+import type { AppSettingsState, ChorderState } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 
 export function useChorderState() {
@@ -22,5 +22,32 @@ export function useChorderState() {
     };
   }, []);
 
-  return [state]
+  return state
+}
+
+export function useAppSettingsState() {
+  const [state, setState] = useState<AppSettingsState>({
+    bundleIdsNeedingRelaunch: [],
+    gitRepos: [],
+    permissions: {
+      isAccessibilityEnabled: false,
+      isInputMonitoringEnabled: false,
+      isAutostartEnabled: false
+    }
+  });
+
+  useEffect(() => {
+    const unlistenPromise = listen<AppSettingsState>(
+      "app-settings-state-changed",
+      (event) => {
+        setState(event.payload)
+      },
+    );
+
+    return () => {
+      void unlistenPromise.then((unlisten) => unlisten?.());
+    };
+  }, []);
+
+  return state
 }

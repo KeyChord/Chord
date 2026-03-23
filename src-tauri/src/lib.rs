@@ -1,6 +1,6 @@
 use crate::api::{Api, ApiImpl};
 use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorUi};
+use crate::feature::{AppSettings, Chorder, ChorderIndicatorUi};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use anyhow::Result;
 use frontmost::{start_nsrunloop, Detector};
@@ -162,8 +162,9 @@ fn setup(app: &mut tauri::App) -> Result<()> {
 
     let handle = app.handle().clone();
     let chorder = Chorder::new(ChorderIndicatorUi::new(handle.clone())?);
+    let settings = AppSettings::new(handle.clone());
     let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
-    let context = AppContext::new(chorder, bundled_app_chords);
+    let context = AppContext::new(chorder, settings, bundled_app_chords);
     // Setting the frontmost application immediately (the frontmost crate only detects changes)
     let workspace = NSWorkspace::sharedWorkspace();
     if let Some(application) = workspace.frontmostApplication() {

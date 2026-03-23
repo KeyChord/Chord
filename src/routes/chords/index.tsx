@@ -12,10 +12,6 @@ export const Route = createFileRoute('/chords/')({
   component: Chords,
 })
 
-function formatKeys(keys: string[]) {
-  return keys.map((key) => normalizePrettyKey(getPrettyKey(key))).join(" ");
-}
-
 const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
   String.fromCharCode("A".charCodeAt(0) + index),
 );
@@ -132,7 +128,7 @@ function ChordKeyRow({
 }
 
 export function Chords() {
-  const [state] = useChorderState();
+  const state = useChorderState();
   const [allSuggestions, setAllSuggestions] = useState<ActiveChordInfo[]>([]);
   const [suggestions, setSuggestions] = useState<ActiveChordInfo[]>([]);
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);

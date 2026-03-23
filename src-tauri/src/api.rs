@@ -5,7 +5,7 @@ use crate::sources::{
 };
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
-    list_active_chords, list_app_metadata, list_apps_needing_relaunch, list_loaded_chords,
+    list_active_chords, list_apps_needing_relaunch, list_loaded_chords,
     list_matching_chords, relaunch_app, reload_loaded_app_chords, startup, ActiveChordInfo,
     AppMetadataInfo, AppNeedsRelaunchInfo,
 };
@@ -14,6 +14,7 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
+use crate::get_app_metadata;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -63,8 +64,8 @@ pub trait Api {
     async fn list_active_chords() -> Result<Vec<ActiveChordInfo>, String>;
     #[taurpc(alias = "listMatchingChords")]
     async fn list_matching_chords() -> Result<Vec<ActiveChordInfo>, String>;
-    #[taurpc(alias = "listAppMetadata")]
-    async fn list_app_metadata(bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>, String>;
+    #[taurpc(alias = "getAppMetadata")]
+    async fn get_app_metadata(bundle_id: String) -> Result<AppMetadataInfo, String>;
     #[taurpc(alias = "listRepoChords")]
     async fn list_repo_chords(repo: String) -> Result<Vec<ActiveChordInfo>, String>;
     #[taurpc(alias = "listLocalChordFolderChords")]
@@ -178,11 +179,11 @@ impl Api for ApiImpl {
         list_matching_chords(app_handle).map_err(|error| error.to_string())
     }
 
-    async fn list_app_metadata(
+    async fn get_app_metadata(
         self,
-        bundle_ids: Vec<String>,
-    ) -> Result<Vec<AppMetadataInfo>, String> {
-        list_app_metadata(bundle_ids).map_err(|error| error.to_string())
+        bundle_id: String,
+    ) -> Result<AppMetadataInfo, String> {
+        get_app_metadata(bundle_id).map_err(|error| error.to_string())
     }
 
     async fn list_repo_chords(self, repo: String) -> Result<Vec<ActiveChordInfo>, String> {

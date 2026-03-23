@@ -8,30 +8,46 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-
-type PermissionStep = {
-  id: string;
-  title: string;
-  description: string;
-  granted: boolean;
-  busy: boolean;
-  buttonLabel: string;
-  onClick: () => void;
-};
+import { useAppPermissionsState } from "../../utils/permissions.ts";
+import { useMutation } from "@tanstack/react-query";
+import { taurpc } from "../../api/taurpc.ts";
 
 export function FirstRunOnboarding({
-  canFinish,
-  isMacOS,
-  onContinue,
   onSkip,
-  permissionSteps,
 }: {
-  canFinish: boolean;
-  isMacOS: boolean;
-  onContinue: () => void;
   onSkip: () => void;
-  permissionSteps: PermissionStep[];
 }) {
+  const [state] = useAppPermissionsState()
+  const openAccessibilitySettingsMutation = useMutation({
+    mutationFn: taurpc.openAccessibilitySettings
+  })
+  const openInputMonitoringSettingsMutation = useMutation({
+    mutationFn: taurpc.openInputMonitoringSettings
+  })
+  const canFinish = state.isAccessibilityEnabled && state.isInputMonitoringEnabled;
+  const completeOnboardingMutation = useMutation({
+    mutationFn: taurpc.completeOnboarding,
+  })
+
+  const permissionSteps = [
+    {
+      id: "accessibility",
+      title: "Grant Accessibility",
+      description: "Required for UI automation and executing chords inside other apps.",
+      granted: state.isAccessibilityEnabled,
+      mutation: openAccessibilitySettingsMutation,
+      buttonLabel: state.isAccessibilityEnabled ? "Open Settings" : "Grant Access",
+    },
+    {
+      id: "input-monitoring",
+      title: "Grant Input Monitoring",
+      description: "Required for detecting the global trigger before Chord can activate in the background.",
+      granted: state.isInputMonitoringEnabled,
+      mutation: openInputMonitoringSettingsMutation,
+      buttonLabel: state.isInputMonitoringEnabled ? "Open Settings" : "Grant Access",
+    },
+  ]
+
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,_rgba(22,163,74,0.18),_transparent_38%),linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(255,255,255,1))] px-5 py-5 text-sm text-foreground">
       <div className="mx-auto flex max-w-[760px] flex-col gap-4">
@@ -83,10 +99,10 @@ export function FirstRunOnboarding({
                     type="button"
                     variant={step.granted ? "outline" : "default"}
                     className={step.granted ? "" : "bg-slate-950 text-white hover:bg-slate-800"}
-                    onClick={step.onClick}
-                    disabled={step.busy}
+                    onClick={() => step.mutation.mutate()}
+                    disabled={step.mutation.isPending}
                   >
-                    {step.busy ? "Opening..." : step.buttonLabel}
+                    {step.mutation.isPending ? "Opening..." : step.buttonLabel}
                   </Button>
                 </div>
               </div>
@@ -108,13 +124,15 @@ export function FirstRunOnboarding({
                 Finish Later
               </Button>
               <div className="flex items-center gap-2 self-end sm:self-auto">
-                {isMacOS && !canFinish ? (
+                {!canFinish ? (
                   <p className="text-xs text-slate-500">Grant both permissions to finish setup now.</p>
                 ) : null}
                 <Button
                   type="button"
-                  onClick={onContinue}
-                  disabled={isMacOS && !canFinish}
+                  onClick={() => {
+                    completeOnboardingMutation.mutate()
+                  }}
+                  disabled={!canFinish}
                   className="bg-emerald-600 text-white hover:bg-emerald-700"
                 >
                   Continue

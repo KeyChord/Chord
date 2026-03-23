@@ -13,54 +13,47 @@ import { AppIcon } from "#/components/settings/app-icon.tsx";
 import { ShortcutKeys } from "#/components/settings/shortcut-keys.tsx";
 import { getAppLabel } from "#/utils/settings.ts";
 import type { SettingsPageData } from "#/utils/use-settings-page.ts";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { taurpc } from "../../api/taurpc.ts";
+import { useEffect, useState } from "react";
 
-export function GlobalShortcutsTab({
-  globalShortcuts,
-  appMetadataByBundleId,
-}: {
-  globalShortcuts: SettingsPageData["globalShortcutsTab"];
-  appMetadataByBundleId: SettingsPageData["appMetadataByBundleId"];
-}) {
+export function GlobalShortcutsTab() {
+  const [input, setInput] = useState("");
+  const removeGlobalShortcutMappingMutation = useMutation({
+    mutationFn: taurpc.removeGlobalShortcutMapping
+  })
+  const { data, isSuccess, isLoading } = useQuery({
+    queryKey: ["global-shortcuts"],
+    queryFn: () => taurpc.listGlobalShortcutMappings()
+  })
+
   return (
     <Card size="sm">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <CardTitle>Global Shortcut Mappings</CardTitle>
-            <CardDescription>
-              Current shortcut assignments stored in `global-hotkeys.json`.
-            </CardDescription>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void globalShortcuts.refreshGlobalShortcutMappings({ showSuccessToast: true });
-            }}
-            disabled={globalShortcuts.globalShortcutMappingsBusy}
-          >
-            {globalShortcuts.globalShortcutMappingsBusy ? "Refreshing..." : "Refresh"}
-          </Button>
-        </div>
+      <CardHeader className="flex items-center justify-between gap-3">
+        <CardTitle>Global Shortcut Mappings</CardTitle>
+        <CardDescription>
+          Current shortcut assignments stored in `global-hotkeys.json`.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Input
-            value={globalShortcuts.globalShortcutSearch}
+            value={input}
             onChange={(event) => {
-              globalShortcuts.setGlobalShortcutSearch(event.target.value);
+              setInput(event.target.value);
             }}
             placeholder="Filter by shortcut, app, bundle ID, or hotkey ID"
           />
-          <Badge variant="outline" className="self-start sm:self-center">
-            {globalShortcuts.filteredGlobalShortcutMappings.length} mappings
-          </Badge>
+          {isSuccess && (
+            <Badge variant="outline" className="self-start sm:self-center">
+              {data.length} mappings
+            </Badge>
+          )}
         </div>
 
-        {globalShortcuts.globalShortcutMappingsBusy ? (
+        {/* {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading global shortcut mappings...</p>
-        ) : globalShortcuts.globalShortcutMappings.length === 0 ? (
+        ) : globalShortcutMappings.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No global shortcut mappings are currently registered.
           </p>
@@ -104,9 +97,9 @@ export function GlobalShortcutsTab({
                     aria-label={`Remove ${mapping.shortcut}`}
                     title="Remove mapping"
                     onClick={() => {
-                      void globalShortcuts.handleRemoveGlobalShortcutMapping(mapping.shortcut);
+                      removeGlobalShortcutMappingMutation.mutate(mapping.shortcut);
                     }}
-                    disabled={isRemoving}
+                    disabled={removeGlobalShortcutMappingMutation.isPending}
                     className="text-muted-foreground hover:text-destructive"
                   >
                     <X />
@@ -115,7 +108,7 @@ export function GlobalShortcutsTab({
               );
             })}
           </div>
-        )}
+        )} */}
       </CardContent>
     </Card>
   );

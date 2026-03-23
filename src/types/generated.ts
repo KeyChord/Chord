@@ -3,7 +3,27 @@
 */
 
 export type Key = string;
-export type Value = unknown;
+
+export interface AppPermissionsState {
+	isAutostartEnabled: boolean;
+	isInputMonitoringEnabled: boolean;
+	isAccessibilityEnabled: boolean;
+}
+
+export interface AppSettingsStateGitRepo {
+	owner: string;
+	name: string;
+	slug: string;
+	url: string;
+	localPath: string;
+	headShortSha?: string;
+}
+
+export interface AppSettingsState {
+	bundleIdsNeedingRelaunch: string[];
+	gitRepos: AppSettingsStateGitRepo[];
+	permissions: AppPermissionsState;
+}
 
 export interface ShortcutChord {
 	keys: Key[];
@@ -36,3 +56,4 @@ export interface ChorderState {
 	pressedChord?: Chord;
 	activeChord?: Chord;
 }
+

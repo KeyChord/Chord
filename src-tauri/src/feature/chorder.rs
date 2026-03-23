@@ -23,41 +23,6 @@ pub struct Chorder {
 }
 
 impl Chorder {
-    fn emit_will_show(window: &tauri::WebviewWindow) {
-        if let Err(error) = window.emit("chorder-will-show", ()) {
-            log::error!("Failed to emit chorder will-show event: {error}");
-        }
-    }
-
-    fn emit_visibility_changed(&self, visible: bool) {
-        if let Err(error) = self.ui.window.emit("chorder-visibility-changed", visible) {
-            log::error!("Failed to emit chorder visibility change: {error}");
-        }
-    }
-
-    fn prepare_surface_before_reveal(window: &tauri::WebviewWindow) {
-        let (tx, rx) = mpsc::sync_channel(1);
-        window.once("chorder-surface-ready", move |_| {
-            let _ = tx.send(());
-        });
-        Self::emit_will_show(window);
-
-        if rx.recv_timeout(Duration::from_millis(160)).is_err() {
-            log::debug!("Timed out waiting for chorder surface to prepare before reveal");
-        }
-    }
-
-    fn preload_ui(ui: &ChorderIndicatorUi) -> Result<()> {
-        log::debug!("Preloading chorder panel");
-
-        if ui.ensure_visible()? {
-            Self::prepare_surface_before_reveal(&ui.window);
-            ui.ensure_hidden()?;
-        }
-
-        Ok(())
-    }
-
     pub fn new(ui: ChorderIndicatorUi) -> Self {
         let state = ObservableProperty::new(Arc::new(ChorderState::new()));
 
@@ -107,6 +72,41 @@ impl Chorder {
             ui,
             held_keys: Mutex::new(HashSet::new()),
         }
+    }
+
+    fn emit_will_show(window: &tauri::WebviewWindow) {
+        if let Err(error) = window.emit("chorder-will-show", ()) {
+            log::error!("Failed to emit chorder will-show event: {error}");
+        }
+    }
+
+    fn emit_visibility_changed(&self, visible: bool) {
+        if let Err(error) = self.ui.window.emit("chorder-visibility-changed", visible) {
+            log::error!("Failed to emit chorder visibility change: {error}");
+        }
+    }
+
+    fn prepare_surface_before_reveal(window: &tauri::WebviewWindow) {
+        let (tx, rx) = mpsc::sync_channel(1);
+        window.once("chorder-surface-ready", move |_| {
+            let _ = tx.send(());
+        });
+        Self::emit_will_show(window);
+
+        if rx.recv_timeout(Duration::from_millis(160)).is_err() {
+            log::debug!("Timed out waiting for chorder surface to prepare before reveal");
+        }
+    }
+
+    fn preload_ui(ui: &ChorderIndicatorUi) -> Result<()> {
+        log::debug!("Preloading chorder panel");
+
+        if ui.ensure_visible()? {
+            Self::prepare_surface_before_reveal(&ui.window);
+            ui.ensure_hidden()?;
+        }
+
+        Ok(())
     }
 
     pub fn ensure_active(&self) -> Result<()> {
