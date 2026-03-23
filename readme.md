@@ -6,7 +6,7 @@ _Chord_ lets you bind actions to key sequences while **keeping your existing sho
 
 ## How does it work?
 
-Chords are sequences of non-modifier keys that correspond to actions. Most of the time, these actions are defined to simulate existing keyboard shortcuts within an application.
+Chords are sequences of non-modifier keys that correspond to actions. Most of the time, these actions are defined as existing keyboard shortcuts in an application.
 
 For example, here are some example chords for the macOS Finder app:
 ```toml
