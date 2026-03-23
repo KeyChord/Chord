@@ -63,8 +63,6 @@ pub trait Api {
     async fn get_startup_status() -> AppResult<StartupStatusInfo>;
     #[taurpc(alias = "completeOnboarding")]
     async fn complete_onboarding() -> AppResult<()>;
-    #[taurpc(alias = "listGitRepos")]
-    async fn list_git_repos() -> AppResult<Vec<GitRepo>>;
     #[taurpc(alias = "addGitRepo")]
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
     #[taurpc(alias = "syncGitRepo")]
@@ -142,18 +140,19 @@ impl Api for ApiImpl {
     async fn add_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
         let registry = handle.app_chord_package_registry();
-        let repo_info = registry.git.add_repo(GitHubRepoRef::parse(&repo)?)?;
-        reload_loaded_app_chords(handle).await?;
-        Ok(repo_info)
+        let repo_ref = GitHubRepoRef::parse(&repo)?;
+        registry.git.add_repo(repo_ref.clone())?;
+        reload_loaded_app_chords(handle.clone()).await?;
+        Ok(repo_ref.into_repo(registry.git.dir.as_path()))
     }
 
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
         let registry = handle.app_chord_package_registry();
-        let repo_info =
-            registry.git.sync_repo(GitHubRepoRef::parse(&repo)?)?;
-        reload_loaded_app_chords(handle).await?;
-        Ok(repo_info)
+        let repo_ref  = GitHubRepoRef::parse(&repo)?;
+        registry.git.sync_repo(repo_ref.clone())?;
+        reload_loaded_app_chords(handle.clone()).await?;
+        Ok(repo_ref.into_repo(registry.git.dir.as_path()))
     }
 
     async fn list_local_chord_folders(self) -> AppResult<Vec<LocalChordPackage>> {
