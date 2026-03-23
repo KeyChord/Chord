@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::Serialize;
 use typeshare::typeshare;
 use crate::define_observable;
@@ -5,7 +6,7 @@ use crate::define_observable;
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitReposState {
-    pub repos: Vec<GitRepo>
+    pub repos: HashMap<String, GitRepo>
 }
 
 #[taurpc::ipc_type]

@@ -12,7 +12,7 @@ import { OpenRepoButton } from "./open-repo-button.tsx";
 import { SyncRepoButton } from "./sync-repo-button.tsx";
 
 export function ChordReposCard() {
-  const { repos: gitRepos } = useGitRepoStoreState();
+  const { repos } = useGitRepoStoreState();
   return (
     <Card size="sm">
       <CardHeader>
@@ -28,12 +28,12 @@ export function ChordReposCard() {
       <CardContent className="space-y-4 pt-0">
         <AddRepoButton />
         <div className="space-y-3">
-          {gitRepos.length === 0 ? (
+          {Object.values(repos).length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No external repos added yet. Bundled chords still load by default.
             </p>
           ) : (
-            gitRepos.map((repo) => <GitRepoRow key={repo.slug} repo={repo} />)
+            Object.values(repos).map((repo) => <GitRepoRow key={repo.slug} repo={repo} />)
           )}
         </div>
       </CardContent>

@@ -33,7 +33,7 @@ impl GitPackageRegistry {
         let mut packages = Vec::new();
         let repos = self.handle.git_repos_store()?;
         let state = repos.observable.get_state()?;
-        for repo in state.repos.iter() {
+        for repo in state.repos.values() {
             match gix::open(&repo.local_path)
                 .context(format!("failed to open repo {}", repo.slug))
                 .and_then(|repo_handle| ChordPackage::load_from_git_repo(&repo_handle))
