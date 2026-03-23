@@ -2,7 +2,7 @@
 
 **Multi-letter shortcuts for macOS.**
 
-**Chord** lets you bind actions to key sequences while _keeping your existing shortcuts untouched_.
+_Chord_ lets you bind actions to key sequences while **keeping your existing shortcuts untouched**.
 
 ## How does it work?
 
@@ -21,7 +21,7 @@ nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
 
 Because chords are only composed of multiple letters, they are often easier to remember than their modifier + key counterparts.
 
-In order to run a chord, you need to have the **Chord** app installed and running in the background. **Chord** won't do anything until you press the activation sequence to activate _Chord Mode_, which defaults to `Caps Lock` + `Space`.
+In order to run a chord, you need to have the _Chord_ app installed and running in the background. _Chord_ won't do anything until you press the activation sequence to activate _Chord Mode_, which defaults to `Caps Lock` + `Space`.
 
 <details>
   <summary>Why Caps Lock + Space?</summary>
