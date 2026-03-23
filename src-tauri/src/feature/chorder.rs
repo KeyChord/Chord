@@ -27,28 +27,22 @@ pub struct ChorderObservable {
 }
 
 impl ChorderObservable {
-    fn new(ui: &ChorderIndicatorUi, state: ChorderState) -> Self {
+    fn new(ui: &ChorderIndicatorUi, state: ChorderState) -> Result<Self> {
         let state = ObservableProperty::new(Arc::new(state));
-
         let window = ui.window.clone();
-        if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
+        state.subscribe(Arc::new(move |_, new_state| {
             if let Err(e) = window.emit("state:chorder", new_state) {
                 log::error!("Failed to emit chorder state change: {e}");
             }
-        })) {
-            log::error!("Failed to subscribe chorder state observer: {e}");
-        };
-
-        Self {
-            state
-        }
+        }))?;
+        Ok(Self { state })
     }
 }
 
 impl AppChorder {
     pub fn new(safe_handle: SafeAppHandle, state: ChorderState) -> Result<Self> {
         let ui = ChorderIndicatorUi::new(safe_handle.clone(), &state)?;
-        let observable = ChorderObservable::new(&ui, state);
+        let observable = ChorderObservable::new(&ui, state)?;
         let surface_window = ui.window.clone();
         let surface_handle = ui.handle.clone();
         let listener_window = surface_window.clone();

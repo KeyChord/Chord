@@ -11,21 +11,7 @@ use crate::feature::SafeAppHandle;
 #[serde(rename_all = "camelCase")]
 pub struct AppSettingsState {
     pub bundle_ids_needing_relaunch: Vec<String>,
-    pub git_repos: Vec<AppSettingsStateGitRepo>,
 }
-
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppSettingsStateGitRepo {
-    pub owner: String,
-    pub name: String,
-    pub slug: String,
-    pub url: String,
-    pub local_path: String,
-    pub head_short_sha: Option<String>
-}
-
 
 pub struct AppSettings {
     _observable: SettingsObservable,
@@ -62,19 +48,15 @@ struct SettingsObservable {
 }
 
 impl SettingsObservable {
-    fn new(ui: &SettingsUi, state: AppSettingsState) -> Self {
+    fn new(ui: &SettingsUi, state: AppSettingsState) -> Result<Self> {
         let state = ObservableProperty::new(Arc::new(state));
-
         let window = ui.window.clone();
-        if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
+        state.subscribe(Arc::new(move |_, new_state| {
             if let Err(e) = window.emit("state:settings", new_state) {
                 log::error!("Failed to emit app settings state change: {e}");
             }
-        })) {
-            log::error!("Failed to subscribe app settings state observer: {e}");
-        };
-
-        Self { _state: state }
+        }))?;
+        Ok(Self { _state: state })
     }
 }
 
@@ -82,7 +64,7 @@ impl SettingsObservable {
 impl AppSettings {
     pub fn new(handle: SafeAppHandle, state: AppSettingsState) -> Result<Self> {
         let ui = SettingsUi::new(handle.clone(), &state)?;
-        let observable = SettingsObservable::new(&ui, state);
+        let observable = SettingsObservable::new(&ui, state)?;
         Ok(Self {
             _observable: observable,
             ui

@@ -1,4 +1,4 @@
-use crate::git::{GitHubRepoRef, GitRepoInfo};
+use crate::git::{GitHubRepoRef};
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_apps_needing_relaunch, list_loaded_chords,
@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use crate::get_app_metadata;
-use crate::tauri_app::git::LocalChordPackage;
+use crate::tauri_app::git::{GitRepo, LocalChordPackage};
 use specta::Type;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
@@ -64,11 +64,11 @@ pub trait Api {
     #[taurpc(alias = "completeOnboarding")]
     async fn complete_onboarding() -> AppResult<()>;
     #[taurpc(alias = "listGitRepos")]
-    async fn list_git_repos() -> AppResult<Vec<GitRepoInfo>>;
+    async fn list_git_repos() -> AppResult<Vec<GitRepo>>;
     #[taurpc(alias = "addGitRepo")]
-    async fn add_git_repo(repo: String) -> AppResult<GitRepoInfo>;
+    async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
     #[taurpc(alias = "syncGitRepo")]
-    async fn sync_git_repo(repo: String) -> AppResult<GitRepoInfo>;
+    async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
     #[taurpc(alias = "listLocalChordFolders")]
     async fn list_local_chord_folders() -> AppResult<Vec<LocalChordPackage>>;
     #[taurpc(alias = "pickLocalChordFolder")]
@@ -139,13 +139,7 @@ impl Api for ApiImpl {
         Ok(startup::complete_onboarding(&handle)?)
     }
 
-    async fn list_git_repos(self) -> AppResult<Vec<GitRepoInfo>> {
-        let handle = self.app_handle()?;
-        let registry = handle.app_chord_package_registry();
-        Ok(registry.git.discover_repos()?)
-    }
-
-    async fn add_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
+    async fn add_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
         let registry = handle.app_chord_package_registry();
         let repo_info = registry.git.add_repo(GitHubRepoRef::parse(&repo)?)?;
@@ -153,7 +147,7 @@ impl Api for ApiImpl {
         Ok(repo_info)
     }
 
-    async fn sync_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
+    async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
         let registry = handle.app_chord_package_registry();
         let repo_info =

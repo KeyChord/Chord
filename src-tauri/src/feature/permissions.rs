@@ -3,7 +3,7 @@ use observable_property::ObservableProperty;
 use serde::Serialize;
 use std::sync::Arc;
 use typeshare::typeshare;
-use crate::feature::{AppSettingsState, SafeAppHandle, SettingsUi};
+use crate::feature::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 
 pub struct AppPermissions {

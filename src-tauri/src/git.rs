@@ -1,19 +1,7 @@
 use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-
-#[derive(Debug)]
-#[taurpc::ipc_type]
-#[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
-pub struct GitRepoInfo {
-    pub owner: String,
-    pub name: String,
-    pub slug: String,
-    pub url: String,
-    pub local_path: String,
-    pub head_short_sha: Option<String>,
-}
+use crate::tauri_app::git::GitRepo;
 
 #[derive(Debug, Clone)]
 pub struct GitHubRepoRef {
@@ -74,12 +62,12 @@ impl GitHubRepoRef {
         repos_root.join(&self.owner).join(&self.name)
     }
 
-    pub fn into_info(self, repos_root: &Path) -> GitRepoInfo {
+    pub fn into_repo(self, repos_root: &Path) -> GitRepo {
         let slug = self.slug();
         let url = self.url();
         let local_path = self.local_path(repos_root);
         let head_short_sha = repo_head_short_sha(&local_path);
-        GitRepoInfo {
+        GitRepo {
             owner: self.owner,
             name: self.name,
             slug,

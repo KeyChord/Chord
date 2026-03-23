@@ -1,7 +1,7 @@
 use crate::api::{Api, ApiImpl};
 use crate::feature::{
     AppChorder, AppFrontmost, AppPermissions, AppSettings, AppSettingsState,
-    AppSettingsStateGitRepo, ChorderState, SafeAppHandle,
+    ChorderState, SafeAppHandle,
 };
 use crate::tauri_app::git::ChordPackageRegistry;
 use anyhow::Result;
@@ -139,18 +139,6 @@ async fn create_app_settings(
 
     let settings_state = AppSettingsState {
         bundle_ids_needing_relaunch: Vec::new(),
-        git_repos: chord_package_registry
-            .git.discover_repos()?
-            .iter()
-            .map(|r| AppSettingsStateGitRepo {
-                owner: r.owner.clone(),
-                name: r.name.clone(),
-                slug: r.slug.clone(),
-                url: r.url.clone(),
-                local_path: r.local_path.clone(),
-                head_short_sha: r.head_short_sha.clone(),
-            })
-            .collect(),
     };
 
     let settings = AppSettings::new(safe_handle.clone(), settings_state)?;

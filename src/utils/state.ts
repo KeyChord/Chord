@@ -26,3 +26,4 @@ function createUseTauriState<T>(stateName: string) {
 export const useChorderState = createUseTauriState<ChorderState>("chorder");
 export const useSettingsState = createUseTauriState<AppSettingsState>("settings");
 export const usePermissionsState = createUseTauriState<AppPermissionsState>("permissions");
+export const useGitPackageRegistryState = createUseTauriState<AppPermissionsState>("git-package-registry");

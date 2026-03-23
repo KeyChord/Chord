@@ -6,13 +6,13 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-import { useSettingsState } from "../../utils/state.ts";
+import { useGitPackageRegistryState, useSettingsState } from "../../utils/state.ts";
 import { AddRepoButton } from "./add-repo-button.tsx";
 import { OpenRepoButton } from "./open-repo-button.tsx";
 import { SyncRepoButton } from "./sync-repo-button.tsx";
 
 export function ChordReposCard() {
-  const { gitRepos } = useSettingsState();
+  const { gitRepos } = useGitPackageRegistryState();
   return (
     <Card size="sm">
       <CardHeader>
