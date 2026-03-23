@@ -1,41 +1,27 @@
 # Chord
 
-**shortcuts reimagined.**
+**Multi-letter shortcuts for macOS.**
 
-> This app isn't ready for general use. It's currently only released as a way for me to dogfood it myself.
-
-**Chord** introduces the _chord_, an alternative to keyboard shortcuts which let you trigger actions by typing plain characters without modifier keys.
+**Chord** lets you bind actions to key sequences while _keeping your existing shortcuts untouched_.
 
 ## How does it work?
 
-Chords are sequences of letters and/or numbers that correspond to actions. Usually, these actions are simply keyboard shortcuts which already have an associated action in an existing app.
+Chords are sequences of non-modifier keys that correspond to actions. Most of the time, these actions are defined to simulate existing keyboard shortcuts within an application.
 
 For example, here are some example chords for the macOS Finder app:
 ```toml
 # chords/com/apple/finder/macos.toml
-gd = { name = "Go to Downloads", shortcut = "opt+cmd+l" }
-fu = { name = "Folder Up", shortcut = "cmd+up" }
+gd = { name = "Goto Downloads", shortcut = "opt+cmd+l" }
+du = { name = "Directory Up", shortcut = "cmd+up" }
 tt = { name = "Toggle Tabs", shortcut = "cmd+shift+t" }
 ts = { name = "Toggle Sidebar", shortcut = "ctrl+cmd+s" }
 tp = { name = "Toggle Preview", shortcut = "cmd+shift+p" }
 nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
 ```
 
-These chords will only be enabled when the Finder app (which has the bundle identifier `com.apple.finder`) is focused. In addition to application-specific chords, you're also able to define global chords by starting the key sequence with a non-alphanumeric character:
+Because chords are only composed of multiple letters, they are often easier to remember than their modifier + key counterparts.
 
-```toml
-# chords/macos.toml
-"/q" = { name = "Force Quit", command = "Force Quit", shortcut = "cmd+opt+esc" }
-```
-
-Global chords will always be enabled regardless of which app is focused.
-
-Actions can also take the form of shell commands, which is useful when certain functionality isn't available via a keyboard shortcut:
-```toml
-"/f" = { name = "Finder", command = "Finder", shell = "open -a Finder" }
-```
-
-To run a chord, you need to have the **Chords** app installed and running in the background. **Chords** won't do anything until you press `Caps Lock + Space`, which activates _Chord Mode_.
+In order to run a chord, you need to have the **Chord** app installed and running in the background. **Chord** won't do anything until you press the activation sequence to activate _Chord Mode_, which defaults to `Caps Lock` + `Space`.
 
 <details>
   <summary>Why Caps Lock + Space?</summary>
@@ -47,38 +33,38 @@ To run a chord, you need to have the **Chords** app installed and running in the
   Because we only use it as part of a key combination, pressing `Caps Lock` on its own will still toggle on Caps as usual, and this special behavior only applies when `Space` is pressed down while `Caps Lock` is pressed.
 </details>
 
-_Chord Mode_ stays active as long as the `Space` key is pressed down. In _Chord Mode_, you can type a sequence of letters and/or numbers that corresponds to a defined chord. One way to run a chord is by typing the sequence followed by the `Caps Lock` key:
+After pressing the `Space` key, the chords panel will appear on the left, which displays the valid chords for the focused application.
+
+In addition to app-specific chords, you're also able to define global chords (which can be triggered from any app) by starting the key sequence with a symbol instead of a letter:
+
+```toml
+# chords/macos.toml
+"/q" = { name = "Force Quit", command = "Force Quit", shortcut = "cmd+opt+esc" }
+```
+
+After typing out all the chord letters, you can simply release `Space` to trigger it and exit _Chord Mode_.
+
+If you want to trigger a chord without exiting _Chord Mode_, you can press `Caps Lock` which will trigger and clear your input. You'll remain in _Chord Mode_ as long as `Space` is still held down.
 
 <details>
-  <summary>/f⇪</summary>
+  <summary>Why `Caps Lock`?</summary>
 
-  1. Press(Slash)
-  2. Release(Slash)
-  3. Press(KeyF)
-  4. Release(KeyF)
-  5. Press(CapsLock)
-  6. Release(CapsLock)
-
-  > In future expansions, we use `Tap` to mean a `Press` followed by a `Release`, so this expansion could've also been written as:
-
-  1. Tap(Slash)
-  2. Tap(KeyF)
-  3. Tap(CapsLock)
-</details>
+  `Caps Lock` is a key that's significantly more comfortable to press after many chord sequences, especially ones containing symbols. To try it yourself, compare pressing `[o` followed by `Caps Lock`, and then compare it to pressing `Enter` afterwards.
+ <details>
 
 You can run a chord multiple times by pressing `Caps Lock` again. Pressing the following sequence of keys in _Chord Mode_ goes up three folders in Finder:
 
 <details>
-  <summary>/f⇪⇪⇪</summary>
+  <summary>du⇪⇪⇪</summary>
 
-  1. Tap(Slash)
-  2. Tap(F)
-  3. Tap(CapsLock)
-  4. Tap(CapsLock)
-  5. Tap(CapsLock)
+  1. Tap(D)
+  2. Tap(U)
+  3. Tap(Caps)
+  4. Tap(Caps)
+  5. Tap(Caps)
 </details>
 
-Another way to run a chord is by holding `Shift` while typing the last key of the chord:
+If you're triggering a sequence of chords that share the same prefix, you can hold `Shift` while pressing the last key of the chord:
 
 <details>
   <summary>/F</summary>
@@ -89,56 +75,36 @@ Another way to run a chord is by holding `Shift` while typing the last key of th
   4. Release(Shift)
 </details>
 
-This second method is useful for running multiple chords that share a similar prefix. Unlike Caps Lock, it keeps the chord's starting letters in the input buffer so you can type out similar chords just by typing their endings.
+This will execute the chord with that sequence (lowercased, since all chords must be lowercase) _without_ adding appending the key to your existing sequence.
 
 As an example, say you wanted to quickly toggle the tabs view, the sidebar view, and the preview in Finder. Instead of typing out the entirety of three separate chords:
 
 <details>
-  <summary>tTtStP</summary>
+  <summary>tt⇪ts⇪tp⇪</summary>
 
   1. Tap(T)
-  2. Press(Shift)
-  3. Tap(T)
-  4. Release(Shift)
-  5. Tap(T)
-  6. Press(Shift)
-  7. Tap(S)
-  8. Release(Shift)
-  9. Tap(T)
-  10. Press(Shift)
-  11. Tap(P)
-  12. Release(Shift)
+  1. Tap(T)
+  1. Tap(Caps)
+  1. Tap(T)
+  1. Tap(S)
+  1. Tap(Caps)
+  1. Tap(T)
+  1. Tap(P)
+  1. Tap(Caps)
 </details>
 
-You can just type:
+You can just type `T` once and keep `Shift` held down for the other three keys:
 
 <details>
   <summary>tTSP</summary>
 
   1. Tap(T)
-  3. Press(Shift)
-  4. Tap(T)
-  5. Tap(S)
-  6. Tap(P)
-  4. Release(Shift)
+  1. Press(Shift)
+  1. Tap(T)
+  1. Tap(S)
+  1. Tap(P)
+  1. Release(Shift)
 </details>
-
-<details>
-  <summary>Why do chords require Caps Lock or Shift?</summary>
-
-  While the extra keypress does make it more verbose, it's necessary for distinguishing between certain chords. For example, let's say we have the following chords defined:
-  ```toml
-  # chords/com/apple/finder/macos.toml
-  nd = { name = "New Directory", shortcut = "cmd+shift+n" }
-  nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
-  ```
-
-  If just typing `nd` triggered the first chord, it'd be impossible to run the second chord `nds`. While a possible solution might be to force all chords to be two characters, this ends up sacrificing the flexibility that make chords an appealing alternative to traditional keyboard shortcuts in the first place.
-
-  You might have also noticed that all chords are a minimum of two keys, and this is an intentional rule or else it'd be ambiguous whether pressing `Shift` means starting a new chord or re-using the existing prefix.
-</details>
-
-While it might seem a bit tedious to press `Caps Lock` or `Shift` to trigger chords, it's actually a lot smoother in practice since both `Caps Lock` and `Shift` are relatively easy to reach compared to modifier keys. For one-off chords, you can also simply lift `Space` and Chord will automatically execute whatever you have in the input buffer.
 
 In addition, because chords don't use modifier keys, you're able to use any existing shortcuts while _Chord Mode_ is active. The following sequence of keys will move all the contents of your Downloads folder into a new folder:
 
@@ -161,6 +127,16 @@ In addition, because chords don't use modifier keys, you're able to use any exis
   11. Tap(S)
   12. Tap(CapsLock)
 </details>
+
+## Actions
+
+Actions can also take the form of shell commands, which is useful when certain functionality isn't available via a keyboard shortcut:
+```toml
+"/f" = { name = "Finder", command = "Finder", shell = "open -a Finder" }
+```
+
+
+
 
 > **Chords** ignores all inputs whenever a modifier key (other than Shift) is held down.
 
