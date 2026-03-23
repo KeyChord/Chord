@@ -27,7 +27,6 @@ pub fn show_settings_window(handle: AppHandle) -> Result<()> {
     Ok(())
 }
 
-#[cfg(debug_assertions)]
 pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
     let window = get_settings_window(handle)?;
     window.show()?;
@@ -37,7 +36,6 @@ pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
     Ok(())
 }
 
-#[cfg(debug_assertions)]
 pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
     let window = get_chords_window(handle)?;
     window.show()?;
