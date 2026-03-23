@@ -3,7 +3,7 @@ use observable_property::ObservableProperty;
 use serde::Serialize;
 use std::sync::Arc;
 use typeshare::typeshare;
-use crate::feature::SafeAppHandle;
+use crate::feature::{AppSettingsState, SafeAppHandle, SettingsUi};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 
 pub struct AppPermissions {
@@ -14,6 +14,22 @@ pub struct AppPermissions {
 
 pub struct AppPermissionsObservable {
     state: ObservableProperty<Arc<AppPermissionsState>>,
+}
+
+impl AppPermissionsObservable {
+    fn new(handle: SafeAppHandle, state: AppPermissionsState) -> Self {
+        let state = ObservableProperty::new(Arc::new(state));
+
+        if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
+            if let Err(e) = handle.emit("state:permissions", new_state) {
+                log::error!("Failed to emit app settings state change: {e}");
+            }
+        })) {
+            log::error!("Failed to subscribe app settings state observer: {e}");
+        };
+
+        Self { state }
+    }
 }
 
 #[typeshare]
@@ -27,12 +43,12 @@ pub struct AppPermissionsState {
 
 impl AppPermissions {
     pub async fn from_check(safe_handle: SafeAppHandle) -> Result<Self> {
-        let state = ObservableProperty::new(Arc::new(AppPermissionsState {
+        let state = AppPermissionsState {
             is_autostart_enabled: safe_handle.is_autolaunch_enabled()?,
             is_input_monitoring_enabled: tauri_plugin_macos_permissions::check_input_monitoring_permission().await,
             is_accessibility_enabled: tauri_plugin_macos_permissions::check_accessibility_permission().await,
-        }));
-        let observable = AppPermissionsObservable { state };
+        };
+        let observable = AppPermissionsObservable::new(safe_handle.clone(), state);
         let input_monitoring = AppPermissionsInputMonitoring::new_from_observable(safe_handle.clone(), &observable)?;
         let accessibility = AppPermissionsAccessibility::new_from_observable(safe_handle.clone(), &observable)?;
         Ok(Self {

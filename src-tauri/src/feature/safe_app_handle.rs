@@ -1,10 +1,11 @@
-use tauri::{Manager, Wry};
+use tauri::{Emitter, Manager, Wry};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use std::sync::{Arc, Mutex};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use delegate::delegate;
+use serde::Serialize;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
 use crate::feature::app_handle_ext::AppManaged;
@@ -109,6 +110,7 @@ impl SafeAppHandle {
             pub fn path(&self) -> &tauri::path::PathResolver<Wry>;
             pub fn dialog(&self) -> &Dialog<Wry>;
             pub fn run_on_main_thread<F: FnOnce() + Send + 'static>(&self, f: F) -> tauri::Result<()>;
+            pub fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) -> tauri::Result<()>;
         }
     }
 }

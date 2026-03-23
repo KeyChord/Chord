@@ -8,11 +8,11 @@ import {
 import { Checkbox } from "#/components/ui/checkbox.tsx";
 import { Label } from "#/components/ui/label.tsx";
 import { useMutation } from "@tanstack/react-query";
-import { useSettingsState } from "../../utils/state.ts";
+import { usePermissionsState, useSettingsState } from "../../utils/state.ts";
 import { taurpc } from "../../api/taurpc.ts";
 
 export function LaunchOnLoginCard() {
-  const { permissions } = useSettingsState();
+  const permissions = usePermissionsState();
   const setAutostartMutation = useMutation({
     // TODO
     mutationFn: taurpc.getStartupStatus,

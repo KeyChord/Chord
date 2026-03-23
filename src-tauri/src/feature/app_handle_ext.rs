@@ -15,6 +15,7 @@ pub struct AppManaged {
 impl AppManaged {
     pub fn register(self, handle: &AppHandle) {
         handle.manage(self.frontmost);
+        handle.manage(self.permissions);
         handle.manage(self.settings);
         handle.manage(self.chorder);
         handle.manage(self.context);

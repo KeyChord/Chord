@@ -1,6 +1,6 @@
 use crate::chords::{Chord, ChordPackage, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
-use crate::feature::AppFrontmost;
 use crate::js::{format_js_error, reset_js, with_js};
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
@@ -13,9 +13,9 @@ use parking_lot::RwLock;
 use rquickjs::Module;
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use std::sync::Arc;
+use tauri::{AppHandle, Emitter, Runtime};
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
@@ -23,7 +23,6 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
 use std::time::{Duration, Instant};
-use crate::feature::app_handle_ext::AppHandleExt;
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 

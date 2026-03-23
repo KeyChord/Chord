@@ -1,13 +1,12 @@
 use crate::input::Key;
-use crate::AppContext;
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
 use bitflags::bitflags;
 use keycode::KeyMappingCode;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
-use crate::feature::app_handle_ext::AppHandleExt;
+use tauri::AppHandle;
 
 #[derive(Debug)]
 pub enum KeyEvent {
@@ -30,44 +29,46 @@ pub fn register_key_event_input_grabber(handle: AppHandle) {
         });
     }
 
-    let callback = move |event: rdev::Event| -> Option<rdev::Event> {
-        // Synthetic, skip processing
-        if event.source_user_data == 0xDEADBEEF || event.source_user_data == 0xDEADDEAD {
-            return Some(event);
-        }
+    std::thread::spawn(move || {
+        let callback = move |event: rdev::Event| -> Option<rdev::Event> {
+            // Synthetic, skip processing
+            if event.source_user_data == 0xDEADBEEF || event.source_user_data == 0xDEADDEAD {
+                return Some(event);
+            }
 
-        let context = handle.app_context();
-        let key_event = match event.event_type {
-            rdev::EventType::KeyPress(key) => {
-                let Ok(key) = Key::try_from(key) else {
-                    return Some(event);
-                };
-                KeyEvent::Press(key)
+            let context = handle.app_context();
+            let key_event = match event.event_type {
+                rdev::EventType::KeyPress(key) => {
+                    let Ok(key) = Key::try_from(key) else {
+                        return Some(event);
+                    };
+                    KeyEvent::Press(key)
+                }
+                rdev::EventType::KeyRelease(key) => {
+                    let Ok(key) = Key::try_from(key) else {
+                        return Some(event);
+                    };
+                    KeyEvent::Release(key)
+                }
+                _ => return Some(event),
+            };
+
+            let action = context.key_event_state.process_event(&key_event);
+
+            if let Err(e) = tx.send(key_event) {
+                log::error!("Failed to send key event: {e}");
             }
-            rdev::EventType::KeyRelease(key) => {
-                let Ok(key) = Key::try_from(key) else {
-                    return Some(event);
-                };
-                KeyEvent::Release(key)
+
+            match action {
+                EventAction::Consume => None,
+                _ => Some(event),
             }
-            _ => return Some(event),
         };
 
-        let action = context.key_event_state.process_event(&key_event);
-
-        if let Err(e) = tx.send(key_event) {
-            log::error!("Failed to send key event: {e}");
+        if let Err(error) = rdev::grab(callback) {
+            println!("Error: {:?}", error)
         }
-
-        match action {
-            EventAction::Consume => None,
-            _ => Some(event),
-        }
-    };
-
-    if let Err(error) = rdev::grab(callback) {
-        println!("Error: {:?}", error)
-    }
+    });
 }
 
 bitflags! {

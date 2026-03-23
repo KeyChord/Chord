@@ -7,12 +7,12 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-import { useSettingsState } from "../../utils/state.ts";
+import { usePermissionsState, useSettingsState } from "../../utils/state.ts";
 import { useMutation } from "node_modules/@tanstack/react-query/build/modern/_tsup-dts-rollup";
 import { taurpc } from "../../api/taurpc.ts";
 
 export function PermissionsCard() {
-  const { permissions } = useSettingsState();
+  const permissions = usePermissionsState();
   const openAccessibilitySettingsMutation = useMutation({
     mutationFn: taurpc.openAccessibilitySettings,
   });
