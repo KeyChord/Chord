@@ -3,59 +3,30 @@ use std::sync::Arc;
 use serde::Serialize;
 use tauri::{App, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use typeshare::typeshare;
-use crate::constants::SETTINGS_WINDOW_LABEL;
-use crate::feature::{ChorderIndicatorUi, ChorderState};
+use crate::feature::{AppPermissions, AppPermissionsState, ChorderIndicatorUi, ChorderState, SafeAppHandle};
 use anyhow::Result;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettingsState {
-    bundle_ids_needing_relaunch: Vec<String>,
-    git_repos: Vec<AppSettingsStateGitRepo>,
-    permissions: AppPermissionsState
+    pub bundle_ids_needing_relaunch: Vec<String>,
+    pub git_repos: Vec<AppSettingsStateGitRepo>,
+    pub permissions: AppPermissionsState
 }
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct AppSettingsStateGitRepo {
-    owner: String,
-    name: String,
-    slug: String,
-    url: String,
-    local_path: String,
-    head_short_sha: Option<String>
+pub struct AppSettingsStateGitRepo {
+    pub owner: String,
+    pub name: String,
+    pub slug: String,
+    pub url: String,
+    pub local_path: String,
+    pub head_short_sha: Option<String>
 }
 
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AppPermissionsState {
-    is_autostart_enabled: bool,
-    is_input_monitoring_enabled: bool,
-    is_accessibility_enabled: bool,
-}
-
-impl AppPermissionsState {
-    pub fn new() -> Self {
-        Self {
-            is_autostart_enabled: false,
-            is_input_monitoring_enabled: false,
-            is_accessibility_enabled: false,
-        }
-    }
-}
-
-impl AppSettingsState {
-    pub fn new() -> Self {
-        Self {
-            bundle_ids_needing_relaunch: Vec::new(),
-            git_repos: Vec::new(),
-            permissions: AppPermissionsState::new(),
-        }
-    }
-}
 
 pub struct AppSettings {
     pub observable: SettingsObservable,
@@ -67,12 +38,9 @@ pub struct SettingsUi {
 }
 
 impl SettingsUi {
-    pub fn new(handle: AppHandle, state: &AppSettingsState) -> Result<Self> {
-        let window = WebviewWindowBuilder::new(
-            &handle,
-            "settings",
-            WebviewUrl::App("index.html".into()),
-        )
+    pub fn new(handle: SafeAppHandle, state: &AppSettingsState) -> Result<Self> {
+        let window = handle
+            .new_webview_window_builder("settings", WebviewUrl::App("index.html".into()))
             .title("Settings")
             .initialization_script(format!(r#"
               window.__INITIAL_STATE__ = {}
@@ -95,11 +63,12 @@ struct SettingsObservable {
 }
 
 impl SettingsObservable {
-    fn new(handle: AppHandle, state: AppSettingsState) -> Self {
+    fn new(ui: &SettingsUi, state: AppSettingsState) -> Self {
         let state = ObservableProperty::new(Arc::new(state));
 
+        let window = ui.window.clone();
         if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("state:settings", new_state) {
+            if let Err(e) = window.emit("state:settings", new_state) {
                 log::error!("Failed to emit app settings state change: {e}");
             }
         })) {
@@ -112,10 +81,9 @@ impl SettingsObservable {
 
 
 impl AppSettings {
-    pub fn new(handle: AppHandle) -> Result<Self> {
-        let state = AppSettingsState::new();
+    pub fn new(handle: SafeAppHandle, state: AppSettingsState) -> Result<Self> {
         let ui = SettingsUi::new(handle.clone(), &state)?;
-        let observable = SettingsObservable::new(handle.clone(), state);
+        let observable = SettingsObservable::new(&ui, state);
         Ok(Self {
             observable,
             ui

@@ -1,5 +1,5 @@
 use crate::chords::shortcut::{press_shortcut, release_shortcut, Shortcut};
-use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordFolder};
+use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
 use crate::input::Key;
 use crate::js::{format_js_error, with_js};
 use anyhow::Result;
@@ -286,7 +286,7 @@ fn resolve_runtime_extends(
 }
 
 impl LoadedAppChords {
-    pub fn from_folders(chord_folders: Vec<ChordFolder>) -> Result<Self> {
+    pub fn from_folders(chord_folders: Vec<ChordPackage>) -> Result<Self> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();

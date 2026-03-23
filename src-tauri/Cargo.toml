@@ -3,7 +3,7 @@ name = "chords"
 version = "0.1.0"
 description = "shortcuts reimagined"
 authors = ["you"]
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -61,13 +61,12 @@ llrt_readline = { path = "./crates/llrt_readline" }
 rquickjs-serde = "0.5.0"
 tauri-plugin-store = "2"
 jsonc-parser = "0.31.0"
-minijinja = "2.18.0"
 include_json = "*"
-ts-rs = "12.0"
 typeshare = "1"
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }
-specta-typescript = "0.0.9"
 taurpc = "0.7.1"
+delegate = "0.13.5"
+thiserror = "2.0.18"
 
 
 # Deno makes input methods super laggy for some reason, might debug in future, but not worth right now

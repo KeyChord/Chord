@@ -4,29 +4,29 @@ use crate::AppContext;
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use tauri::{AppHandle, Manager};
+use crate::feature::AppChorder;
 
 pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
     let context = handle.state::<AppContext>();
     let app_mode = context.get_app_mode();
+    let chorder = handle.state::<AppChorder>();
 
     match app_mode {
         AppMode::Chord => {
-            context
-                .chorder
+                chorder
                 .handle_key_event(handle.clone(), &key_event)?;
         }
         AppMode::None => {
             let should_finalize_chord_mode =
                 matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space)))
-                    && !context.chorder.observable.state.get()?.is_idle();
+                    && chorder.observable.state.get()?.is_idle();
 
             if should_finalize_chord_mode {
-                context
-                    .chorder
+                    chorder
                     .handle_key_event(handle.clone(), &key_event)?;
             }
 
-            context.chorder.ensure_inactive()?;
+            chorder.ensure_inactive()?;
         }
     }
 

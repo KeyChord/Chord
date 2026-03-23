@@ -1,7 +1,6 @@
-use crate::chords::{Chord, ChordFolder, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
-use crate::feature::{AppSettings, Chorder};
+use crate::chords::{Chord, ChordPackage, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
+use crate::feature::{AppSettings, AppSettingsState, AppChorder, ChorderState, AppFrontmost};
 use crate::js::{format_js_error, reset_js, with_js};
-use crate::sources::load_all_chord_folders;
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
@@ -18,18 +17,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
-
-#[cfg(target_os = "macos")]
 use objc2::runtime::AnyObject;
-#[cfg(target_os = "macos")]
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
     NSWorkspaceLaunchOptions,
 };
-#[cfg(target_os = "macos")]
 use objc2_foundation::{NSDictionary, NSSize, NSString};
-#[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
+use crate::feature::app_handle_ext::AppHandleExt;
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 
@@ -67,13 +62,9 @@ pub struct AppMetadataInfo {
 }
 
 pub struct AppContext {
-    pub chorder: Chorder,
-    pub settings: AppSettings,
-
     pub device_state: Option<DeviceState>,
     pub loaded_app_chords: RwLock<LoadedAppChords>,
     pub apps_needing_relaunch: RwLock<BTreeSet<String>>,
-    pub frontmost_application_id: ArcSwap<Option<String>>,
     pub key_event_state: KeyEventState,
 
     // Not a mutex since it uses Atomics
@@ -81,10 +72,8 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new(handle:AppHandle) -> Result<Self> {
-        let chorder = Chorder::new(handle.clone())?;
-        let settings = AppSettings::new(handle.clone())?;
-        let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
+    pub fn new() -> Result<Self> {
+        let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordPackage::load_bundled()?])?;
 
         let device_state = if macos_accessibility_client::accessibility::application_is_trusted() {
             Some(DeviceState {})
@@ -95,14 +84,11 @@ impl AppContext {
         let app_mode_state_machine = Arc::new(AppModeStateMachine::new(device_state.clone()));
 
         Ok(Self {
-            settings,
             device_state,
             apps_needing_relaunch: RwLock::new(BTreeSet::new()),
-            frontmost_application_id: ArcSwap::new(Arc::new(None)),
             key_event_state: KeyEventState::new(app_mode_state_machine.clone()),
             loaded_app_chords: RwLock::new(bundled_app_chords),
             app_mode_state_machine,
-            chorder,
         })
     }
 
@@ -311,11 +297,13 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
 
 // Also evaluates JavaScript
 pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
-    let context = app.state::<AppContext>();
-    context.chorder.ensure_inactive()?;
+    let context = app.app_context();
+    let chorder = app.app_chorder();
+    let chord_package_registry = app.app_chord_package_registry();
+    chorder.ensure_inactive()?;
 
     // Load all JS files as modules
-    let chord_folders = load_all_chord_folders(app.clone())?;
+    let chord_folders = chord_package_registry.load_all_chord_packages()?;
     reset_js(app.clone()).await?;
 
     // Load all JS files as modules, but keep `chord_folders` so we can use it later.
@@ -518,15 +506,17 @@ pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
 }
 
 pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
-    let context = app.state::<AppContext>();
-    let state = context.chorder.observable.state.get()?;
-    let frontmost_application_id = context.frontmost_application_id.load();
+    let context = app.app_context();
+    let chorder = app.app_chorder();
+    let frontmost = app.app_frontmost();
+    let state = chorder.observable.state.get()?;
+    let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
     let loaded_app_chords = context.loaded_app_chords.read();
 
     Ok(list_matching_loaded_chords(
         &loaded_app_chords,
         &state.key_buffer,
-        frontmost_application_id.as_ref().as_deref(),
+        frontmost_application_id.as_deref(),
     ))
 }
 

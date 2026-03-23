@@ -1,4 +1,4 @@
-use crate::chords::{ChordFolder, LoadedAppChords};
+use crate::chords::{ChordPackage, LoadedAppChords};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -99,114 +99,7 @@ fn repo_head_short_sha(repo_path: &Path) -> Option<String> {
     Some(head_id.shorten_or_id().to_string())
 }
 
-pub fn github_repos_root<R: Runtime>(app: AppHandle<R>) -> Result<PathBuf> {
-    Ok(app.path().app_cache_dir()?.join("repos/github.com"))
-}
-
-pub fn discover_git_repos<R: Runtime>(app: AppHandle<R>) -> Result<Vec<GitRepoInfo>> {
-    let repos_root = github_repos_root(app)?;
-    if !repos_root.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut repos = Vec::new();
-    for owner_entry in fs::read_dir(&repos_root)? {
-        let owner_entry = owner_entry?;
-        let owner_path = owner_entry.path();
-        if !owner_path.is_dir() {
-            continue;
-        }
-
-        for repo_entry in fs::read_dir(&owner_path)? {
-            let repo_entry = repo_entry?;
-            let repo_path = repo_entry.path();
-            if !repo_path.is_dir() || !repo_path.join(".git").exists() {
-                continue;
-            }
-
-            let Some(owner) = owner_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-            let Some(name) = repo_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-
-            repos.push(
-                GitHubRepoRef {
-                    owner: owner.to_string(),
-                    name: name.to_string(),
-                }
-                .into_info(&repos_root),
-            );
-        }
-    }
-
-    repos.sort_by(|left, right| left.slug.cmp(&right.slug));
-    Ok(repos)
-}
-
-pub fn add_git_repo<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<GitRepoInfo> {
-    let repo_ref = GitHubRepoRef::parse(repo_input)?;
-    let repos_root = github_repos_root(app)?;
-    let repo_path = repo_ref.local_path(&repos_root);
-
-    if repo_path.join(".git").exists() {
-        return Ok(repo_ref.into_info(&repos_root));
-    }
-
-    clone_repo(&repo_ref, &repo_path)?;
-    Ok(repo_ref.into_info(&repos_root))
-}
-
-pub fn sync_git_repo<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<GitRepoInfo> {
-    let repo_ref = GitHubRepoRef::parse(repo_input)?;
-    let repos_root = github_repos_root(app)?;
-    let repo_path = repo_ref.local_path(&repos_root);
-
-    if !repo_path.join(".git").exists() {
-        anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-    }
-
-    refresh_repo(&repo_ref, &repo_path)?;
-    Ok(repo_ref.into_info(&repos_root))
-}
-
-pub fn load_repo_chords<R: Runtime>(
-    app: AppHandle<R>,
-    repo_input: &str,
-) -> Result<LoadedAppChords> {
-    let repo_ref = GitHubRepoRef::parse(repo_input)?;
-    let repos_root = github_repos_root(app)?;
-    let repo_path = repo_ref.local_path(&repos_root);
-
-    if !repo_path.join(".git").exists() {
-        anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-    }
-
-    let repo = gix::open(&repo_path).context(format!("failed to open repo {}", repo_ref.slug()))?;
-    let chord_folder = ChordFolder::load_from_git_repo(&repo)?;
-    LoadedAppChords::from_folders(vec![chord_folder])
-}
-
-pub fn load_all_chord_folders<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ChordFolder>> {
-    let mut chord_folders = Vec::new();
-
-    for repo in discover_git_repos(app)? {
-        match gix::open(&repo.local_path)
-            .context(format!("failed to open repo {}", repo.slug))
-            .and_then(|repo_handle| ChordFolder::load_from_git_repo(&repo_handle))
-        {
-            Ok(repo_folder) => {
-                chord_folders.push(repo_folder);
-            }
-            Err(error) => log::warn!("Skipping repo {}: {error}", repo.slug),
-        }
-    }
-
-    Ok(chord_folders)
-}
-
-fn clone_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
+pub fn clone_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -234,7 +127,7 @@ fn clone_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn refresh_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> Result<()> {
+pub fn refresh_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> anyhow::Result<()> {
     let temp_destination = destination.with_extension("syncing");
     if temp_destination.exists() {
         fs::remove_dir_all(&temp_destination)?;

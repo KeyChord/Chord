@@ -1,8 +1,4 @@
-use crate::git::{add_git_repo, discover_git_repos, load_repo_chords, sync_git_repo, GitRepoInfo};
-use crate::sources::{
-    add_local_chord_folder, list_local_chord_folders, load_local_chord_folder_chords,
-    pick_local_chord_folder, LocalChordFolderInfo,
-};
+use crate::git::{GitHubRepoRef, GitRepoInfo};
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_apps_needing_relaunch, list_loaded_chords,
@@ -12,9 +8,14 @@ use crate::tauri_app::{
 use crate::tauri_app::startup::StartupStatusInfo;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 use crate::get_app_metadata;
+use crate::tauri_app::git::{ChordPackageRegistry, LocalChordFolderInfo, LocalChordPackage};
+use serde::Serialize;
+use specta::Type;
+use thiserror::Error;
+use crate::feature::app_handle_ext::AppHandleExt;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -26,10 +27,10 @@ pub struct GlobalShortcutMappingInfo {
     pub hotkey_id: String,
 }
 
-fn global_hotkeys_store(app: &AppHandle) -> Result<GlobalHotkeyStore, String> {
+fn global_hotkeys_store(app: &AppHandle) -> AppResult<GlobalHotkeyStore> {
     app.store("global-hotkeys.json")
         .map(GlobalHotkeyStore::new)
-        .map_err(|error| format!("failed to open global hotkeys store: {error}"))
+        .map_err(|error| AppError::Message(format!("failed to open global hotkeys store: {error}")))
 }
 
 fn open_system_settings(url: &str, permission_name: &str) {
@@ -38,6 +39,20 @@ fn open_system_settings(url: &str, permission_name: &str) {
     }
 }
 
+#[derive(Debug, Error, Serialize, Type)]
+pub enum AppError {
+    #[error("{0}")]
+    Message(String),
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(e: anyhow::Error) -> Self {
+        AppError::Message(e.to_string())
+    }
+}
+
+type AppResult<T> = Result<T, AppError>;
+
 #[taurpc::procedures(export_to = "../src/api/bindings.gen.ts")]
 pub trait Api {
     #[taurpc(alias = "openAccessibilitySettings")]
@@ -45,39 +60,39 @@ pub trait Api {
     #[taurpc(alias = "openInputMonitoringSettings")]
     async fn open_input_monitoring_settings();
     #[taurpc(alias = "getStartupStatus")]
-    async fn get_startup_status() -> Result<StartupStatusInfo, String>;
+    async fn get_startup_status() -> AppResult<StartupStatusInfo>;
     #[taurpc(alias = "completeOnboarding")]
-    async fn complete_onboarding() -> Result<(), String>;
+    async fn complete_onboarding() -> AppResult<()>;
     #[taurpc(alias = "listGitRepos")]
-    async fn list_git_repos() -> Result<Vec<GitRepoInfo>, String>;
+    async fn list_git_repos() -> AppResult<Vec<GitRepoInfo>>;
     #[taurpc(alias = "addGitRepo")]
-    async fn add_git_repo(repo: String) -> Result<GitRepoInfo, String>;
+    async fn add_git_repo(repo: String) -> AppResult<GitRepoInfo>;
     #[taurpc(alias = "syncGitRepo")]
-    async fn sync_git_repo(repo: String) -> Result<GitRepoInfo, String>;
+    async fn sync_git_repo(repo: String) -> AppResult<GitRepoInfo>;
     #[taurpc(alias = "listLocalChordFolders")]
-    async fn list_local_chord_folders() -> Result<Vec<LocalChordFolderInfo>, String>;
+    async fn list_local_chord_folders() -> AppResult<Vec<LocalChordPackage>>;
     #[taurpc(alias = "pickLocalChordFolder")]
-    async fn pick_local_chord_folder() -> Result<Option<String>, String>;
+    async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     #[taurpc(alias = "addLocalChordFolder")]
-    async fn add_local_chord_folder(path: String) -> Result<LocalChordFolderInfo, String>;
+    async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;
     #[taurpc(alias = "listActiveChords")]
-    async fn list_active_chords() -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_active_chords() -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "listMatchingChords")]
-    async fn list_matching_chords() -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_matching_chords() -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "getAppMetadata")]
-    async fn get_app_metadata(bundle_id: String) -> Result<AppMetadataInfo, String>;
+    async fn get_app_metadata(bundle_id: String) -> AppResult<AppMetadataInfo>;
     #[taurpc(alias = "listRepoChords")]
-    async fn list_repo_chords(repo: String) -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_repo_chords(repo: String) -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "listLocalChordFolderChords")]
-    async fn list_local_chord_folder_chords(path: String) -> Result<Vec<ActiveChordInfo>, String>;
+    async fn list_local_chord_folder_chords(path: String) -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "listGlobalShortcutMappings")]
-    async fn list_global_shortcut_mappings() -> Result<Vec<GlobalShortcutMappingInfo>, String>;
+    async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;
     #[taurpc(alias = "removeGlobalShortcutMapping")]
-    async fn remove_global_shortcut_mapping(shortcut: String) -> Result<(), String>;
+    async fn remove_global_shortcut_mapping(shortcut: String) -> AppResult<()>;
     #[taurpc(alias = "listAppsNeedingRelaunch")]
-    async fn list_apps_needing_relaunch() -> Result<Vec<AppNeedsRelaunchInfo>, String>;
+    async fn list_apps_needing_relaunch() -> AppResult<Vec<AppNeedsRelaunchInfo>>;
     #[taurpc(alias = "relaunchApp")]
-    async fn relaunch_app(bundle_id: String) -> Result<(), String>;
+    async fn relaunch_app(bundle_id: String) -> AppResult<()>;
 }
 
 #[derive(Clone, Default)]
@@ -90,11 +105,11 @@ impl ApiImpl {
         *self.app_handle.lock() = Some(app_handle);
     }
 
-    fn app_handle(&self) -> Result<AppHandle, String> {
+    fn app_handle(&self) -> AppResult<AppHandle> {
         self.app_handle
             .lock()
             .clone()
-            .ok_or_else(|| "app handle is not initialized".to_string())
+            .ok_or_else(|| AppError::Message("app handle is not initialized".to_string()))
     }
 }
 
@@ -114,96 +129,97 @@ impl Api for ApiImpl {
         );
     }
 
-    async fn get_startup_status(self) -> Result<StartupStatusInfo, String> {
-        let app_handle = self.app_handle()?;
-        startup::get_startup_status(&app_handle).map_err(|error| error.to_string())
+    async fn get_startup_status(self) -> AppResult<StartupStatusInfo> {
+        let handle = self.app_handle()?;
+        Ok(startup::get_startup_status(&handle)?)
     }
 
-    async fn complete_onboarding(self) -> Result<(), String> {
-        let app_handle = self.app_handle()?;
-        startup::complete_onboarding(&app_handle).map_err(|error| error.to_string())
+    async fn complete_onboarding(self) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        Ok(startup::complete_onboarding(&handle)?)
     }
 
-    async fn list_git_repos(self) -> Result<Vec<GitRepoInfo>, String> {
-        let app_handle = self.app_handle()?;
-        discover_git_repos(app_handle).map_err(|error| error.to_string())
+    async fn list_git_repos(self) -> AppResult<Vec<GitRepoInfo>> {
+        let handle = self.app_handle()?;
+        let registry = handle.state::<ChordPackageRegistry>();
+        Ok(registry.git.discover_repos()?)
     }
 
-    async fn add_git_repo(self, repo: String) -> Result<GitRepoInfo, String> {
-        let app_handle = self.app_handle()?;
-        let repo_info =
-            add_git_repo(app_handle.clone(), &repo).map_err(|error| error.to_string())?;
-        reload_loaded_app_chords(app_handle)
-            .await
-            .map_err(|error| error.to_string())?;
+    async fn add_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
+        let handle = self.app_handle()?;
+        let registry = handle.state::<ChordPackageRegistry>();
+        let repo_info = registry.git.add_repo(GitHubRepoRef::parse(&repo)?)?;
+        reload_loaded_app_chords(handle).await?;
         Ok(repo_info)
     }
 
-    async fn sync_git_repo(self, repo: String) -> Result<GitRepoInfo, String> {
+    async fn sync_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
         let app_handle = self.app_handle()?;
+        let registry = app_handle.state::<ChordPackageRegistry>();
         let repo_info =
-            sync_git_repo(app_handle.clone(), &repo).map_err(|error| error.to_string())?;
-        reload_loaded_app_chords(app_handle)
-            .await
-            .map_err(|error| error.to_string())?;
+            registry.git.sync_repo(GitHubRepoRef::parse(&repo)?)?;
+        reload_loaded_app_chords(app_handle).await?;
         Ok(repo_info)
     }
 
-    async fn list_local_chord_folders(self) -> Result<Vec<LocalChordFolderInfo>, String> {
+    async fn list_local_chord_folders(self) -> AppResult<Vec<LocalChordPackage>> {
         let app_handle = self.app_handle()?;
-        list_local_chord_folders(app_handle).map_err(|error| error.to_string())
+        let registry = app_handle.state::<ChordPackageRegistry>();
+        Ok(registry .local .list()?)
     }
 
-    async fn pick_local_chord_folder(self) -> Result<Option<String>, String> {
+    async fn pick_local_chord_folder(self) -> AppResult<Option<String>> {
         let app_handle = self.app_handle()?;
-        pick_local_chord_folder(app_handle).map_err(|error| error.to_string())
+        let registry = app_handle.app_chord_package_registry();
+        Ok(registry
+            .local
+            .pick()
+            .map(|folder| folder.map(|folder| folder.path().display().to_string()))?)
     }
 
-    async fn add_local_chord_folder(self, path: String) -> Result<LocalChordFolderInfo, String> {
+    async fn add_local_chord_folder(self, path: String) -> AppResult<LocalChordPackage> {
         let app_handle = self.app_handle()?;
-        let folder_info =
-            add_local_chord_folder(app_handle.clone(), &path).map_err(|error| error.to_string())?;
-        reload_loaded_app_chords(app_handle)
-            .await
-            .map_err(|error| error.to_string())?;
+        let registry = app_handle.app_chord_package_registry();
+        let folder_info = registry.local.add(&path)?;
+        reload_loaded_app_chords(app_handle).await?;
         Ok(folder_info)
     }
 
-    async fn list_active_chords(self) -> Result<Vec<ActiveChordInfo>, String> {
+    async fn list_active_chords(self) -> AppResult<Vec<ActiveChordInfo>> {
         let app_handle = self.app_handle()?;
-        list_active_chords(app_handle).map_err(|error| error.to_string())
+        Ok(list_active_chords(app_handle)?)
     }
 
-    async fn list_matching_chords(self) -> Result<Vec<ActiveChordInfo>, String> {
+    async fn list_matching_chords(self) -> AppResult<Vec<ActiveChordInfo>> {
         let app_handle = self.app_handle()?;
-        list_matching_chords(app_handle).map_err(|error| error.to_string())
+        Ok(list_matching_chords(app_handle)?)
     }
 
     async fn get_app_metadata(
         self,
         bundle_id: String,
-    ) -> Result<AppMetadataInfo, String> {
-        get_app_metadata(bundle_id).map_err(|error| error.to_string())
+    ) -> AppResult<AppMetadataInfo> {
+        Ok(get_app_metadata(bundle_id)?)
     }
 
-    async fn list_repo_chords(self, repo: String) -> Result<Vec<ActiveChordInfo>, String> {
+    async fn list_repo_chords(self, repo: String) -> AppResult<Vec<ActiveChordInfo>> {
         let app_handle = self.app_handle()?;
-        let loaded_chords =
-            load_repo_chords(app_handle, &repo).map_err(|error| error.to_string())?;
+        let registry = app_handle.app_chord_package_registry();
+        let loaded_chords = registry.git.load_repo_chords(&repo)?;
         Ok(list_loaded_chords(&loaded_chords))
     }
 
     async fn list_local_chord_folder_chords(
         self,
         path: String,
-    ) -> Result<Vec<ActiveChordInfo>, String> {
+    ) -> AppResult<Vec<ActiveChordInfo>> {
         let app_handle = self.app_handle()?;
-        let loaded_chords =
-            load_local_chord_folder_chords(app_handle, &path).map_err(|error| error.to_string())?;
+        let registry = app_handle.app_chord_package_registry();
+        let loaded_chords = registry.local.load_folder_chords(&path)?;
         Ok(list_loaded_chords(&loaded_chords))
     }
 
-    async fn list_global_shortcut_mappings(self) -> Result<Vec<GlobalShortcutMappingInfo>, String> {
+    async fn list_global_shortcut_mappings(self) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
         let app_handle = self.app_handle()?;
         let store = global_hotkeys_store(&app_handle)?;
         let mut mappings = store
@@ -226,11 +242,12 @@ impl Api for ApiImpl {
         Ok(mappings)
     }
 
-    async fn remove_global_shortcut_mapping(self, shortcut: String) -> Result<(), String> {
+    async fn remove_global_shortcut_mapping(self, shortcut: String) -> AppResult<()> {
         let app_handle = self.app_handle()?;
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
-            return Err("shortcut cannot be empty".to_string());
+            // TODO: fix
+            return Ok(())
         }
 
         let store = global_hotkeys_store(&app_handle)?;
@@ -238,13 +255,13 @@ impl Api for ApiImpl {
         Ok(())
     }
 
-    async fn list_apps_needing_relaunch(self) -> Result<Vec<AppNeedsRelaunchInfo>, String> {
+    async fn list_apps_needing_relaunch(self) -> AppResult<Vec<AppNeedsRelaunchInfo>> {
         let app_handle = self.app_handle()?;
-        list_apps_needing_relaunch(app_handle).map_err(|error| error.to_string())
+        Ok(list_apps_needing_relaunch(app_handle)?)
     }
 
-    async fn relaunch_app(self, bundle_id: String) -> Result<(), String> {
+    async fn relaunch_app(self, bundle_id: String) -> AppResult<()> {
         let app_handle = self.app_handle()?;
-        relaunch_app(app_handle, &bundle_id).map_err(|error| error.to_string())
+        Ok(relaunch_app(app_handle, &bundle_id)?)
     }
 }

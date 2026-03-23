@@ -1,4 +1,4 @@
-use super::{AppSettingsState, ChorderIndicatorUi, NativeSurfaceRect, SettingsUi};
+use super::{AppFrontmost, AppSettingsState, ChorderIndicatorUi, NativeSurfaceRect, SettingsUi};
 use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
 use crate::{input::KeyEvent, AppContext};
@@ -16,7 +16,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener, Manager};
 use typeshare::typeshare;
 
-pub struct Chorder {
+pub struct AppChorder {
     pub observable: ChorderObservable,
     pub ui: ChorderIndicatorUi,
     held_keys: Mutex<HashSet<Key>>,
@@ -44,9 +44,8 @@ impl ChorderObservable {
     }
 }
 
-impl Chorder {
-    pub fn new(handle: AppHandle) -> Result<Self> {
-        let state = ChorderState::new();
+impl AppChorder {
+    pub fn new(handle: AppHandle, state: ChorderState) -> Result<Self> {
         let ui = ChorderIndicatorUi::new(handle.clone(), &state)?;
         let observable = ChorderObservable::new(handle.clone(), state);
         let surface_window = ui.window.clone();
@@ -136,7 +135,7 @@ impl Chorder {
             return Ok(());
         }
 
-        self.observable.state.set(Arc::new(ChorderState::new()))?;
+        self.observable.state.set(Arc::new(ChorderState::default()))?;
         if self.ui.ensure_hidden()? {
             self.emit_visibility_changed(false);
         }
@@ -201,7 +200,7 @@ impl Chorder {
                         )?;
                     }
 
-                    self.observable.state.set(Arc::new(ChorderState::new()))?;
+                    self.observable.state.set(Arc::new(ChorderState::default()))?;
                 }
 
                 Ok(())
@@ -213,6 +212,7 @@ impl Chorder {
                 self.ensure_active()?;
 
                 let context = handle.state::<AppContext>();
+                let frontmost = handle.state::<AppFrontmost>();
                 let loaded_app_chords = context.loaded_app_chords.read();
                 let state = self.observable.state.get()?;
                 let key_buffer = state.key_buffer.clone();
@@ -225,7 +225,7 @@ impl Chorder {
                         return Ok(());
                     };
 
-                    let application_id = context.frontmost_application_id.load().as_ref().clone();
+                    let application_id = frontmost.frontmost_application_id.load().as_ref().clone();
                     let chord_runtime =
                         loaded_app_chords.get_chord_runtime(&last_chord.keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
@@ -305,7 +305,8 @@ impl Chorder {
         release_immediately: bool,
     ) -> Result<Option<Chord>> {
         let context = handle.state::<AppContext>();
-        let frontmost_application_id = context.frontmost_application_id.load().as_ref().clone();
+        let frontmost = handle.state::<AppFrontmost>();
+        let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
         let loaded_app_chords = context.loaded_app_chords.read();
         let Some(chord_runtime) =
             loaded_app_chords.get_chord_runtime(&key_buffer, frontmost_application_id.clone())
@@ -385,7 +386,9 @@ impl Chorder {
             }
         };
 
-        let frontmost_application_id = context.frontmost_application_id.load().as_ref().clone();
+        let frontmost = handle.state::<AppFrontmost>();
+        let context = handle.state::<AppContext>();
+        let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
         let loaded_app_chords = context.loaded_app_chords.read();
         let chord_runtime =
             loaded_app_chords.get_chord_runtime(&sequence, frontmost_application_id);
@@ -426,15 +429,17 @@ pub struct ChorderState {
     pub active_chord: Option<Chord>,
 }
 
-impl ChorderState {
-    pub fn new() -> Self {
+impl Default for ChorderState {
+    fn default() -> Self {
         Self {
             key_buffer: Vec::new(),
             pressed_chord: None,
             active_chord: None,
         }
     }
+}
 
+impl ChorderState {
     pub fn is_idle(&self) -> bool {
         self.key_buffer.is_empty() && self.pressed_chord.is_none() && self.active_chord.is_none()
     }
@@ -505,7 +510,7 @@ mod tests {
             pressed_chord: None,
             active_chord: None,
         };
-        assert!(Chorder::should_execute_key_buffer_on_space_release(
+        assert!(AppChorder::should_execute_key_buffer_on_space_release(
             &buffered_state
         ));
 
@@ -514,12 +519,12 @@ mod tests {
             pressed_chord: Some(test_chord()),
             active_chord: Some(test_chord()),
         };
-        assert!(!Chorder::should_execute_key_buffer_on_space_release(
+        assert!(!AppChorder::should_execute_key_buffer_on_space_release(
             &executed_state
         ));
 
-        let empty_state = ChorderState::new();
-        assert!(!Chorder::should_execute_key_buffer_on_space_release(
+        let empty_state = ChorderState::default();
+        assert!(!AppChorder::should_execute_key_buffer_on_space_release(
             &empty_state
         ));
     }

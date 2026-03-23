@@ -1,0 +1,119 @@
+use std::path::PathBuf;
+use tauri::{Manager, Wry};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
+use std::sync::{Arc, Mutex};
+use anyhow::{anyhow, Result};
+use tauri::AppHandle;
+use tauri_plugin_autostart::ManagerExt;
+use delegate::delegate;
+use tauri::ipc::RuntimeCapability;
+use tauri_plugin_dialog::{Dialog, DialogExt};
+use tauri_plugin_store::{Store, StoreExt};
+
+type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
+
+#[derive(Clone)]
+pub struct SafeAppHandle {
+    inner: Arc<Inner>,
+}
+
+struct Inner {
+    handle: AppHandle,
+    state: Mutex<State>,
+}
+
+struct State {
+    is_safe: bool,
+    callbacks: Vec<OnSafeCallback>,
+}
+
+impl SafeAppHandle {
+    pub fn new(handle: AppHandle) -> Self {
+        Self {
+            inner: Arc::new(Inner {
+                handle,
+                state: Mutex::new(State {
+                    is_safe: false,
+                    callbacks: Vec::new(),
+                }),
+            }),
+        }
+    }
+
+    pub fn on_safe<F>(&self, callback: F)
+    where
+        F: FnOnce(&AppHandle) + Send + 'static,
+    {
+        let mut state = self
+            .inner
+            .state
+            .lock()
+            .expect("state mutex poisoned");
+
+        if state.is_safe {
+            drop(state);
+            callback(&self.inner.handle);
+        } else {
+            state.callbacks.push(Box::new(callback));
+        }
+    }
+
+    pub fn mark_safe(&self) {
+        let callbacks = {
+            let mut state = self
+                .inner
+                .state
+                .lock()
+                .expect("state mutex poisoned");
+
+            if state.is_safe {
+                return;
+            }
+
+            state.is_safe = true;
+            std::mem::take(&mut state.callbacks)
+        };
+
+        for callback in callbacks {
+            callback(&self.inner.handle);
+        }
+    }
+
+    pub fn is_safe(&self) -> Result<bool> {
+        let state = self
+            .inner
+            .state
+            .lock()
+            .map_err(|_| anyhow!("SafeAppHandle state mutex poisoned"))?;
+
+        Ok(state.is_safe)
+    }
+
+    pub fn handle(&self) -> &AppHandle {
+        &self.inner.handle
+    }
+}
+
+// Methods that can be called without `.state`
+impl SafeAppHandle {
+    pub fn is_autolaunch_enabled(&self) -> Result<bool> {
+        Ok(self.handle().autolaunch().is_enabled()?)
+    }
+
+    pub fn new_webview_window_builder<L: Into<String>>(
+        &self,
+        label: L,
+        url: WebviewUrl,
+    ) -> WebviewWindowBuilder<'_, Wry, AppHandle> {
+        let label = label.into();
+        WebviewWindowBuilder::new(self.handle(), label, url)
+    }
+
+    delegate! {
+        to self.handle() {
+            pub fn store(&self, path: impl AsRef<std::path::Path>) -> tauri_plugin_store::Result<Arc<Store<Wry>>>;
+            pub fn path(&self) -> &tauri::path::PathResolver<Wry>;
+            pub fn dialog(&self) -> &Dialog<Wry>;
+        }
+    }
+}

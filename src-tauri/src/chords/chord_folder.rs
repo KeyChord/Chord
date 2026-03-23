@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 #[derive(Debug)]
-pub struct ChordFolder {
+pub struct ChordPackage {
     pub root_dir: Option<PathBuf>,
 
     // Map from file path to chord
@@ -16,7 +16,7 @@ pub struct ChordFolder {
 
 static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords");
 
-impl ChordFolder {
+impl ChordPackage {
     pub fn load_bundled() -> Result<Self> {
         let mut chords_files = StringRadixMap::new();
         for file in BUNDLED_MACOS_CHORDS_DIR.find("**/macos.toml")? {

@@ -1,6 +1,6 @@
 use crate::api::{Api, ApiImpl};
-use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{AppSettings, Chorder, ChorderIndicatorUi};
+use crate::chords::{ChordPackage, LoadedAppChords};
+use crate::feature::{AppSettings, AppChorder, ChorderIndicatorUi, ChorderState, AppSettingsState, AppPermissions, AppFrontmost, SettingsUi, AppSettingsStateGitRepo, SafeAppHandle};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use anyhow::Result;
 use frontmost::{start_nsrunloop, Detector};
@@ -9,7 +9,6 @@ use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::async_runtime::block_on;
 use tauri::{AppHandle, Manager};
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
@@ -26,6 +25,9 @@ mod sources;
 mod tauri_app;
 
 use tauri_nspanel::tauri_panel;
+use tauri_plugin_autostart::ManagerExt;
+use crate::tauri_app::git::ChordPackageRegistry;
+
 tauri_panel! {
     panel!(IndicatorPanel {
         config: {
@@ -35,27 +37,6 @@ tauri_panel! {
             hides_on_deactivate: false
         }
     })
-}
-
-#[derive(Debug)]
-struct Frontmost {
-    frontmost: String,
-    handle: AppHandle,
-}
-
-#[cfg(target_os = "macos")]
-impl frontmost::app::FrontmostApp for Frontmost {
-    fn set_frontmost(&mut self, new_value: &str) {
-        self.frontmost = new_value.to_string();
-        let context = self.handle.state::<AppContext>();
-        context
-            .frontmost_application_id
-            .store(Arc::new(Some(new_value.to_string())));
-    }
-
-    fn update(&mut self) {
-        println!("Application activated: {}", self.frontmost);
-    }
 }
 
 #[cfg_attr(mobile, tauri_app::mobile_entry_point)]
@@ -154,27 +135,61 @@ pub fn run() {
         .expect("error while running tauri_app application");
 }
 
+async fn create_app_settings(
+    safe_handle: SafeAppHandle,
+) -> Result<AppSettings, anyhow::Error> {
+    let chord_package_registry = ChordPackageRegistry::new(
+        safe_handle,
+    );
+
+    let settings_state = AppSettingsState {
+        bundle_ids_needing_relaunch: Vec::new(),
+        git_repos: chord_package_registry
+            .git
+            .discover_git_repos()?
+            .iter()
+            .map(|r| AppSettingsStateGitRepo {
+                owner: r.owner.clone(),
+                name: r.name.clone(),
+                slug: r.slug.clone(),
+                url: r.url.clone(),
+                local_path: r.local_path.clone(),
+                head_short_sha: r.head_short_sha.clone(),
+            })
+            .collect(),
+        permissions: AppPermissions::from_check(safe_handle.clone()).await,
+    };
+
+    let settings = AppSettings::new(safe_handle.clone(), settings_state);
+    Ok(settings)
+}
+
+async fn create_app_permissions(safe_handle: SafeAppHandle) -> Result<AppPermissions> {
+    AppPermissions::from_check(safe_handle).await
+}
+
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
-    thread::spawn(|| {
-        start_nsrunloop!();
-    });
+    let safe_handle = SafeAppHandle::new(app.handle().clone());
 
-    let handle = app.handle().clone();
-    let context = AppContext::new(handle.clone())?;
+    let app_permissions = tauri::async_runtime::block_on(create_app_permissions(safe_handle))?;
+    app.manage(app_permissions);
 
-    // Setting the frontmost application immediately (the frontmost crate only detects changes)
-    let workspace = NSWorkspace::sharedWorkspace();
-    if let Some(application) = workspace.frontmostApplication() {
-        if let Some(bundle_id) = application.bundleIdentifier() {
-            context
-                .frontmost_application_id
-                .store(Arc::new(Some(bundle_id.to_string())));
-        }
-    }
+    let app_frontmost = AppFrontmost::new_with_detector();
+    app.manage(app_frontmost);
 
-    handle.manage(context);
+    let chorder_state = ChorderState::default();
+    let chorder = AppChorder::new(app.handle().clone(), chorder_state)?;
+    app.manage(chorder);
 
+    let context = AppContext::new()?;
+    app.manage(context);
+
+    let app_settings = tauri::async_runtime::block_on(create_app_settings(app))?;
+    app.manage(app_settings);
+
+
+    let handle = app.handle();
     let tray_created = match tauri_app::tray::create_tray(handle.clone()) {
         Ok(()) => true,
         Err(error) => {
@@ -182,52 +197,6 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             false
         }
     };
-
-    let startup_status = tauri_app::startup::get_startup_status(&handle)?;
-
-    let frontmost = Frontmost {
-        frontmost: String::new(),
-        handle: handle.clone(),
-    };
-    Detector::init(Box::new(frontmost));
-
-    if startup_status.should_show_onboarding || !tray_created {
-        if let Err(error) = tauri_app::settings::show_settings_window(handle.clone()) {
-            log::error!("failed to show settings window at startup: {error}");
-        }
-    } else if let Err(error) = tauri_app::settings::hide_settings_window(handle.clone()) {
-        log::error!("failed to hide settings window at startup: {error}");
-    }
-
-    {
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let has_permission =
-                tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
-            if has_permission {
-                log::info!("Input monitoring permission granted, registering caps lock listener");
-                if let Err(e) = register_caps_lock_input_handler(handle.clone()) {
-                    log::error!("Failed to handle caps lock input: {e}");
-                }
-            } else {
-                log::warn!("Input monitoring permission not granted, skipping caps lock listener");
-            }
-        });
-    }
-
-    {
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let has_permission =
-                tauri_plugin_macos_permissions::check_accessibility_permission().await;
-            if has_permission {
-                log::info!("Accessibility permission granted, registering grab listener");
-                register_key_event_input_grabber(handle.clone());
-            } else {
-                log::warn!("Accessibility permission not granted, skipping grab listener");
-            }
-        });
-    }
 
     {
         let handle = handle.clone();
@@ -237,21 +206,6 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             }
         });
     }
-
-    let accessibility_enabled = block_on(async {
-        tauri_plugin_macos_permissions::check_accessibility_permission().await
-    });
-    let input_monitoring_enabled = block_on(async {
-        tauri_plugin_macos_permissions::check_input_monitoring_permission().await
-    });
-    log::info!(
-        "Launch visibility: onboarding={}, tray_created={}, accessibility={}, input_monitoring={}, autostart={}",
-        startup_status.should_show_onboarding,
-        tray_created,
-        accessibility_enabled,
-        input_monitoring_enabled,
-        startup_status.launched_via_autostart
-    );
 
     Ok(())
 }

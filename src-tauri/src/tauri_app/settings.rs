@@ -1,10 +1,12 @@
+use crate::feature::app_handle_ext::AppHandleExt;
 use anyhow::Result;
 use tauri::{AppHandle, Manager, WebviewWindow};
 use crate::AppContext;
+use crate::feature::{AppChorder, AppSettings};
 
 pub fn show_settings_window(handle: AppHandle) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let window = &context.settings.ui.window;
+    let settings = handle.app_settings();
+    let window = &settings.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -12,15 +14,15 @@ pub fn show_settings_window(handle: AppHandle) -> Result<()> {
 }
 
 pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let window = &context.settings.ui.window;
+    let settings = handle.app_settings();
+    let window = &settings.ui.window;
     window.hide()?;
     Ok(())
 }
 
 pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let window = &context.settings.ui.window;
+    let settings = handle.app_settings();
+    let window = &settings.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -30,8 +32,8 @@ pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
 }
 
 pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let window = &context.chorder.ui.window;
+    let chorder = handle.app_chorder();
+    let window = &chorder.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
