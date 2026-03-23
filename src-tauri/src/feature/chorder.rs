@@ -23,8 +23,8 @@ pub struct Chorder {
 }
 
 impl Chorder {
-    fn emit_will_show(&self) {
-        if let Err(error) = self.ui.window.emit("chorder-will-show", ()) {
+    fn emit_will_show(window: &tauri::WebviewWindow) {
+        if let Err(error) = window.emit("chorder-will-show", ()) {
             log::error!("Failed to emit chorder will-show event: {error}");
         }
     }
@@ -35,16 +35,27 @@ impl Chorder {
         }
     }
 
-    fn prepare_surface_before_reveal(&self) {
+    fn prepare_surface_before_reveal(window: &tauri::WebviewWindow) {
         let (tx, rx) = mpsc::sync_channel(1);
-        self.ui.window.once("chorder-surface-ready", move |_| {
+        window.once("chorder-surface-ready", move |_| {
             let _ = tx.send(());
         });
-        self.emit_will_show();
+        Self::emit_will_show(window);
 
         if rx.recv_timeout(Duration::from_millis(160)).is_err() {
             log::debug!("Timed out waiting for chorder surface to prepare before reveal");
         }
+    }
+
+    fn preload_ui(ui: &ChorderIndicatorUi, handle: AppHandle) -> Result<()> {
+        log::debug!("Preloading chorder panel");
+
+        if ui.ensure_visible(handle.clone())? {
+            Self::prepare_surface_before_reveal(&ui.window);
+            ui.ensure_hidden(handle)?;
+        }
+
+        Ok(())
     }
 
     pub fn new(ui: ChorderIndicatorUi) -> Self {
@@ -66,8 +77,9 @@ impl Chorder {
         let surface_window = ui.window.clone();
         let listener_window = surface_window.clone();
         let surface_handle = surface_window.app_handle().clone();
-        listener_window.listen("chorder-surface-rect", move |event| {
-            match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
+        listener_window.listen(
+            "chorder-surface-rect",
+            move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
                 Ok(rect) => {
                     if let Err(error) = ChorderIndicatorUi::configure_window_surface(
                         &surface_window,
@@ -80,6 +92,14 @@ impl Chorder {
                 Err(error) => {
                     log::error!("Failed to parse chorder surface rect: {error}");
                 }
+            },
+        );
+
+        let preload_ui = ui.clone();
+        let preload_handle = preload_ui.window.app_handle().clone();
+        ui.window.once("chorder-window-ready", move |_| {
+            if let Err(error) = Self::preload_ui(&preload_ui, preload_handle.clone()) {
+                log::error!("Failed to preload chorder panel: {error}");
             }
         });
 
@@ -92,7 +112,7 @@ impl Chorder {
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
         if self.ui.ensure_visible(handle.clone())? {
-            self.prepare_surface_before_reveal();
+            Self::prepare_surface_before_reveal(&self.ui.window);
             self.ui.reveal(handle.clone())?;
             self.emit_visibility_changed(true);
         }
@@ -165,7 +185,11 @@ impl Chorder {
 
                 if code == &KeyMappingCode::Space {
                     if Self::should_execute_key_buffer_on_space_release(&state) {
-                        let _ = self.execute_key_buffer(handle.clone(), state.key_buffer.clone(), true)?;
+                        let _ = self.execute_key_buffer(
+                            handle.clone(),
+                            state.key_buffer.clone(),
+                            true,
+                        )?;
                     }
 
                     self.state.set(Arc::new(ChorderState::new()))?;
@@ -224,7 +248,8 @@ impl Chorder {
 
                 // A non-empty key_buffer means we should execute the chord.
                 log::debug!("Executing key_buffer {:?}", key_buffer);
-                let Some(chord) = self.execute_key_buffer(handle.clone(), key_buffer.clone(), false)?
+                let Some(chord) =
+                    self.execute_key_buffer(handle.clone(), key_buffer.clone(), false)?
                 else {
                     self.state.set(Arc::new(ChorderState {
                         key_buffer: vec![],

@@ -1,10 +1,10 @@
 use crate::IndicatorPanel;
 use anyhow::Result;
 use objc2_app_kit::{
-    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSView,
+    NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
     NSWindowAnimationBehavior, NSWindowOrderingMode,
 };
-use objc2_foundation::{NSInteger, MainThreadMarker, NSPoint, NSRect, NSSize};
+use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};

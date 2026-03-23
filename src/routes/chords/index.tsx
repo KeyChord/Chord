@@ -203,6 +203,10 @@ export function Chords() {
     };
   }, []);
 
+  useEffect(() => {
+    void emit("chorder-window-ready");
+  }, []);
+
   useLayoutEffect(() => {
     if (!isPreparingSurface) {
       return;

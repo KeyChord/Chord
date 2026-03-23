@@ -16,10 +16,9 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
                 .handle_key_event(handle.clone(), &key_event)?;
         }
         AppMode::None => {
-            let should_finalize_chord_mode = matches!(
-                key_event,
-                KeyEvent::Release(Key(KeyMappingCode::Space))
-            ) && !context.chorder.state.get()?.is_idle();
+            let should_finalize_chord_mode =
+                matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space)))
+                    && !context.chorder.state.get()?.is_idle();
 
             if should_finalize_chord_mode {
                 context

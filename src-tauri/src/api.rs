@@ -6,8 +6,8 @@ use crate::sources::{
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_app_metadata, list_apps_needing_relaunch, list_loaded_chords,
-    list_matching_chords, relaunch_app, reload_loaded_app_chords, ActiveChordInfo,
-    AppMetadataInfo, AppNeedsRelaunchInfo,
+    list_matching_chords, relaunch_app, reload_loaded_app_chords, ActiveChordInfo, AppMetadataInfo,
+    AppNeedsRelaunchInfo,
 };
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -163,7 +163,10 @@ impl Api for ApiImpl {
         list_matching_chords(app_handle).map_err(|error| error.to_string())
     }
 
-    async fn list_app_metadata(self, bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>, String> {
+    async fn list_app_metadata(
+        self,
+        bundle_ids: Vec<String>,
+    ) -> Result<Vec<AppMetadataInfo>, String> {
         list_app_metadata(bundle_ids).map_err(|error| error.to_string())
     }
 
