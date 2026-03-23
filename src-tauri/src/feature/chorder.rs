@@ -1,4 +1,4 @@
-use super::ChorderIndicatorUi;
+use super::{ChorderIndicatorUi, NativeSurfaceRect};
 use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
 use crate::{input::KeyEvent, AppContext};
@@ -35,8 +35,26 @@ impl Chorder {
         }
     }
 
-    fn prepare_surface_before_reveal(&self) {
+    fn prepare_surface_before_reveal(&self, handle: AppHandle) {
         let (tx, rx) = mpsc::sync_channel(1);
+        let surface_window = self.ui.window.clone();
+        let surface_handle = handle.clone();
+        self.ui.window.once("chorder-surface-rect", move |event| {
+            match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
+                Ok(rect) => {
+                    if let Err(error) = ChorderIndicatorUi::configure_window_surface(
+                        &surface_window,
+                        surface_handle.clone(),
+                        rect,
+                    ) {
+                        log::error!("Failed to configure native chorder surface: {error}");
+                    }
+                }
+                Err(error) => {
+                    log::error!("Failed to parse chorder surface rect: {error}");
+                }
+            }
+        });
         self.ui.window.once("chorder-surface-ready", move |_| {
             let _ = tx.send(());
         });
@@ -72,7 +90,7 @@ impl Chorder {
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
         if self.ui.ensure_visible(handle.clone())? {
-            self.prepare_surface_before_reveal();
+            self.prepare_surface_before_reveal(handle.clone());
             self.ui.reveal(handle.clone())?;
             self.emit_visibility_changed(true);
         }

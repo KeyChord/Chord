@@ -818,6 +818,7 @@ dependencies = [
  "objc2-foundation",
  "observable-property",
  "parking_lot",
+ "raw-window-handle",
  "rdev",
  "rquickjs",
  "rquickjs-serde",
@@ -843,6 +844,7 @@ dependencies = [
  "ts-rs",
  "typeshare",
  "walkdir",
+ "window-vibrancy",
 ]
 
 [[package]]

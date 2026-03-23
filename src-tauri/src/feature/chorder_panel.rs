@@ -1,12 +1,30 @@
 use crate::IndicatorPanel;
 use anyhow::Result;
-use objc2_app_kit::NSWindowAnimationBehavior;
+use objc2_app_kit::{
+    NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSView,
+    NSWindowAnimationBehavior, NSWindowOrderingMode,
+};
+use objc2_foundation::{NSInteger, MainThreadMarker, NSPoint, NSRect, NSSize};
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
+use window_vibrancy::NSVisualEffectViewTagged;
 
 const INDICATOR_WIDTH: u32 = 640;
+const NATIVE_SURFACE_TAG: NSInteger = 91376255;
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeSurfaceRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub radius: f64,
+}
 
 pub struct ChorderIndicatorUi {
     pub is_visible: Arc<AtomicBool>,
@@ -49,6 +67,55 @@ impl ChorderIndicatorUi {
 
     pub fn is_visible(&self) -> bool {
         self.is_visible.load(Ordering::Relaxed)
+    }
+
+    fn webview_ns_view(window: &WebviewWindow) -> Result<usize> {
+        let handle = window.window_handle()?;
+        match handle.as_raw() {
+            RawWindowHandle::AppKit(handle) => Ok(handle.ns_view.as_ptr() as usize),
+            _ => anyhow::bail!("unsupported platform for native surface vibrancy"),
+        }
+    }
+
+    pub fn configure_window_surface(
+        window: &WebviewWindow,
+        handle: AppHandle,
+        rect: NativeSurfaceRect,
+    ) -> Result<()> {
+        let ns_view = Self::webview_ns_view(window)?;
+
+        handle.run_on_main_thread(move || unsafe {
+            let view: &NSView = &*(ns_view as *mut NSView);
+            if let Some(existing_view) = view.viewWithTag(NATIVE_SURFACE_TAG) {
+                existing_view.removeFromSuperview();
+            }
+
+            let frame = NSRect::new(
+                NSPoint::new(rect.x - rect.radius, rect.y),
+                NSSize::new(rect.width + rect.radius, rect.height),
+            );
+            let vibrancy_view = NSVisualEffectViewTagged::initWithFrame(
+                MainThreadMarker::new().unwrap().alloc(),
+                frame,
+                NATIVE_SURFACE_TAG,
+            );
+            vibrancy_view.setMaterial(NSVisualEffectMaterial::HUDWindow);
+            vibrancy_view.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+            vibrancy_view.setState(NSVisualEffectState::Active);
+            vibrancy_view.setCornerRadius(rect.radius);
+
+            view.addSubview_positioned_relativeTo(
+                &vibrancy_view,
+                NSWindowOrderingMode::Below,
+                None,
+            );
+        })?;
+
+        Ok(())
+    }
+
+    pub fn configure_surface(&self, handle: AppHandle, rect: NativeSurfaceRect) -> Result<()> {
+        Self::configure_window_surface(&self.window, handle, rect)
     }
 
     fn show(&self, handle: AppHandle) -> Result<()> {
