@@ -52,6 +52,14 @@ pub struct MatchingChordInfo {
     pub chord: Chord,
 }
 
+#[derive(Debug, Clone)]
+pub struct MatchingDescriptionInfo {
+    pub scope: String,
+    pub scope_kind: &'static str,
+    pub sequence: Vec<Key>,
+    pub description: String,
+}
+
 // Each chord runtime is associated with a JS module which lives in-memory
 // (similar to require.cache)
 pub struct ChordRuntime {
@@ -59,6 +67,7 @@ pub struct ChordRuntime {
     pub path: String,
 
     pub chords: HashMap<Vec<Key>, Chord>,
+    pub descriptions: HashMap<Vec<Key>, String>,
     // Needs to be an Arc so the JS runtime can access its latest value
     pub raw_chords: Arc<Mutex<HashMap<String, AppChordMapValue>>>,
     pub config: Option<AppChordsFileConfig>,
@@ -78,6 +87,7 @@ impl ChordRuntime {
         Ok(Self {
             path,
             chords,
+            descriptions: HashMap::new(),
             raw_chords,
             config: None,
         })
@@ -90,12 +100,14 @@ impl ChordRuntime {
 
         // We intentionally keep global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow();
+        let descriptions = chord_file.get_descriptions_shallow();
 
         Ok(Self {
             path,
             raw_chords,
             config,
             chords,
+            descriptions,
         })
     }
 
@@ -104,6 +116,12 @@ impl ChordRuntime {
             self.chords
                 .entry(sequence.clone())
                 .or_insert_with(|| chord.clone());
+        }
+
+        for (sequence, description) in &base.descriptions {
+            self.descriptions
+                .entry(sequence.clone())
+                .or_insert_with(|| description.clone());
         }
 
         let mut raw_chords = self.raw_chords.lock().expect("poisoned lock");
@@ -188,6 +206,27 @@ fn push_runtime_matches(
             scope_kind,
             sequence: sequence.clone(),
             chord: chord.clone(),
+        });
+    }
+}
+
+fn push_runtime_description_matches(
+    matches: &mut Vec<MatchingDescriptionInfo>,
+    scope: &str,
+    scope_kind: &'static str,
+    runtime: &ChordRuntime,
+    chord_prefix: &[Key],
+) {
+    for (sequence, description) in &runtime.descriptions {
+        if !sequence.starts_with(chord_prefix) {
+            continue;
+        }
+
+        matches.push(MatchingDescriptionInfo {
+            scope: scope.to_string(),
+            scope_kind,
+            sequence: sequence.clone(),
+            description: description.clone(),
         });
     }
 }
@@ -342,7 +381,13 @@ impl LoadedAppChords {
         if chord_prefix.is_empty() {
             if let Some(application_id) = application_id {
                 if let Some(runtime) = self.runtimes.get(application_id) {
-                    push_runtime_matches(&mut matches, application_id, "app", runtime, chord_prefix);
+                    push_runtime_matches(
+                        &mut matches,
+                        application_id,
+                        "app",
+                        runtime,
+                        chord_prefix,
+                    );
                 }
             }
 
@@ -400,11 +445,97 @@ impl LoadedAppChords {
 
         matches
     }
+
+    pub fn list_matching_descriptions(
+        &self,
+        key_buffer: &[Key],
+        application_id: Option<&str>,
+    ) -> Vec<MatchingDescriptionInfo> {
+        let (_, chord_prefix) = split_repeat_prefix(key_buffer);
+        let mut matches = Vec::new();
+
+        if chord_prefix.is_empty() {
+            if let Some(application_id) = application_id {
+                if let Some(runtime) = self.runtimes.get(application_id) {
+                    push_runtime_description_matches(
+                        &mut matches,
+                        application_id,
+                        "app",
+                        runtime,
+                        chord_prefix,
+                    );
+                }
+            }
+
+            let global_runtime_ids = self
+                .global_chords_to_runtime_key
+                .values()
+                .cloned()
+                .collect::<HashSet<_>>();
+            for runtime_id in global_runtime_ids {
+                let Some(runtime) = self.runtimes.get(&runtime_id) else {
+                    continue;
+                };
+
+                push_runtime_description_matches(
+                    &mut matches,
+                    "Global",
+                    "global",
+                    runtime,
+                    chord_prefix,
+                );
+            }
+        } else if is_global_chord_sequence(chord_prefix) {
+            let global_runtime_ids = self
+                .global_chords_to_runtime_key
+                .values()
+                .cloned()
+                .collect::<HashSet<_>>();
+            for runtime_id in global_runtime_ids {
+                let Some(runtime) = self.runtimes.get(&runtime_id) else {
+                    continue;
+                };
+
+                push_runtime_description_matches(
+                    &mut matches,
+                    "Global",
+                    "global",
+                    runtime,
+                    chord_prefix,
+                );
+            }
+        } else if let Some(application_id) = application_id {
+            if let Some(runtime) = self.runtimes.get(application_id) {
+                push_runtime_description_matches(
+                    &mut matches,
+                    application_id,
+                    "app",
+                    runtime,
+                    chord_prefix,
+                );
+            }
+        }
+
+        matches.sort_by(|left, right| {
+            let left_scope_rank = if left.scope_kind == "app" { 0 } else { 1 };
+            let right_scope_rank = if right.scope_kind == "app" { 0 } else { 1 };
+
+            left_scope_rank
+                .cmp(&right_scope_rank)
+                .then(left.sequence.len().cmp(&right.sequence.len()))
+                .then(left.scope.cmp(&right.scope))
+                .then(left.description.cmp(&right.description))
+        });
+
+        matches
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{runtime_id_from_chords_path, ChordRuntime, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
+    use super::{
+        runtime_id_from_chords_path, ChordRuntime, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID,
+    };
     use crate::chords::Chord;
     use crate::input::Key;
     use keycode::KeyMappingCode::{ArrowUp, Digit2, KeyA, KeyB, KeyC, KeyD};

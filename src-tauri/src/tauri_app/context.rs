@@ -27,7 +27,7 @@ use objc2_app_kit::{
     NSWorkspaceLaunchOptions,
 };
 #[cfg(target_os = "macos")]
-use objc2_foundation::{NSDictionary, NSString, NSSize};
+use objc2_foundation::{NSDictionary, NSSize, NSString};
 #[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
 
@@ -43,6 +43,8 @@ pub struct ActiveChordInfo {
     pub sequence: String,
     pub name: String,
     pub action: String,
+    pub description: Option<String>,
+    pub is_description: bool,
 }
 
 #[derive(Debug)]
@@ -239,8 +241,9 @@ fn resolve_app_icon_data_url(bundle_id: &str) -> Option<String> {
     let tiff = icon.TIFFRepresentation()?;
     let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)?;
     let properties = NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
-    let png_data =
-        unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties) }?;
+    let png_data = unsafe {
+        bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties)
+    }?;
     let encoded = base64::engine::general_purpose::STANDARD.encode(png_data.to_vec());
     Some(format!("data:image/png;base64,{encoded}"))
 }
@@ -567,11 +570,29 @@ pub fn list_matching_loaded_chords(
     key_buffer: &[crate::input::Key],
     application_id: Option<&str>,
 ) -> Vec<ActiveChordInfo> {
-    loaded_app_chords
-        .list_matching_chords(key_buffer, application_id)
+    let mut items = loaded_app_chords
+        .list_matching_descriptions(key_buffer, application_id)
         .into_iter()
-        .map(|item| build_active_chord_info(&item.scope, item.scope_kind, &item.sequence, &item.chord))
-        .collect()
+        .map(|item| {
+            build_description_info(
+                &item.scope,
+                item.scope_kind,
+                &item.sequence,
+                &item.description,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    items.extend(
+        loaded_app_chords
+            .list_matching_chords(key_buffer, application_id)
+            .into_iter()
+            .map(|item| {
+                build_active_chord_info(&item.scope, item.scope_kind, &item.sequence, &item.chord)
+            }),
+    );
+
+    items
 }
 
 fn application_scope(application_id: &str) -> &str {
@@ -602,6 +623,25 @@ fn build_active_chord_info(
         sequence: format_sequence(sequence),
         name: chord.name.clone(),
         action: format_action(chord),
+        description: None,
+        is_description: false,
+    }
+}
+
+fn build_description_info(
+    scope: &str,
+    scope_kind: &str,
+    sequence: &[crate::input::Key],
+    description: &str,
+) -> ActiveChordInfo {
+    ActiveChordInfo {
+        scope: scope.to_string(),
+        scope_kind: scope_kind.to_string(),
+        sequence: format_sequence(sequence),
+        name: description.to_string(),
+        action: "Description".to_string(),
+        description: Some(description.to_string()),
+        is_description: true,
     }
 }
 

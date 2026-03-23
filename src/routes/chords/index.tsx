@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { taurpc, type ActiveChordInfo } from "#/api/taurpc.ts";
-import { Input } from "#/components/ui/input.tsx";
+import { Kbd } from "#/components/ui/kbd.tsx";
 import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { debug } from "@tauri-apps/plugin-log";
 import getPrettyKey from "pretty-key";
+import { cn } from "#/utils/style.ts";
 
 export const Route = createFileRoute('/chords/')({
   component: Chords,
@@ -14,10 +15,108 @@ function formatKeys(keys: string[]) {
   return keys.map((key) => getPrettyKey(key)).join(" ");
 }
 
+const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
+  String.fromCharCode("A".charCodeAt(0) + index),
+);
+const MAX_KEY_SIZE = 32;
+
+function compareSymbolTokens(left: string, right: string) {
+  return left.localeCompare(right);
+}
+
+function isSingleCharacterToken(token: string) {
+  return token.length === 1;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function compareSuggestionPriority(left: ActiveChordInfo, right: ActiveChordInfo) {
+  const leftDescriptionRank = left.isDescription ? 0 : 1;
+  const rightDescriptionRank = right.isDescription ? 0 : 1;
+  const leftScopeRank = left.scopeKind === "app" ? 0 : 1;
+  const rightScopeRank = right.scopeKind === "app" ? 0 : 1;
+
+  return leftDescriptionRank - rightDescriptionRank
+    || leftScopeRank - rightScopeRank
+    || left.sequence.localeCompare(right.sequence)
+    || left.name.localeCompare(right.name);
+}
+
+function resolveTokenDescription(
+  suggestions: ActiveChordInfo[],
+  prefixTokens: string[],
+  token: string,
+) {
+  const sequence = [...prefixTokens, token].join(" ");
+  let bestMatch: ActiveChordInfo | undefined;
+
+  for (const suggestion of suggestions) {
+    if (suggestion.sequence !== sequence) {
+      continue;
+    }
+
+    if (!bestMatch || compareSuggestionPriority(suggestion, bestMatch) < 0) {
+      bestMatch = suggestion;
+    }
+  }
+
+  if (!bestMatch) {
+    return "";
+  }
+
+  return bestMatch.description ?? (!bestMatch.isDescription ? bestMatch.name : "");
+}
+
+function ChordKeyRow({
+  token,
+  description = "",
+  isSelected = false,
+  keySize,
+  descriptionFontSize,
+}: {
+  token: string;
+  description?: string;
+  isSelected?: boolean;
+  keySize: number;
+  descriptionFontSize: number;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 transition-colors",
+        "text-foreground/95",
+      )}
+    >
+      <Kbd
+        style={{
+          height: `${keySize}px`,
+          minWidth: `${keySize}px`,
+          fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
+        }}
+        className={cn(
+          "rounded-md border px-0 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]",
+          isSelected
+            ? "border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]"
+            : "border-border/80 bg-background/95 text-foreground",
+        )}
+      >
+        {token}
+      </Kbd>
+      <div style={{ fontSize: `${descriptionFontSize}px` }}>
+        {description}
+      </div>
+    </div>
+  );
+}
+
 export function Chords() {
   const [state] = useChorderState();
+  const [allSuggestions, setAllSuggestions] = useState<ActiveChordInfo[]>([]);
   const [suggestions, setSuggestions] = useState<ActiveChordInfo[]>([]);
-  const hasBuffer = state.keyBuffer.length > 0;
+  const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
+  const currentPrefixLength = state.keyBuffer.length;
   const inputValue = state.keyBuffer.length > 0
     ? formatKeys(state.keyBuffer)
     : state.activeChord
@@ -25,18 +124,25 @@ export function Chords() {
       : "";
 
   useEffect(() => {
-    let cancelled = false;
+    const handleResize = () => {
+      setViewportHeight(window.innerHeight);
+    };
 
-    if (!hasBuffer) {
-      setSuggestions([]);
-      return () => {
-        cancelled = true;
-      };
-    }
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
 
     void taurpc.listMatchingChords()
       .then((items) => {
         if (!cancelled) {
+          if (currentPrefixLength === 0) {
+            setAllSuggestions(items);
+          }
           setSuggestions(items);
         }
       })
@@ -50,34 +156,119 @@ export function Chords() {
     return () => {
       cancelled = true;
     };
-  }, [hasBuffer, state.keyBuffer]);
+  }, [currentPrefixLength, state.keyBuffer]);
+
+  const sequenceSource = allSuggestions.length > 0 ? allSuggestions : suggestions;
+  const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
+  const normalizedBufferTokens = state.keyBuffer.map((key) => {
+    const pretty = getPrettyKey(key);
+    return pretty.length === 1 ? pretty.toUpperCase() : pretty;
+  });
+
+  const allSymbolTokens = [...new Set(
+    allSequences
+      .flatMap((sequence) => sequence)
+      .filter((token) => isSingleCharacterToken(token) && !/^[A-Z0-9]$/.test(token)),
+  )].sort(compareSymbolTokens);
+  const maxVisibleRows = Math.max(
+    1,
+    ...Array.from({ length: Math.max(1, currentPrefixLength + 1) }, (_, columnIndex) => {
+      const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
+      const activeTokens = new Set(
+        allSequences
+          .filter((sequence) =>
+            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token)
+          )
+          .map((sequence) => sequence[columnIndex])
+          .filter((token): token is string => Boolean(token)),
+      );
+      const letterCount = LETTER_TOKENS.filter((token) => activeTokens.has(token)).length;
+      const symbolCount = allSymbolTokens.filter((token) => activeTokens.has(token)).length;
+      return letterCount + symbolCount + (symbolCount > 0 ? 2 : 0);
+    }),
+  );
+  const availableHeight = Math.max(viewportHeight - 96, 240);
+  const idealKeySize = availableHeight / (maxVisibleRows + Math.max(maxVisibleRows - 1, 0) * 0.18);
+  const keySize = clamp(Math.floor(idealKeySize), 22, MAX_KEY_SIZE);
+  const rowGap = clamp(
+    Math.floor((availableHeight - keySize * maxVisibleRows) / Math.max(maxVisibleRows - 1, 1)),
+    4,
+    10,
+  );
+  const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
+  const keyColumns = Array.from({ length: Math.max(1, currentPrefixLength + 1) }, (_, columnIndex) => {
+    const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
+    const activeTokens = new Set(
+      allSequences
+        .filter((sequence) =>
+          prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token)
+        )
+        .map((sequence) => sequence[columnIndex])
+        .filter((token): token is string => Boolean(token)),
+    );
+
+    return {
+      id: `column-${columnIndex}`,
+      prefixTokens,
+      activeTokens,
+      selectedToken: normalizedBufferTokens[columnIndex],
+    };
+  });
 
   return (
-    <div className="size-full bg-transparent p-3">
-      <div className="flex flex-col gap-2">
-      <Input
-        readOnly
-        value={inputValue}
-        placeholder="Start typing a chord"
-        className="h-11 w-full border-border/70 bg-background/85 font-mono text-base shadow-sm"
-      />
-        {hasBuffer && suggestions.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-border/70 bg-background/85 shadow-sm">
-            {suggestions.map((suggestion) => (
+    <div className="relative size-full bg-transparent">
+      <div className="absolute left-4 top-1/2 -translate-y-1/2">
+        <div className="flex items-start gap-8">
+          <div className="flex items-start gap-6">
+            {keyColumns.map((column) => (
               <div
-                key={`${suggestion.scopeKind}:${suggestion.scope}:${suggestion.sequence}:${suggestion.name}`}
-                className="grid grid-cols-[minmax(0,112px)_minmax(0,1fr)] gap-3 border-b px-3 py-2 last:border-b-0"
+                key={column.id}
+                className="flex flex-col items-start justify-center"
+                style={{ gap: `${rowGap}px` }}
               >
-                <div className="truncate font-mono text-xs text-foreground/80">
-                  {suggestion.sequence}
-                </div>
-                <div className="min-w-0 truncate text-sm">
-                  {suggestion.name}
-                </div>
+                {LETTER_TOKENS.filter((token) => column.activeTokens.has(token)).map((token) => (
+                  <ChordKeyRow
+                    key={`${column.id}-${token}`}
+                    token={token}
+                    description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
+                    isSelected={column.selectedToken === token}
+                    keySize={keySize}
+                    descriptionFontSize={descriptionFontSize}
+                  />
+                ))}
+
+                {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
+                  <div
+                    className="mt-2 flex flex-col items-start"
+                    style={{ gap: `${rowGap}px` }}
+                  >
+                    {allSymbolTokens.filter((token) => column.activeTokens.has(token)).map((token) => (
+                      <ChordKeyRow
+                        key={`${column.id}-${token}`}
+                        token={token}
+                        description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
+                        isSelected={column.selectedToken === token}
+                        keySize={keySize}
+                        descriptionFontSize={descriptionFontSize}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
-        ) : null}
+
+          <div className="flex min-h-12 w-full min-w-[240px] max-w-md flex-col justify-center gap-3">
+            {inputValue ? (
+              <div
+                className="font-mono tracking-[0.18em] text-foreground/95"
+                style={{ fontSize: `${clamp(Math.round(keySize * 1.2), 24, 42)}px` }}
+              >
+                {inputValue}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import { createTauRPCProxy as createProxy, type InferCommandOutput } from 'taurp
 type TAURI_CHANNEL<T> = (response: T) => void
 
 
-export type ActiveChordInfo = { scope: string; scopeKind: string; sequence: string; name: string; action: string }
+export type ActiveChordInfo = { scope: string; scopeKind: string; sequence: string; name: string; action: string; description: string | null; isDescription: boolean }
 
 export type AppMetadataInfo = { bundleId: string; displayName: string | null; iconDataUrl: string | null }
 

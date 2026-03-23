@@ -7,7 +7,6 @@ use tauri::{AppHandle, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 
 const INDICATOR_WIDTH: u32 = 640;
-const INDICATOR_HEIGHT: u32 = 180;
 
 pub struct ChorderIndicatorUi {
     pub is_visible: Arc<AtomicBool>,
@@ -59,17 +58,15 @@ impl ChorderIndicatorUi {
 
         handle.clone().run_on_main_thread(move || {
             let native_panel = panel.as_panel();
-            native_panel.setContentSize(tauri_nspanel::objc2_foundation::NSSize::new(
-                INDICATOR_WIDTH as f64,
-                INDICATOR_HEIGHT as f64,
-            ));
-
             if let Some(screen) = native_panel.screen() {
                 let visible_frame = screen.visibleFrame();
-                let x = visible_frame.origin.x
-                    + ((visible_frame.size.width - INDICATOR_WIDTH as f64) / 2.0).max(0.0);
-                let y =
-                    visible_frame.origin.y + visible_frame.size.height - INDICATOR_HEIGHT as f64;
+                native_panel.setContentSize(tauri_nspanel::objc2_foundation::NSSize::new(
+                    INDICATOR_WIDTH as f64,
+                    visible_frame.size.height,
+                ));
+
+                let x = visible_frame.origin.x;
+                let y = visible_frame.origin.y;
                 native_panel.setFrameOrigin(tauri_nspanel::objc2_foundation::NSPoint::new(x, y));
             }
 
