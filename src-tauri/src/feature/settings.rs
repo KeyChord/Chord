@@ -33,9 +33,9 @@ impl SettingsUi {
 }
 
 impl AppSettings {
-    pub fn new(handle: SafeAppHandle, state: AppSettingsState) -> Result<Self> {
+    pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let ui = SettingsUi::new(handle.clone())?;
-        let observable = AppSettingsObservable::new(handle, state)?;
+        let observable = AppSettingsObservable::new(handle)?;
         Ok(Self {
             _observable: observable,
             ui

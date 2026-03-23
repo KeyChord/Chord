@@ -49,13 +49,11 @@ macro_rules! define_observable {
                 Ok(::serde_json::to_value(<$state as ::std::default::Default>::default())?)
             }
 
-            $vis fn new(
-                handle: $crate::feature::SafeAppHandle,
-                state: $state,
-            ) -> ::anyhow::Result<Self>
+            $vis fn new(handle: $crate::feature::SafeAppHandle) -> ::anyhow::Result<Self>
             where
                 $state: ::serde::Serialize + Send + Sync + 'static,
             {
+                let state = <$state as ::std::default::Default>::default();
                 let state =
                     ::observable_property::ObservableProperty::new(::std::sync::Arc::new(state));
 

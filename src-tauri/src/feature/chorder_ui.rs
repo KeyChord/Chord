@@ -37,16 +37,13 @@ pub struct ChorderIndicatorUi {
 }
 
 impl ChorderIndicatorUi {
-    pub fn new(handle: SafeAppHandle, state: &ChorderState) -> Result<Self> {
+    pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let window = handle
             .new_webview_window_builder(
                 "chords",
                 WebviewUrl::App("index.html".into()),
             )?
             .title("Chords")
-            .initialization_script(format!(r#"
-              window.__CHORDS_STATE__ = {}
-            "#, serde_json::to_string(state)?))
             .inner_size(640.0, 180.0)
             .visible(false)
             .transparent(true)

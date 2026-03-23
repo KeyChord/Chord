@@ -1,8 +1,4 @@
 use crate::api::{Api, ApiImpl};
-use crate::feature::{
-    AppChorder, AppFrontmost, AppPermissions, AppSettings, AppSettingsState,
-    ChorderState, SafeAppHandle,
-};
 use crate::tauri_app::git::ChordPackageRegistry;
 use anyhow::Result;
 use parking_lot::deadlock;
@@ -25,6 +21,8 @@ mod observables;
 
 use tauri_nspanel::tauri_panel;
 use crate::feature::app_handle_ext::AppManaged;
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
+use crate::observables::{AppSettingsState, ChorderState};
 
 tauri_panel! {
     panel!(IndicatorPanel {
@@ -133,32 +131,15 @@ pub fn run() {
         .expect("error while running tauri_app application");
 }
 
-async fn create_app_settings(
-    safe_handle: SafeAppHandle,
-) -> Result<AppSettings> {
-    let chord_package_registry = ChordPackageRegistry::new(safe_handle.clone())?;
-
-    let settings_state = AppSettingsState {
-        bundle_ids_needing_relaunch: Vec::new(),
-    };
-
-    let settings = AppSettings::new(safe_handle.clone(), settings_state)?;
-    Ok(settings)
-}
-
-async fn create_app_permissions(safe_handle: SafeAppHandle) -> Result<AppPermissions> {
-    AppPermissions::from_check(safe_handle).await
-}
-
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
     let safe_handle = SafeAppHandle::new(app.handle().clone());
     safe_handle.mark_safe(AppManaged {
         frontmost: AppFrontmost::new_with_detector(),
-        chorder: AppChorder::new(safe_handle.clone(), ChorderState::default())?,
+        chorder: AppChorder::new(safe_handle.clone())?,
         context: AppContext::new()?,
-        permissions: tauri::async_runtime::block_on(create_app_permissions(safe_handle.clone()))?,
-        settings: tauri::async_runtime::block_on(create_app_settings(safe_handle.clone()))?,
+        permissions: AppPermissions::new(safe_handle.clone()),
+        settings: AppSettings::new(safe_handle.clone())?,
         chord_package_registry: ChordPackageRegistry::new(safe_handle.clone())?
     });
 

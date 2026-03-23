@@ -20,9 +20,9 @@ pub struct AppChorder {
 }
 
 impl AppChorder {
-    pub fn new(handle: SafeAppHandle, state: ChorderState) -> Result<Self> {
-        let ui = ChorderIndicatorUi::new(handle.clone(), &state)?;
-        let observable = ChorderObservable::new(handle, state)?;
+    pub fn new(handle: SafeAppHandle) -> Result<Self> {
+        let ui = ChorderIndicatorUi::new(handle.clone())?;
+        let observable = ChorderObservable::new(handle)?;
         let surface_window = ui.window.clone();
         let surface_handle = ui.handle.clone();
         let listener_window = surface_window.clone();
