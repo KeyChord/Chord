@@ -16,11 +16,12 @@ mod feature;
 pub mod git;
 mod input;
 mod mode;
+mod stores;
 mod tauri_app;
 mod observables;
 
 use tauri_nspanel::tauri_panel;
-use crate::feature::app_handle_ext::AppManaged;
+use crate::feature::app_handle_ext::{AppHandleExt, AppManaged};
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
 use crate::observables::{AppSettingsState, ChorderState};
 
@@ -134,18 +135,28 @@ pub fn run() {
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
     let safe_handle = SafeAppHandle::new(app.handle().clone());
-    safe_handle.mark_safe(AppManaged {
+    safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(),
         chorder: AppChorder::new(safe_handle.clone())?,
         context: AppContext::new()?,
-        permissions: AppPermissions::new(safe_handle.clone()),
+        permissions: AppPermissions::new_unloaded(safe_handle.clone())?,
         settings: AppSettings::new(safe_handle.clone())?,
-        chord_package_registry: ChordPackageRegistry::new(safe_handle.clone())?
+        chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?
     });
 
     let handle = app.handle();
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
         log::error!("Failed to create tray: {error:#}");
+    }
+
+    {
+        let handle = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let permissions = handle.app_permissions();
+            if let Err(e) = permissions.load().await {
+                log::error!("Failed to load permissions:\n{:#?}", e);
+            }
+        });
     }
 
     {

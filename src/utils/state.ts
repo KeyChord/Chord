@@ -3,12 +3,12 @@ import type { AppPermissionsState, AppSettingsState, ChorderState } from "../typ
 import { listen } from "@tauri-apps/api/event";
 import renameFunction from "rename-fn";
 
-function createUseTauriState<T>(stateName: string) {
+function createUseTauriState<T>(stateId: string) {
   const useTauriState = () => {
-    const [state, setState] = useState<T>((window as any).__INITIAL_STATE__ as T);
+    const [state, setState] = useState<T>((window as any).__INITIAL_STATES__[stateId] as T);
 
     useEffect(() => {
-      const unlistenPromise = listen<T>(`state:${stateName}`, (event) => {
+      const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
         setState(event.payload);
       });
 
@@ -20,7 +20,7 @@ function createUseTauriState<T>(stateName: string) {
     return state;
   };
 
-  return renameFunction(useTauriState, stateName);
+  return renameFunction(useTauriState, stateId);
 }
 
 export const useChorderState = createUseTauriState<ChorderState>("chorder");

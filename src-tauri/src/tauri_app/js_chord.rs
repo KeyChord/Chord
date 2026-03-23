@@ -1,7 +1,6 @@
 use crate::chords::{press_shortcut, release_shortcut, Shortcut};
 use crate::constants::GLOBAL_HOTKEYS_POOL;
 use crate::js::{throw_js_error, AppUserData};
-use crate::store::{GlobalHotkeyStore, GlobalHotkeyStoreEntry};
 use crate::tauri_app::app_lifecycle::{
     init as init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
@@ -9,6 +8,7 @@ use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::{Ctx, Function};
 use std::collections::HashSet;
 use tauri_plugin_store::StoreExt;
+use crate::stores::{AppHandleStoreExt, GlobalHotkeyStoreEntry};
 
 pub struct ChordModule;
 
@@ -91,14 +91,14 @@ impl ModuleDef for ChordModule {
                 })?;
 
                 press_shortcut(shortcut.clone(), 1).map_err(|err| {
-                    crate::tauri_app::js::throw_js_error(
+                    throw_js_error(
                         ctx.clone(),
                         format!("tap({key:?}) press failed: {err}"),
                     )
                 })?;
 
                 release_shortcut(shortcut).map_err(|err| {
-                    crate::tauri_app::js::throw_js_error(
+                    throw_js_error(
                         ctx.clone(),
                         format!("tap({key:?}) release failed: {err}"),
                     )
@@ -110,13 +110,12 @@ impl ModuleDef for ChordModule {
         .with_name("tap")?;
         exports.export("tap", tap)?;
 
-        let global_hotkeys_store =
-            GlobalHotkeyStore::new(handle.store("global-hotkeys.json").map_err(|err| {
-                throw_js_error(
-                    ctx.clone(),
-                    format!("failed to open global hotkeys store: {err}"),
-                )
-            })?);
+        let global_hotkeys_store = handle.global_hotkeys_store().map_err(|err| {
+            throw_js_error(
+                ctx.clone(),
+                format!("failed to open global hotkeys store: {err}"),
+            )
+        })?;
 
         let register_global_hotkey_store = global_hotkeys_store.clone();
         let register_global_hotkey = Function::new(

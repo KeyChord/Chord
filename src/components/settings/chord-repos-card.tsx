@@ -13,6 +13,7 @@ import { SyncRepoButton } from "./sync-repo-button.tsx";
 
 export function ChordReposCard() {
   const { gitRepos } = useGitPackageRegistryState();
+  console.log('repos', gitRepos)
   return (
     <Card size="sm">
       <CardHeader>

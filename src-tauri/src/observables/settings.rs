@@ -11,5 +11,5 @@ pub struct AppSettingsState {
 
 define_observable! {
     pub struct AppSettingsObservable(AppSettingsState);
-    id: "permissions";
+    id: "settings";
 }

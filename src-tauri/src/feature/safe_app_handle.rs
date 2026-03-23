@@ -62,7 +62,7 @@ impl SafeAppHandle {
         }
     }
 
-    pub fn mark_safe(&self, managed: AppManaged) {
+    pub fn manage(&self, managed: AppManaged) {
         managed.register(&self.inner.handle);
 
         let callbacks = {

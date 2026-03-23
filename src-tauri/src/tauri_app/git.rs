@@ -2,12 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use anyhow::{Result, Context};
-use observable_property::ObservableProperty;
 use serde::Serialize;
 use specta::Type;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use typeshare::typeshare;
 use crate::chords::{ChordPackage, LoadedAppChords};
 use crate::feature::SafeAppHandle;
 use crate::git::{clone_repo, GitHubRepoRef};
@@ -20,7 +18,6 @@ pub struct GitPackageRegistry {
     pub dir: PathBuf,
     pub observable: GitPackageRegistryObservable
 }
-
 
 fn discover_repos(repos_root: PathBuf) -> Result<Vec<GitRepo>> {
     if !repos_root.exists() {
@@ -66,10 +63,12 @@ fn discover_repos(repos_root: PathBuf) -> Result<Vec<GitRepo>> {
 impl GitPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let dir = handle.path().app_cache_dir()?;
-        let state = GitPackageRegistryState {
-            git_repos: discover_repos(dir.clone())?
-        };
-        let observable = GitPackageRegistryObservable::new(handle.clone(), state)?;
+        let observable = GitPackageRegistryObservable::new(handle.clone())?;
+        let git_repos = discover_repos(dir.clone())?;
+        let repos = handle.store("repos.json");
+        log::debug!("repos: {:?}", git_repos);
+        observable.set_state(GitPackageRegistryState { git_repos })?;
+
         Ok(Self {
             dir,
             observable,
@@ -94,6 +93,7 @@ impl GitPackageRegistry {
         };
         git_repos.push(repo);
 
+        log::debug!("repos: {:?}", git_repos);
         self.observable.set_state(GitPackageRegistryState { git_repos })?;
         Ok(())
     }
@@ -300,9 +300,9 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
+    pub fn new_unloaded(handle: SafeAppHandle) -> Result<Self> {
         Ok(Self {
-            git:GitPackageRegistry::new(handle.clone())?,
+            git: GitPackageRegistry::new(handle.clone())?,
             local: LocalPackageRegistry::new(handle),
         })
     }

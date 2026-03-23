@@ -5,21 +5,37 @@ use crate::input::{register_caps_lock_input_handler, register_key_event_input_gr
 use crate::observables::{AppPermissionsObservable, AppPermissionsState};
 
 pub struct AppPermissions {
-    _observable: AppPermissionsObservable,
+    observable: AppPermissionsObservable,
     _input_monitoring: AppPermissionsInputMonitoring,
     _accessibility: AppPermissionsAccessibility
 }
 
 impl AppPermissions {
-    pub async fn new(safe_handle: SafeAppHandle) -> Result<Self> {
+    pub fn new_unloaded(safe_handle: SafeAppHandle) -> Result<Self> {
         let observable = AppPermissionsObservable::new(safe_handle.clone())?;
         let input_monitoring = AppPermissionsInputMonitoring::new_from_observable(safe_handle.clone(), &observable)?;
         let accessibility = AppPermissionsAccessibility::new_from_observable(safe_handle.clone(), &observable)?;
+        let is_autolaunch_enabled = safe_handle.is_autolaunch_enabled()?;
+        observable.set_state(AppPermissionsState {
+            is_input_monitoring_enabled: None,
+            is_accessibility_enabled: None,
+            is_autostart_enabled: Some(is_autolaunch_enabled)
+        })?;
         Ok(Self {
-            _observable: observable,
+            observable,
             _input_monitoring: input_monitoring,
             _accessibility: accessibility
         })
+    }
+
+    pub async fn load(&self) -> Result<()> {
+        let state = self.observable.get_state()?;
+        self.observable.set_state(AppPermissionsState {
+            is_input_monitoring_enabled: Some(tauri_plugin_macos_permissions::check_input_monitoring_permission().await),
+            is_accessibility_enabled: Some(tauri_plugin_macos_permissions::check_accessibility_permission().await),
+            is_autostart_enabled: state.is_autostart_enabled
+        })?;
+        Ok(())
     }
 }
 

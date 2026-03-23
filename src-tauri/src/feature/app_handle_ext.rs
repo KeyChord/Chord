@@ -29,6 +29,7 @@ pub trait AppHandleExt {
     fn app_context(&self) -> &AppContext;
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry;
     fn app_frontmost(&self) -> &AppFrontmost;
+    fn app_permissions(&self) -> &AppPermissions;
 }
 
 impl<R: Runtime> AppHandleExt for AppHandle<R> {
@@ -50,5 +51,9 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
 
     fn app_frontmost(&self) -> &AppFrontmost {
         self.state::<AppFrontmost>().inner()
+    }
+
+    fn app_permissions(&self) -> &AppPermissions {
+        self.state::<AppPermissions>().inner()
     }
 }

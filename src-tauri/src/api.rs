@@ -1,5 +1,4 @@
 use crate::git::{GitHubRepoRef};
-use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_apps_needing_relaunch, list_loaded_chords,
     list_matching_chords, relaunch_app, reload_loaded_app_chords, startup, ActiveChordInfo,
@@ -17,6 +16,7 @@ use specta::Type;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::observables::GitRepo;
+use crate::stores::AppHandleStoreExt;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -26,12 +26,6 @@ pub struct GlobalShortcutMappingInfo {
     pub shortcut: String,
     pub bundle_id: String,
     pub hotkey_id: String,
-}
-
-fn global_hotkeys_store(app: &AppHandle) -> AppResult<GlobalHotkeyStore> {
-    app.store("global-hotkeys.json")
-        .map(GlobalHotkeyStore::new)
-        .map_err(|error| AppError::Message(format!("failed to open global hotkeys store: {error}")))
 }
 
 fn open_system_settings(url: &str, permission_name: &str) {
@@ -214,8 +208,8 @@ impl Api for ApiImpl {
     }
 
     async fn list_global_shortcut_mappings(self) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
-        let app_handle = self.app_handle()?;
-        let store = global_hotkeys_store(&app_handle)?;
+        let handle = self.app_handle()?;
+        let store = handle.global_hotkeys_store()?;
         let mut mappings = store
             .entries()
             .into_iter()
@@ -237,13 +231,13 @@ impl Api for ApiImpl {
     }
 
     async fn remove_global_shortcut_mapping(self, shortcut: String) -> AppResult<()> {
-        let app_handle = self.app_handle()?;
+        let handle = self.app_handle()?;
+        let store = handle.global_hotkeys_store()?;
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
             return Err(AppError::Message("cannot be empty".into()))
         }
 
-        let store = global_hotkeys_store(&app_handle)?;
         store.remove(trimmed_shortcut);
         Ok(())
     }
