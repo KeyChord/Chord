@@ -126,6 +126,22 @@ export function Chords() {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const currentPrefixLength = state.keyBuffer.length;
 
+  const emitSurfaceRect = () => {
+    const surface = surfaceRef.current;
+    if (!surface) {
+      return;
+    }
+
+    const rect = surface.getBoundingClientRect();
+    void emit("chorder-surface-rect", {
+      x: rect.left,
+      y: window.innerHeight - rect.bottom,
+      width: rect.width,
+      height: rect.height,
+      radius: NATIVE_SURFACE_RADIUS,
+    });
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setViewportHeight(window.innerHeight);
@@ -177,21 +193,26 @@ export function Chords() {
       return;
     }
 
-    const surface = surfaceRef.current;
-    if (surface) {
-      const rect = surface.getBoundingClientRect();
-      void emit("chorder-surface-rect", {
-        x: rect.left,
-        y: window.innerHeight - rect.bottom,
-        width: rect.width,
-        height: rect.height,
-        radius: NATIVE_SURFACE_RADIUS,
-      });
-    }
-
+    emitSurfaceRect();
     void emit("chorder-surface-ready");
     setIsPreparingSurface(false);
   }, [isPreparingSurface, surfaceVersion]);
+
+  useEffect(() => {
+    const surface = surfaceRef.current;
+    if (!surface) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      emitSurfaceRect();
+    });
+    observer.observe(surface);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [surfaceVersion]);
 
   const sequenceSource = allSuggestions.length > 0 ? allSuggestions : suggestions;
   const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
@@ -250,6 +271,10 @@ export function Chords() {
       hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
     };
   });
+
+  useLayoutEffect(() => {
+    emitSurfaceRect();
+  }, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize]);
 
   return (
     <div className="relative size-full bg-transparent">
