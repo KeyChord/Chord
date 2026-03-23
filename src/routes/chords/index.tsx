@@ -13,7 +13,7 @@ export const Route = createFileRoute('/chords/')({
 })
 
 function formatKeys(keys: string[]) {
-  return keys.map((key) => getPrettyKey(key)).join(" ");
+  return keys.map((key) => normalizePrettyKey(getPrettyKey(key))).join(" ");
 }
 
 const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
@@ -32,6 +32,21 @@ function isSingleCharacterToken(token: string) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function normalizePrettyKey(token: string) {
+  if (token === "_") {
+    return "-";
+  }
+
+  return token;
+}
+
+function normalizeSequenceString(sequence: string) {
+  return sequence
+    .split(" ")
+    .map((token) => normalizePrettyKey(token))
+    .join(" ");
 }
 
 function compareSuggestionPriority(left: ActiveChordInfo, right: ActiveChordInfo) {
@@ -214,10 +229,13 @@ export function Chords() {
     };
   }, [surfaceVersion]);
 
-  const sequenceSource = allSuggestions.length > 0 ? allSuggestions : suggestions;
+  const sequenceSource = (allSuggestions.length > 0 ? allSuggestions : suggestions).map((suggestion) => ({
+    ...suggestion,
+    sequence: normalizeSequenceString(suggestion.sequence),
+  }));
   const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
   const normalizedBufferTokens = state.keyBuffer.map((key) => {
-    const pretty = getPrettyKey(key);
+    const pretty = normalizePrettyKey(getPrettyKey(key));
     return pretty.length === 1 ? pretty.toUpperCase() : pretty;
   });
 
