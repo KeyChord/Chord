@@ -328,7 +328,7 @@ export function Chords() {
 
                   {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
                     <div
-                      className="mt-2 flex flex-col items-start"
+                      className="flex flex-col items-start"
                       style={{ gap: `${rowGap}px` }}
                     >
                       {allSymbolTokens.filter((token) => column.activeTokens.has(token)).map((token) => (
