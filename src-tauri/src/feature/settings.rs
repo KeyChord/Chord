@@ -12,7 +12,6 @@ use anyhow::Result;
 pub struct AppSettingsState {
     pub bundle_ids_needing_relaunch: Vec<String>,
     pub git_repos: Vec<AppSettingsStateGitRepo>,
-    pub permissions: AppPermissionsState
 }
 
 #[typeshare]

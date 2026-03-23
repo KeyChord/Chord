@@ -12,7 +12,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
-use crate::feature::ChorderState;
+use crate::feature::{ChorderState, SafeAppHandle};
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -29,19 +29,19 @@ pub struct NativeSurfaceRect {
 
 #[derive(Clone)]
 pub struct ChorderIndicatorUi {
-    pub handle: AppHandle,
+    pub handle: SafeAppHandle,
     pub is_visible: Arc<AtomicBool>,
     pub panel: Arc<dyn Panel>,
     pub window: WebviewWindow,
 }
 
 impl ChorderIndicatorUi {
-    pub fn new(handle: AppHandle, state: &ChorderState) -> Result<Self> {
-        let window = WebviewWindowBuilder::new(
-            &handle,
-            "chords",
-            WebviewUrl::App("index.html".into()),
-        )
+    pub fn new(handle: SafeAppHandle, state: &ChorderState) -> Result<Self> {
+        let window = handle
+            .new_webview_window_builder(
+                "chords",
+                WebviewUrl::App("index.html".into()),
+            )
             .title("Chords")
             .initialization_script(format!(r#"
               window.__CHORDS_STATE__ = {}
@@ -105,7 +105,7 @@ impl ChorderIndicatorUi {
 
     pub fn configure_window_surface(
         window: &WebviewWindow,
-        handle: AppHandle,
+        handle: SafeAppHandle,
         rect: NativeSurfaceRect,
     ) -> Result<()> {
         let ns_view = Self::webview_ns_view(window)?;

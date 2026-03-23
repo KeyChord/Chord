@@ -21,7 +21,6 @@ mod feature;
 mod git;
 mod input;
 mod mode;
-mod sources;
 mod tauri_app;
 
 use tauri_nspanel::tauri_panel;
@@ -137,16 +136,16 @@ pub fn run() {
 
 async fn create_app_settings(
     safe_handle: SafeAppHandle,
-) -> Result<AppSettings, anyhow::Error> {
+) -> Result<AppSettings> {
     let chord_package_registry = ChordPackageRegistry::new(
-        safe_handle,
-    );
+        safe_handle.clone(),
+    )?;
+    let permissions =AppPermissions::from_check(safe_handle.clone()).await?;
 
     let settings_state = AppSettingsState {
         bundle_ids_needing_relaunch: Vec::new(),
         git_repos: chord_package_registry
-            .git
-            .discover_git_repos()?
+            .git.discover_repos()?
             .iter()
             .map(|r| AppSettingsStateGitRepo {
                 owner: r.owner.clone(),
@@ -157,10 +156,9 @@ async fn create_app_settings(
                 head_short_sha: r.head_short_sha.clone(),
             })
             .collect(),
-        permissions: AppPermissions::from_check(safe_handle.clone()).await,
     };
 
-    let settings = AppSettings::new(safe_handle.clone(), settings_state);
+    let settings = AppSettings::new(safe_handle.clone(), settings_state)?;
     Ok(settings)
 }
 
@@ -172,22 +170,21 @@ async fn create_app_permissions(safe_handle: SafeAppHandle) -> Result<AppPermiss
 fn setup(app: &mut tauri::App) -> Result<()> {
     let safe_handle = SafeAppHandle::new(app.handle().clone());
 
-    let app_permissions = tauri::async_runtime::block_on(create_app_permissions(safe_handle))?;
+    let app_permissions = tauri::async_runtime::block_on(create_app_permissions(safe_handle.clone()))?;
     app.manage(app_permissions);
 
     let app_frontmost = AppFrontmost::new_with_detector();
     app.manage(app_frontmost);
 
     let chorder_state = ChorderState::default();
-    let chorder = AppChorder::new(app.handle().clone(), chorder_state)?;
+    let chorder = AppChorder::new(safe_handle.clone(), chorder_state)?;
     app.manage(chorder);
 
     let context = AppContext::new()?;
     app.manage(context);
 
-    let app_settings = tauri::async_runtime::block_on(create_app_settings(app))?;
+    let app_settings = tauri::async_runtime::block_on(create_app_settings(safe_handle.clone()))?;
     app.manage(app_settings);
-
 
     let handle = app.handle();
     let tray_created = match tauri_app::tray::create_tray(handle.clone()) {

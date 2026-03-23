@@ -100,7 +100,7 @@ impl GitPackageRegistry {
             anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
         }
 
-        git::refresh_repo(&repo_ref, &repo_path)?;
+        crate::git::refresh_repo(&repo_ref, &repo_path)?;
         Ok(repo_ref.into_info(&repos_root))
     }
 

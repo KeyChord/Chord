@@ -1,4 +1,4 @@
-use super::{AppFrontmost, AppSettingsState, ChorderIndicatorUi, NativeSurfaceRect, SettingsUi};
+use super::{AppFrontmost, AppSettingsState, ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle, SettingsUi};
 use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
 use crate::{input::KeyEvent, AppContext};
@@ -27,11 +27,12 @@ pub struct ChorderObservable {
 }
 
 impl ChorderObservable {
-    fn new(handle: AppHandle, state: ChorderState) -> Self {
+    fn new(ui: &ChorderIndicatorUi, state: ChorderState) -> Self {
         let state = ObservableProperty::new(Arc::new(state));
 
+        let window = ui.window.clone();
         if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("state:chorder", new_state) {
+            if let Err(e) = window.emit("state:chorder", new_state) {
                 log::error!("Failed to emit chorder state change: {e}");
             }
         })) {
@@ -45,9 +46,9 @@ impl ChorderObservable {
 }
 
 impl AppChorder {
-    pub fn new(handle: AppHandle, state: ChorderState) -> Result<Self> {
-        let ui = ChorderIndicatorUi::new(handle.clone(), &state)?;
-        let observable = ChorderObservable::new(handle.clone(), state);
+    pub fn new(safe_handle: SafeAppHandle, state: ChorderState) -> Result<Self> {
+        let ui = ChorderIndicatorUi::new(safe_handle.clone(), &state)?;
+        let observable = ChorderObservable::new(&ui, state);
         let surface_window = ui.window.clone();
         let surface_handle = ui.handle.clone();
         let listener_window = surface_window.clone();

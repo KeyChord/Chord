@@ -246,8 +246,7 @@ impl Api for ApiImpl {
         let app_handle = self.app_handle()?;
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
-            // TODO: fix
-            return Ok(())
+            return Err(AppError::Message("cannot be empty".into()))
         }
 
         let store = global_hotkeys_store(&app_handle)?;

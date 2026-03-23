@@ -12,6 +12,9 @@ use tauri_plugin_store::{Store, StoreExt};
 
 type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
 
+/// A safe handle is a wrapper around AppHandle that is guaranteed to not panic (i.e. it only exposes
+/// "safe" methods). In contrast, calling `.state` on AppHandle will panic if the state hasn't been
+/// managed yet.
 #[derive(Clone)]
 pub struct SafeAppHandle {
     inner: Arc<Inner>,
@@ -114,6 +117,7 @@ impl SafeAppHandle {
             pub fn store(&self, path: impl AsRef<std::path::Path>) -> tauri_plugin_store::Result<Arc<Store<Wry>>>;
             pub fn path(&self) -> &tauri::path::PathResolver<Wry>;
             pub fn dialog(&self) -> &Dialog<Wry>;
+            pub fn run_on_main_thread<F: FnOnce() + Send + 'static>(&self, f: F) -> tauri::Result<()>;
         }
     }
 }

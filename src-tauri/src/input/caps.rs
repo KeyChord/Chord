@@ -11,7 +11,7 @@ use tauri::{AppHandle, Manager};
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
-extern "C" {
+unsafe extern "C" {
     fn start_caps_lock_listener(cb: extern "C" fn(c_int));
 }
 
