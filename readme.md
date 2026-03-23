@@ -19,7 +19,7 @@ tp = { name = "Toggle Preview", shortcut = "cmd+shift+p" }
 nds = { name = "New Directory with Selection", shortcut = "ctrl+cmd+n" }
 ```
 
-Because chords are only composed of multiple letters, they are often easier to remember than their modifier + key counterparts.
+Because chords are only composed of letters and/or numbers, they are often easier to remember than their modifier + key counterparts.
 
 In order to run a chord, you need to have the _Chord_ app installed and running in the background. _Chord_ won't do anything until you press the activation sequence to activate _Chord Mode_, which defaults to `Caps Lock` + `Space`.
 
