@@ -6,12 +6,13 @@ use crate::sources::{
 use crate::tauri_app::store::GlobalHotkeyStore;
 use crate::tauri_app::{
     list_active_chords, list_app_metadata, list_apps_needing_relaunch, list_loaded_chords,
-    list_matching_chords, relaunch_app, reload_loaded_app_chords, ActiveChordInfo, AppMetadataInfo,
-    AppNeedsRelaunchInfo,
+    list_matching_chords, relaunch_app, reload_loaded_app_chords, startup, ActiveChordInfo,
+    AppMetadataInfo, AppNeedsRelaunchInfo,
 };
+use crate::tauri_app::startup::StartupStatusInfo;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 #[derive(Debug)]
@@ -42,6 +43,10 @@ pub trait Api {
     async fn open_accessibility_settings();
     #[taurpc(alias = "openInputMonitoringSettings")]
     async fn open_input_monitoring_settings();
+    #[taurpc(alias = "getStartupStatus")]
+    async fn get_startup_status() -> Result<StartupStatusInfo, String>;
+    #[taurpc(alias = "completeOnboarding")]
+    async fn complete_onboarding() -> Result<(), String>;
     #[taurpc(alias = "listGitRepos")]
     async fn list_git_repos() -> Result<Vec<GitRepoInfo>, String>;
     #[taurpc(alias = "addGitRepo")]
@@ -106,6 +111,16 @@ impl Api for ApiImpl {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent",
             "input monitoring",
         );
+    }
+
+    async fn get_startup_status(self) -> Result<StartupStatusInfo, String> {
+        let app_handle = self.app_handle()?;
+        startup::get_startup_status(&app_handle).map_err(|error| error.to_string())
+    }
+
+    async fn complete_onboarding(self) -> Result<(), String> {
+        let app_handle = self.app_handle()?;
+        startup::complete_onboarding(&app_handle).map_err(|error| error.to_string())
     }
 
     async fn list_git_repos(self) -> Result<Vec<GitRepoInfo>, String> {

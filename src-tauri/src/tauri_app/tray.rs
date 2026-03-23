@@ -3,7 +3,16 @@ use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::settings::open_chords_inspector;
 use crate::tauri_app::context::reload_loaded_app_chords;
 use crate::tauri_app::settings::show_settings_window;
-use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle};
+use tauri::{image::Image, menu::MenuBuilder, tray::TrayIconBuilder, AppHandle};
+
+const TRAY_ICON_BYTES: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/icons/32x32.png"
+));
+
+fn load_tray_icon() -> tauri::Result<Image<'static>> {
+    Image::from_bytes(TRAY_ICON_BYTES).map(|image| image.to_owned())
+}
 
 pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
     let mut menu = MenuBuilder::new(&handle)
@@ -21,6 +30,7 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
         .menu(&menu)
         .tooltip("Chord")
         .show_menu_on_left_click(true)
+        .icon(load_tray_icon()?)
         .on_menu_event(|handle, event| match event.id().as_ref() {
             SETTINGS_MENU_ID => {
                 if let Err(e) = show_settings_window(handle.clone()) {
@@ -47,8 +57,9 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
             _ => {}
         });
 
-    if let Some(icon) = handle.default_window_icon().cloned() {
-        tray = tray.icon(icon);
+    #[cfg(target_os = "macos")]
+    {
+        tray = tray.icon_as_template(false);
     }
 
     tray.build(&handle)?;

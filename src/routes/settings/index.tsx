@@ -4,6 +4,7 @@ import { TanStackDevtools } from "@tanstack/react-devtools";
 import { Badge } from "#/components/ui/badge.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
 import { Toaster } from "#/components/ui/sonner.tsx";
+import { FirstRunOnboarding } from "#/components/settings/first-run-onboarding.tsx";
 import { SettingsTab } from "#/components/settings/settings-tab.tsx";
 import { ActiveChordsTab } from "#/components/settings/active-chords-tab.tsx";
 import { GlobalShortcutsTab } from "#/components/settings/global-shortcuts-tab.tsx";
@@ -15,6 +16,25 @@ export const Route = createFileRoute("/settings/")({
 
 function Settings() {
   const settingsPage = useSettingsPage();
+
+  if (!settingsPage.onboarding.startupBusy && settingsPage.onboarding.showOnboarding) {
+    return (
+      <>
+        <FirstRunOnboarding
+          canFinish={settingsPage.onboarding.canFinish}
+          isMacOS={settingsPage.onboarding.isMacOS}
+          onContinue={() => {
+            void settingsPage.onboarding.handleCompleteOnboarding();
+          }}
+          onSkip={() => {
+            void settingsPage.onboarding.handleCompleteOnboarding();
+          }}
+          permissionSteps={settingsPage.onboarding.permissionSteps}
+        />
+        <Toaster position="top-right" />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-full bg-muted/30 px-5 py-4 text-sm text-foreground">

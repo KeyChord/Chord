@@ -6,6 +6,7 @@ import {
   type GitRepoInfo,
   type GlobalShortcutMappingInfo,
   type LocalChordFolderInfo,
+  type StartupStatusInfo,
 } from "#/api/bindings.gen.ts";
 
 export const taurpc = createTauRPCProxy();
@@ -17,4 +18,5 @@ export type {
   GitRepoInfo,
   GlobalShortcutMappingInfo,
   LocalChordFolderInfo,
+  StartupStatusInfo,
 };

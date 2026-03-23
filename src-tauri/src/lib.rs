@@ -1,21 +1,19 @@
 use crate::api::{Api, ApiImpl};
 use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorUi, ChorderState};
+use crate::feature::{Chorder, ChorderIndicatorUi};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use frontmost::{start_nsrunloop, Detector};
 use objc2_app_kit::NSWorkspace;
 use parking_lot::deadlock;
-use specta_typescript::Typescript;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
+use tauri::async_runtime::block_on;
 use tauri::{AppHandle, Manager};
-use tauri_app::store::GlobalHotkeyStore;
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
-use tauri_plugin_store::StoreExt;
 
 mod api;
 mod chords;
@@ -109,7 +107,6 @@ pub fn run() {
     let api_impl_for_setup = api_impl.clone();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(taurpc::create_ipc_handler(api_impl.into_handler()))
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -144,7 +141,7 @@ pub fn run() {
             if let Err(e) = setup(app) {
                 log::error!("Failed to set up app:\n{:#?}", e);
                 app.dialog()
-                    .message(format!("Failed to start Chords:\n\n{e}"))
+                    .message(format!("Failed to start Chord:\n\n{e}"))
                     .title("Startup Error")
                     .blocking_show();
 
@@ -179,8 +176,16 @@ fn setup(app: &mut tauri::App) -> Result<()> {
 
     handle.manage(context);
 
-    tauri_app::tray::create_tray(handle.clone()).context("failed to create tray")?;
+    let tray_created = match tauri_app::tray::create_tray(handle.clone()) {
+        Ok(()) => true,
+        Err(error) => {
+            log::error!("Failed to create tray: {error:#}");
+            false
+        }
+    };
     tauri_app::settings::configure_settings_window(handle.clone())?;
+
+    let startup_status = tauri_app::startup::get_startup_status(&handle)?;
 
     let frontmost = Frontmost {
         frontmost: String::new(),
@@ -188,7 +193,11 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     };
     Detector::init(Box::new(frontmost));
 
-    if let Err(error) = tauri_app::settings::hide_settings_window(handle.clone()) {
+    if startup_status.should_show_onboarding || !tray_created {
+        if let Err(error) = tauri_app::settings::show_settings_window(handle.clone()) {
+            log::error!("failed to show settings window at startup: {error}");
+        }
+    } else if let Err(error) = tauri_app::settings::hide_settings_window(handle.clone()) {
         log::error!("failed to hide settings window at startup: {error}");
     }
 
@@ -230,6 +239,21 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             }
         });
     }
+
+    let accessibility_enabled = block_on(async {
+        tauri_plugin_macos_permissions::check_accessibility_permission().await
+    });
+    let input_monitoring_enabled = block_on(async {
+        tauri_plugin_macos_permissions::check_input_monitoring_permission().await
+    });
+    log::info!(
+        "Launch visibility: onboarding={}, tray_created={}, accessibility={}, input_monitoring={}, autostart={}",
+        startup_status.should_show_onboarding,
+        tray_created,
+        accessibility_enabled,
+        input_monitoring_enabled,
+        startup_status.launched_via_autostart
+    );
 
     Ok(())
 }

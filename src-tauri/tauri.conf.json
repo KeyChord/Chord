@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Chords",
+  "productName": "Chord",
   "version": "0.1.0",
   "identifier": "com.leonsilicon.chord",
   "build": {
@@ -13,7 +13,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyMTA1MTg3MjAzMTkxMzAKUldRd2tURWdoMUVRTXRiM3hzRlkvRVhjdkE0Y3lLNXJvaTEzRGRlYjRXdjVCdzVYc0lLM3lILysK",
       "endpoints": [
-        "https://github.com/leonsilicon/Chord/releases/latest/download/latest.json"
+        "https://github.com/KeyChord/Chord/releases/latest/download/latest.json"
       ]
     }
   },
@@ -23,8 +23,10 @@
       {
         "label": "settings",
         "title": "Settings",
-        "width": 420,
-        "height": 320,
+        "width": 920,
+        "height": 760,
+        "minWidth": 760,
+        "minHeight": 620,
         "visible": false,
         "resizable": true,
         "center": true

@@ -20,6 +20,7 @@ import {
   type GitRepoInfo,
   type GlobalShortcutMappingInfo,
   type LocalChordFolderInfo,
+  type StartupStatusInfo,
   taurpc,
 } from "#/api/taurpc.ts";
 import {
@@ -41,9 +42,11 @@ export function useSettingsPage() {
   const isMacOS = navigator.userAgent.includes("Mac");
   const [accessibilityBusy, setAccessibilityBusy] = useState(false);
   const [inputMonitoringBusy, setInputMonitoringBusy] = useState(false);
+  const [startupBusy, setStartupBusy] = useState(true);
   const [autostartBusy, setAutostartBusy] = useState(false);
   const [hasAccessibilityPermission, setHasAccessibilityPermission] = useState(!isMacOS);
   const [hasInputMonitoringPermission, setHasInputMonitoringPermission] = useState(!isMacOS);
+  const [startupStatus, setStartupStatus] = useState<StartupStatusInfo | null>(null);
   const [autostartEnabled, setAutostartEnabled] = useState(false);
   const [autostartStatus, setAutostartStatus] = useState("Checking launch on login...");
   const [repos, setRepos] = useState<GitRepoInfo[]>([]);
@@ -144,6 +147,18 @@ export function useSettingsPage() {
       enabled ? "Chords launches automatically when you log in." : "Chords will not launch on login.",
     );
     return enabled;
+  }
+
+  async function refreshStartupStatus() {
+    setStartupBusy(true);
+
+    try {
+      const nextStatus = await taurpc.getStartupStatus();
+      setStartupStatus(nextStatus);
+      return nextStatus;
+    } finally {
+      setStartupBusy(false);
+    }
   }
 
   async function refreshRepos(options?: RefreshOptions) {
@@ -441,6 +456,28 @@ export function useSettingsPage() {
     }
   }
 
+  async function handleCompleteOnboarding() {
+    try {
+      await taurpc.completeOnboarding();
+      setStartupStatus((current: StartupStatusInfo | null) =>
+        current
+          ? {
+              ...current,
+              onboardingCompleted: true,
+              shouldShowOnboarding: false,
+            }
+          : {
+              launchedViaAutostart: false,
+              onboardingCompleted: true,
+              shouldShowOnboarding: false,
+            },
+      );
+      toast.success("Setup complete.");
+    } catch (error) {
+      toast.error(`Failed to finish setup: ${getErrorMessage(error)}`);
+    }
+  }
+
   async function handleAddRepo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -596,6 +633,7 @@ export function useSettingsPage() {
     async function configureWindow() {
       try {
         await Promise.all([
+          refreshStartupStatus(),
           refreshAccessibilityPermissionState(),
           refreshInputMonitoringPermissionState(),
           refreshAutostartState(),
@@ -618,6 +656,24 @@ export function useSettingsPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isMacOS) {
+      return;
+    }
+
+    const refreshPermissions = () => {
+      void refreshAccessibilityPermissionState();
+      void refreshInputMonitoringPermissionState();
+    };
+
+    refreshPermissions();
+    window.addEventListener("focus", refreshPermissions);
+
+    return () => {
+      window.removeEventListener("focus", refreshPermissions);
+    };
+  }, [isMacOS]);
 
   useEffect(() => {
     setOpenChordGroups((current) => {
@@ -670,6 +726,8 @@ export function useSettingsPage() {
         ].some((value) => value.toLowerCase().includes(normalizedGlobalShortcutSearch))
       )
     : globalShortcutMappings;
+  const showOnboarding =
+    currentWindow.label === "settings" && startupStatus?.shouldShowOnboarding === true;
 
   return {
     summary: {
@@ -678,6 +736,37 @@ export function useSettingsPage() {
       shortcutCount: globalShortcutMappings.length,
     },
     appMetadataByBundleId,
+    onboarding: {
+      startupBusy,
+      showOnboarding,
+      canFinish: hasAccessibilityPermission && hasInputMonitoringPermission,
+      isMacOS,
+      handleCompleteOnboarding,
+      permissionSteps: [
+        {
+          id: "accessibility",
+          title: "Grant Accessibility",
+          description: "Required for UI automation and executing chords inside other apps.",
+          granted: hasAccessibilityPermission,
+          busy: accessibilityBusy,
+          buttonLabel: hasAccessibilityPermission ? "Open Settings" : "Grant Access",
+          onClick: () => {
+            void handleAccessibilityButtonClick();
+          },
+        },
+        {
+          id: "input-monitoring",
+          title: "Grant Input Monitoring",
+          description: "Required for detecting the global trigger before Chord can activate in the background.",
+          granted: hasInputMonitoringPermission,
+          busy: inputMonitoringBusy,
+          buttonLabel: hasInputMonitoringPermission ? "Open Settings" : "Grant Access",
+          onClick: () => {
+            void handleInputMonitoringButtonClick();
+          },
+        },
+      ],
+    },
     settingsTab: {
       repos,
       reposBusy,
@@ -731,6 +820,7 @@ export function useSettingsPage() {
       hasInputMonitoringPermission,
       accessibilityBusy,
       inputMonitoringBusy,
+      startupBusy,
       handleAccessibilityButtonClick,
       handleInputMonitoringButtonClick,
       autostartEnabled,
