@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::{AppHandle, Runtime, Wry};
+use tauri::{Runtime, Wry};
 use tauri_plugin_store::Store;
-use crate::AppContext;
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
-use crate::tauri_app::git::ChordPackageRegistry;
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
+use anyhow::Result;
+
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHotkeyStoreEntry {
@@ -14,21 +13,15 @@ pub struct GlobalHotkeyStoreEntry {
     pub hotkey_id: String,
 }
 
-pub struct GlobalHotkeyStore<R: Runtime> {
-    pub store: Arc<Store<R>>,
+#[derive(Clone)]
+pub struct GlobalHotkeyStore {
+    pub store: Arc<Store<Wry>>,
 }
 
-impl<R: Runtime> Clone for GlobalHotkeyStore<R> {
-    fn clone(&self) -> Self {
-        Self {
-            store: self.store.clone()
-        }
-    }
-}
-
-impl<R: Runtime> GlobalHotkeyStore<R> {
-    pub fn new(store: Arc<Store<R>>) -> Self {
-        Self { store }
+impl GlobalHotkeyStore {
+    pub fn new(handle: SafeAppHandle) -> Result<Self> {
+        let store = handle.store("global-hotkeys.json")?;
+        Ok(Self { store })
     }
 
     pub fn entries(&self) -> HashMap<String, GlobalHotkeyStoreEntry> {

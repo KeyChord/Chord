@@ -8,8 +8,7 @@ use tauri::Wry;
 use tauri_plugin_store::Store;
 use crate::chords::{ChordPackage, LoadedAppChords};
 use crate::feature::SafeAppHandle;
-use crate::git::{clone_repo, GitHubRepoRef};
-use crate::observables::{GitPackageRegistryObservable, GitPackageRegistryState, GitRepo};
+use crate::git::{GitHubRepoRef};
 use crate::stores::AppHandleStoreExt;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
@@ -17,71 +16,24 @@ pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
 
 pub struct GitPackageRegistry {
     pub dir: PathBuf,
-    pub observable: GitPackageRegistryObservable
+
+    handle: SafeAppHandle,
 }
 
 impl GitPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let dir = handle.path().app_cache_dir()?;
-        let observable = GitPackageRegistryObservable::new(handle.clone())?;
-        let store = handle.git_repos_store()?;
-        let git_repos = store.entries().values().cloned().map(|m| m.repo).collect();
-        observable.set_state(GitPackageRegistryState { git_repos })?;
-
         Ok(Self {
             dir,
-            observable,
+            handle
         })
     }
 
-    pub fn github_repos_dir(&self) -> PathBuf {
-        self.dir.join("repos/github.com")
-    }
-
-    pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
-        let repos_root = self.github_repos_dir();
-        let repo_path = repo_ref.local_path(&repos_root);
-        let state = self.observable.get_state()?;
-        let mut git_repos = state.git_repos.clone();
-
-        let repo = if repo_path.join(".git").exists() {
-            repo_ref.into_repo(&repos_root)
-        } else {
-            clone_repo(&repo_ref, &repo_path)?;
-            repo_ref.into_repo(&repos_root)
-        };
-        git_repos.push(repo);
-
-        log::debug!("repos: {:?}", git_repos);
-        self.observable.set_state(GitPackageRegistryState { git_repos })?;
-        Ok(())
-    }
-
-    pub fn sync_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
-        let repos_root = self.github_repos_dir();
-        let repo_path = repo_ref.local_path(&repos_root);
-
-        if !repo_path.join(".git").exists() {
-            anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-        }
-
-        crate::git::refresh_repo(&repo_ref, &repo_path)?;
-        let repo = repo_ref.into_repo(&repos_root);
-        let state = self.observable.get_state()?;
-        let mut git_repos = state.git_repos.clone();
-        match git_repos.iter_mut().find(|r| r.owner == repo.owner && r.slug == r.owner) {
-            Some(existing) => *existing = repo,
-            None => git_repos.push(repo),
-        }
-
-        self.observable.set_state(GitPackageRegistryState { git_repos })?;
-        Ok(())
-    }
-
-    pub fn load_all_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {
+    pub fn load_all_packages(&self) -> Result<Vec<ChordPackage>> {
         let mut packages = Vec::new();
-        let state = self.observable.get_state()?;
-        for repo in state.git_repos.iter() {
+        let repos = self.handle.git_repos_store()?;
+        let state = repos.observable.get_state()?;
+        for repo in state.repos.iter() {
             match gix::open(&repo.local_path)
                 .context(format!("failed to open repo {}", repo.slug))
                 .and_then(|repo_handle| ChordPackage::load_from_git_repo(&repo_handle))
@@ -96,8 +48,7 @@ impl GitPackageRegistry {
 
     pub fn load_repo_chords(&self, repo_input: &str) -> anyhow::Result<LoadedAppChords> {
         let repo_ref = GitHubRepoRef::parse(repo_input)?;
-        let repos_root = self.github_repos_dir();
-        let repo_path = repo_ref.local_path(&repos_root);
+        let repo_path = repo_ref.local_path(&self.dir);
 
         if !repo_path.join(".git").exists() {
             anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());

@@ -1,7 +1,15 @@
 use std::any::Any;
 use std::collections::HashMap;
 
-automoduse::dir!("src/observables" pub use);
+mod chorder;
+mod git_repos;
+mod permissions;
+mod settings;
+
+pub use chorder::*;
+pub use git_repos::*;
+pub use permissions::*;
+pub use settings::*;
 
 pub struct ObservableRegistration {
     pub id: &'static str,

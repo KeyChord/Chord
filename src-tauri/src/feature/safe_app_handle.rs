@@ -115,6 +115,7 @@ impl SafeAppHandle {
             pub fn dialog(&self) -> &Dialog<Wry>;
             pub fn run_on_main_thread<F: FnOnce() + Send + 'static>(&self, f: F) -> tauri::Result<()>;
             pub fn emit<S: Serialize + Clone>(&self, event: &str, payload: S) -> tauri::Result<()>;
+            pub fn get_webview_window(&self, label: &str) -> Option<tauri::webview::WebviewWindow<Wry>>;
         }
     }
 }

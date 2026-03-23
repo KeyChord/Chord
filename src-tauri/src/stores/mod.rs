@@ -11,27 +11,29 @@ pub use global_hotkey::*;
 pub use repos::*;
 use crate::feature::SafeAppHandle;
 
-pub trait AppHandleStoreExt<R: Runtime> {
-    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore<R>>;
-    fn git_repos_store(&self) -> Result<GitReposStore<R>>;
+pub trait AppHandleStoreExt {
+    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore>;
+    fn git_repos_store(&self) -> Result<GitReposStore>;
 }
 
-impl<R: Runtime> AppHandleStoreExt<R> for AppHandle<R> {
-    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore<R>> {
-       Ok(self.store("global-hotkeys.json").map(GlobalHotkeyStore::new)?)
+impl AppHandleStoreExt for AppHandle<Wry> {
+    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore> {
+        let handle = SafeAppHandle::new(self.clone());
+        Ok(GlobalHotkeyStore::new(handle)?)
     }
 
-    fn git_repos_store(&self) -> Result<GitReposStore<R>> {
-        Ok(self.store("repos.json").map(GitReposStore::new)?)
+    fn git_repos_store(&self) -> Result<GitReposStore> {
+        let handle = SafeAppHandle::new(self.clone());
+        Ok(GitReposStore::new(handle)?)
     }
 }
 
-impl AppHandleStoreExt<Wry> for SafeAppHandle {
-    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore<Wry>> {
-        Ok(self.store("global-hotkeys.json").map(GlobalHotkeyStore::new)?)
+impl AppHandleStoreExt for SafeAppHandle {
+    fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore> {
+        GlobalHotkeyStore::new(self.clone())
     }
 
-    fn git_repos_store(&self) -> Result<GitReposStore<Wry>> {
-        Ok(self.store("repos.json").map(GitReposStore::new)?)
+    fn git_repos_store(&self) -> Result<GitReposStore> {
+        GitReposStore::new(self.clone())
     }
 }

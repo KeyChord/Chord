@@ -4,7 +4,7 @@ use tauri::AppHandle;
 
 pub fn show_settings_window(handle: AppHandle) -> Result<()> {
     let settings = handle.app_settings();
-    let window = &settings.ui.window;
+    let window = settings.ui.get_or_create_window()?;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -13,14 +13,14 @@ pub fn show_settings_window(handle: AppHandle) -> Result<()> {
 
 pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
     let settings = handle.app_settings();
-    let window = &settings.ui.window;
+    let window = settings.ui.get_or_create_window()?;
     window.hide()?;
     Ok(())
 }
 
 pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
     let settings = handle.app_settings();
-    let window = &settings.ui.window;
+    let window = settings.ui.get_or_create_window()?;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;

@@ -4,8 +4,8 @@ use crate::define_observable;
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct GitPackageRegistryState {
-    pub git_repos: Vec<GitRepo>
+pub struct GitReposState {
+    pub repos: Vec<GitRepo>
 }
 
 #[taurpc::ipc_type]
@@ -23,6 +23,6 @@ pub struct GitRepo {
 }
 
 define_observable! {
-    pub struct GitPackageRegistryObservable(GitPackageRegistryState);
-    id: "git-package-registry";
+    pub struct GitReposObservable(GitReposState);
+    id: "git-repos";
 }

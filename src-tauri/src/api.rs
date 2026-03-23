@@ -133,20 +133,20 @@ impl Api for ApiImpl {
 
     async fn add_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let registry = handle.app_chord_package_registry();
+        let store = handle.git_repos_store()?;
         let repo_ref = GitHubRepoRef::parse(&repo)?;
-        registry.git.add_repo(repo_ref.clone())?;
+        store.add_repo(repo_ref.clone())?;
         reload_loaded_app_chords(handle.clone()).await?;
-        Ok(repo_ref.into_repo(registry.git.dir.as_path()))
+        Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
     }
 
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let registry = handle.app_chord_package_registry();
+        let store = handle.git_repos_store()?;
         let repo_ref  = GitHubRepoRef::parse(&repo)?;
-        registry.git.sync_repo(repo_ref.clone())?;
+        store.sync_repo(repo_ref.clone())?;
         reload_loaded_app_chords(handle.clone()).await?;
-        Ok(repo_ref.into_repo(registry.git.dir.as_path()))
+        Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
     }
 
     async fn list_local_chord_folders(self) -> AppResult<Vec<LocalChordPackage>> {
