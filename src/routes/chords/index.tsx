@@ -73,19 +73,22 @@ function ChordKeyRow({
   token,
   description = "",
   isSelected = false,
+  isDimmed = false,
   keySize,
   descriptionFontSize,
 }: {
   token: string;
   description?: string;
   isSelected?: boolean;
+  isDimmed?: boolean;
   keySize: number;
   descriptionFontSize: number;
 }) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 transition-colors",
+        "flex items-center gap-3 transition-all",
+        isDimmed ? "opacity-35" : "opacity-100",
         "text-foreground/95",
       )}
     >
@@ -117,11 +120,6 @@ export function Chords() {
   const [suggestions, setSuggestions] = useState<ActiveChordInfo[]>([]);
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const currentPrefixLength = state.keyBuffer.length;
-  const inputValue = state.keyBuffer.length > 0
-    ? formatKeys(state.keyBuffer)
-    : state.activeChord
-      ? formatKeys(state.activeChord.keys)
-      : "";
 
   useEffect(() => {
     const handleResize = () => {
@@ -212,61 +210,61 @@ export function Chords() {
       prefixTokens,
       activeTokens,
       selectedToken: normalizedBufferTokens[columnIndex],
+      hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
     };
   });
 
   return (
     <div className="relative size-full bg-transparent">
-      <div className="absolute left-4 top-1/2 -translate-y-1/2">
-        <div className="flex items-start gap-8">
-          <div className="flex items-start gap-6">
-            {keyColumns.map((column) => (
-              <div
-                key={column.id}
-                className="flex flex-col items-start justify-center"
-                style={{ gap: `${rowGap}px` }}
-              >
-                {LETTER_TOKENS.filter((token) => column.activeTokens.has(token)).map((token) => (
-                  <ChordKeyRow
-                    key={`${column.id}-${token}`}
-                    token={token}
-                    description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
-                    isSelected={column.selectedToken === token}
-                    keySize={keySize}
-                    descriptionFontSize={descriptionFontSize}
-                  />
-                ))}
+      <div className="absolute left-0 top-1/2 -translate-y-1/2">
+        <div
+        className={cn(
+            "relative overflow-hidden rounded-r-[2rem] rounded-l-none border border-l-0 px-5 py-5 pl-7",
+            "border-white/28 bg-white/30 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] backdrop-blur-[52px] backdrop-saturate-180",
+            "dark:border-white/10 dark:bg-zinc-950/34 dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]",
+          )}
+        >
+          <div className="relative flex items-start">
+            <div className="flex items-start gap-6">
+              {keyColumns.map((column) => (
+                <div
+                  key={column.id}
+                  className="flex flex-col items-start justify-center"
+                  style={{ gap: `${rowGap}px` }}
+                >
+                  {LETTER_TOKENS.filter((token) => column.activeTokens.has(token)).map((token) => (
+                    <ChordKeyRow
+                      key={`${column.id}-${token}`}
+                      token={token}
+                      description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
+                      isSelected={column.selectedToken === token}
+                      isDimmed={column.hasSelection && column.selectedToken !== token}
+                      keySize={keySize}
+                      descriptionFontSize={descriptionFontSize}
+                    />
+                  ))}
 
-                {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
-                  <div
-                    className="mt-2 flex flex-col items-start"
-                    style={{ gap: `${rowGap}px` }}
-                  >
-                    {allSymbolTokens.filter((token) => column.activeTokens.has(token)).map((token) => (
-                      <ChordKeyRow
-                        key={`${column.id}-${token}`}
-                        token={token}
-                        description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
-                        isSelected={column.selectedToken === token}
-                        keySize={keySize}
-                        descriptionFontSize={descriptionFontSize}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex min-h-12 w-full min-w-[240px] max-w-md flex-col justify-center gap-3">
-            {inputValue ? (
-              <div
-                className="font-mono tracking-[0.18em] text-foreground/95"
-                style={{ fontSize: `${clamp(Math.round(keySize * 1.2), 24, 42)}px` }}
-              >
-                {inputValue}
-              </div>
-            ) : null}
+                  {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
+                    <div
+                      className="mt-2 flex flex-col items-start"
+                      style={{ gap: `${rowGap}px` }}
+                    >
+                      {allSymbolTokens.filter((token) => column.activeTokens.has(token)).map((token) => (
+                        <ChordKeyRow
+                          key={`${column.id}-${token}`}
+                          token={token}
+                          description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
+                          isSelected={column.selectedToken === token}
+                          isDimmed={column.hasSelection && column.selectedToken !== token}
+                          keySize={keySize}
+                          descriptionFontSize={descriptionFontSize}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
