@@ -38,6 +38,7 @@ impl GitReposStore {
             })
             .collect();
         let observable = Arc::new(GitReposObservable::new(handle.clone())?);
+        log::debug!("repos: {:?}", repos);
         observable.set_state(GitReposState { repos })?;
         Ok(Self { handle, store, observable: observable.clone() })
     }
@@ -51,6 +52,8 @@ impl GitReposStore {
         let state = self.observable.get_state()?;
         let mut repos = state.repos.clone();
         repos.insert(id, repo);
+        self.observable.set_state(GitReposState { repos })?;
+
         Ok(())
     }
 
@@ -62,6 +65,8 @@ impl GitReposStore {
         let state = self.observable.get_state()?;
         let mut repos = state.repos.clone();
         repos.remove(&id);
+        self.observable.set_state(GitReposState { repos })?;
+
         Ok(())
     }
 
