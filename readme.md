@@ -49,8 +49,8 @@ If you want to trigger a chord without exiting _Chord Mode_, you can press `Caps
 <details>
   <summary>Why `Caps Lock`?</summary>
 
-  `Caps Lock` is a key that's significantly more comfortable to press after many chord sequences, especially ones containing symbols. To try it yourself, compare pressing `[o` followed by `Caps Lock`, and then compare it to pressing `Enter` afterwards.
- <details>
+  `Caps Lock` is a key that's significantly more comfortable to press after many chord sequences, especially ones containing symbols. To try it yourself, compare pressing `[o` followed by `Caps Lock`, and then compare it to pressing `Enter` afterwards. 
+</details>
 
 You can run a chord multiple times by pressing `Caps Lock` again. Pressing the following sequence of keys in _Chord Mode_ goes up three folders in Finder:
 
