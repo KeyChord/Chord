@@ -1,4 +1,4 @@
-use crate::chords::{Chord, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
+use crate::chords::{Chord, ChordFolder, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::{AppSettings, Chorder};
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::sources::load_all_chord_folders;
@@ -81,7 +81,11 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new(chorder: Chorder, settings: AppSettings, bundled_app_chords: LoadedAppChords) -> Self {
+    pub fn new(handle:AppHandle) -> Result<Self> {
+        let chorder = Chorder::new(handle.clone())?;
+        let settings = AppSettings::new(handle.clone())?;
+        let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
+
         let device_state = if macos_accessibility_client::accessibility::application_is_trusted() {
             Some(DeviceState {})
         } else {
@@ -90,7 +94,7 @@ impl AppContext {
 
         let app_mode_state_machine = Arc::new(AppModeStateMachine::new(device_state.clone()));
 
-        Self {
+        Ok(Self {
             settings,
             device_state,
             apps_needing_relaunch: RwLock::new(BTreeSet::new()),
@@ -99,7 +103,7 @@ impl AppContext {
             loaded_app_chords: RwLock::new(bundled_app_chords),
             app_mode_state_machine,
             chorder,
-        }
+        })
     }
 
     pub fn get_app_mode(&self) -> AppMode {
@@ -515,7 +519,7 @@ pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
 
 pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     let context = app.state::<AppContext>();
-    let state = context.chorder.state.get()?;
+    let state = context.chorder.observable.state.get()?;
     let frontmost_application_id = context.frontmost_application_id.load();
     let loaded_app_chords = context.loaded_app_chords.read();
 

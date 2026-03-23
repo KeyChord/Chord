@@ -19,35 +19,6 @@
   },
   "app": {
     "macOSPrivateApi": true,
-    "windows": [
-      {
-        "label": "settings",
-        "title": "Settings",
-        "width": 920,
-        "height": 760,
-        "minWidth": 760,
-        "minHeight": 620,
-        "visible": false,
-        "resizable": true,
-        "center": true
-      },
-      {
-        "label": "chords",
-        "title": "Chords",
-        "width": 640,
-        "height": 180,
-        "visible": false,
-        "transparent": true,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "maximizable": false,
-        "minimizable": false,
-        "visibleOnAllWorkspaces": true,
-        "shadow": false
-      }
-    ],
     "security": {
       "csp": null
     }

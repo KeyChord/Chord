@@ -160,11 +160,8 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         start_nsrunloop!();
     });
 
-    let handle = app.handle().clone();
-    let chorder = Chorder::new(ChorderIndicatorUi::new(handle.clone())?);
-    let settings = AppSettings::new(handle.clone())?;
-    let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
-    let context = AppContext::new(chorder, settings, bundled_app_chords);
+    let context = AppContext::new()?;
+    
     // Setting the frontmost application immediately (the frontmost crate only detects changes)
     let workspace = NSWorkspace::sharedWorkspace();
     if let Some(application) = workspace.frontmostApplication() {
@@ -184,7 +181,6 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             false
         }
     };
-    tauri_app::settings::configure_settings_window(handle.clone())?;
 
     let startup_status = tauri_app::startup::get_startup_status(&handle)?;
 

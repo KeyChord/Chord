@@ -9,9 +9,10 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
+use crate::feature::ChorderState;
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -35,10 +36,29 @@ pub struct ChorderIndicatorUi {
 }
 
 impl ChorderIndicatorUi {
-    pub fn new(handle: AppHandle) -> Result<Self> {
-        let window = handle
-            .get_webview_window(crate::constants::CHORD_WINDOW_LABEL)
-            .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
+    pub fn new(handle: AppHandle, state: &ChorderState) -> Result<Self> {
+        let window = WebviewWindowBuilder::new(
+            &handle,
+            "chords",
+            WebviewUrl::App("index.html".into()),
+        )
+            .title("Chords")
+            .initialization_script(format!(r#"
+              window.__CHORDS_STATE__ = {}
+            "#, serde_json::to_string(state)?))
+            .inner_size(640.0, 180.0)
+            .visible(false)
+            .transparent(true)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .maximizable(false)
+            .minimizable(false)
+            .visible_on_all_workspaces(true)
+            .shadow(false)
+            .build()?;
+
         let _ = window.set_ignore_cursor_events(true);
 
         let panel = window.to_panel::<IndicatorPanel>()?;
