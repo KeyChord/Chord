@@ -70,9 +70,20 @@ impl ChorderIndicatorUi {
                 native_panel.setFrameOrigin(tauri_nspanel::objc2_foundation::NSPoint::new(x, y));
             }
 
+            panel.set_alpha_value(0.0);
             panel.show();
             panel.order_front_regardless();
             is_visible.store(true, Ordering::Relaxed);
+        })?;
+
+        Ok(())
+    }
+
+    pub fn reveal(&self, handle: AppHandle) -> Result<()> {
+        let panel = self.panel.clone();
+
+        handle.run_on_main_thread(move || {
+            panel.set_alpha_value(1.0);
         })?;
 
         Ok(())

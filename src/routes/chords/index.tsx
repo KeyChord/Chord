@@ -3,7 +3,7 @@ import { taurpc, type ActiveChordInfo } from "#/api/taurpc.ts";
 import { Kbd } from "#/components/ui/kbd.tsx";
 import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { debug } from "@tauri-apps/plugin-log";
 import getPrettyKey from "pretty-key";
 import { cn } from "#/utils/style.ts";
@@ -161,16 +161,13 @@ export function Chords() {
   useEffect(() => {
     let firstFrame = 0;
     let secondFrame = 0;
-    const unlistenPromise = listen<boolean>("chorder-visibility-changed", (event) => {
-      if (!event.payload) {
-        return;
-      }
-
+    const unlistenPromise = listen("chorder-will-show", () => {
       cancelAnimationFrame(firstFrame);
       cancelAnimationFrame(secondFrame);
       firstFrame = requestAnimationFrame(() => {
         secondFrame = requestAnimationFrame(() => {
           setSurfaceVersion((version) => version + 1);
+          void emit("chorder-surface-ready");
         });
       });
     });

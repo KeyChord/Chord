@@ -10,8 +10,10 @@ use observable_property::ObservableProperty;
 use parking_lot::Mutex;
 use serde::Serialize;
 use std::collections::HashSet;
+use std::sync::mpsc;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Listener, Manager};
 use typeshare::typeshare;
 
 pub struct Chorder {
@@ -21,9 +23,27 @@ pub struct Chorder {
 }
 
 impl Chorder {
+    fn emit_will_show(&self) {
+        if let Err(error) = self.ui.window.emit("chorder-will-show", ()) {
+            log::error!("Failed to emit chorder will-show event: {error}");
+        }
+    }
+
     fn emit_visibility_changed(&self, visible: bool) {
         if let Err(error) = self.ui.window.emit("chorder-visibility-changed", visible) {
             log::error!("Failed to emit chorder visibility change: {error}");
+        }
+    }
+
+    fn prepare_surface_before_reveal(&self) {
+        let (tx, rx) = mpsc::sync_channel(1);
+        self.ui.window.once("chorder-surface-ready", move |_| {
+            let _ = tx.send(());
+        });
+        self.emit_will_show();
+
+        if rx.recv_timeout(Duration::from_millis(160)).is_err() {
+            log::debug!("Timed out waiting for chorder surface to prepare before reveal");
         }
     }
 
@@ -52,6 +72,8 @@ impl Chorder {
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
         if self.ui.ensure_visible(handle.clone())? {
+            self.prepare_surface_before_reveal();
+            self.ui.reveal(handle.clone())?;
             self.emit_visibility_changed(true);
         }
         Ok(())
