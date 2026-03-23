@@ -26,6 +26,7 @@ pub struct NativeSurfaceRect {
     pub radius: f64,
 }
 
+#[derive(Clone)]
 pub struct ChorderIndicatorUi {
     pub is_visible: Arc<AtomicBool>,
     pub panel: Arc<dyn Panel>,
