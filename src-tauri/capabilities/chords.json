@@ -2,9 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "chords",
   "description": "Capability for the Chords window",
-  "windows": [
-    "chords"
-  ],
+  "windows": ["chords"],
   "permissions": [
     "core:default",
     "autostart:default",

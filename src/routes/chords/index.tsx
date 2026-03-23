@@ -8,9 +8,9 @@ import { debug } from "@tauri-apps/plugin-log";
 import getPrettyKey from "pretty-key";
 import { cn } from "#/utils/style.ts";
 
-export const Route = createFileRoute('/chords/')({
+export const Route = createFileRoute("/chords/")({
   component: Chords,
-})
+});
 
 const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
   String.fromCharCode("A".charCodeAt(0) + index),
@@ -51,10 +51,12 @@ function compareSuggestionPriority(left: ActiveChordInfo, right: ActiveChordInfo
   const leftScopeRank = left.scopeKind === "app" ? 0 : 1;
   const rightScopeRank = right.scopeKind === "app" ? 0 : 1;
 
-  return leftDescriptionRank - rightDescriptionRank
-    || leftScopeRank - rightScopeRank
-    || left.sequence.localeCompare(right.sequence)
-    || left.name.localeCompare(right.name);
+  return (
+    leftDescriptionRank - rightDescriptionRank ||
+    leftScopeRank - rightScopeRank ||
+    left.sequence.localeCompare(right.sequence) ||
+    left.name.localeCompare(right.name)
+  );
 }
 
 function resolveTokenDescription(
@@ -120,9 +122,7 @@ function ChordKeyRow({
       >
         {token}
       </Kbd>
-      <div style={{ fontSize: `${descriptionFontSize}px` }}>
-        {description}
-      </div>
+      <div style={{ fontSize: `${descriptionFontSize}px` }}>{description}</div>
     </div>
   );
 }
@@ -167,7 +167,8 @@ export function Chords() {
   useEffect(() => {
     let cancelled = false;
 
-    void taurpc.listMatchingChords()
+    void taurpc
+      .listMatchingChords()
       .then((items) => {
         if (!cancelled) {
           if (currentPrefixLength === 0) {
@@ -179,7 +180,9 @@ export function Chords() {
       .catch((error: unknown) => {
         if (!cancelled) {
           setSuggestions([]);
-          void debug(`Failed to load matching chords: ${error instanceof Error ? error.message : String(error)}`);
+          void debug(
+            `Failed to load matching chords: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       });
 
@@ -229,21 +232,25 @@ export function Chords() {
     };
   }, [surfaceVersion]);
 
-  const sequenceSource = (allSuggestions.length > 0 ? allSuggestions : suggestions).map((suggestion) => ({
-    ...suggestion,
-    sequence: normalizeSequenceString(suggestion.sequence),
-  }));
+  const sequenceSource = (allSuggestions.length > 0 ? allSuggestions : suggestions).map(
+    (suggestion) => ({
+      ...suggestion,
+      sequence: normalizeSequenceString(suggestion.sequence),
+    }),
+  );
   const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
   const normalizedBufferTokens = state.keyBuffer.map((key) => {
     const pretty = normalizePrettyKey(getPrettyKey(key));
     return pretty.length === 1 ? pretty.toUpperCase() : pretty;
   });
 
-  const allSymbolTokens = [...new Set(
-    allSequences
-      .flatMap((sequence) => sequence)
-      .filter((token) => isSingleCharacterToken(token) && !/^[A-Z0-9]$/.test(token)),
-  )].sort(compareSymbolTokens);
+  const allSymbolTokens = [
+    ...new Set(
+      allSequences
+        .flatMap((sequence) => sequence)
+        .filter((token) => isSingleCharacterToken(token) && !/^[A-Z0-9]$/.test(token)),
+    ),
+  ].sort(compareSymbolTokens);
   const maxVisibleRows = Math.max(
     1,
     ...Array.from({ length: Math.max(1, currentPrefixLength + 1) }, (_, columnIndex) => {
@@ -251,7 +258,7 @@ export function Chords() {
       const activeTokens = new Set(
         allSequences
           .filter((sequence) =>
-            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token)
+            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token),
           )
           .map((sequence) => sequence[columnIndex])
           .filter((token): token is string => Boolean(token)),
@@ -270,25 +277,28 @@ export function Chords() {
     10,
   );
   const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
-  const keyColumns = Array.from({ length: Math.max(1, currentPrefixLength + 1) }, (_, columnIndex) => {
-    const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
-    const activeTokens = new Set(
-      allSequences
-        .filter((sequence) =>
-          prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token)
-        )
-        .map((sequence) => sequence[columnIndex])
-        .filter((token): token is string => Boolean(token)),
-    );
+  const keyColumns = Array.from(
+    { length: Math.max(1, currentPrefixLength + 1) },
+    (_, columnIndex) => {
+      const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
+      const activeTokens = new Set(
+        allSequences
+          .filter((sequence) =>
+            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token),
+          )
+          .map((sequence) => sequence[columnIndex])
+          .filter((token): token is string => Boolean(token)),
+      );
 
-    return {
-      id: `column-${columnIndex}`,
-      prefixTokens,
-      activeTokens,
-      selectedToken: normalizedBufferTokens[columnIndex],
-      hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
-    };
-  });
+      return {
+        id: `column-${columnIndex}`,
+        prefixTokens,
+        activeTokens,
+        selectedToken: normalizedBufferTokens[columnIndex],
+        hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
+      };
+    },
+  );
 
   useLayoutEffect(() => {
     emitSurfaceRect();
@@ -318,7 +328,11 @@ export function Chords() {
                     <ChordKeyRow
                       key={`${column.id}-${token}`}
                       token={token}
-                      description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
+                      description={resolveTokenDescription(
+                        sequenceSource,
+                        column.prefixTokens,
+                        token,
+                      )}
                       isSelected={column.selectedToken === token}
                       isDimmed={column.hasSelection && column.selectedToken !== token}
                       keySize={keySize}
@@ -327,21 +341,24 @@ export function Chords() {
                   ))}
 
                   {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
-                    <div
-                      className="flex flex-col items-start"
-                      style={{ gap: `${rowGap}px` }}
-                    >
-                      {allSymbolTokens.filter((token) => column.activeTokens.has(token)).map((token) => (
-                        <ChordKeyRow
-                          key={`${column.id}-${token}`}
-                          token={token}
-                          description={resolveTokenDescription(sequenceSource, column.prefixTokens, token)}
-                          isSelected={column.selectedToken === token}
-                          isDimmed={column.hasSelection && column.selectedToken !== token}
-                          keySize={keySize}
-                          descriptionFontSize={descriptionFontSize}
-                        />
-                      ))}
+                    <div className="flex flex-col items-start" style={{ gap: `${rowGap}px` }}>
+                      {allSymbolTokens
+                        .filter((token) => column.activeTokens.has(token))
+                        .map((token) => (
+                          <ChordKeyRow
+                            key={`${column.id}-${token}`}
+                            token={token}
+                            description={resolveTokenDescription(
+                              sequenceSource,
+                              column.prefixTokens,
+                              token,
+                            )}
+                            isSelected={column.selectedToken === token}
+                            isDimmed={column.hasSelection && column.selectedToken !== token}
+                            keySize={keySize}
+                            descriptionFontSize={descriptionFontSize}
+                          />
+                        ))}
                     </div>
                   ) : null}
                 </div>

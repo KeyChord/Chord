@@ -3,7 +3,11 @@ import { hotkeysCoreFeature, syncDataLoaderFeature, type Updater } from "@headle
 import { useTree } from "@headless-tree/react";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "#/components/ui/badge.tsx";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "#/components/ui/collapsible.tsx";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "#/components/ui/collapsible.tsx";
 import { AppIcon } from "#/components/settings/app-icon.tsx";
 import { cn } from "#/utils/style.ts";
 import {
@@ -45,7 +49,9 @@ function ChordTreeRows({
               </div>
               <div className="min-w-0">
                 {node.chords.length === 0 ? (
-                  <span className="text-[11px] text-muted-foreground">{node.chordCount} chords</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {node.chordCount} chords
+                  </span>
                 ) : (
                   <div className="space-y-1">
                     {node.chords.map((chord) => (
@@ -90,7 +96,8 @@ export function ChordGroupList({
       {groups.map((group) => {
         const isOpen = forceOpen || openGroups[group.key] === true;
         const tree = buildChordTree(group.chords);
-        const appMetadata = group.scopeKind === "app" ? appMetadataByBundleId[group.scope] : undefined;
+        const appMetadata =
+          group.scopeKind === "app" ? appMetadataByBundleId[group.scope] : undefined;
         const appLabel = getAppLabel(group.scope, appMetadata);
         const showsBundleId = group.scopeKind === "app" && appLabel !== group.scope;
 
@@ -188,7 +195,8 @@ export function ActiveChordTree({
     state: { expandedItems },
     setExpandedItems: (updaterOrValue: Updater<string[]>) => {
       setExpandedItems((current) => {
-        const next = typeof updaterOrValue === "function" ? updaterOrValue(current) : updaterOrValue;
+        const next =
+          typeof updaterOrValue === "function" ? updaterOrValue(current) : updaterOrValue;
         const nextSet = new Set(next);
 
         for (const groupItemId of treeModel.groupItemIds) {
@@ -225,7 +233,10 @@ export function ActiveChordTree({
               <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-muted-foreground">
                 {data.childIds.length > 0 ? (
                   <ChevronRight
-                    className={cn("size-3.5 transition-transform", item.isExpanded() ? "rotate-90" : undefined)}
+                    className={cn(
+                      "size-3.5 transition-transform",
+                      item.isExpanded() ? "rotate-90" : undefined,
+                    )}
                   />
                 ) : (
                   <span className="size-1.5 rounded-full bg-border" />
@@ -253,13 +264,17 @@ export function ActiveChordTree({
               ) : (
                 <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,140px)_minmax(0,1fr)] gap-x-3">
                   <div className="truncate font-mono text-[11px] text-foreground/85">
-                    <span className={data.chords.length === 0 ? "text-muted-foreground" : undefined}>
+                    <span
+                      className={data.chords.length === 0 ? "text-muted-foreground" : undefined}
+                    >
                       {data.prefix}
                     </span>
                   </div>
                   <div className="min-w-0">
                     {data.chords.length === 0 ? (
-                      <span className="text-[11px] text-muted-foreground">{data.chordCount} chords</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {data.chordCount} chords
+                      </span>
                     ) : (
                       <div className="space-y-1">
                         {data.chords.map((chord) => (

@@ -265,10 +265,6 @@ pub fn throw_js_error(ctx: Ctx<'_>, message: impl Into<String>) -> Error {
     }
 }
 
-fn init_globals(ctx: Ctx<'_>, handle: AppHandle) -> rquickjs::Result<()> {
-    Ok(())
-}
-
 pub fn format_js_error(ctx: Ctx<'_>, err: Error) -> String {
     match err {
         Error::Exception => {

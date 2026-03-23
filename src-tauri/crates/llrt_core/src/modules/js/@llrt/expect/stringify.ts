@@ -26,10 +26,7 @@ SOFTWARE.
 // Extracted and modified from Vitest:  https://github.com/vitest-dev/vitest/blob/0f86ff98975a80191d6215b0d30ff6cd9f8388d3/packages/utils/src/stringify.ts
 
 import type { PrettyFormatOptions } from "pretty-format";
-import {
-  format as prettyFormat,
-  plugins as prettyFormatPlugins,
-} from "pretty-format";
+import { format as prettyFormat, plugins as prettyFormatPlugins } from "pretty-format";
 
 const {
   AsymmetricMatcher,
@@ -52,7 +49,7 @@ const PLUGINS = [
 export function stringify(
   object: unknown,
   maxDepth = 10,
-  { maxLength, ...options }: PrettyFormatOptions & { maxLength?: number } = {}
+  { maxLength, ...options }: PrettyFormatOptions & { maxLength?: number } = {},
 ): string {
   const MAX_LENGTH = maxLength ?? 10000;
   let result;

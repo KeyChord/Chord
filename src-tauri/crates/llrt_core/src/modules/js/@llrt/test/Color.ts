@@ -10,9 +10,7 @@ const NAMES = [
   "default",
 ] as const;
 
-type BgType<T extends string> = T extends `${infer A}${infer B}`
-  ? `bg${Uppercase<A>}${B}`
-  : T;
+type BgType<T extends string> = T extends `${infer A}${infer B}` ? `bg${Uppercase<A>}${B}` : T;
 
 type BrightType<T extends string> = `${T}Bright`;
 
@@ -38,43 +36,36 @@ type Options = {
 
 class Color {
   private static CODES = (() => {
-    return NAMES.reduce<Record<string, number>>(
-      (acc, name: string, i: number) => {
-        let code = i + 30;
+    return NAMES.reduce<Record<string, number>>((acc, name: string, i: number) => {
+      let code = i + 30;
 
-        const COLOR = Color as any;
+      const COLOR = Color as any;
 
-        const bgName = `bg${name[0].toUpperCase()}${name.substring(1)}`;
-        const brightName = `${name}Bright`;
-        const bgBrightName = `${bgName}Bright`;
-        acc[name] = code;
-        acc[brightName] = code + 60;
-        acc[bgName] = code + 10;
-        acc[bgBrightName] = code + 70;
+      const bgName = `bg${name[0].toUpperCase()}${name.substring(1)}`;
+      const brightName = `${name}Bright`;
+      const bgBrightName = `${bgName}Bright`;
+      acc[name] = code;
+      acc[brightName] = code + 60;
+      acc[bgName] = code + 10;
+      acc[bgBrightName] = code + 70;
 
-        COLOR[name] = Color.colorizer(code);
-        COLOR[brightName] = Color.colorizer(code + 60);
+      COLOR[name] = Color.colorizer(code);
+      COLOR[brightName] = Color.colorizer(code + 60);
 
-        COLOR[bgName] = Color.colorizer(0, {
-          bgColor: code + 10,
-        });
-        COLOR[bgBrightName] = Color.colorizer(0, {
-          bgColor: code + 70,
-        });
+      COLOR[bgName] = Color.colorizer(0, {
+        bgColor: code + 10,
+      });
+      COLOR[bgBrightName] = Color.colorizer(0, {
+        bgColor: code + 70,
+      });
 
-        return acc;
-      },
-      {}
-    ) as ColorNames;
+      return acc;
+    }, {}) as ColorNames;
   })();
 
   static RESET: string = "\x1b[0m";
 
-  static colorizer(
-    color: number,
-    options: Options = {},
-    option?: keyof Options
-  ) {
+  static colorizer(color: number, options: Options = {}, option?: keyof Options) {
     options.color = color;
     if (option) {
       const colorOption = Color.CODES && (Color.CODES as any)[option];
@@ -125,7 +116,7 @@ class Color {
         }
 
         return `\x1b[${colorCode}m${modes.map((m) => `\x1b[${m}m`).join("")}${args.join(
-          " "
+          " ",
         )}${Color.RESET}`;
       },
     });

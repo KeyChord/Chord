@@ -5,5 +5,5 @@ export function useAppMetadataQuery(bundleId: string) {
   return useQuery({
     queryKey: ["appMetadata", bundleId],
     queryFn: () => taurpc.getAppMetadata(bundleId),
-  })
+  });
 }

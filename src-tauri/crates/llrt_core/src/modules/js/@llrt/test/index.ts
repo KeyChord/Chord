@@ -57,11 +57,7 @@ type WorkerData = {
 
 class Color {
   private static colorizer =
-    (
-      color: number | null,
-      bgColor: number | null = null,
-      style: number | null = null
-    ) =>
+    (color: number | null, bgColor: number | null = null, style: number | null = null) =>
     (text: string) =>
       `\x1b[${color || bgColor || style}m${text}${Color.RESET}`;
 
@@ -85,8 +81,7 @@ type TestFailure = {
 class TestServer {
   private static UPDATE_FPS = 15;
   private static UPDATE_INTERVAL_MS = 1000 / TestServer.UPDATE_FPS;
-  private static DEFAULT_TIMEOUT_MS =
-    parseInt((process.env as any).TEST_TIMEOUT) || 5000;
+  private static DEFAULT_TIMEOUT_MS = parseInt((process.env as any).TEST_TIMEOUT) || 5000;
   private static DEFAULT_PROGRESS_BAR_WIDTH = 24;
   private static SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
   private static TESTING_TEXT = " Testing ";
@@ -123,10 +118,7 @@ class TestServer {
   private activeWorkers = 0;
   private printFinalResults = false;
 
-  constructor(
-    testFiles: string[],
-    { workerCount = os.availableParallelism() }: TestOptions = {}
-  ) {
+  constructor(testFiles: string[], { workerCount = os.availableParallelism() }: TestOptions = {}) {
     this.fileQueue = [...testFiles];
     this.testFiles = [...testFiles];
     this.testFileNames = testFiles.map((file) => path.basename(file));
@@ -142,9 +134,7 @@ class TestServer {
       return;
     }
     this.started = performance.now();
-    const server = net.createServer((socket) =>
-      this.handleSocketConnected(socket)
-    );
+    const server = net.createServer((socket) => this.handleSocketConnected(socket));
 
     this.server = server;
 
@@ -176,13 +166,9 @@ class TestServer {
       socket.write(JSON.stringify(response), (err) => {
         workerData.writeInProgress = false;
         if (err) {
-          return this.handleError(
-            TestServer.ERROR_CODE_SOCKET_WRITE_ERROR,
-            err,
-            {
-              socket,
-            }
-          );
+          return this.handleError(TestServer.ERROR_CODE_SOCKET_WRITE_ERROR, err, {
+            socket,
+          });
         }
         if (this.shutdownPending) {
           this.shutdown();
@@ -260,13 +246,9 @@ class TestServer {
       __LLRT_TEST_FILE: file,
     };
     delete env.LLRT_LOG;
-    const proc = spawn(
-      process.argv0,
-      ["-e", `import("llrt:test/worker").catch(console.error)`],
-      {
-        env,
-      }
-    );
+    const proc = spawn(process.argv0, ["-e", `import("llrt:test/worker").catch(console.error)`], {
+      env,
+    });
     proc.stderr.on("data", (data) => {
       stdErrBuffer.append(data);
     });
@@ -287,7 +269,7 @@ class TestServer {
           {
             id,
             ended: performance.now(),
-          }
+          },
         );
         this.handleWorkerCompleted(id);
       }
@@ -319,10 +301,7 @@ class TestServer {
     }
   }
 
-  handleData(
-    socket: net.Socket,
-    data: Buffer
-  ): { response: object | null; workerId: number } {
+  handleData(socket: net.Socket, data: Buffer): { response: object | null; workerId: number } {
     const message = JSON.parse(data as any) as SocketReqMsg;
     const { type } = message;
 
@@ -446,10 +425,7 @@ class TestServer {
     this.activeWorkers--;
 
     const shutdownOrPrint = () => {
-      if (
-        this.completedWorkers == this.testFiles.length &&
-        !this.printFinalResults
-      ) {
+      if (this.completedWorkers == this.testFiles.length && !this.printFinalResults) {
         this.printFinalResults = true;
         clearInterval(this.updateInterval!);
         this.tick();
@@ -465,7 +441,7 @@ class TestServer {
     if (workerData.childProc) {
       const exitTimeout = setTimeout(() => {
         const error = new Error(
-          "Test did not exit within 1s. It does not properly clean up created resources (servers, timeouts etc)"
+          "Test did not exit within 1s. It does not properly clean up created resources (servers, timeouts etc)",
         );
         this.handleTestError(workerId, error, performance.now());
         try {
@@ -527,8 +503,7 @@ class TestServer {
     const now = Date.now();
     const first = this.lastUpdate == 0;
     if (now - this.lastUpdate > TestServer.UPDATE_INTERVAL_MS) {
-      this.spinnerFrameIndex =
-        (this.spinnerFrameIndex + 1) % TestServer.SPINNER.length;
+      this.spinnerFrameIndex = (this.spinnerFrameIndex + 1) % TestServer.SPINNER.length;
       this.lastUpdate = now;
     }
 
@@ -543,7 +518,7 @@ class TestServer {
         this.handleTestError(
           id as any,
           new Error(`Test timed out after ${workerData.currentTimeout}ms`),
-          performance.now()
+          performance.now(),
         );
         try {
           workerData.childProc?.kill();
@@ -576,12 +551,11 @@ class TestServer {
       TestServer.DEFAULT_PROGRESS_BAR_WIDTH,
       Math.max(
         10,
-        terminalWidth - (2 + progressText.length + 2) //[ + ] + spinner + spacing + progress text
-      )
+        terminalWidth - (2 + progressText.length + 2), //[ + ] + spinner + spacing + progress text
+      ),
     );
     let totalProgressBarWidth = progressbarWidth;
-    const showProgressBarDesc =
-      totalProgressBarWidth == TestServer.DEFAULT_PROGRESS_BAR_WIDTH;
+    const showProgressBarDesc = totalProgressBarWidth == TestServer.DEFAULT_PROGRESS_BAR_WIDTH;
     if (showProgressBarDesc) {
       totalProgressBarWidth += TestServer.TESTING_TEXT.length;
     }
@@ -600,9 +574,7 @@ class TestServer {
       if (results && (isSuccess || isFailed)) {
         if (!results.printed) {
           results.printed = true;
-          message += isSuccess
-            ? Color.GREEN(TestServer.CHECKMARK)
-            : Color.RED(TestServer.CROSS);
+          message += isSuccess ? Color.GREEN(TestServer.CHECKMARK) : Color.RED(TestServer.CROSS);
           message += " ";
           message += results.name;
           message += "\n";
@@ -614,22 +586,13 @@ class TestServer {
       const inProgress = this.workerDataFileInProgress.has(file);
       const filename = this.testFileNames[i];
 
-      if (
-        inProgress &&
-        totalProgressBarWidth + suffix.length + 4 < terminalWidth
-      ) {
-        if (
-          totalProgressBarWidth + suffix.length + filename.length + 4 <
-          terminalWidth
-        ) {
+      if (inProgress && totalProgressBarWidth + suffix.length + 4 < terminalWidth) {
+        if (totalProgressBarWidth + suffix.length + filename.length + 4 < terminalWidth) {
           suffix += filename;
           suffix += ", ";
         } else {
           overflow = true;
-          suffix += filename.slice(
-            0,
-            terminalWidth - (totalProgressBarWidth + suffix.length + 5)
-          );
+          suffix += filename.slice(0, terminalWidth - (totalProgressBarWidth + suffix.length + 5));
           suffix += "...";
         }
       }
@@ -673,13 +636,9 @@ class TestServer {
     }
 
     if (this.totalFailed == 0) {
-      output += Color.GREEN_BACKGROUND(
-        Color.BOLD(` ${TestServer.CHECKMARK} ALL PASS `)
-      );
+      output += Color.GREEN_BACKGROUND(Color.BOLD(` ${TestServer.CHECKMARK} ALL PASS `));
     } else {
-      output += Color.RED_BACKGROUND(
-        Color.BOLD(` ${TestServer.CHECKMARK} TESTS FAILED `)
-      );
+      output += Color.RED_BACKGROUND(Color.BOLD(` ${TestServer.CHECKMARK} TESTS FAILED `));
     }
     output += ` ${Color.DIM(TestServer.elapsed({ started: this.started, ended }))}\n`;
     output += `${this.totalSuccess} passed, ${this.totalFailed} failed, ${this.totalSkipped} skipped, ${this.totalTests} tests\n`;
@@ -687,9 +646,7 @@ class TestServer {
     if (this.totalFailed > 0) {
       output = "";
       const sortedFilesFailed = new Map(
-        Array.from(this.filesFailed.entries()).sort(([keyA], [keyB]) =>
-          keyA.localeCompare(keyB)
-        )
+        Array.from(this.filesFailed.entries()).sort(([keyA], [keyB]) => keyA.localeCompare(keyB)),
       );
       for (let [file, testFailure] of sortedFilesFailed) {
         output += `\n${Color.RED_BACKGROUND(` ${file} `)}\n`;
@@ -715,9 +672,7 @@ class TestServer {
     let output = "";
     const indent = "  ".repeat(depth);
     for (let test of result.tests) {
-      const icon = test.success
-        ? Color.GREEN(TestServer.CHECKMARK)
-        : Color.RED(TestServer.CROSS);
+      const icon = test.success ? Color.GREEN(TestServer.CHECKMARK) : Color.RED(TestServer.CROSS);
       output += `${indent}${icon} ${test.desc} ${Color.DIM(TestServer.elapsed(test))}\n`;
       if (test.error) {
         output += this.formattedError(test.error) + "\n";
@@ -740,18 +695,10 @@ class TestServer {
         .join("\n");
     }
 
-    return Color.RED(
-      `${indent}\x1b[1m${error.name}:\x1b[22m ${error.message}\n${stack}`
-    );
+    return Color.RED(`${indent}\x1b[1m${error.name}:\x1b[22m ${error.message}\n${stack}`);
   }
 
-  static elapsed({
-    started,
-    ended,
-  }: {
-    started: number;
-    ended: number;
-  }): string {
+  static elapsed({ started, ended }: { started: number; ended: number }): string {
     return `${(ended - started).toFixed(3)}ms`;
   }
 }

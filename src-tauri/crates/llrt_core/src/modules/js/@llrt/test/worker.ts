@@ -20,11 +20,7 @@ type SuiteFunctionWithOptions = SuiteFunction & {
   only?: SuiteFunction;
 };
 
-type SuiteFunction = (
-  desc: string,
-  fn: () => Promise<void>,
-  timeout?: number
-) => void;
+type SuiteFunction = (desc: string, fn: () => Promise<void>, timeout?: number) => void;
 
 type TestSuite = TestSettings &
   TestSetup & {
@@ -57,22 +53,15 @@ type MessageTypeMap = {
   [K in SocketReqMsg["type"]]: Extract<SocketReqMsg, { type: K }>;
 };
 
-type MessagePayload<T extends SocketReqMsg["type"]> = Omit<
-  MessageTypeMap[T],
-  "type"
->;
+type MessagePayload<T extends SocketReqMsg["type"]> = Omit<MessageTypeMap[T], "type">;
 
-type SocketReturnType<T> = T extends keyof SocketResponseMap
-  ? SocketResponseMap[T]
-  : null;
+type SocketReturnType<T> = T extends keyof SocketResponseMap ? SocketResponseMap[T] : null;
 
 class TestAgent {
-  private static DEFAULT_TIMEOUT_MS =
-    parseInt((process.env as any).TEST_TIMEOUT) || 5000;
+  private static DEFAULT_TIMEOUT_MS = parseInt((process.env as any).TEST_TIMEOUT) || 5000;
 
   private static EMPTY_ARROW_FN_REGEX = /^(async)?\s*\(\s*\)\s*=>/m;
-  private static EMPTY_FN_REGEX =
-    /^(async)?\s*function\s*[a-zA-Z0-9_-]*\s*\(\s*\)\s*\{/m;
+  private static EMPTY_FN_REGEX = /^(async)?\s*function\s*[a-zA-Z0-9_-]*\s*\(\s*\)\s*\{/m;
 
   private static EXPECT = (() => {
     chai.use(JestChaiExpect);
@@ -146,10 +135,7 @@ class TestAgent {
         await fn();
         let afterLength = this.suiteLoadPromises.length;
 
-        let items = this.suiteLoadPromises.splice(
-          beforeLength,
-          afterLength - beforeLength
-        );
+        let items = this.suiteLoadPromises.splice(beforeLength, afterLength - beforeLength);
         if (items.length) {
           this.suiteLoadPromises.unshift(...items);
           let subSuites = new Array(items.length).fill(this.currentSuite);
@@ -192,11 +178,7 @@ class TestAgent {
     };
   }
 
-  private async runHook(
-    testSuite: TestSuite,
-    hook: keyof TestSetup,
-    timeout?: number
-  ) {
+  private async runHook(testSuite: TestSuite, hook: keyof TestSetup, timeout?: number) {
     const hooks: MaybeAsyncFunction[] = [];
     const walkParents = hook === "beforeEach" || hook === "afterEach";
     let current: TestSuite | undefined = testSuite;
@@ -213,12 +195,11 @@ class TestAgent {
 
   private async executeAsyncOrCallbackFn(
     fn: Function,
-    timeout: number = TestAgent.DEFAULT_TIMEOUT_MS
+    timeout: number = TestAgent.DEFAULT_TIMEOUT_MS,
   ) {
     const fnBody = fn.toString();
     const usesArgument = !(
-      TestAgent.EMPTY_ARROW_FN_REGEX.test(fnBody) ||
-      TestAgent.EMPTY_FN_REGEX.test(fnBody)
+      TestAgent.EMPTY_ARROW_FN_REGEX.test(fnBody) || TestAgent.EMPTY_FN_REGEX.test(fnBody)
     );
     TestAgent.EMPTY_ARROW_FN_REGEX.lastIndex = -1;
     TestAgent.EMPTY_FN_REGEX.lastIndex = -1;
@@ -265,9 +246,7 @@ class TestAgent {
 
   private async sendMessage<T extends SocketReqMsg["type"]>(
     type: T,
-    ...message: MessagePayload<T> extends Record<string, never>
-      ? []
-      : [MessagePayload<T>]
+    ...message: MessagePayload<T> extends Record<string, never> ? [] : [MessagePayload<T>]
   ): Promise<SocketReturnType<T>> {
     const [messageData] = message!;
 
@@ -424,10 +403,7 @@ class TestAgent {
     await this.runHook(suite, "beforeAll", suite.timeout);
     await this.runTests(suite, suite.tests);
     for (const child of suite.suites ?? []) {
-      if (
-        child.skip ||
-        (this.onlyCount > 0 && !child.only && !child.containsOnly)
-      ) {
+      if (child.skip || (this.onlyCount > 0 && !child.only && !child.containsOnly)) {
         continue;
       }
       const childStarted = performance.now();
@@ -500,7 +476,7 @@ const serverPort = parseInt(serverPortEnv || "");
 
 if (isNaN(workerId) || isNaN(serverPort) || !testFile) {
   throw new Error(
-    "Test worker requires __LLRT_TEST_SERVER_PORT, __LLRT_TEST_WORKER_ID & __LLRT_TEST_FILE env"
+    "Test worker requires __LLRT_TEST_SERVER_PORT, __LLRT_TEST_WORKER_ID & __LLRT_TEST_FILE env",
   );
 }
 

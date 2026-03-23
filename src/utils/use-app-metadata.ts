@@ -16,15 +16,14 @@ export function useAppMetadata(bundleIds: string[]) {
       };
     }
 
-    void taurpc.listAppMetadata(bundleIds)
+    void taurpc
+      .listAppMetadata(bundleIds)
       .then((items: AppMetadataInfo[]) => {
         if (cancelled) {
           return;
         }
 
-        setAppMetadataByBundleId(
-          Object.fromEntries(items.map((item) => [item.bundleId, item])),
-        );
+        setAppMetadataByBundleId(Object.fromEntries(items.map((item) => [item.bundleId, item])));
       })
       .catch((error) => {
         if (!cancelled) {

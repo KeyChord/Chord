@@ -34,7 +34,7 @@ export function equals(
   a: unknown,
   b: unknown,
   customTesters?: Array<any>,
-  strictCheck?: boolean
+  strictCheck?: boolean,
 ): boolean {
   customTesters = customTesters || [];
   return eq(a, b, [], [], customTesters, strictCheck ? hasKey : hasDefinedKey);
@@ -56,10 +56,8 @@ export function hasAsymmetric(obj: any, seen = new Set()): boolean {
   seen.add(obj);
   if (isAsymmetric(obj)) return true;
   if (Array.isArray(obj)) return obj.some((i) => hasAsymmetric(i, seen));
-  if (obj instanceof Set)
-    return Array.from(obj).some((i) => hasAsymmetric(i, seen));
-  if (isObject(obj))
-    return Object.values(obj).some((v) => hasAsymmetric(v, seen));
+  if (obj instanceof Set) return Array.from(obj).some((i) => hasAsymmetric(i, seen));
+  if (isObject(obj)) return Object.values(obj).some((v) => hasAsymmetric(v, seen));
   return false;
 }
 
@@ -82,7 +80,7 @@ function eq(
   aStack: Array<unknown>,
   bStack: Array<unknown>,
   customTesters: Array<any>,
-  hasKey: any
+  hasKey: any,
 ): boolean {
   let result = true;
 
@@ -91,19 +89,13 @@ function eq(
 
   const testerContext: any = { equals };
   for (let i = 0; i < customTesters.length; i++) {
-    const customTesterResult = customTesters[i].call(
-      testerContext,
-      a,
-      b,
-      customTesters
-    );
+    const customTesterResult = customTesters[i].call(testerContext, a, b, customTesters);
     if (customTesterResult !== undefined) return customTesterResult;
   }
 
   if (a instanceof Error && b instanceof Error) return a.message === b.message;
 
-  if (typeof URL === "function" && a instanceof URL && b instanceof URL)
-    return a.href === b.href;
+  if (typeof URL === "function" && a instanceof URL && b instanceof URL) return a.href === b.href;
 
   if (Object.is(a, b)) return true;
 
@@ -173,9 +165,7 @@ function eq(
     key = aKeys[size];
 
     // Deep compare each member
-    result =
-      hasKey(b, key) &&
-      eq(a[key], b[key], aStack, bStack, customTesters, hasKey);
+    result = hasKey(b, key) && eq(a[key], b[key], aStack, bStack, customTesters, hasKey);
 
     if (!result) return false;
   }
@@ -194,10 +184,8 @@ function keys(obj: object, hasKey: (obj: object, key: string) => boolean) {
   }
   return keys.concat(
     (Object.getOwnPropertySymbols(obj) as Array<any>).filter(
-      (symbol) =>
-        (Object.getOwnPropertyDescriptor(obj, symbol) as PropertyDescriptor)
-          .enumerable
-    )
+      (symbol) => (Object.getOwnPropertyDescriptor(obj, symbol) as PropertyDescriptor).enumerable,
+    ),
   );
 }
 
@@ -229,9 +217,7 @@ function isDomNode(obj: any): boolean {
 export function fnNameFor(func: Function) {
   if (func.name) return func.name;
 
-  const matches = functionToString
-    .call(func)
-    .match(/^(?:async)?\s*function\s*\*?\s*([\w$]+)\s*\(/);
+  const matches = functionToString.call(func).match(/^(?:async)?\s*function\s*\*?\s*([\w$]+)\s*\(/);
   return matches ? matches[1] : "<anonymous>";
 }
 
@@ -257,19 +243,11 @@ const IS_SET_SENTINEL = "@@__IMMUTABLE_SET__@@";
 const IS_ORDERED_SENTINEL = "@@__IMMUTABLE_ORDERED__@@";
 
 export function isImmutableUnorderedKeyed(maybeKeyed: any) {
-  return !!(
-    maybeKeyed &&
-    maybeKeyed[IS_KEYED_SENTINEL] &&
-    !maybeKeyed[IS_ORDERED_SENTINEL]
-  );
+  return !!(maybeKeyed && maybeKeyed[IS_KEYED_SENTINEL] && !maybeKeyed[IS_ORDERED_SENTINEL]);
 }
 
 export function isImmutableUnorderedSet(maybeSet: any) {
-  return !!(
-    maybeSet &&
-    maybeSet[IS_SET_SENTINEL] &&
-    !maybeSet[IS_ORDERED_SENTINEL]
-  );
+  return !!(maybeSet && maybeSet[IS_SET_SENTINEL] && !maybeSet[IS_ORDERED_SENTINEL]);
 }
 
 /**
@@ -290,7 +268,7 @@ export function iterableEquality(
   b: any,
   customTesters: Array<any> = [],
   aStack: Array<any> = [],
-  bStack: Array<any> = []
+  bStack: Array<any> = [],
 ): boolean | undefined {
   if (
     typeof a !== "object" ||
@@ -321,13 +299,7 @@ export function iterableEquality(
   ];
 
   function iterableEqualityWithStack(a: any, b: any) {
-    return iterableEquality(
-      a,
-      b,
-      [...filteredCustomTesters],
-      [...aStack],
-      [...bStack]
-    );
+    return iterableEquality(a, b, [...filteredCustomTesters], [...aStack], [...bStack]);
   }
 
   if (a.size !== undefined) {
@@ -356,25 +328,14 @@ export function iterableEquality(
     } else if (isA("Map", a) || isImmutableUnorderedKeyed(a)) {
       let allFound = true;
       for (const aEntry of a) {
-        if (
-          !b.has(aEntry[0]) ||
-          !equals(aEntry[1], b.get(aEntry[0]), filteredCustomTesters)
-        ) {
+        if (!b.has(aEntry[0]) || !equals(aEntry[1], b.get(aEntry[0]), filteredCustomTesters)) {
           let has = false;
           for (const bEntry of b) {
-            const matchedKey = equals(
-              aEntry[0],
-              bEntry[0],
-              filteredCustomTesters
-            );
+            const matchedKey = equals(aEntry[0], bEntry[0], filteredCustomTesters);
 
             let matchedValue = false;
             if (matchedKey === true)
-              matchedValue = equals(
-                aEntry[1],
-                bEntry[1],
-                filteredCustomTesters
-              );
+              matchedValue = equals(aEntry[1], bEntry[1], filteredCustomTesters);
 
             if (matchedValue === true) has = true;
           }
@@ -396,8 +357,7 @@ export function iterableEquality(
 
   for (const aValue of a) {
     const nextB = bIterator.next();
-    if (nextB.done || !equals(aValue, nextB.value, filteredCustomTesters))
-      return false;
+    if (nextB.done || !equals(aValue, nextB.value, filteredCustomTesters)) return false;
   }
   if (!bIterator.next().done) return false;
 
@@ -411,8 +371,7 @@ export function iterableEquality(
  * Checks if `hasOwnProperty(object, key)` up the prototype chain, stopping at `Object.prototype`.
  */
 function hasPropertyInObject(object: object, key: string): boolean {
-  const shouldTerminate =
-    !object || typeof object !== "object" || object === Object.prototype;
+  const shouldTerminate = !object || typeof object !== "object" || object === Object.prototype;
 
   if (shouldTerminate) return false;
 
@@ -423,22 +382,15 @@ function hasPropertyInObject(object: object, key: string): boolean {
 }
 
 function isObjectWithKeys(a: any) {
-  return (
-    isObject(a) &&
-    !(a instanceof Error) &&
-    !Array.isArray(a) &&
-    !(a instanceof Date)
-  );
+  return isObject(a) && !(a instanceof Error) && !Array.isArray(a) && !(a instanceof Date);
 }
 
 export function subsetEquality(
   object: unknown,
   subset: unknown,
-  customTesters: Array<any> = []
+  customTesters: Array<any> = [],
 ): boolean | undefined {
-  const filteredCustomTesters = customTesters.filter(
-    (t) => t !== subsetEquality
-  );
+  const filteredCustomTesters = customTesters.filter((t) => t !== subsetEquality);
   // subsetEquality needs to keep track of the references
   // it has already visited to avoid infinite loops in case
   // there are circular references in the subset passed to it.
@@ -475,22 +427,17 @@ export function subsetEquality(
 }
 
 export function typeEquality(a: any, b: any): boolean | undefined {
-  if (a == null || b == null || a.constructor === b.constructor)
-    return undefined;
+  if (a == null || b == null || a.constructor === b.constructor) return undefined;
 
   return false;
 }
 
-export function arrayBufferEquality(
-  a: unknown,
-  b: unknown
-): boolean | undefined {
+export function arrayBufferEquality(a: unknown, b: unknown): boolean | undefined {
   let dataViewA = a as DataView;
   let dataViewB = b as DataView;
 
   if (!(a instanceof DataView && b instanceof DataView)) {
-    if (!(a instanceof ArrayBuffer) || !(b instanceof ArrayBuffer))
-      return undefined;
+    if (!(a instanceof ArrayBuffer) || !(b instanceof ArrayBuffer)) return undefined;
 
     try {
       dataViewA = new DataView(a);
@@ -514,23 +461,21 @@ export function arrayBufferEquality(
 export function sparseArrayEquality(
   a: unknown,
   b: unknown,
-  customTesters: Array<any> = []
+  customTesters: Array<any> = [],
 ): boolean | undefined {
   if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
 
   // A sparse array [, , 1] will have keys ["2"] whereas [undefined, undefined, 1] will have keys ["0", "1", "2"]
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
-  const filteredCustomTesters = customTesters.filter(
-    (t) => t !== sparseArrayEquality
-  );
+  const filteredCustomTesters = customTesters.filter((t) => t !== sparseArrayEquality);
   return equals(a, b, filteredCustomTesters, true) && equals(aKeys, bKeys);
 }
 
 export function generateToBeMessage(
   deepEqualityName: string,
   expected = "#{this}",
-  actual = "#{exp}"
+  actual = "#{exp}",
 ) {
   const toBeMessage = `expected ${expected} to be ${actual} // Object.is equality`;
 

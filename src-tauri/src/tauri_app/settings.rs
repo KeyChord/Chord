@@ -4,16 +4,23 @@ use crate::AppContext;
 
 pub fn show_settings_window(handle: AppHandle) -> Result<()> {
     let context = handle.state::<AppContext>();
-    let window = &context.settings.window;
+    let window = &context.settings.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
     Ok(())
 }
 
+pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
+    let context = handle.state::<AppContext>();
+    let window = &context.settings.ui.window;
+    window.hide()?;
+    Ok(())
+}
+
 pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
     let context = handle.state::<AppContext>();
-    let window = &context.settings.window;
+    let window = &context.settings.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -33,9 +40,3 @@ pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
     Ok(())
 }
 
-pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let window = &context.settings.window;
-    window.hide()?;
-    Ok(())
-}

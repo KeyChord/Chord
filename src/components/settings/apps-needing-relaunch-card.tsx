@@ -7,15 +7,16 @@ import {
   CardTitle,
 } from "#/components/ui/card.tsx";
 import { AppIcon } from "#/components/settings/app-icon.tsx";
-import { useAppSettingsState } from "../../utils/state.ts";
+import { useSettingsState } from "../../utils/state.ts";
 import { RelaunchAppButton } from "./relaunch-app-button.tsx";
 import { useAppMetadataQuery } from "../../utils/app.ts";
 
 export function AppsNeedingRelaunchCard() {
-  const { bundleIdsNeedingRelaunch } = useAppSettingsState()
+  const { bundleIdsNeedingRelaunch } = useSettingsState();
 
-    return <Card size="sm">
-      <CardHeader  className="flex items-center justify-between gap-3">
+  return (
+    <Card size="sm">
+      <CardHeader className="flex items-center justify-between gap-3">
         <CardTitle>Apps Needing Relaunch</CardTitle>
         <CardDescription>
           Scripts can flag apps that should be restarted after they change app state.
@@ -28,33 +29,32 @@ export function AppsNeedingRelaunchCard() {
           </p>
         ) : (
           bundleIdsNeedingRelaunch.map((bundleId) => {
-            return <AppNeedingRelaunchRow key={bundleId} app={ { bundleId }} />
+            return <AppNeedingRelaunchRow key={bundleId} app={{ bundleId }} />;
           })
         )}
       </CardContent>
     </Card>
+  );
 }
 
 function AppNeedingRelaunchRow({ app }: { app: { bundleId: string } }) {
-  const { data } = useAppMetadataQuery(app.bundleId)
+  const { data } = useAppMetadataQuery(app.bundleId);
   // TODO
-  const appLabel = app.bundleId
+  const appLabel = app.bundleId;
 
-              return (
-                <div
-                  className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-2"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <AppIcon appMetadata={data} label={appLabel} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-medium">{appLabel}</p>
-                        <Badge variant="secondary">Needs relaunch</Badge>
-                      </div>
-                    </div>
-                  </div>
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <AppIcon appMetadata={data} label={appLabel} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="truncate font-medium">{appLabel}</p>
+            <Badge variant="secondary">Needs relaunch</Badge>
+          </div>
+        </div>
+      </div>
 
-                  <RelaunchAppButton app={app} />
-                </div>
-)
+      <RelaunchAppButton app={app} />
+    </div>
+  );
 }

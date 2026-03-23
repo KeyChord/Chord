@@ -22,7 +22,7 @@ pub struct Chorder {
     held_keys: Mutex<HashSet<Key>>,
 }
 
-struct ChorderObservable {
+pub struct ChorderObservable {
     pub state: ObservableProperty<Arc<ChorderState>>
 }
 
@@ -31,7 +31,7 @@ impl ChorderObservable {
         let state = ObservableProperty::new(Arc::new(state));
 
         if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("chorder-state-changed", new_state) {
+            if let Err(e) = handle.emit("state:chorder", new_state) {
                 log::error!("Failed to emit chorder state change: {e}");
             }
         })) {

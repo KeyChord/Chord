@@ -12,22 +12,18 @@ import { useAppPermissionsState } from "../../utils/permissions.ts";
 import { useMutation } from "@tanstack/react-query";
 import { taurpc } from "../../api/taurpc.ts";
 
-export function FirstRunOnboarding({
-  onSkip,
-}: {
-  onSkip: () => void;
-}) {
-  const [state] = useAppPermissionsState()
+export function FirstRunOnboarding({ onSkip }: { onSkip: () => void }) {
+  const [state] = useAppPermissionsState();
   const openAccessibilitySettingsMutation = useMutation({
-    mutationFn: taurpc.openAccessibilitySettings
-  })
+    mutationFn: taurpc.openAccessibilitySettings,
+  });
   const openInputMonitoringSettingsMutation = useMutation({
-    mutationFn: taurpc.openInputMonitoringSettings
-  })
+    mutationFn: taurpc.openInputMonitoringSettings,
+  });
   const canFinish = state.isAccessibilityEnabled && state.isInputMonitoringEnabled;
   const completeOnboardingMutation = useMutation({
     mutationFn: taurpc.completeOnboarding,
-  })
+  });
 
   const permissionSteps = [
     {
@@ -41,12 +37,13 @@ export function FirstRunOnboarding({
     {
       id: "input-monitoring",
       title: "Grant Input Monitoring",
-      description: "Required for detecting the global trigger before Chord can activate in the background.",
+      description:
+        "Required for detecting the global trigger before Chord can activate in the background.",
       granted: state.isInputMonitoringEnabled,
       mutation: openInputMonitoringSettingsMutation,
       buttonLabel: state.isInputMonitoringEnabled ? "Open Settings" : "Grant Access",
     },
-  ]
+  ];
 
   return (
     <div className="min-h-full bg-[radial-gradient(circle_at_top_left,_rgba(22,163,74,0.18),_transparent_38%),linear-gradient(180deg,_rgba(248,250,252,0.98),_rgba(255,255,255,1))] px-5 py-5 text-sm text-foreground">
@@ -65,8 +62,9 @@ export function FirstRunOnboarding({
                 Chord needs two macOS permissions before it can listen and click.
               </CardTitle>
               <CardDescription className="max-w-[620px] text-[15px] leading-6 text-slate-600">
-                This setup window stays visible on first launch so the app does not disappear into a hidden tray-only state.
-                Grant Accessibility and Input Monitoring, then continue into the full settings view.
+                This setup window stays visible on first launch so the app does not disappear into a
+                hidden tray-only state. Grant Accessibility and Input Monitoring, then continue into
+                the full settings view.
               </CardDescription>
             </div>
           </CardHeader>
@@ -92,7 +90,9 @@ export function FirstRunOnboarding({
                         <Badge variant="outline">Required</Badge>
                       )}
                     </div>
-                    <p className="max-w-[520px] text-sm leading-6 text-slate-600">{step.description}</p>
+                    <p className="max-w-[520px] text-sm leading-6 text-slate-600">
+                      {step.description}
+                    </p>
                   </div>
 
                   <Button
@@ -114,8 +114,8 @@ export function FirstRunOnboarding({
                 Why both permissions are needed
               </div>
               <p className="mt-2">
-                Accessibility lets Chord execute UI automation. Input Monitoring lets it detect the global trigger. macOS may
-                ask you to reopen the app after enabling them.
+                Accessibility lets Chord execute UI automation. Input Monitoring lets it detect the
+                global trigger. macOS may ask you to reopen the app after enabling them.
               </p>
             </div>
 
@@ -125,12 +125,14 @@ export function FirstRunOnboarding({
               </Button>
               <div className="flex items-center gap-2 self-end sm:self-auto">
                 {!canFinish ? (
-                  <p className="text-xs text-slate-500">Grant both permissions to finish setup now.</p>
+                  <p className="text-xs text-slate-500">
+                    Grant both permissions to finish setup now.
+                  </p>
                 ) : null}
                 <Button
                   type="button"
                   onClick={() => {
-                    completeOnboardingMutation.mutate()
+                    completeOnboardingMutation.mutate();
                   }}
                   disabled={!canFinish}
                   className="bg-emerald-600 text-white hover:bg-emerald-700"

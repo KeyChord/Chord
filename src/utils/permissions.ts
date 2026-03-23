@@ -6,14 +6,14 @@ export function useAppPermissionsState() {
   const [state, setState] = useState<AppPermissionsState>({
     isAccessibilityEnabled: false,
     isInputMonitoringEnabled: false,
-    isAutostartEnabled: false
+    isAutostartEnabled: false,
   });
 
   useEffect(() => {
     const unlistenPromise = listen<AppPermissionsState>(
       "app-permissions-state-changed",
       (event) => {
-        setState(event.payload)
+        setState(event.payload);
       },
     );
 
@@ -22,5 +22,5 @@ export function useAppPermissionsState() {
     };
   }, []);
 
-  return [state]
+  return [state];
 }

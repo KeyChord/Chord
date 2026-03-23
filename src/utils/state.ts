@@ -1,53 +1,27 @@
 import { useEffect, useState } from "react";
 import type { AppSettingsState, ChorderState } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
+import renameFunction from "rename-fn";
 
-export function useChorderState() {
-  const [state, setState] = useState<ChorderState>({
-    keyBuffer: [],
-    activeChord: undefined,
-    pressedChord: undefined
-  });
+function createUseTauriState<T>(stateName: string) {
+  const useTauriState = () => {
+    const [state, setState] = useState<T>((window as any).__INITIAL_STATE__ as T);
 
-  useEffect(() => {
-    const unlistenPromise = listen<ChorderState>(
-      "chorder-state-changed",
-      (event) => {
-        setState(event.payload)
-      },
-    );
+    useEffect(() => {
+      const unlistenPromise = listen<T>(`state:${stateName}`, (event) => {
+        setState(event.payload);
+      });
 
-    return () => {
-      void unlistenPromise.then((unlisten) => unlisten?.());
-    };
-  }, []);
+      return () => {
+        void unlistenPromise.then((unlisten) => unlisten?.());
+      };
+    }, []);
 
-  return state
+    return state;
+  };
+
+  return renameFunction(useTauriState, stateName);
 }
 
-export function useAppSettingsState() {
-  const [state, setState] = useState<AppSettingsState>({
-    bundleIdsNeedingRelaunch: [],
-    gitRepos: [],
-    permissions: {
-      isAccessibilityEnabled: false,
-      isInputMonitoringEnabled: false,
-      isAutostartEnabled: false
-    }
-  });
-
-  useEffect(() => {
-    const unlistenPromise = listen<AppSettingsState>(
-      "app-settings-state-changed",
-      (event) => {
-        setState(event.payload)
-      },
-    );
-
-    return () => {
-      void unlistenPromise.then((unlisten) => unlisten?.());
-    };
-  }, []);
-
-  return state
-}
+export const useChorderState = createUseTauriState<ChorderState>("chorder");
+export const useSettingsState = createUseTauriState<AppSettingsState>("settings");

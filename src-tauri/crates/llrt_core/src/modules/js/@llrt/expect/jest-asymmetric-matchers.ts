@@ -37,15 +37,13 @@ export interface AsymmetricMatcherInterface {
   toAsymmetricMatcher?: () => string;
 }
 
-export abstract class AsymmetricMatcher<T>
-  implements AsymmetricMatcherInterface
-{
+export abstract class AsymmetricMatcher<T> implements AsymmetricMatcherInterface {
   // should have "jest" to be compatible with its ecosystem
   $$typeof = Symbol.for("jest.asymmetricMatcher");
 
   constructor(
     protected sample: T,
-    protected inverse = false
+    protected inverse = false,
   ) {}
 
   // protected getMatcherContext(expect?: Chai.ExpectStatic): State {
@@ -114,9 +112,7 @@ export class Anything extends AsymmetricMatcher<void> {
   }
 }
 
-export class ObjectContaining extends AsymmetricMatcher<
-  Record<string, unknown>
-> {
+export class ObjectContaining extends AsymmetricMatcher<Record<string, unknown>> {
   constructor(sample: Record<string, unknown>, inverse = false) {
     super(sample, inverse);
   }
@@ -140,8 +136,7 @@ export class ObjectContaining extends AsymmetricMatcher<
   asymmetricMatch(other: any) {
     if (typeof this.sample !== "object") {
       throw new TypeError(
-        `You must provide an object to ${this.toString()}, not '${typeof this
-          .sample}'.`
+        `You must provide an object to ${this.toString()}, not '${typeof this.sample}'.`,
       );
     }
 
@@ -178,17 +173,14 @@ export class ArrayContaining<T = unknown> extends AsymmetricMatcher<Array<T>> {
   asymmetricMatch(other: Array<T>) {
     if (!Array.isArray(this.sample)) {
       throw new TypeError(
-        `You must provide an array to ${this.toString()}, not '${typeof this
-          .sample}'.`
+        `You must provide an array to ${this.toString()}, not '${typeof this.sample}'.`,
       );
     }
 
     const result =
       this.sample.length === 0 ||
       (Array.isArray(other) &&
-        this.sample.every((item) =>
-          other.some((another) => equals(item, another, []))
-        ));
+        this.sample.every((item) => other.some((another) => equals(item, another, []))));
 
     return this.inverse ? !result : result;
   }
@@ -207,7 +199,7 @@ export class Any extends AsymmetricMatcher<any> {
     if (typeof sample === "undefined") {
       throw new TypeError(
         "any() expects to be passed a constructor function. " +
-          "Please pass one or use anything() to match any object."
+          "Please pass one or use anything() to match any object.",
       );
     }
     super(sample);
@@ -225,23 +217,17 @@ export class Any extends AsymmetricMatcher<any> {
   }
 
   asymmetricMatch(other: unknown) {
-    if (this.sample === String)
-      return typeof other == "string" || other instanceof String;
+    if (this.sample === String) return typeof other == "string" || other instanceof String;
 
-    if (this.sample === Number)
-      return typeof other == "number" || other instanceof Number;
+    if (this.sample === Number) return typeof other == "number" || other instanceof Number;
 
-    if (this.sample === Function)
-      return typeof other == "function" || other instanceof Function;
+    if (this.sample === Function) return typeof other == "function" || other instanceof Function;
 
-    if (this.sample === Boolean)
-      return typeof other == "boolean" || other instanceof Boolean;
+    if (this.sample === Boolean) return typeof other == "boolean" || other instanceof Boolean;
 
-    if (this.sample === BigInt)
-      return typeof other == "bigint" || other instanceof BigInt;
+    if (this.sample === BigInt) return typeof other == "bigint" || other instanceof BigInt;
 
-    if (this.sample === Symbol)
-      return typeof other == "symbol" || other instanceof Symbol;
+    if (this.sample === Symbol) return typeof other == "symbol" || other instanceof Symbol;
 
     if (this.sample === Object) return typeof other == "object";
 
@@ -311,15 +297,9 @@ class CloseTo extends AsymmetricMatcher<number> {
     if (!isA("Number", other)) return false;
 
     let result = false;
-    if (
-      other === Number.POSITIVE_INFINITY &&
-      this.sample === Number.POSITIVE_INFINITY
-    ) {
+    if (other === Number.POSITIVE_INFINITY && this.sample === Number.POSITIVE_INFINITY) {
       result = true; // Infinity - Infinity is NaN
-    } else if (
-      other === Number.NEGATIVE_INFINITY &&
-      this.sample === Number.NEGATIVE_INFINITY
-    ) {
+    } else if (other === Number.NEGATIVE_INFINITY && this.sample === Number.NEGATIVE_INFINITY) {
       result = true; // -Infinity - -Infinity is NaN
     } else {
       result = Math.abs(this.sample - other) < 10 ** -this.precision / 2;
@@ -336,11 +316,7 @@ class CloseTo extends AsymmetricMatcher<number> {
   }
 
   override toAsymmetricMatcher(): string {
-    return [
-      this.toString(),
-      this.sample,
-      `(${pluralize("digit", this.precision)})`,
-    ].join(" ");
+    return [this.toString(), this.sample, `(${pluralize("digit", this.precision)})`].join(" ");
   }
 }
 
@@ -352,43 +328,35 @@ export const JestAsymmetricMatchers: ChaiPlugin = (chai, utils) => {
   utils.addMethod(
     chai.expect,
     "stringContaining",
-    (expected: string) => new StringContaining(expected)
+    (expected: string) => new StringContaining(expected),
   );
 
   utils.addMethod(
     chai.expect,
     "objectContaining",
-    (expected: any) => new ObjectContaining(expected)
+    (expected: any) => new ObjectContaining(expected),
   );
 
   utils.addMethod(
     chai.expect,
     "arrayContaining",
-    <T = any>(expected: Array<T>) => new ArrayContaining<T>(expected)
+    <T = any>(expected: Array<T>) => new ArrayContaining<T>(expected),
   );
 
-  utils.addMethod(
-    chai.expect,
-    "stringMatching",
-    (expected: any) => new StringMatching(expected)
-  );
+  utils.addMethod(chai.expect, "stringMatching", (expected: any) => new StringMatching(expected));
 
   utils.addMethod(
     chai.expect,
     "closeTo",
-    (expected: any, precision?: number) => new CloseTo(expected, precision)
+    (expected: any, precision?: number) => new CloseTo(expected, precision),
   );
 
   // defineProperty does not work
   (chai.expect as any).not = {
-    stringContaining: (expected: string) =>
-      new StringContaining(expected, true),
+    stringContaining: (expected: string) => new StringContaining(expected, true),
     objectContaining: (expected: any) => new ObjectContaining(expected, true),
-    arrayContaining: <T = unknown>(expected: Array<T>) =>
-      new ArrayContaining<T>(expected, true),
-    stringMatching: (expected: string | RegExp) =>
-      new StringMatching(expected, true),
-    closeTo: (expected: any, precision?: number) =>
-      new CloseTo(expected, precision, true),
+    arrayContaining: <T = unknown>(expected: Array<T>) => new ArrayContaining<T>(expected, true),
+    stringMatching: (expected: string | RegExp) => new StringMatching(expected, true),
+    closeTo: (expected: any, precision?: number) => new CloseTo(expected, precision, true),
   };
 };

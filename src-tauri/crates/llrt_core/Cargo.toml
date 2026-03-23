@@ -51,10 +51,7 @@ llrt_utils = { git = "https://github.com/awslabs/llrt", package = "llrt_utils", 
 once_cell = { version = "1", features = ["std"], default-features = false }
 phf = { version = "0.13", default-features = false }
 quick-xml = { version = "0.39", default-features = false }
-rand = { version = "0.10.0", features = [
-  "alloc",
-  "thread_rng",
-], default-features = false }
+rand = { version = "0.10.0", features = ["alloc", "thread_rng"], default-features = false }
 rquickjs = { version = "0.11", features = [
   "futures",
   "parallel",

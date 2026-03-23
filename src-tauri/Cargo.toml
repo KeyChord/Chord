@@ -45,13 +45,16 @@ include_dir = { version = "0.7", features = ["glob"] }
 device_query = "4"
 bijective-enum-map = "0.1.0"
 walkdir = "2.5.0"
-gix = {  version = "0.80.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
+gix = { version = "0.80.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-rquickjs = {  version = "0.11.0", features = ["full-async"] }
+rquickjs = { version = "0.11.0", features = ["full-async"] }
 mac-keycode = "0.0.2"
 fast_radix_trie = "1.1.0"
 llrt_modules = { git = "https://github.com/awslabs/llrt", package = "llrt_modules" }
-llrt_core = { git = "https://github.com/awslabs/llrt", package = "llrt_core", features = ['no-sdk', 'uncompressed'] }
+llrt_core = { git = "https://github.com/awslabs/llrt", package = "llrt_core", features = [
+  'no-sdk',
+  'uncompressed',
+] }
 # We need to manually enable all features
 llrt_os = { git = "https://github.com/awslabs/llrt", package = "llrt_os", default-features = true }
 llrt_readline = { path = "./crates/llrt_readline" }

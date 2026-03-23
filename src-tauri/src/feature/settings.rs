@@ -75,7 +75,7 @@ impl SettingsUi {
         )
             .title("Settings")
             .initialization_script(format!(r#"
-              window.__SETTINGS_STATE__ = {}
+              window.__INITIAL_STATE__ = {}
             "#, serde_json::to_string(state)?))
             .inner_size(920.0, 760.0)
             .min_inner_size(760.0, 620.0)
@@ -99,7 +99,7 @@ impl SettingsObservable {
         let state = ObservableProperty::new(Arc::new(state));
 
         if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
-            if let Err(e) = handle.emit("app-settings-state-changed", new_state) {
+            if let Err(e) = handle.emit("state:settings", new_state) {
                 log::error!("Failed to emit app settings state change: {e}");
             }
         })) {

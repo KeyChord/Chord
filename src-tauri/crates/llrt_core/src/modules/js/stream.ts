@@ -118,13 +118,4 @@ Stream.prototype.pipe = function (dest: any, options: any) {
 };
 
 export default Stream;
-export {
-  Readable,
-  Writable,
-  Duplex,
-  Transform,
-  PassThrough,
-  finished,
-  pipeline,
-  Stream,
-};
+export { Readable, Writable, Duplex, Transform, PassThrough, finished, pipeline, Stream };

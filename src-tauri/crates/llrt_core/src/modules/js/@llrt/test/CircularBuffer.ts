@@ -15,10 +15,7 @@ export default class CircularBuffer {
   }
 
   private grow(targetSize: number): void {
-    const newSize = Math.min(
-      Math.pow(2, Math.ceil(Math.log2(targetSize))),
-      this.maxSize
-    );
+    const newSize = Math.min(Math.pow(2, Math.ceil(Math.log2(targetSize))), this.maxSize);
 
     if (newSize === this.maxSize) {
       this.atCapacity = true;
@@ -50,10 +47,7 @@ export default class CircularBuffer {
       return;
     }
 
-    if (
-      !this.atCapacity &&
-      this.currentPosition + data.length > this.buffer.length
-    ) {
+    if (!this.atCapacity && this.currentPosition + data.length > this.buffer.length) {
       this.grow(this.currentPosition + data.length);
     }
 

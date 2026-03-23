@@ -16,12 +16,12 @@ import { useEffect, useState } from "react";
 export function GlobalShortcutsTab() {
   const [input, setInput] = useState("");
   const removeGlobalShortcutMappingMutation = useMutation({
-    mutationFn: taurpc.removeGlobalShortcutMapping
-  })
+    mutationFn: taurpc.removeGlobalShortcutMapping,
+  });
   const { data, isSuccess, isLoading } = useQuery({
     queryKey: ["global-shortcuts"],
-    queryFn: () => taurpc.listGlobalShortcutMappings()
-  })
+    queryFn: () => taurpc.listGlobalShortcutMappings(),
+  });
 
   return (
     <Card size="sm">

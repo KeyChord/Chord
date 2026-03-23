@@ -160,8 +160,9 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         start_nsrunloop!();
     });
 
-    let context = AppContext::new()?;
-    
+    let handle = app.handle().clone();
+    let context = AppContext::new(handle.clone())?;
+
     // Setting the frontmost application immediately (the frontmost crate only detects changes)
     let workspace = NSWorkspace::sharedWorkspace();
     if let Some(application) = workspace.frontmostApplication() {

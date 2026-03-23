@@ -1,7 +1,4 @@
-import type {
-  ActiveChordInfo,
-  AppMetadataInfo,
-} from "#/api/taurpc.ts";
+import type { ActiveChordInfo, AppMetadataInfo } from "#/api/taurpc.ts";
 
 export type ChordGroup = {
   key: string;
@@ -116,9 +113,9 @@ export function buildChordGroups(chords: ActiveChordInfo[]): ChordGroup[] {
   for (const group of chordGroups) {
     group.chords.sort(
       (left, right) =>
-        left.sequence.localeCompare(right.sequence)
-        || left.name.localeCompare(right.name)
-        || left.action.localeCompare(right.action),
+        left.sequence.localeCompare(right.sequence) ||
+        left.name.localeCompare(right.name) ||
+        left.action.localeCompare(right.action),
     );
   }
 
@@ -143,7 +140,8 @@ function compressChordTreeNode(node: MutableChordTreeNode): ChordTreeNode {
   const children = [...current.children.values()]
     .sort((left, right) => left.prefix.localeCompare(right.prefix))
     .map((child) => compressChordTreeNode(child));
-  const chordCount = current.chords.length + children.reduce((count, child) => count + child.chordCount, 0);
+  const chordCount =
+    current.chords.length + children.reduce((count, child) => count + child.chordCount, 0);
 
   return {
     key: current.prefix,
@@ -218,7 +216,9 @@ export function buildActiveChordTreeModel(
     const appLabel = getAppLabel(group.scope, appMetadata);
     const showsBundleId = group.scopeKind === "app" && appLabel !== group.scope;
     const groupItemId = `group:${group.key}`;
-    const childIds = buildChordTree(group.chords).map((node) => registerPrefixNode(group.key, node));
+    const childIds = buildChordTree(group.chords).map((node) =>
+      registerPrefixNode(group.key, node),
+    );
 
     itemsById[groupItemId] = {
       id: groupItemId,
@@ -243,7 +243,9 @@ export function buildActiveChordTreeModel(
   const folderItemIds = Object.values(itemsById)
     .filter((item) => item.kind !== "root" && item.childIds.length > 0)
     .map((item) => item.id);
-  const prefixFolderItemIds = folderItemIds.filter((itemId) => itemsById[itemId]?.kind === "prefix");
+  const prefixFolderItemIds = folderItemIds.filter(
+    (itemId) => itemsById[itemId]?.kind === "prefix",
+  );
 
   return {
     rootItemId,

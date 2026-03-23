@@ -10,18 +10,19 @@ Use [pnpm] because it supports specifying a dependency which is subdirectory of 
   "devDependencies": {
     "llrt-types": "github:awslabs/llrt#path:/types",
     // ...
-  }
+  },
 }
 ```
 
 Make sure your `tsconfig.json` has the `types` property set to `llrt-types`:
+
 ```jsonc
 // tsconfig.json
 {
   "compilerOptions": {
     "types": ["llrt-types"],
     // ...
-  }
+  },
 }
 ```
 

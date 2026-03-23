@@ -5,55 +5,52 @@
 export type Key = string;
 
 export interface AppPermissionsState {
-	isAutostartEnabled: boolean;
-	isInputMonitoringEnabled: boolean;
-	isAccessibilityEnabled: boolean;
+  isAutostartEnabled: boolean;
+  isInputMonitoringEnabled: boolean;
+  isAccessibilityEnabled: boolean;
 }
 
 export interface AppSettingsStateGitRepo {
-	owner: string;
-	name: string;
-	slug: string;
-	url: string;
-	localPath: string;
-	headShortSha?: string;
+  owner: string;
+  name: string;
+  slug: string;
+  url: string;
+  localPath: string;
+  headShortSha?: string;
 }
 
 export interface AppSettingsState {
-	bundleIdsNeedingRelaunch: string[];
-	gitRepos: AppSettingsStateGitRepo[];
-	permissions: AppPermissionsState;
+  bundleIdsNeedingRelaunch: string[];
+  gitRepos: AppSettingsStateGitRepo[];
+  permissions: AppPermissionsState;
 }
 
 export interface ShortcutChord {
-	keys: Key[];
+  keys: Key[];
 }
 
 /** Represents a parsed keyboard shortcut, e.g. "cmd+shift+n". */
 export interface Shortcut {
-	chords: ShortcutChord[];
+  chords: ShortcutChord[];
 }
 
-export type ChordJsArgs = 
-	| { type: "Values", value: Value[] }
-	| { type: "Eval", value: string };
+export type ChordJsArgs = { type: "Values"; value: Value[] } | { type: "Eval"; value: string };
 
 export interface ChordJsInvocation {
-	export_name?: string;
-	args: ChordJsArgs;
+  export_name?: string;
+  args: ChordJsArgs;
 }
 
 export interface Chord {
-	keys: Key[];
-	name: string;
-	shortcut?: Shortcut;
-	shell?: string;
-	js?: ChordJsInvocation;
+  keys: Key[];
+  name: string;
+  shortcut?: Shortcut;
+  shell?: string;
+  js?: ChordJsInvocation;
 }
 
 export interface ChorderState {
-	keyBuffer: Key[];
-	pressedChord?: Chord;
-	activeChord?: Chord;
+  keyBuffer: Key[];
+  pressedChord?: Chord;
+  activeChord?: Chord;
 }
-

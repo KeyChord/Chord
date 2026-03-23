@@ -16,7 +16,7 @@ export function ActiveChordsTab() {
   const { data, isSuccess } = useQuery({
     queryKey: ["listActiveChords"],
     queryFn: () => taurpc.listActiveChords(),
-  })
+  });
 
   return (
     <Card size="sm">
@@ -35,9 +35,11 @@ export function ActiveChordsTab() {
             }}
             placeholder="Filter by app, trigger, name, or action"
           />
-          {isSuccess && <Badge variant="outline" className="self-start sm:self-center">
-            {data.length} matches
-          </Badge>}
+          {isSuccess && (
+            <Badge variant="outline" className="self-start sm:self-center">
+              {data.length} matches
+            </Badge>
+          )}
         </div>
 
         {/* {isLoading ? (

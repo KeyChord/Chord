@@ -7,7 +7,10 @@ export function ShortcutKeys({ shortcut }: { shortcut: string }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {chords.map((keys, chordIndex) => (
-        <div key={`${shortcut}:${keys.join("+")}:${chordIndex}`} className="flex items-center gap-1.5">
+        <div
+          key={`${shortcut}:${keys.join("+")}:${chordIndex}`}
+          className="flex items-center gap-1.5"
+        >
           <KbdGroup>
             {keys.map((key) => (
               <Kbd key={key} className="font-mono text-[11px]">

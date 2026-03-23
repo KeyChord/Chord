@@ -1,12 +1,6 @@
 import type { AppMetadataInfo } from "#/api/taurpc.ts";
 
-export function AppIcon({
-  appMetadata,
-  label,
-}: {
-  appMetadata?: AppMetadataInfo;
-  label: string;
-}) {
+export function AppIcon({ appMetadata, label }: { appMetadata?: AppMetadataInfo; label: string }) {
   const fallback = label.trim().charAt(0).toUpperCase() || "?";
 
   return (

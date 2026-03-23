@@ -15,7 +15,7 @@ const transform: Transform<Rust> = async (root) => {
     return rootNode.text();
   }
 
-  const edits = nodes.map((node) => node.replace(node.text().replace(/^(\s*)/, "$1// ")))
+  const edits = nodes.map((node) => node.replace(node.text().replace(/^(\s*)/, "$1// ")));
 
   return rootNode.commitEdits(edits);
 };
