@@ -32,6 +32,7 @@ pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
+    #[cfg(debug_assertions)]
     window.open_devtools();
     Ok(())
 }
@@ -41,6 +42,7 @@ pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
+    #[cfg(debug_assertions)]
     window.open_devtools();
     Ok(())
 }

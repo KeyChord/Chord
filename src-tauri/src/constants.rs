@@ -7,7 +7,6 @@ use std::sync::LazyLock;
 
 pub const SETTINGS_MENU_ID: &str = "settings";
 pub const RELOAD_CONFIGS_MENU_ID: &str = "reload-configs";
-#[cfg(debug_assertions)]
 pub const OPEN_INSPECTOR_MENU_ID: &str = "open-inspector";
 pub const QUIT_MENU_ID: &str = "quit";
 
