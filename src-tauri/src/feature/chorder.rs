@@ -21,6 +21,12 @@ pub struct Chorder {
 }
 
 impl Chorder {
+    fn emit_visibility_changed(&self, visible: bool) {
+        if let Err(error) = self.ui.window.emit("chorder-visibility-changed", visible) {
+            log::error!("Failed to emit chorder visibility change: {error}");
+        }
+    }
+
     pub fn new(ui: ChorderIndicatorUi) -> Self {
         let state = ObservableProperty::new(Arc::new(ChorderState::new()));
 
@@ -45,7 +51,9 @@ impl Chorder {
     }
 
     pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
-        self.ui.ensure_visible(handle.clone())?;
+        if self.ui.ensure_visible(handle.clone())? {
+            self.emit_visibility_changed(true);
+        }
         Ok(())
     }
 
@@ -58,7 +66,9 @@ impl Chorder {
         }
 
         self.state.set(Arc::new(ChorderState::new()))?;
-        self.ui.ensure_hidden(handle.clone())?;
+        if self.ui.ensure_hidden(handle.clone())? {
+            self.emit_visibility_changed(false);
+        }
         Ok(())
     }
 

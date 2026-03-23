@@ -91,19 +91,21 @@ impl ChorderIndicatorUi {
         Ok(())
     }
 
-    pub fn ensure_hidden(&self, handle: AppHandle) -> Result<()> {
+    pub fn ensure_hidden(&self, handle: AppHandle) -> Result<bool> {
         if self.is_visible() {
             self.hide(handle)?;
+            return Ok(true);
         }
 
-        Ok(())
+        Ok(false)
     }
 
-    pub fn ensure_visible(&self, handle: AppHandle) -> Result<()> {
+    pub fn ensure_visible(&self, handle: AppHandle) -> Result<bool> {
         if !self.is_visible() {
             self.show(handle)?;
+            return Ok(true);
         }
 
-        Ok(())
+        Ok(false)
     }
 }

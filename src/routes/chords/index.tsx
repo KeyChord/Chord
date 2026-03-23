@@ -3,6 +3,7 @@ import { taurpc, type ActiveChordInfo } from "#/api/taurpc.ts";
 import { Kbd } from "#/components/ui/kbd.tsx";
 import { useChorderState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
+import { listen } from "@tauri-apps/api/event";
 import { debug } from "@tauri-apps/plugin-log";
 import getPrettyKey from "pretty-key";
 import { cn } from "#/utils/style.ts";
@@ -119,6 +120,7 @@ export function Chords() {
   const [allSuggestions, setAllSuggestions] = useState<ActiveChordInfo[]>([]);
   const [suggestions, setSuggestions] = useState<ActiveChordInfo[]>([]);
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
+  const [surfaceVersion, setSurfaceVersion] = useState(0);
   const currentPrefixLength = state.keyBuffer.length;
 
   useEffect(() => {
@@ -155,6 +157,30 @@ export function Chords() {
       cancelled = true;
     };
   }, [currentPrefixLength, state.keyBuffer]);
+
+  useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+    const unlistenPromise = listen<boolean>("chorder-visibility-changed", (event) => {
+      if (!event.payload) {
+        return;
+      }
+
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      firstFrame = requestAnimationFrame(() => {
+        secondFrame = requestAnimationFrame(() => {
+          setSurfaceVersion((version) => version + 1);
+        });
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      void unlistenPromise.then((unlisten) => unlisten?.());
+    };
+  }, []);
 
   const sequenceSource = allSuggestions.length > 0 ? allSuggestions : suggestions;
   const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
@@ -218,9 +244,16 @@ export function Chords() {
     <div className="relative size-full bg-transparent">
       <div className="absolute left-0 top-1/2 -translate-y-1/2">
         <div
-        className={cn(
-            "relative overflow-hidden rounded-r-[2rem] rounded-l-none border border-l-0 px-5 py-5 pl-7",
-            "border-white/28 bg-white/30 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] backdrop-blur-[52px] backdrop-saturate-180",
+          key={surfaceVersion}
+          style={{
+            backdropFilter: "blur(52px) saturate(1.8)",
+            WebkitBackdropFilter: "blur(52px) saturate(1.8)",
+            transform: "translateZ(0)",
+            willChange: "backdrop-filter, -webkit-backdrop-filter",
+          }}
+          className={cn(
+            "relative isolate overflow-hidden rounded-r-[2rem] rounded-l-none border border-l-0 px-5 py-5 pl-7 transform-gpu",
+            "border-white/28 bg-white/30 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)]",
             "dark:border-white/10 dark:bg-zinc-950/34 dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]",
           )}
         >
