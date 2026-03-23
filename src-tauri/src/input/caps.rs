@@ -8,6 +8,7 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::sync::{mpsc::Sender, OnceLock};
 use tauri::{AppHandle, Manager};
+use crate::feature::app_handle_ext::AppHandleExt;
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
@@ -41,7 +42,7 @@ pub fn register_caps_lock_input_handler(handle: AppHandle) -> Result<()> {
     let handle = handle.clone();
     std::thread::spawn(move || {
         while let Ok(pressed) = rx.recv() {
-            let context = handle.state::<AppContext>();
+            let context = handle.app_context();
             if pressed {
                 context
                     .key_event_state

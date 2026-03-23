@@ -8,7 +8,7 @@
 static io_connect_t open_hid_system(void) {
     io_service_t service =
         IOServiceGetMatchingService(
-            kIOMasterPortDefault,
+            kIOMainPortDefault,
             IOServiceMatching(kIOHIDSystemClass)
         );
 

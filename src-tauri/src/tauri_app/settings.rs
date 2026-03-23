@@ -1,8 +1,6 @@
 use crate::feature::app_handle_ext::AppHandleExt;
 use anyhow::Result;
-use tauri::{AppHandle, Manager, WebviewWindow};
-use crate::AppContext;
-use crate::feature::{AppChorder, AppSettings};
+use tauri::AppHandle;
 
 pub fn show_settings_window(handle: AppHandle) -> Result<()> {
     let settings = handle.app_settings();
@@ -41,4 +39,3 @@ pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
     window.open_devtools();
     Ok(())
 }
-

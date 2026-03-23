@@ -7,12 +7,12 @@ use crate::tauri_app::{
 };
 use crate::tauri_app::startup::StartupStatusInfo;
 use parking_lot::Mutex;
+use serde::Serialize;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use crate::get_app_metadata;
-use crate::tauri_app::git::{ChordPackageRegistry, LocalChordFolderInfo, LocalChordPackage};
-use serde::Serialize;
+use crate::tauri_app::git::LocalChordPackage;
 use specta::Type;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
@@ -141,30 +141,30 @@ impl Api for ApiImpl {
 
     async fn list_git_repos(self) -> AppResult<Vec<GitRepoInfo>> {
         let handle = self.app_handle()?;
-        let registry = handle.state::<ChordPackageRegistry>();
+        let registry = handle.app_chord_package_registry();
         Ok(registry.git.discover_repos()?)
     }
 
     async fn add_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
         let handle = self.app_handle()?;
-        let registry = handle.state::<ChordPackageRegistry>();
+        let registry = handle.app_chord_package_registry();
         let repo_info = registry.git.add_repo(GitHubRepoRef::parse(&repo)?)?;
         reload_loaded_app_chords(handle).await?;
         Ok(repo_info)
     }
 
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepoInfo> {
-        let app_handle = self.app_handle()?;
-        let registry = app_handle.state::<ChordPackageRegistry>();
+        let handle = self.app_handle()?;
+        let registry = handle.app_chord_package_registry();
         let repo_info =
             registry.git.sync_repo(GitHubRepoRef::parse(&repo)?)?;
-        reload_loaded_app_chords(app_handle).await?;
+        reload_loaded_app_chords(handle).await?;
         Ok(repo_info)
     }
 
     async fn list_local_chord_folders(self) -> AppResult<Vec<LocalChordPackage>> {
-        let app_handle = self.app_handle()?;
-        let registry = app_handle.state::<ChordPackageRegistry>();
+        let handle = self.app_handle()?;
+        let registry = handle.app_chord_package_registry();
         Ok(registry .local .list()?)
     }
 

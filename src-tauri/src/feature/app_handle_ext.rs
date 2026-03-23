@@ -1,7 +1,26 @@
 use tauri::{AppHandle, Manager, Runtime};
 use crate::AppContext;
-use crate::feature::{AppChorder, AppFrontmost, AppSettings};
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
 use crate::tauri_app::git::ChordPackageRegistry;
+
+pub struct AppManaged {
+    pub settings: AppSettings,
+    pub chorder: AppChorder,
+    pub context: AppContext,
+    pub chord_package_registry: ChordPackageRegistry,
+    pub frontmost: AppFrontmost,
+    pub permissions: AppPermissions
+}
+
+impl AppManaged {
+    pub fn register(self, handle: &AppHandle) {
+        handle.manage(self.frontmost);
+        handle.manage(self.settings);
+        handle.manage(self.chorder);
+        handle.manage(self.context);
+        handle.manage(self.chord_package_registry);
+    }
+}
 
 pub trait AppHandleExt {
     fn app_settings(&self) -> &AppSettings;

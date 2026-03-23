@@ -53,6 +53,7 @@ fn main() -> StdResult<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn generate_sdk_client_endpoint_map(out_dir: &str) -> StdResult<(), Box<dyn Error>> {
     let file = File::open("../sdk.cfg")?;
     let reader = BufReader::new(file);

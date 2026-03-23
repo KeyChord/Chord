@@ -1,21 +1,19 @@
-use std::sync::Arc;
-use observable_property::{ObservableProperty, ObserverId};
+use anyhow::Result;
+use observable_property::ObservableProperty;
 use serde::Serialize;
-use tauri::AppHandle;
-use tauri_plugin_autostart::ManagerExt;
+use std::sync::Arc;
 use typeshare::typeshare;
 use crate::feature::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
-use anyhow::Result;
 
 pub struct AppPermissions {
-    pub observable: AppPermissionsObservable,
-    pub input_monitoring: AppPermissionsInputMonitoring,
-    pub accessibility: AppPermissionsAccessibility
+    _observable: AppPermissionsObservable,
+    _input_monitoring: AppPermissionsInputMonitoring,
+    _accessibility: AppPermissionsAccessibility
 }
 
 pub struct AppPermissionsObservable {
-    pub state: ObservableProperty<Arc<AppPermissionsState>>,
+    state: ObservableProperty<Arc<AppPermissionsState>>,
 }
 
 #[typeshare]
@@ -38,9 +36,9 @@ impl AppPermissions {
         let input_monitoring = AppPermissionsInputMonitoring::new_from_observable(safe_handle.clone(), &observable)?;
         let accessibility = AppPermissionsAccessibility::new_from_observable(safe_handle.clone(), &observable)?;
         Ok(Self {
-            observable,
-            input_monitoring,
-            accessibility
+            _observable: observable,
+            _input_monitoring: input_monitoring,
+            _accessibility: accessibility
         })
     }
 }
@@ -97,4 +95,3 @@ impl AppPermissionsAccessibility {
         Ok(Self {})
     }
 }
-

@@ -4,25 +4,14 @@ use std::sync::Arc;
 use anyhow::{Result, Context};
 use serde::Serialize;
 use specta::Type;
-use tauri::{AppHandle, Runtime, Wry};
-use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_store::{Store, StoreExt};
+use tauri::Wry;
+use tauri_plugin_store::Store;
 use crate::chords::{ChordPackage, LoadedAppChords};
 use crate::feature::SafeAppHandle;
 use crate::git::{clone_repo, GitHubRepoRef, GitRepoInfo};
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
-
-#[derive(Debug)]
-#[taurpc::ipc_type]
-#[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
-pub struct LocalChordFolderInfo {
-    pub name: String,
-    pub local_path: String,
-}
-
 
 pub struct GitPackageRegistry {
     pub dir: PathBuf,
@@ -150,19 +139,6 @@ impl LocalChordPackage {
         &self.path
     }
 
-    pub fn info(&self) -> LocalChordFolderInfo {
-        let local_path = self.path.display().to_string();
-        let name = self
-            .path
-            .file_name()
-            .and_then(|segment| segment.to_str())
-            .filter(|segment| !segment.is_empty())
-            .map(|segment| segment.to_string())
-            .unwrap_or_else(|| local_path.clone());
-
-        LocalChordFolderInfo { name, local_path }
-    }
-
     pub fn load(&self) -> anyhow::Result<ChordPackage> {
         ChordPackage::load_from_local_folder(&self.path)
     }
@@ -191,14 +167,6 @@ impl LocalPackageRegistry {
 
         packages.sort_by(|left, right| left.path().cmp(right.path()));
         Ok(packages)
-    }
-
-    pub fn list_infos(&self ) -> Result<Vec<LocalChordFolderInfo>> {
-        Ok(self
-            .list()?
-            .into_iter()
-            .map(|package| package.info())
-            .collect())
     }
 
     pub fn pick(&self) -> Result<Option<LocalChordPackage>> {

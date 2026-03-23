@@ -1,8 +1,6 @@
-use crate::chords::{ChordPackage, LoadedAppChords};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager, Runtime};
 
 #[derive(Debug)]
 #[taurpc::ipc_type]

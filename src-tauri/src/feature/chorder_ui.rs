@@ -9,7 +9,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{WebviewUrl, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 use crate::feature::{ChorderState, SafeAppHandle};
@@ -138,10 +138,6 @@ impl ChorderIndicatorUi {
         })?;
 
         Ok(())
-    }
-
-    pub fn configure_surface(&self, rect: NativeSurfaceRect) -> Result<()> {
-        Self::configure_window_surface(&self.window, self.handle.clone(), rect)
     }
 
     fn show(&self) -> Result<()> {

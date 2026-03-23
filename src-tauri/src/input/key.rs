@@ -1,7 +1,6 @@
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use keycode::KeyMappingCode::*;
-use serde::Serialize;
 use std::str::FromStr;
 use typeshare::typeshare;
 

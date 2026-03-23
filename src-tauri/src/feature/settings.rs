@@ -1,10 +1,10 @@
 use observable_property::ObservableProperty;
-use std::sync::Arc;
-use serde::Serialize;
-use tauri::{App, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use typeshare::typeshare;
-use crate::feature::{AppPermissions, AppPermissionsState, ChorderIndicatorUi, ChorderState, SafeAppHandle};
 use anyhow::Result;
+use serde::Serialize;
+use std::sync::Arc;
+use tauri::{Emitter, WebviewUrl, WebviewWindow};
+use typeshare::typeshare;
+use crate::feature::SafeAppHandle;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -28,7 +28,7 @@ pub struct AppSettingsStateGitRepo {
 
 
 pub struct AppSettings {
-    pub observable: SettingsObservable,
+    _observable: SettingsObservable,
     pub ui: SettingsUi
 }
 
@@ -58,7 +58,7 @@ impl SettingsUi {
 
 
 struct SettingsObservable {
-    pub state: ObservableProperty<Arc<AppSettingsState>>
+    _state: ObservableProperty<Arc<AppSettingsState>>
 }
 
 impl SettingsObservable {
@@ -74,7 +74,7 @@ impl SettingsObservable {
             log::error!("Failed to subscribe app settings state observer: {e}");
         };
 
-        Self { state }
+        Self { _state: state }
     }
 }
 
@@ -84,7 +84,7 @@ impl AppSettings {
         let ui = SettingsUi::new(handle.clone(), &state)?;
         let observable = SettingsObservable::new(&ui, state);
         Ok(Self {
-            observable,
+            _observable: observable,
             ui
         })
     }

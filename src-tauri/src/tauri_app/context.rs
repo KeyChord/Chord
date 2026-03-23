@@ -1,12 +1,11 @@
 use crate::chords::{Chord, ChordPackage, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
-use crate::feature::{AppSettings, AppSettingsState, AppChorder, ChorderState, AppFrontmost};
+use crate::feature::AppFrontmost;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
 };
 use anyhow::Result;
-use arc_swap::ArcSwap;
 use base64::Engine;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
@@ -14,8 +13,8 @@ use parking_lot::RwLock;
 use rquickjs::Module;
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
@@ -103,10 +102,6 @@ impl AppContext {
     }
 }
 
-pub async fn initialize_app_context(handle: AppHandle) -> Result<()> {
-    Ok(())
-}
-
 fn normalize_bundle_id(bundle_id: &str) -> Result<String> {
     let bundle_id = bundle_id.trim();
     if bundle_id.is_empty() {
@@ -141,7 +136,7 @@ pub fn set_app_needs_relaunch<R: Runtime>(
     needs_relaunch: bool,
 ) -> Result<()> {
     let bundle_id = normalize_bundle_id(bundle_id)?;
-    let context = app.state::<AppContext>();
+    let context = app.app_context();
 
     let (changed, snapshot) = {
         let mut apps_needing_relaunch = context.apps_needing_relaunch.write();
@@ -162,7 +157,7 @@ pub fn set_app_needs_relaunch<R: Runtime>(
 }
 
 pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunchInfo>> {
-    let context = app.state::<AppContext>();
+    let context = app.app_context();
     let apps_needing_relaunch = context.apps_needing_relaunch.read();
     Ok(apps_needing_relaunch_payload(&apps_needing_relaunch))
 }
@@ -427,8 +422,8 @@ pub async fn load_chord_files_runtime_modules(
 
                     let chords = match rquickjs_serde::to_value(ctx.clone(), raw_chords) {
                         Ok(value) => value,
-                        Err(e) => {
-                            log::error!("Failed to serialize chords");
+                        Err(error) => {
+                            log::error!("Failed to serialize chords: {error}");
                             return Ok(());
                         }
                     };
@@ -443,8 +438,8 @@ pub async fn load_chord_files_runtime_modules(
 
                     let meta = match module.meta() {
                         Ok(meta) => meta,
-                        Err(e) => {
-                            log::error!("Failed to get import.meta for module {}", path);
+                        Err(error) => {
+                            log::error!("Failed to get import.meta for module {}: {error}", path);
                             return Ok(());
                         }
                     };
@@ -500,7 +495,7 @@ pub async fn load_chord_files_runtime_modules(
 }
 
 pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
-    let context = app.state::<AppContext>();
+    let context = app.app_context();
     let loaded_app_chords = context.loaded_app_chords.read();
     Ok(list_loaded_chords(&loaded_app_chords))
 }

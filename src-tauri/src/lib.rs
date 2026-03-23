@@ -1,15 +1,14 @@
 use crate::api::{Api, ApiImpl};
-use crate::chords::{ChordPackage, LoadedAppChords};
-use crate::feature::{AppSettings, AppChorder, ChorderIndicatorUi, ChorderState, AppSettingsState, AppPermissions, AppFrontmost, SettingsUi, AppSettingsStateGitRepo, SafeAppHandle};
-use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
+use crate::feature::{
+    AppChorder, AppFrontmost, AppPermissions, AppSettings, AppSettingsState,
+    AppSettingsStateGitRepo, ChorderState, SafeAppHandle,
+};
+use crate::tauri_app::git::ChordPackageRegistry;
 use anyhow::Result;
-use frontmost::{start_nsrunloop, Detector};
-use objc2_app_kit::NSWorkspace;
 use parking_lot::deadlock;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+use tauri::Manager;
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
@@ -18,14 +17,13 @@ mod api;
 mod chords;
 mod constants;
 mod feature;
-mod git;
+pub mod git;
 mod input;
 mod mode;
 mod tauri_app;
 
 use tauri_nspanel::tauri_panel;
-use tauri_plugin_autostart::ManagerExt;
-use crate::tauri_app::git::ChordPackageRegistry;
+use crate::feature::app_handle_ext::AppManaged;
 
 tauri_panel! {
     panel!(IndicatorPanel {
@@ -137,10 +135,7 @@ pub fn run() {
 async fn create_app_settings(
     safe_handle: SafeAppHandle,
 ) -> Result<AppSettings> {
-    let chord_package_registry = ChordPackageRegistry::new(
-        safe_handle.clone(),
-    )?;
-    let permissions =AppPermissions::from_check(safe_handle.clone()).await?;
+    let chord_package_registry = ChordPackageRegistry::new(safe_handle.clone())?;
 
     let settings_state = AppSettingsState {
         bundle_ids_needing_relaunch: Vec::new(),
@@ -169,31 +164,19 @@ async fn create_app_permissions(safe_handle: SafeAppHandle) -> Result<AppPermiss
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
     let safe_handle = SafeAppHandle::new(app.handle().clone());
-
-    let app_permissions = tauri::async_runtime::block_on(create_app_permissions(safe_handle.clone()))?;
-    app.manage(app_permissions);
-
-    let app_frontmost = AppFrontmost::new_with_detector();
-    app.manage(app_frontmost);
-
-    let chorder_state = ChorderState::default();
-    let chorder = AppChorder::new(safe_handle.clone(), chorder_state)?;
-    app.manage(chorder);
-
-    let context = AppContext::new()?;
-    app.manage(context);
-
-    let app_settings = tauri::async_runtime::block_on(create_app_settings(safe_handle.clone()))?;
-    app.manage(app_settings);
+    safe_handle.mark_safe(AppManaged {
+        frontmost: AppFrontmost::new_with_detector(),
+        chorder: AppChorder::new(safe_handle.clone(), ChorderState::default())?,
+        context: AppContext::new()?,
+        permissions: tauri::async_runtime::block_on(create_app_permissions(safe_handle.clone()))?,
+        settings: tauri::async_runtime::block_on(create_app_settings(safe_handle.clone()))?,
+        chord_package_registry: ChordPackageRegistry::new(safe_handle.clone())?
+    });
 
     let handle = app.handle();
-    let tray_created = match tauri_app::tray::create_tray(handle.clone()) {
-        Ok(()) => true,
-        Err(error) => {
-            log::error!("Failed to create tray: {error:#}");
-            false
-        }
-    };
+    if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
+        log::error!("Failed to create tray: {error:#}");
+    }
 
     {
         let handle = handle.clone();

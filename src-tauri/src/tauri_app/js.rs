@@ -1,5 +1,4 @@
 use crate::tauri_app::js_chord::ChordModule;
-use include_json::include_json;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
@@ -8,20 +7,11 @@ use rquickjs::{
     module::Declared,
     AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value,
 };
-use std::sync::LazyLock;
 use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::{
     async_runtime::{block_on, channel},
     AppHandle,
 };
-
-const BUILTIN_MODULES: LazyLock<Vec<String>> = LazyLock::new(|| {
-    let json: serde_json::Value = include_json!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../data/builtin-modules.json"
-    ));
-    serde_json::from_value(json).expect("failed to parse builtin-modules.json")
-});
 
 struct JsEngine {
     // Keep the runtime alive for as long as the context exists.
@@ -188,7 +178,7 @@ type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 type SendBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 unsafe fn uplift<'a, 'b, T>(fut: LocalBoxFuture<'a, T>) -> SendBoxFuture<'b, T> {
-    std::mem::transmute(fut)
+    unsafe { std::mem::transmute(fut) }
 }
 
 pub async fn with_js<F, R>(handle: AppHandle, f: F) -> anyhow::Result<R>
@@ -285,8 +275,4 @@ pub fn format_js_error(ctx: Ctx<'_>, err: Error) -> String {
         }
         _ => err.to_string(),
     }
-}
-
-fn format_js_error_fallback(err: Error) -> String {
-    err.to_string()
 }

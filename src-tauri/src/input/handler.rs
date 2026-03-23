@@ -1,15 +1,13 @@
 use crate::input::{Key, KeyEvent};
 use crate::mode::AppMode;
-use crate::AppContext;
 use anyhow::Result;
 use keycode::KeyMappingCode;
-use tauri::{AppHandle, Manager};
-use crate::feature::AppChorder;
+use tauri::AppHandle;
+use crate::feature::app_handle_ext::AppHandleExt;
 
 pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
-    let context = handle.state::<AppContext>();
-    let app_mode = context.get_app_mode();
-    let chorder = handle.state::<AppChorder>();
+    let app_mode = handle.app_context().get_app_mode();
+    let chorder = handle.app_chorder();
 
     match app_mode {
         AppMode::Chord => {

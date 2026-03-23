@@ -2,12 +2,12 @@ use crate::input::Key;
 use crate::AppContext;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
 use bitflags::bitflags;
-use device_query::DeviceQuery;
 use keycode::KeyMappingCode;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use crate::feature::app_handle_ext::AppHandleExt;
 
 #[derive(Debug)]
 pub enum KeyEvent {
@@ -36,19 +36,19 @@ pub fn register_key_event_input_grabber(handle: AppHandle) {
             return Some(event);
         }
 
-        let context = handle.state::<AppContext>();
-        let (key, key_event) = match event.event_type {
+        let context = handle.app_context();
+        let key_event = match event.event_type {
             rdev::EventType::KeyPress(key) => {
                 let Ok(key) = Key::try_from(key) else {
                     return Some(event);
                 };
-                (key, KeyEvent::Press(key))
+                KeyEvent::Press(key)
             }
             rdev::EventType::KeyRelease(key) => {
                 let Ok(key) = Key::try_from(key) else {
                     return Some(event);
                 };
-                (key, KeyEvent::Release(key))
+                KeyEvent::Release(key)
             }
             _ => return Some(event),
         };

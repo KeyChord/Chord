@@ -1,4 +1,3 @@
-use crate::chords::Shortcut;
 use crate::input::{Key, KeyCombination, KeyCombinationModifiers};
 use anyhow::{bail, Context};
 use jsonc_parser::{JsonValue, ParseOptions};
@@ -9,11 +8,6 @@ pub const SETTINGS_MENU_ID: &str = "settings";
 pub const RELOAD_CONFIGS_MENU_ID: &str = "reload-configs";
 pub const OPEN_INSPECTOR_MENU_ID: &str = "open-inspector";
 pub const QUIT_MENU_ID: &str = "quit";
-
-// The chord mode
-pub const CHORD_WINDOW_LABEL: &str = "chords";
-
-pub const SETTINGS_WINDOW_LABEL: &str = "settings";
 
 pub static GLOBAL_HOTKEYS_POOL: LazyLock<Vec<KeyCombination>> =
     LazyLock::new(|| load_hotkeys().expect("failed to load GLOBAL_HOTKEYS_POOL"));

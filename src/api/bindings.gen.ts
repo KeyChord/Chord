@@ -6,6 +6,8 @@ type TAURI_CHANNEL<T> = (response: T) => void
 
 export type ActiveChordInfo = { scope: string; scopeKind: string; sequence: string; name: string; action: string; description: string | null; isDescription: boolean }
 
+export type AppError = { Message: string }
+
 export type AppMetadataInfo = { bundleId: string; displayName: string | null; iconDataUrl: string | null }
 
 export type AppNeedsRelaunchInfo = { bundleId: string; displayName: string | null }
@@ -14,13 +16,13 @@ export type GitRepoInfo = { owner: string; name: string; slug: string; url: stri
 
 export type GlobalShortcutMappingInfo = { shortcut: string; bundleId: string; hotkeyId: string }
 
-export type LocalChordFolderInfo = { name: string; localPath: string }
+export type LocalChordPackage = { path: string }
 
 export type StartupStatusInfo = { launchedViaAutostart: boolean; onboardingCompleted: boolean; shouldShowOnboarding: boolean }
 
 const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getAppMetadata":["bundle_id"],"getStartupStatus":[],"listActiveChords":[],"listAppsNeedingRelaunch":[],"listGitRepos":[],"listGlobalShortcutMappings":[],"listLocalChordFolderChords":["path"],"listLocalChordFolders":[],"listMatchingChords":[],"listRepoChords":["repo"],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"syncGitRepo":["repo"]}' }
 export type Router = { "": {addGitRepo: (repo: string) => Promise<GitRepoInfo>, 
-addLocalChordFolder: (path: string) => Promise<LocalChordFolderInfo>, 
+addLocalChordFolder: (path: string) => Promise<LocalChordPackage>, 
 completeOnboarding: () => Promise<null>, 
 getAppMetadata: (bundleId: string) => Promise<AppMetadataInfo>, 
 getStartupStatus: () => Promise<StartupStatusInfo>, 
@@ -29,7 +31,7 @@ listAppsNeedingRelaunch: () => Promise<AppNeedsRelaunchInfo[]>,
 listGitRepos: () => Promise<GitRepoInfo[]>, 
 listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>, 
 listLocalChordFolderChords: (path: string) => Promise<ActiveChordInfo[]>, 
-listLocalChordFolders: () => Promise<LocalChordFolderInfo[]>, 
+listLocalChordFolders: () => Promise<LocalChordPackage[]>, 
 listMatchingChords: () => Promise<ActiveChordInfo[]>, 
 listRepoChords: (repo: string) => Promise<ActiveChordInfo[]>, 
 openAccessibilitySettings: () => Promise<void>, 

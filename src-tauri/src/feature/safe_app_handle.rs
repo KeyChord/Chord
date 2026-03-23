@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use tauri::{Manager, Wry};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use std::sync::{Arc, Mutex};
@@ -6,9 +5,9 @@ use anyhow::{anyhow, Result};
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use delegate::delegate;
-use tauri::ipc::RuntimeCapability;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
+use crate::feature::app_handle_ext::AppManaged;
 
 type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
 
@@ -61,7 +60,9 @@ impl SafeAppHandle {
         }
     }
 
-    pub fn mark_safe(&self) {
+    pub fn mark_safe(&self, managed: AppManaged) {
+        managed.register(&self.inner.handle);
+
         let callbacks = {
             let mut state = self
                 .inner
@@ -80,16 +81,6 @@ impl SafeAppHandle {
         for callback in callbacks {
             callback(&self.inner.handle);
         }
-    }
-
-    pub fn is_safe(&self) -> Result<bool> {
-        let state = self
-            .inner
-            .state
-            .lock()
-            .map_err(|_| anyhow!("SafeAppHandle state mutex poisoned"))?;
-
-        Ok(state.is_safe)
     }
 
     pub fn handle(&self) -> &AppHandle {

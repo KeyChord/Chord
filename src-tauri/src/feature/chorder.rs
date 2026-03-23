@@ -1,11 +1,10 @@
-use super::{AppFrontmost, AppSettingsState, ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle, SettingsUi};
+use super::{ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle};
 use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
 use crate::input::Key;
-use crate::{input::KeyEvent, AppContext};
+use crate::input::KeyEvent;
 use anyhow::Result;
-use device_query::DeviceQuery;
+use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
-use keycode::KeyMappingCode::*;
 use observable_property::ObservableProperty;
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -13,8 +12,9 @@ use std::collections::HashSet;
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Listener, Manager};
+use tauri::{AppHandle, Emitter, Listener};
 use typeshare::typeshare;
+use crate::feature::app_handle_ext::AppHandleExt;
 
 pub struct AppChorder {
     pub observable: ChorderObservable,
@@ -159,7 +159,7 @@ impl AppChorder {
         }
 
         let non_shift_modifiers = Key::non_shift_modifiers();
-        let context = handle.state::<AppContext>();
+        let context = handle.app_context();
         let Some(device_state) = &context.device_state else {
             log::debug!("no accessibility permissions");
             return Ok(());
@@ -171,7 +171,7 @@ impl AppChorder {
         if device_keys
             .iter()
             .copied()
-            .any(|key| non_shift_modifiers.contains(&key.into()))
+            .any(|key: Keycode| non_shift_modifiers.contains(&key.into()))
         {
             log::debug!(
                 "Ignoring event because the following modifiers were held down: {:?}",
@@ -212,8 +212,8 @@ impl AppChorder {
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
                 self.ensure_active()?;
 
-                let context = handle.state::<AppContext>();
-                let frontmost = handle.state::<AppFrontmost>();
+                let context = handle.app_context();
+                let frontmost = handle.app_frontmost();
                 let loaded_app_chords = context.loaded_app_chords.read();
                 let state = self.observable.state.get()?;
                 let key_buffer = state.key_buffer.clone();
@@ -305,8 +305,8 @@ impl AppChorder {
         key_buffer: Vec<Key>,
         release_immediately: bool,
     ) -> Result<Option<Chord>> {
-        let context = handle.state::<AppContext>();
-        let frontmost = handle.state::<AppFrontmost>();
+        let context = handle.app_context();
+        let frontmost = handle.app_frontmost();
         let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
         let loaded_app_chords = context.loaded_app_chords.read();
         let Some(chord_runtime) =
@@ -344,7 +344,7 @@ impl AppChorder {
 
     // If an unshifted key is pressed, we append it to the key buffer, which always clears
     // our `active_chord`
-    fn handle_unshifted_key_press(&self, handle: AppHandle, key: &Key) -> Result<()> {
+    fn handle_unshifted_key_press(&self, _handle: AppHandle, key: &Key) -> Result<()> {
         let state = self.observable.state.get()?;
         let mut next_key_buffer = state.key_buffer.clone();
         next_key_buffer.push(key.clone());
@@ -360,7 +360,6 @@ impl AppChorder {
     // If shift is pressed, it means the user is trying to execute a chord.
     // If a chord is executed, we always reset `key_buffer`.
     fn handle_shifted_key_press(&self, handle: AppHandle, key: &Key) -> Result<()> {
-        let context = handle.state::<AppContext>();
         let state = self.observable.state.get()?;
         let key_buffer = state.key_buffer.clone();
 
@@ -387,8 +386,8 @@ impl AppChorder {
             }
         };
 
-        let frontmost = handle.state::<AppFrontmost>();
-        let context = handle.state::<AppContext>();
+        let frontmost = handle.app_frontmost();
+        let context = handle.app_context();
         let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
         let loaded_app_chords = context.loaded_app_chords.read();
         let chord_runtime =
@@ -446,10 +445,6 @@ impl ChorderState {
     }
 }
 
-fn format_keys(keys: &[Key]) -> Vec<String> {
-    keys.iter().map(|key| format_key(*key)).collect()
-}
-
 fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
     match key_event {
         KeyEvent::Press(key) => held_keys.insert(*key),
@@ -460,39 +455,10 @@ fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEve
     }
 }
 
-fn format_key(key: Key) -> String {
-    if let Some(ch) = key.to_char(false) {
-        return ch.to_ascii_uppercase().to_string();
-    }
-
-    match key.0 {
-        ShiftLeft | ShiftRight => "Shift".to_string(),
-        ControlLeft | ControlRight => "Ctrl".to_string(),
-        MetaLeft | MetaRight => "Cmd".to_string(),
-        AltLeft | AltRight => "Alt".to_string(),
-        CapsLock => "Caps".to_string(),
-        Space => "Space".to_string(),
-        Enter => "Enter".to_string(),
-        Tab => "Tab".to_string(),
-        Escape => "Esc".to_string(),
-        ArrowUp => "Up".to_string(),
-        ArrowDown => "Down".to_string(),
-        ArrowLeft => "Left".to_string(),
-        ArrowRight => "Right".to_string(),
-        Backspace => "Backspace".to_string(),
-        Delete => "Delete".to_string(),
-        Home => "Home".to_string(),
-        End => "End".to_string(),
-        PageUp => "PgUp".to_string(),
-        PageDown => "PgDn".to_string(),
-        Fn => "Fn".to_string(),
-        other => format!("{other:?}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use KeyMappingCode::*;
 
     fn test_chord() -> Chord {
         Chord {
