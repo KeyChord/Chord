@@ -40,10 +40,7 @@ function Settings() {
           </TabsContent>
 
           <TabsContent value="global-shortcuts">
-            <GlobalShortcutsTab
-              globalShortcuts={settingsPage.globalShortcutsTab}
-              appMetadataByBundleId={settingsPage.appMetadataByBundleId}
-            />
+            <GlobalShortcutsTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -7,14 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-import { Collapsible, CollapsibleContent } from "#/components/ui/collapsible.tsx";
-import { ChordGroupList } from "#/components/settings/chord-views.tsx";
-import { buildChordGroups, getAppLabel } from "#/utils/settings.ts";
-import type { SettingsPageData } from "#/utils/use-settings-page.ts";
-import { useAppSettingsState } from "../../utils/state.ts";
-import { AddRepoButton } from "./add-repo-button.tsx";
-import { OpenRepoButton } from "./open-repo-button.tsx";
-import { AppsNeedingRelaunchCard } from "./apps-needing-relaunch-card.tsx";
 import { useMutation } from "@tanstack/react-query";
 import { taurpc } from "../../api/taurpc.ts";
 

@@ -162,7 +162,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
 
     let handle = app.handle().clone();
     let chorder = Chorder::new(ChorderIndicatorUi::new(handle.clone())?);
-    let settings = AppSettings::new(handle.clone());
+    let settings = AppSettings::new(handle.clone())?;
     let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
     let context = AppContext::new(chorder, settings, bundled_app_chords);
     // Setting the frontmost application immediately (the frontmost crate only detects changes)

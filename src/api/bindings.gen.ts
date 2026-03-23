@@ -18,13 +18,13 @@ export type LocalChordFolderInfo = { name: string; localPath: string }
 
 export type StartupStatusInfo = { launchedViaAutostart: boolean; onboardingCompleted: boolean; shouldShowOnboarding: boolean }
 
-const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getStartupStatus":[],"listActiveChords":[],"listAppMetadata":["bundle_ids"],"listAppsNeedingRelaunch":[],"listGitRepos":[],"listGlobalShortcutMappings":[],"listLocalChordFolderChords":["path"],"listLocalChordFolders":[],"listMatchingChords":[],"listRepoChords":["repo"],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"syncGitRepo":["repo"]}' }
+const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getAppMetadata":["bundle_id"],"getStartupStatus":[],"listActiveChords":[],"listAppsNeedingRelaunch":[],"listGitRepos":[],"listGlobalShortcutMappings":[],"listLocalChordFolderChords":["path"],"listLocalChordFolders":[],"listMatchingChords":[],"listRepoChords":["repo"],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"syncGitRepo":["repo"]}' }
 export type Router = { "": {addGitRepo: (repo: string) => Promise<GitRepoInfo>, 
 addLocalChordFolder: (path: string) => Promise<LocalChordFolderInfo>, 
 completeOnboarding: () => Promise<null>, 
+getAppMetadata: (bundleId: string) => Promise<AppMetadataInfo>, 
 getStartupStatus: () => Promise<StartupStatusInfo>, 
 listActiveChords: () => Promise<ActiveChordInfo[]>, 
-listAppMetadata: (bundleIds: string[]) => Promise<AppMetadataInfo[]>, 
 listAppsNeedingRelaunch: () => Promise<AppNeedsRelaunchInfo[]>, 
 listGitRepos: () => Promise<GitRepoInfo[]>, 
 listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>, 

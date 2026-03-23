@@ -1,9 +1,11 @@
 use observable_property::ObservableProperty;
 use std::sync::Arc;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
 use typeshare::typeshare;
+use crate::constants::SETTINGS_WINDOW_LABEL;
 use crate::feature::{ChorderIndicatorUi, ChorderState};
+use anyhow::Result;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -57,10 +59,16 @@ impl AppSettingsState {
 
 pub struct AppSettings {
     pub state: ObservableProperty<Arc<AppSettingsState>>,
+
+    pub window: WebviewWindow,
 }
 
 impl AppSettings {
-    pub fn new(handle: AppHandle) -> Self {
+    pub fn new(handle: AppHandle) -> Result<Self> {
+        let window = handle
+            .get_webview_window(SETTINGS_WINDOW_LABEL)
+            .ok_or(anyhow::anyhow!("settings window not found"))?;
+
         let state = ObservableProperty::new(Arc::new(AppSettingsState::new()));
         if let Err(e) = state.subscribe(Arc::new(move |_, new_state| {
             if let Err(e) = handle.emit("app-settings-state-changed", new_state) {
@@ -70,8 +78,9 @@ impl AppSettings {
             log::error!("Failed to subscribe app settings state observer: {e}");
         };
 
-        Self {
+        Ok(Self {
             state,
-        }
+            window
+        })
     }
 }

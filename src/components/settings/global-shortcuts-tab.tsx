@@ -9,10 +9,6 @@ import {
   CardTitle,
 } from "#/components/ui/card.tsx";
 import { Input } from "#/components/ui/input.tsx";
-import { AppIcon } from "#/components/settings/app-icon.tsx";
-import { ShortcutKeys } from "#/components/settings/shortcut-keys.tsx";
-import { getAppLabel } from "#/utils/settings.ts";
-import type { SettingsPageData } from "#/utils/use-settings-page.ts";
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { taurpc } from "../../api/taurpc.ts";
 import { useEffect, useState } from "react";

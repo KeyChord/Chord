@@ -1,26 +1,10 @@
-use crate::constants::{CHORD_WINDOW_LABEL, SETTINGS_WINDOW_LABEL};
 use anyhow::Result;
 use tauri::{AppHandle, Manager, WebviewWindow};
-
-pub fn get_settings_window(handle: AppHandle) -> Result<WebviewWindow> {
-    handle
-        .get_webview_window(SETTINGS_WINDOW_LABEL)
-        .ok_or(anyhow::anyhow!("settings window not found"))
-}
-
-pub fn get_chords_window(handle: AppHandle) -> Result<WebviewWindow> {
-    handle
-        .get_webview_window(CHORD_WINDOW_LABEL)
-        .ok_or(anyhow::anyhow!("chord window not found"))
-}
-
-pub fn configure_settings_window(handle: AppHandle) -> Result<()> {
-    let _window = get_settings_window(handle)?;
-    Ok(())
-}
+use crate::AppContext;
 
 pub fn show_settings_window(handle: AppHandle) -> Result<()> {
-    let window = get_settings_window(handle)?;
+    let context = handle.state::<AppContext>();
+    let window = &context.settings.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -28,7 +12,8 @@ pub fn show_settings_window(handle: AppHandle) -> Result<()> {
 }
 
 pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
-    let window = get_settings_window(handle)?;
+    let context = handle.state::<AppContext>();
+    let window = &context.settings.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -38,7 +23,8 @@ pub fn open_settings_inspector(handle: AppHandle) -> Result<()> {
 }
 
 pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
-    let window = get_chords_window(handle)?;
+    let context = handle.state::<AppContext>();
+    let window = &context.chorder.ui.window;
     window.show()?;
     window.unminimize()?;
     window.set_focus()?;
@@ -48,7 +34,8 @@ pub fn open_chords_inspector(handle: AppHandle) -> Result<()> {
 }
 
 pub fn hide_settings_window(handle: AppHandle) -> Result<()> {
-    let window = get_settings_window(handle)?;
+    let context = handle.state::<AppContext>();
+    let window = &context.settings.window;
     window.hide()?;
     Ok(())
 }
