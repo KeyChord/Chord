@@ -1,4 +1,4 @@
-use crate::tauri_app::js_chordsapp::ChordsappModule;
+use crate::tauri_app::js_chord::ChordModule;
 use include_json::include_json;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
@@ -62,7 +62,7 @@ impl ModuleResolver {
 impl Resolver for ModuleResolver {
     fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base: &str, name: &str) -> rquickjs::Result<String> {
         // `.` from `.js`
-        if name.contains(".") || name == "chordsapp" {
+        if name.contains(".") || name == "chord" {
             return Ok(name.into());
         }
 
@@ -91,7 +91,7 @@ impl ModuleLoader {
 
 fn get_module<'js>(ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
     let module = match name {
-        "chordsapp" => Module::declare_def::<ChordsappModule, _>(ctx.clone(), "chordsapp"),
+        "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
         "readline" | "node:readline" => {
             Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
         }

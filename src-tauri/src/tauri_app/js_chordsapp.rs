@@ -10,7 +10,7 @@ use rquickjs::{Ctx, Function};
 use std::collections::HashSet;
 use tauri_plugin_store::StoreExt;
 
-pub struct ChordsappModule;
+pub struct ChordModule;
 
 fn on_app_launch<'js>(
     ctx: Ctx<'js>,
@@ -28,7 +28,7 @@ fn on_app_terminate<'js>(
     register_app_terminate_handler(ctx, bundle_id, callback)
 }
 
-impl ModuleDef for ChordsappModule {
+impl ModuleDef for ChordModule {
     fn declare(declare: &Declarations) -> rquickjs::Result<()> {
         declare.declare("press")?;
         declare.declare("release")?;

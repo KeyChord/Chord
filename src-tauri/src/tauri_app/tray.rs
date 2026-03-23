@@ -19,9 +19,9 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
 
     let menu = menu.separator().text(QUIT_MENU_ID, "Quit").build()?;
 
-    let mut tray = TrayIconBuilder::with_id("chords-tray")
+    let mut tray = TrayIconBuilder::with_id("chord-tray")
         .menu(&menu)
-        .tooltip("Chords")
+        .tooltip("Chord")
         .show_menu_on_left_click(true)
         .on_menu_event(|handle, event| match event.id().as_ref() {
             SETTINGS_MENU_ID => {

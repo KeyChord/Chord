@@ -1,7 +1,7 @@
 mod app_lifecycle;
 mod context;
 pub mod js;
-mod js_chordsapp;
+mod js_chord;
 pub mod settings;
 pub mod store;
 pub mod tray;

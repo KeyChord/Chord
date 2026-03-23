@@ -32,9 +32,9 @@ Make sure your `tsconfig.json` has the `types` property set to `llrt-types`:
 - [doctor-json](https://github.com/privatenumber/doctor-json) - A JSON editor that preserves all existing formatting/comments
 - [keycode-ts2](https://github.com/leonsilicon/keycode-ts2) - A TypeScript port of the [Rust `keycode` crate](https://crates.io/crates/keycode) which uses the Chromium keycode names as the source of truth (_Chords_ uses these keycode names as the source of truth).
 
-## `chordsapp`
+## `chord`
 
-The built-in `chordsapp` module also exposes:
+The built-in `chord` module also exposes:
 
 ```ts
 export function setAppNeedsRelaunch(bundleId: string, needsRelaunch: boolean): void;
