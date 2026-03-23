@@ -9,7 +9,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
@@ -28,13 +28,17 @@ pub struct NativeSurfaceRect {
 
 #[derive(Clone)]
 pub struct ChorderIndicatorUi {
+    pub handle: AppHandle,
     pub is_visible: Arc<AtomicBool>,
     pub panel: Arc<dyn Panel>,
     pub window: WebviewWindow,
 }
 
 impl ChorderIndicatorUi {
-    pub fn from_window(window: WebviewWindow) -> Result<Self> {
+    pub fn new(handle: AppHandle) -> Result<Self> {
+        let window = handle
+            .get_webview_window(crate::constants::CHORD_WINDOW_LABEL)
+            .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
         let _ = window.set_ignore_cursor_events(true);
 
         let panel = window.to_panel::<IndicatorPanel>()?;
@@ -60,6 +64,7 @@ impl ChorderIndicatorUi {
         );
 
         Ok(Self {
+            handle,
             is_visible: Arc::new(AtomicBool::new(false)),
             window,
             panel,
@@ -115,16 +120,16 @@ impl ChorderIndicatorUi {
         Ok(())
     }
 
-    pub fn configure_surface(&self, handle: AppHandle, rect: NativeSurfaceRect) -> Result<()> {
-        Self::configure_window_surface(&self.window, handle, rect)
+    pub fn configure_surface(&self, rect: NativeSurfaceRect) -> Result<()> {
+        Self::configure_window_surface(&self.window, self.handle.clone(), rect)
     }
 
-    fn show(&self, handle: AppHandle) -> Result<()> {
+    fn show(&self) -> Result<()> {
         log::debug!("Showing chorder panel");
         let panel = self.panel.clone();
         let is_visible = self.is_visible.clone();
 
-        handle.clone().run_on_main_thread(move || {
+        self.handle.clone().run_on_main_thread(move || {
             let native_panel = panel.as_panel();
             if let Some(screen) = native_panel.screen() {
                 let visible_frame = screen.visibleFrame();
@@ -147,22 +152,22 @@ impl ChorderIndicatorUi {
         Ok(())
     }
 
-    pub fn reveal(&self, handle: AppHandle) -> Result<()> {
+    pub fn reveal(&self) -> Result<()> {
         let panel = self.panel.clone();
 
-        handle.run_on_main_thread(move || {
+        self.handle.run_on_main_thread(move || {
             panel.set_alpha_value(1.0);
         })?;
 
         Ok(())
     }
 
-    fn hide(&self, handle: AppHandle) -> Result<()> {
+    fn hide(&self) -> Result<()> {
         log::debug!("Hiding chorder panel");
         let is_visible = self.is_visible.clone();
         let panel = self.panel.clone();
 
-        handle.clone().run_on_main_thread(move || {
+        self.handle.clone().run_on_main_thread(move || {
             panel.hide();
             is_visible.store(false, Ordering::Relaxed);
         })?;
@@ -170,18 +175,18 @@ impl ChorderIndicatorUi {
         Ok(())
     }
 
-    pub fn ensure_hidden(&self, handle: AppHandle) -> Result<bool> {
+    pub fn ensure_hidden(&self) -> Result<bool> {
         if self.is_visible() {
-            self.hide(handle)?;
+            self.hide()?;
             return Ok(true);
         }
 
         Ok(false)
     }
 
-    pub fn ensure_visible(&self, handle: AppHandle) -> Result<bool> {
+    pub fn ensure_visible(&self) -> Result<bool> {
         if !self.is_visible() {
-            self.show(handle)?;
+            self.show()?;
             return Ok(true);
         }
 

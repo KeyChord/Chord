@@ -53,47 +53,6 @@ pub fn register_key_event_input_grabber(handle: AppHandle) {
             _ => return Some(event),
         };
 
-        let non_shift_modifiers = Key::non_shift_modifiers();
-        let is_modifier = non_shift_modifiers.contains(&key);
-        if is_modifier {
-            if let Some(device_state) = &context.device_state {
-                let _ = device_state.get_keys();
-
-                // // When a modifier key is pressed, we need to make sure the Shift state is propagated to the OS
-                // if matches!(key_event, KeyEvent::Press(_)) {
-                //     let is_left_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
-                //     let is_right_shift_registered = device_keys.contains(&device_query::Keycode::RShift);
-                //     let is_shift_pressed = context.key_event_state.app_mode_state_machine.is_shift_pressed.load(Ordering::SeqCst);
-                //     // If shift pressed and neither shift is registered, register left shift
-                //     if is_shift_pressed && !is_left_shift_registered && !is_right_shift_registered {
-                //         simulate(&rdev::EventType::KeyPress(rdev::Key::ShiftLeft)).ok();
-                //     }
-                //
-                //     // If shift is not pressed and a Shift is registered, register a release
-                //     if !is_shift_pressed && is_left_shift_registered {
-                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftLeft)).ok();
-                //     }
-                //
-                //     if !is_shift_pressed && is_right_shift_registered {
-                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftRight)).ok();
-                //     }
-                // }
-                // // When a modifier key is released, and no more modifier keys are pressed, we need to
-                // // tell the OS that Shift is not being pressed
-                // else {
-                //     let is_left_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
-                //     let is_right_shift_registered = device_keys.contains(&device_query::Keycode::LShift);
-                //     let is_all_modifiers_unpressed = device_keys.into_iter().all(|key| !non_shift_modifiers.contains(&Key::from(key)));
-                //     if is_left_shift_registered && is_all_modifiers_unpressed {
-                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftLeft)).ok();
-                //     }
-                //     if is_right_shift_registered && is_all_modifiers_unpressed {
-                //         simulate(&rdev::EventType::KeyRelease(rdev::Key::ShiftRight)).ok();
-                //     }
-                // }
-            }
-        }
-
         let action = context.key_event_state.process_event(&key_event);
 
         if let Err(e) = tx.send(key_event) {

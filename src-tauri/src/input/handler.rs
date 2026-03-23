@@ -26,7 +26,7 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
                     .handle_key_event(handle.clone(), &key_event)?;
             }
 
-            context.chorder.ensure_inactive(handle.clone())?;
+            context.chorder.ensure_inactive()?;
         }
     }
 

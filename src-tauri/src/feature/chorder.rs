@@ -47,12 +47,12 @@ impl Chorder {
         }
     }
 
-    fn preload_ui(ui: &ChorderIndicatorUi, handle: AppHandle) -> Result<()> {
+    fn preload_ui(ui: &ChorderIndicatorUi) -> Result<()> {
         log::debug!("Preloading chorder panel");
 
-        if ui.ensure_visible(handle.clone())? {
+        if ui.ensure_visible()? {
             Self::prepare_surface_before_reveal(&ui.window);
-            ui.ensure_hidden(handle)?;
+            ui.ensure_hidden()?;
         }
 
         Ok(())
@@ -75,8 +75,8 @@ impl Chorder {
         }
 
         let surface_window = ui.window.clone();
+        let surface_handle = ui.handle.clone();
         let listener_window = surface_window.clone();
-        let surface_handle = surface_window.app_handle().clone();
         listener_window.listen(
             "chorder-surface-rect",
             move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
@@ -96,9 +96,8 @@ impl Chorder {
         );
 
         let preload_ui = ui.clone();
-        let preload_handle = preload_ui.window.app_handle().clone();
         ui.window.once("chorder-window-ready", move |_| {
-            if let Err(error) = Self::preload_ui(&preload_ui, preload_handle.clone()) {
+            if let Err(error) = Self::preload_ui(&preload_ui) {
                 log::error!("Failed to preload chorder panel: {error}");
             }
         });
@@ -110,16 +109,16 @@ impl Chorder {
         }
     }
 
-    pub fn ensure_active(&self, handle: AppHandle) -> Result<()> {
-        if self.ui.ensure_visible(handle.clone())? {
+    pub fn ensure_active(&self) -> Result<()> {
+        if self.ui.ensure_visible()? {
             Self::prepare_surface_before_reveal(&self.ui.window);
-            self.ui.reveal(handle.clone())?;
+            self.ui.reveal()?;
             self.emit_visibility_changed(true);
         }
         Ok(())
     }
 
-    pub fn ensure_inactive(&self, handle: AppHandle) -> Result<()> {
+    pub fn ensure_inactive(&self) -> Result<()> {
         self.held_keys.lock().clear();
 
         let state = self.state.get()?;
@@ -128,7 +127,7 @@ impl Chorder {
         }
 
         self.state.set(Arc::new(ChorderState::new()))?;
-        if self.ui.ensure_hidden(handle.clone())? {
+        if self.ui.ensure_hidden()? {
             self.emit_visibility_changed(false);
         }
         Ok(())
@@ -201,7 +200,7 @@ impl Chorder {
             // If the caps lock key is pressed, it means we should execute (and clear) the chord
             // currently in `key_buffer`, or if empty, execute the last chord
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
-                self.ensure_active(handle.clone())?;
+                self.ensure_active()?;
 
                 let context = handle.state::<AppContext>();
                 let loaded_app_chords = context.loaded_app_chords.read();
@@ -269,11 +268,11 @@ impl Chorder {
             KeyEvent::Press(key) => {
                 // Ignore space presses
                 if key == &Key(KeyMappingCode::Space) {
-                    self.ensure_active(handle)?;
+                    self.ensure_active()?;
                     return Ok(());
                 }
 
-                self.ensure_active(handle.clone())?;
+                self.ensure_active()?;
                 let is_shift_pressed = context.is_shift_pressed();
                 if is_shift_pressed {
                     self.handle_shifted_key_press(handle, key)

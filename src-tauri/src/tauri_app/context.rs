@@ -314,7 +314,7 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
 // Also evaluates JavaScript
 pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
     let context = app.state::<AppContext>();
-    context.chorder.ensure_inactive(app.clone())?;
+    context.chorder.ensure_inactive()?;
 
     // Load all JS files as modules
     let chord_folders = load_all_chord_folders(app.clone())?;

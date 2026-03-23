@@ -164,12 +164,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     });
 
     let handle = app.handle().clone();
-    let chorder = {
-        let window = handle
-            .get_webview_window(crate::constants::CHORD_WINDOW_LABEL)
-            .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
-        Chorder::new(ChorderIndicatorUi::from_window(window)?)
-    };
+    let chorder = Chorder::new(ChorderIndicatorUi::new(handle.clone())?);
     let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
     let context = AppContext::new(chorder, bundled_app_chords);
     // Setting the frontmost application immediately (the frontmost crate only detects changes)
