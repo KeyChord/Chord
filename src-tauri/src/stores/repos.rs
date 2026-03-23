@@ -11,7 +11,6 @@ pub struct GitReposStoreEntry {
     pub repo: GitRepo
 }
 
-#[derive(Clone)]
 pub struct GitReposStore<R: Runtime> {
     pub store: Arc<Store<R>>,
 }

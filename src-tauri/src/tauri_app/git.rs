@@ -10,6 +10,7 @@ use crate::chords::{ChordPackage, LoadedAppChords};
 use crate::feature::SafeAppHandle;
 use crate::git::{clone_repo, GitHubRepoRef};
 use crate::observables::{GitPackageRegistryObservable, GitPackageRegistryState, GitRepo};
+use crate::stores::AppHandleStoreExt;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -19,54 +20,12 @@ pub struct GitPackageRegistry {
     pub observable: GitPackageRegistryObservable
 }
 
-fn discover_repos(repos_root: PathBuf) -> Result<Vec<GitRepo>> {
-    if !repos_root.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut repos = Vec::new();
-
-    for owner_entry in fs::read_dir(&repos_root)? {
-        let owner_entry = owner_entry?;
-        let owner_path = owner_entry.path();
-        if !owner_path.is_dir() {
-            continue;
-        }
-
-        for repo_entry in fs::read_dir(&owner_path)? {
-            let repo_entry = repo_entry?;
-            let repo_path = repo_entry.path();
-            if !repo_path.is_dir() || !repo_path.join(".git").exists() {
-                continue;
-            }
-
-            let Some(owner) = owner_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-            let Some(name) = repo_path.file_name().and_then(|segment| segment.to_str()) else {
-                continue;
-            };
-
-            repos.push(
-                GitHubRepoRef {
-                    owner: owner.to_string(),
-                    name: name.to_string(),
-                }.into_repo(&repos_root),
-            );
-        }
-    }
-
-    repos.sort_by(|left, right| left.slug.cmp(&right.slug));
-    Ok(repos)
-}
-
 impl GitPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let dir = handle.path().app_cache_dir()?;
         let observable = GitPackageRegistryObservable::new(handle.clone())?;
-        let git_repos = discover_repos(dir.clone())?;
-        let repos = handle.store("repos.json");
-        log::debug!("repos: {:?}", git_repos);
+        let store = handle.git_repos_store()?;
+        let git_repos = store.entries().values().cloned().map(|m| m.repo).collect();
         observable.set_state(GitPackageRegistryState { git_repos })?;
 
         Ok(Self {

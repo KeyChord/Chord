@@ -9,7 +9,6 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::AppHandle;
-use tauri_plugin_store::StoreExt;
 use crate::get_app_metadata;
 use crate::tauri_app::git::{LocalChordPackage};
 use specta::Type;
