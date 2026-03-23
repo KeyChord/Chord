@@ -3,8 +3,8 @@ use anyhow::Result;
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
-use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::OnceLock;
 use tauri::AppHandle;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
@@ -52,11 +52,14 @@ pub fn register_app_launch_handler<'js>(
     let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::SeqCst);
 
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
-        callbacks.borrow_mut().launch.push(AppLifecycleCallbackEntry {
-            id,
-            bundle_id,
-            callback: Persistent::save(&ctx, callback),
-        });
+        callbacks
+            .borrow_mut()
+            .launch
+            .push(AppLifecycleCallbackEntry {
+                id,
+                bundle_id,
+                callback: Persistent::save(&ctx, callback),
+            });
     });
     HAS_LAUNCH_CALLBACKS.store(true, Ordering::SeqCst);
 
@@ -117,8 +120,10 @@ pub fn dispatch_app_launch(app: ObservedApp) {
     };
 
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = with_js(handle, move |ctx| Box::pin(invoke_launch_callbacks(ctx, app)))
-            .await
+        if let Err(error) = with_js(handle, move |ctx| {
+            Box::pin(invoke_launch_callbacks(ctx, app))
+        })
+        .await
         {
             log::error!("Failed to run app launch callbacks: {error}");
         }
@@ -135,8 +140,10 @@ pub fn dispatch_app_terminate(app: ObservedApp) {
     };
 
     tauri::async_runtime::spawn(async move {
-        if let Err(error) =
-            with_js(handle, move |ctx| Box::pin(invoke_terminate_callbacks(ctx, app))).await
+        if let Err(error) = with_js(handle, move |ctx| {
+            Box::pin(invoke_terminate_callbacks(ctx, app))
+        })
+        .await
         {
             log::error!("Failed to run app terminate callbacks: {error}");
         }
@@ -213,11 +220,11 @@ async fn await_promise_if_needed<'js>(result: Value<'js>) -> rquickjs::Result<()
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{ObservedApp, dispatch_app_launch, dispatch_app_terminate};
+    use super::{dispatch_app_launch, dispatch_app_terminate, ObservedApp};
     use block2::RcBlock;
     use core::ptr::NonNull;
-    use objc2::MainThreadMarker;
     use objc2::runtime::AnyObject;
+    use objc2::MainThreadMarker;
     use objc2_app_kit::{
         NSRunningApplication, NSWorkspace, NSWorkspaceApplicationKey,
         NSWorkspaceDidLaunchApplicationNotification,
@@ -233,8 +240,8 @@ mod macos {
             return;
         }
 
-        let _main_thread =
-            MainThreadMarker::new().expect("app lifecycle observers must initialize on the main thread");
+        let _main_thread = MainThreadMarker::new()
+            .expect("app lifecycle observers must initialize on the main thread");
 
         let workspace = NSWorkspace::sharedWorkspace();
         let center = workspace.notificationCenter();
@@ -271,7 +278,9 @@ mod macos {
         let _ = Box::leak(Box::new(terminate_observer));
     }
 
-    fn observed_app_from_notification(notification: NonNull<NSNotification>) -> Option<ObservedApp> {
+    fn observed_app_from_notification(
+        notification: NonNull<NSNotification>,
+    ) -> Option<ObservedApp> {
         let notification = unsafe { notification.as_ref() };
 
         let Some(user_info) = notification.userInfo() else {

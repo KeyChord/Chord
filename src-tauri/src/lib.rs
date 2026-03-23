@@ -1,10 +1,12 @@
+use crate::api::{Api, ApiImpl};
 use crate::chords::{ChordFolder, LoadedAppChords};
-use crate::feature::{Chorder, ChorderIndicatorPanel};
+use crate::feature::{Chorder, ChorderIndicatorUi, ChorderState};
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use anyhow::{Context, Result};
 use frontmost::{start_nsrunloop, Detector};
 use objc2_app_kit::NSWorkspace;
 use parking_lot::deadlock;
+use specta_typescript::Typescript;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -15,6 +17,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
 
+mod api;
 mod chords;
 mod constants;
 mod feature;
@@ -102,25 +105,12 @@ pub fn run() {
         ])
         .build();
 
+    let api_impl = ApiImpl::default();
+    let api_impl_for_setup = api_impl.clone();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![
-            tauri_app::commands::list_git_repos,
-            tauri_app::commands::add_git_repo_command,
-            tauri_app::commands::sync_git_repo_command,
-            tauri_app::commands::list_local_chord_folders_command,
-            tauri_app::commands::pick_local_chord_folder_command,
-            tauri_app::commands::add_local_chord_folder_command,
-            tauri_app::commands::list_active_chords_command,
-            tauri_app::commands::list_repo_chords_command,
-            tauri_app::commands::list_local_chord_folder_chords_command,
-            tauri_app::commands::list_global_shortcut_mappings_command,
-            tauri_app::commands::remove_global_shortcut_mapping_command,
-            tauri_app::commands::list_apps_needing_relaunch_command,
-            tauri_app::commands::relaunch_app_command,
-            tauri_app::commands::open_accessibility_settings,
-            tauri_app::commands::open_input_monitoring_settings,
-        ])
+        .invoke_handler(taurpc::create_ipc_handler(api_impl.into_handler()))
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
@@ -149,7 +139,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_user_input::init())
-        .setup(|app| {
+        .setup(move |app| {
+            api_impl_for_setup.set_app_handle(app.handle().clone());
             if let Err(e) = setup(app) {
                 log::error!("Failed to set up app:\n{:#?}", e);
                 app.dialog()
@@ -175,9 +166,9 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let handle = app.handle().clone();
     let chorder = {
         let window = handle
-            .get_webview_window(crate::constants::INDICATOR_WINDOW_LABEL)
+            .get_webview_window(crate::constants::CHORD_WINDOW_LABEL)
             .ok_or(anyhow::anyhow!("chord indicator window not found"))?;
-        Chorder::new(ChorderIndicatorPanel::from_window(window)?)
+        Chorder::new(ChorderIndicatorUi::from_window(window)?)
     };
     let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordFolder::load_bundled()?])?;
     let context = AppContext::new(chorder, bundled_app_chords);

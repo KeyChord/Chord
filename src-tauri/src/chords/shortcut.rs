@@ -1,7 +1,9 @@
 use crate::input::Key;
 use anyhow::Result;
 use keycode::KeyMappingCode;
+use serde::Serialize;
 use std::str::FromStr;
+use typeshare::typeshare;
 
 pub fn press_shortcut(shortcut: Shortcut, num_times: usize) -> Result<()> {
     log::debug!("Pressing shortcut: {:?}", shortcut);
@@ -104,7 +106,8 @@ enum ShortcutAction {
 }
 
 /// Represents a parsed keyboard shortcut, e.g. "cmd+shift+n".
-#[derive(Debug, Clone)]
+#[typeshare]
+#[derive(Debug, Clone, Serialize)]
 pub struct Shortcut {
     pub chords: Vec<ShortcutChord>,
 }
@@ -132,7 +135,8 @@ impl Shortcut {
     }
 }
 
-#[derive(Debug, Clone)]
+#[typeshare]
+#[derive(Debug, Clone, Serialize)]
 pub struct ShortcutChord {
     pub keys: Vec<Key>,
 }

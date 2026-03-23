@@ -1,14 +1,15 @@
-import React from "react";
 import ReactDOM from "react-dom/client";
 import { attachConsole } from "@tauri-apps/plugin-log";
-import App from "./App";
+import { RouterProvider } from '@tanstack/react-router'
+import { getRouter } from "./router.tsx";
 
 if (import.meta.env.DEV) {
   void attachConsole();
 }
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.Fragment>
-    <App />
-  </React.Fragment>,
-);
+const rootElement = document.getElementById('root')
+
+if (rootElement && !rootElement.innerHTML) {
+  const root = ReactDOM.createRoot(rootElement)
+  root.render(<RouterProvider router={getRouter()} />)
+}

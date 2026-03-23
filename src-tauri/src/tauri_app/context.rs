@@ -1,4 +1,4 @@
-use crate::chords::LoadedAppChords;
+use crate::chords::{Chord, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::Chorder;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::sources::load_all_chord_folders;
@@ -8,41 +8,62 @@ use crate::{
 };
 use anyhow::Result;
 use arc_swap::ArcSwap;
+use base64::Engine;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
 use parking_lot::RwLock;
 use rquickjs::Module;
-use serde::Serialize;
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
+use objc2::runtime::AnyObject;
 #[cfg(target_os = "macos")]
-use objc2_foundation::NSString;
+use objc2_app_kit::{
+    NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
+    NSWorkspaceLaunchOptions,
+};
+#[cfg(target_os = "macos")]
+use objc2_foundation::{NSDictionary, NSSize, NSString};
 #[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct ActiveChordInfo {
     pub scope: String,
     pub scope_kind: String,
     pub sequence: String,
     pub name: String,
     pub action: String,
+    pub description: Option<String>,
+    pub is_description: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct AppNeedsRelaunchInfo {
     pub bundle_id: String,
     pub display_name: Option<String>,
+}
+
+#[derive(Debug)]
+#[taurpc::ipc_type]
+#[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
+pub struct AppMetadataInfo {
+    pub bundle_id: String,
+    pub display_name: Option<String>,
+    pub icon_data_url: Option<String>,
 }
 
 pub struct AppContext {
@@ -113,13 +134,20 @@ fn apps_needing_relaunch_payload(bundle_ids: &BTreeSet<String>) -> Vec<AppNeedsR
         .collect()
 }
 
-fn emit_apps_needing_relaunch_changed(app: &AppHandle, bundle_ids: &BTreeSet<String>) -> Result<()> {
+fn emit_apps_needing_relaunch_changed<R: Runtime>(
+    app: &AppHandle<R>,
+    bundle_ids: &BTreeSet<String>,
+) -> Result<()> {
     let payload = apps_needing_relaunch_payload(bundle_ids);
     app.emit(APPS_NEEDING_RELAUNCH_CHANGED_EVENT, payload)?;
     Ok(())
 }
 
-pub fn set_app_needs_relaunch(app: &AppHandle, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
+pub fn set_app_needs_relaunch<R: Runtime>(
+    app: &AppHandle<R>,
+    bundle_id: &str,
+    needs_relaunch: bool,
+) -> Result<()> {
     let bundle_id = normalize_bundle_id(bundle_id)?;
     let context = app.state::<AppContext>();
 
@@ -147,6 +175,22 @@ pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunch
     Ok(apps_needing_relaunch_payload(&apps_needing_relaunch))
 }
 
+pub fn list_app_metadata(bundle_ids: Vec<String>) -> Result<Vec<AppMetadataInfo>> {
+    let bundle_ids = bundle_ids
+        .into_iter()
+        .map(|bundle_id| normalize_bundle_id(&bundle_id))
+        .collect::<Result<BTreeSet<_>>>()?;
+
+    Ok(bundle_ids
+        .into_iter()
+        .map(|bundle_id| AppMetadataInfo {
+            display_name: resolve_app_display_name(&bundle_id),
+            icon_data_url: resolve_app_icon_data_url(&bundle_id),
+            bundle_id,
+        })
+        .collect())
+}
+
 pub fn relaunch_app(app: AppHandle, bundle_id: &str) -> Result<()> {
     let bundle_id = normalize_bundle_id(bundle_id)?;
     relaunch_bundle_id(&bundle_id)?;
@@ -169,11 +213,48 @@ fn resolve_app_display_name(bundle_id: &str) -> Option<String> {
     let app_url = workspace.URLForApplicationWithBundleIdentifier(&bundle_id)?;
     let app_name = app_url.lastPathComponent()?;
     let app_name = app_name.to_string();
-    Some(app_name.strip_suffix(".app").unwrap_or(&app_name).to_string())
+    Some(
+        app_name
+            .strip_suffix(".app")
+            .unwrap_or(&app_name)
+            .to_string(),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_app_path(bundle_id: &str) -> Option<String> {
+    let bundle_id = NSString::from_str(bundle_id);
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app_url = workspace.URLForApplicationWithBundleIdentifier(&bundle_id)?;
+    let app_path = app_url.path()?;
+    Some(app_path.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn resolve_app_icon_data_url(bundle_id: &str) -> Option<String> {
+    let app_path = resolve_app_path(bundle_id)?;
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app_path = NSString::from_str(&app_path);
+    let icon = workspace.iconForFile(&app_path);
+    icon.setSize(NSSize::new(20.0, 20.0));
+
+    let tiff = icon.TIFFRepresentation()?;
+    let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)?;
+    let properties = NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
+    let png_data = unsafe {
+        bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties)
+    }?;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(png_data.to_vec());
+    Some(format!("data:image/png;base64,{encoded}"))
 }
 
 #[cfg(not(target_os = "macos"))]
 fn resolve_app_display_name(_bundle_id: &str) -> Option<String> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn resolve_app_icon_data_url(_bundle_id: &str) -> Option<String> {
     None
 }
 
@@ -202,8 +283,8 @@ fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
 
     let workspace = NSWorkspace::sharedWorkspace();
     #[allow(deprecated)]
-    let launched =
-        workspace.launchAppWithBundleIdentifier_options_additionalEventParamDescriptor_launchIdentifier(
+    let launched = workspace
+        .launchAppWithBundleIdentifier_options_additionalEventParamDescriptor_launchIdentifier(
             &bundle_id,
             NSWorkspaceLaunchOptions::Default,
             None,
@@ -438,19 +519,31 @@ pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     Ok(list_loaded_chords(&loaded_app_chords))
 }
 
+pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
+    let context = app.state::<AppContext>();
+    let state = context.chorder.state.get()?;
+    let frontmost_application_id = context.frontmost_application_id.load();
+    let loaded_app_chords = context.loaded_app_chords.read();
+
+    Ok(list_matching_loaded_chords(
+        &loaded_app_chords,
+        &state.key_buffer,
+        frontmost_application_id.as_ref().as_deref(),
+    ))
+}
+
 pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChordInfo> {
     let mut chords = Vec::new();
     let mut seen = HashSet::new();
 
     for (application_id, runtime) in &loaded_app_chords.runtimes {
         for chord in runtime.chords.values() {
-            let item = ActiveChordInfo {
-                scope: application_id.clone(),
-                scope_kind: "app".to_string(),
-                sequence: format_sequence(&chord.keys),
-                name: chord.name.clone(),
-                action: format_action(chord),
-            };
+            let item = build_active_chord_info(
+                application_scope(application_id),
+                application_scope_kind(application_id),
+                &chord.keys,
+                chord,
+            );
             let fingerprint = format!(
                 "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
                 item.scope_kind, item.scope, item.sequence, item.name, item.action
@@ -471,6 +564,87 @@ pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChor
 
     chords
 }
+
+pub fn list_matching_loaded_chords(
+    loaded_app_chords: &LoadedAppChords,
+    key_buffer: &[crate::input::Key],
+    application_id: Option<&str>,
+) -> Vec<ActiveChordInfo> {
+    let mut items = loaded_app_chords
+        .list_matching_descriptions(key_buffer, application_id)
+        .into_iter()
+        .map(|item| {
+            build_description_info(
+                &item.scope,
+                item.scope_kind,
+                &item.sequence,
+                &item.description,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    items.extend(
+        loaded_app_chords
+            .list_matching_chords(key_buffer, application_id)
+            .into_iter()
+            .map(|item| {
+                build_active_chord_info(&item.scope, item.scope_kind, &item.sequence, &item.chord)
+            }),
+    );
+
+    items
+}
+
+fn application_scope(application_id: &str) -> &str {
+    if application_id == GLOBAL_CHORD_RUNTIME_ID {
+        "Global"
+    } else {
+        application_id
+    }
+}
+
+fn application_scope_kind(application_id: &str) -> &'static str {
+    if application_id == GLOBAL_CHORD_RUNTIME_ID {
+        "global"
+    } else {
+        "app"
+    }
+}
+
+fn build_active_chord_info(
+    scope: &str,
+    scope_kind: &str,
+    sequence: &[crate::input::Key],
+    chord: &Chord,
+) -> ActiveChordInfo {
+    ActiveChordInfo {
+        scope: scope.to_string(),
+        scope_kind: scope_kind.to_string(),
+        sequence: format_sequence(sequence),
+        name: chord.name.clone(),
+        action: format_action(chord),
+        description: None,
+        is_description: false,
+    }
+}
+
+fn build_description_info(
+    scope: &str,
+    scope_kind: &str,
+    sequence: &[crate::input::Key],
+    description: &str,
+) -> ActiveChordInfo {
+    ActiveChordInfo {
+        scope: scope.to_string(),
+        scope_kind: scope_kind.to_string(),
+        sequence: format_sequence(sequence),
+        name: description.to_string(),
+        action: "Description".to_string(),
+        description: Some(description.to_string()),
+        is_description: true,
+    }
+}
+
 fn format_action(chord: &crate::chords::Chord) -> String {
     if let Some(shortcut) = &chord.shortcut {
         return format!("Shortcut: {}", format_shortcut(shortcut));

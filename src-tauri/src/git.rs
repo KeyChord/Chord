@@ -1,12 +1,13 @@
 use crate::chords::{ChordFolder, LoadedAppChords};
 use anyhow::{Context, Result};
-use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug)]
+#[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
 pub struct GitRepoInfo {
     pub owner: String,
     pub name: String,
@@ -98,11 +99,11 @@ fn repo_head_short_sha(repo_path: &Path) -> Option<String> {
     Some(head_id.shorten_or_id().to_string())
 }
 
-pub fn github_repos_root(app: AppHandle) -> Result<PathBuf> {
+pub fn github_repos_root<R: Runtime>(app: AppHandle<R>) -> Result<PathBuf> {
     Ok(app.path().app_cache_dir()?.join("repos/github.com"))
 }
 
-pub fn discover_git_repos(app: AppHandle) -> Result<Vec<GitRepoInfo>> {
+pub fn discover_git_repos<R: Runtime>(app: AppHandle<R>) -> Result<Vec<GitRepoInfo>> {
     let repos_root = github_repos_root(app)?;
     if !repos_root.exists() {
         return Ok(Vec::new());
@@ -144,7 +145,7 @@ pub fn discover_git_repos(app: AppHandle) -> Result<Vec<GitRepoInfo>> {
     Ok(repos)
 }
 
-pub fn add_git_repo(app: AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
+pub fn add_git_repo<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<GitRepoInfo> {
     let repo_ref = GitHubRepoRef::parse(repo_input)?;
     let repos_root = github_repos_root(app)?;
     let repo_path = repo_ref.local_path(&repos_root);
@@ -157,7 +158,7 @@ pub fn add_git_repo(app: AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
     Ok(repo_ref.into_info(&repos_root))
 }
 
-pub fn sync_git_repo(app: AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
+pub fn sync_git_repo<R: Runtime>(app: AppHandle<R>, repo_input: &str) -> Result<GitRepoInfo> {
     let repo_ref = GitHubRepoRef::parse(repo_input)?;
     let repos_root = github_repos_root(app)?;
     let repo_path = repo_ref.local_path(&repos_root);
@@ -170,7 +171,10 @@ pub fn sync_git_repo(app: AppHandle, repo_input: &str) -> Result<GitRepoInfo> {
     Ok(repo_ref.into_info(&repos_root))
 }
 
-pub fn load_repo_chords(app: AppHandle, repo_input: &str) -> Result<LoadedAppChords> {
+pub fn load_repo_chords<R: Runtime>(
+    app: AppHandle<R>,
+    repo_input: &str,
+) -> Result<LoadedAppChords> {
     let repo_ref = GitHubRepoRef::parse(repo_input)?;
     let repos_root = github_repos_root(app)?;
     let repo_path = repo_ref.local_path(&repos_root);
@@ -184,7 +188,7 @@ pub fn load_repo_chords(app: AppHandle, repo_input: &str) -> Result<LoadedAppCho
     LoadedAppChords::from_folders(vec![chord_folder])
 }
 
-pub fn load_all_chord_folders(app: AppHandle) -> Result<Vec<ChordFolder>> {
+pub fn load_all_chord_folders<R: Runtime>(app: AppHandle<R>) -> Result<Vec<ChordFolder>> {
     let mut chord_folders = Vec::new();
 
     for repo in discover_git_repos(app)? {

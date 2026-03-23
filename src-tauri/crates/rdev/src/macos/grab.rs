@@ -2,7 +2,7 @@
 use crate::macos::common::*;
 use crate::rdev::{Event, GrabError};
 use objc2_core_foundation::{CFMachPort, CFRunLoop, kCFRunLoopCommonModes};
-use objc2_core_graphics::{CGEvent, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType, kCGEventMaskForAllEvents, CGEventFlags};
+use objc2_core_graphics::{CGEvent, CGEventTapCallBack, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement, CGEventTapProxy, CGEventType, kCGEventMaskForAllEvents};
 use objc2_foundation::NSAutoreleasePool;
 use std::os::raw::c_void;
 use std::ptr::{NonNull, null_mut};

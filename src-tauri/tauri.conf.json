@@ -22,7 +22,7 @@
     "windows": [
       {
         "label": "settings",
-        "title": "Chords Settings",
+        "title": "Settings",
         "width": 420,
         "height": 320,
         "visible": false,
@@ -30,12 +30,12 @@
         "center": true
       },
       {
-        "label": "indicator",
-        "title": "Chord Mode Indicator",
+        "label": "chords",
+        "title": "Chords",
         "width": 640,
         "height": 180,
         "visible": false,
-        "transparent": false,
+        "transparent": true,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
