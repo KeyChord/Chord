@@ -5,6 +5,8 @@ mod frontmost;
 mod permissions;
 mod safe_app_handle;
 pub mod app_handle_ext;
+pub mod global_hotkey;
+pub mod repos;
 
 pub use chorder::*;
 pub use chorder_ui::*;

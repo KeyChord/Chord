@@ -10,7 +10,6 @@ use crate::chords::{ChordPackage, LoadedAppChords};
 use crate::feature::SafeAppHandle;
 use crate::git::{GitHubRepoRef};
 use crate::observables::{Observable, GitReposObservable};
-use crate::stores::AppHandleStoreExt;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -32,9 +31,7 @@ impl GitPackageRegistry {
 
     pub fn load_all_packages(&self) -> Result<Vec<ChordPackage>> {
         let mut packages = Vec::new();
-        let repos = self.handle.git_repos_store()?;
-        let observable = self.handle.observable::<GitReposObservable>();
-        let state = observable.get_state()?;
+        let state = self.handle.observable_state::<GitReposObservable>()?;
         for repo in state.repos.values() {
             match gix::open(&repo.local_path)
                 .context(format!("failed to open repo {}", repo.slug))

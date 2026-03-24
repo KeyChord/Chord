@@ -1,8 +1,12 @@
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Manager, Runtime, State};
 use crate::AppContext;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
+use crate::feature::global_hotkey::GlobalHotkeyStore;
+use crate::feature::repos::GitReposStore;
 use crate::observables::Observable;
 use crate::tauri_app::git::ChordPackageRegistry;
+use std::sync::Arc;
+use anyhow::Result;
 
 pub struct AppManaged {
     pub settings: AppSettings,
@@ -10,7 +14,9 @@ pub struct AppManaged {
     pub context: AppContext,
     pub chord_package_registry: ChordPackageRegistry,
     pub frontmost: AppFrontmost,
-    pub permissions: AppPermissions
+    pub permissions: AppPermissions,
+    pub global_hotkey_store: GlobalHotkeyStore,
+    pub git_repos_store: GitReposStore
 }
 
 impl AppManaged {
@@ -21,6 +27,8 @@ impl AppManaged {
         handle.manage(self.chorder);
         handle.manage(self.context);
         handle.manage(self.chord_package_registry);
+        handle.manage(self.global_hotkey_store);
+        handle.manage(self.git_repos_store);
     }
 }
 
@@ -31,7 +39,9 @@ pub trait AppHandleExt {
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry;
     fn app_frontmost(&self) -> &AppFrontmost;
     fn app_permissions(&self) -> &AppPermissions;
-    fn observable<T: Observable>(&self) -> tauri::State<'_, T>;
+    fn global_hotkey_store(&self) -> &GlobalHotkeyStore;
+    fn git_repos_store(&self) -> &GitReposStore;
+    fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>>;
 }
 
 impl<R: Runtime> AppHandleExt for AppHandle<R> {
@@ -59,8 +69,15 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
         self.state::<AppPermissions>().inner()
     }
 
-    fn observable<T: Observable>(&self) -> tauri::State<'_, T> {
-        let observable = self.state::<T>();
-        observable
+    fn global_hotkey_store(&self) -> &GlobalHotkeyStore {
+        self.state::<GlobalHotkeyStore>().inner()
+    }
+
+    fn git_repos_store(&self) -> &GitReposStore {
+        self.state::<GitReposStore>().inner()
+    }
+
+    fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>> {
+        Ok(self.state::<Arc<T>>().get_state()?)
     }
 }

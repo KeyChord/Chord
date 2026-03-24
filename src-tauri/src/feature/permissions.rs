@@ -8,15 +8,15 @@ pub struct AppPermissions {
     _input_monitoring: AppPermissionsInputMonitoring,
     _accessibility: AppPermissionsAccessibility,
 
+    observable: Arc<AppPermissionsObservable>,
     handle: SafeAppHandle
 }
 
 impl AppPermissions {
-    pub fn new_unloaded(handle: SafeAppHandle) -> Result<Self> {
-        let input_monitoring = AppPermissionsInputMonitoring::new(handle.clone())?;
-        let accessibility = AppPermissionsAccessibility::new(handle.clone())?;
+    pub fn new_unloaded(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
+        let input_monitoring = AppPermissionsInputMonitoring::new(handle.clone(), observable.clone())?;
+        let accessibility = AppPermissionsAccessibility::new(handle.clone(), observable.clone())?;
         let is_autolaunch_enabled = handle.is_autolaunch_enabled()?;
-        let observable = handle.observable::<AppPermissionsObservable>();
         observable.set_state(AppPermissionsState {
             is_input_monitoring_enabled: None,
             is_accessibility_enabled: None,
@@ -24,15 +24,15 @@ impl AppPermissions {
         })?;
         Ok(Self {
             handle,
+            observable,
             _input_monitoring: input_monitoring,
             _accessibility: accessibility
         })
     }
 
     pub async fn load(&self) -> Result<()> {
-        let observable = self.handle.observable::<AppPermissionsObservable>();
-        let state = observable.get_state()?;
-        observable.set_state(AppPermissionsState {
+        let state = self.observable.get_state()?;
+        self.observable.set_state(AppPermissionsState {
             is_input_monitoring_enabled: Some(tauri_plugin_macos_permissions::check_input_monitoring_permission().await),
             is_accessibility_enabled: Some(tauri_plugin_macos_permissions::check_accessibility_permission().await),
             is_autostart_enabled: state.is_autostart_enabled
@@ -44,8 +44,7 @@ impl AppPermissions {
 pub struct AppPermissionsInputMonitoring {}
 
 impl AppPermissionsInputMonitoring {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let observable = handle.observable::<AppPermissionsObservable>();
+    pub fn new(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
         let handle = handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_input_monitoring_enabled.is_some_and(|s| s) {
@@ -64,8 +63,7 @@ impl AppPermissionsInputMonitoring {
 pub struct AppPermissionsAccessibility {}
 
 impl AppPermissionsAccessibility {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let observable = handle.observable::<AppPermissionsObservable>();
+    pub fn new(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
         let handle = handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_accessibility_enabled.is_some_and(|s| s) {

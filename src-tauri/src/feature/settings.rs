@@ -1,7 +1,6 @@
 use anyhow::Result;
 use tauri::{Emitter, WebviewUrl, WebviewWindow};
 use crate::feature::SafeAppHandle;
-use crate::observables::AppSettingsObservable;
 
 pub struct AppSettings {
     pub ui: SettingsUi

@@ -48,7 +48,7 @@ impl From<AppHandle> for SafeAppHandle {
 }
 
 impl SafeAppHandle {
-    pub fn with_managed_observables(handle: AppHandle) -> Result<Self> {
+    pub fn new(handle: AppHandle) -> Result<Self> {
         let safe_handle = Self {
             inner: Arc::new(Inner {
                 handle: handle.clone(),
@@ -58,11 +58,6 @@ impl SafeAppHandle {
                 }),
             }),
         };
-
-        handle.manage::<ChorderObservable>(ChorderObservable::new(safe_handle.clone())?);
-        handle.manage::<GitReposObservable>(GitReposObservable::new(safe_handle.clone())?);
-        handle.manage::<AppPermissionsObservable>(AppPermissionsObservable::new(safe_handle.clone())?);
-        handle.manage::<AppSettingsObservable>(AppSettingsObservable::new(safe_handle.clone())?);
 
         Ok(safe_handle)
     }
@@ -108,9 +103,10 @@ impl SafeAppHandle {
         }
     }
 
-    pub fn observable<T: Observable>(&self) -> tauri::State<'_, T> {
-        let observable = self.inner.handle.state::<T>();
-        observable
+    /// This is intentionally read-only; only the observable "owner" can write to the observable
+    pub fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>> {
+        let observable = self.inner.handle.state::<Arc<T>>();
+        Ok(observable.get_state()?)
     }
 
     pub fn handle(&self) -> &AppHandle {

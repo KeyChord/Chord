@@ -8,6 +8,8 @@ use tauri::Manager;
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
+use std::sync::Arc;
+use crate::observables::Observable;
 
 mod api;
 mod chords;
@@ -16,14 +18,15 @@ mod feature;
 pub mod git;
 mod input;
 mod mode;
-mod stores;
 mod tauri_app;
 mod observables;
 
 use tauri_nspanel::tauri_panel;
 use crate::feature::app_handle_ext::{AppHandleExt, AppManaged};
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
-use crate::observables::{AppSettingsState, ChorderState};
+use crate::feature::global_hotkey::GlobalHotkeyStore;
+use crate::feature::repos::GitReposStore;
+use crate::observables::{AppPermissionsObservable, AppSettingsObservable, AppSettingsState, ChorderObservable, ChorderState, GitReposObservable};
 
 tauri_panel! {
     panel!(IndicatorPanel {
@@ -134,14 +137,24 @@ pub fn run() {
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
-    let safe_handle = SafeAppHandle::with_managed_observables(app.handle().clone())?;
+    let safe_handle = SafeAppHandle::new(app.handle().clone())?;
+    let chorder_observable = Arc::new(ChorderObservable::new(safe_handle.clone())?);
+    let git_repos_observable = Arc::new(GitReposObservable::new(safe_handle.clone())?);
+    let permissions_observable = Arc::new(AppPermissionsObservable::new(safe_handle.clone())?);
+    let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
+    app.handle().manage(chorder_observable.clone());
+    app.handle().manage(git_repos_observable.clone());
+    app.handle().manage(permissions_observable.clone());
+    app.handle().manage(settings_observable.clone());
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(),
-        chorder: AppChorder::new(safe_handle.clone())?,
+        chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
         context: AppContext::new()?,
-        permissions: AppPermissions::new_unloaded(safe_handle.clone())?,
+        permissions: AppPermissions::new_unloaded(safe_handle.clone(), permissions_observable.clone())?,
         settings: AppSettings::new(safe_handle.clone())?,
-        chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?
+        chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
+        global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
+        git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
     });
 
     let handle = app.handle();

@@ -15,7 +15,6 @@ use specta::Type;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::observables::GitRepo;
-use crate::stores::AppHandleStoreExt;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -133,7 +132,7 @@ impl Api for ApiImpl {
 
     async fn add_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let store = handle.git_repos_store()?;
+        let store = handle.git_repos_store();
         let repo_ref = GitHubRepoRef::parse(&repo)?;
         store.add_repo(repo_ref.clone())?;
         reload_loaded_app_chords(handle.clone()).await?;
@@ -142,7 +141,7 @@ impl Api for ApiImpl {
 
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let store = handle.git_repos_store()?;
+        let store = handle.git_repos_store();
         let repo_ref  = GitHubRepoRef::parse(&repo)?;
         store.sync_repo(repo_ref.clone())?;
         reload_loaded_app_chords(handle.clone()).await?;
@@ -208,7 +207,7 @@ impl Api for ApiImpl {
 
     async fn list_global_shortcut_mappings(self) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
         let handle = self.app_handle()?;
-        let store = handle.global_hotkeys_store()?;
+        let store = handle.global_hotkey_store();
         let mut mappings = store
             .entries()
             .into_iter()
@@ -231,7 +230,7 @@ impl Api for ApiImpl {
 
     async fn remove_global_shortcut_mapping(self, shortcut: String) -> AppResult<()> {
         let handle = self.app_handle()?;
-        let store = handle.global_hotkeys_store()?;
+        let store = handle.global_hotkey_store();
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
             return Err(AppError::Message("cannot be empty".into()))

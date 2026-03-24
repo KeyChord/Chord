@@ -7,8 +7,8 @@ use crate::tauri_app::app_lifecycle::{
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::{Ctx, Function};
 use std::collections::HashSet;
-use tauri_plugin_store::StoreExt;
-use crate::stores::{AppHandleStoreExt, GlobalHotkeyStoreEntry};
+use crate::feature::app_handle_ext::AppHandleExt;
+use crate::feature::global_hotkey::GlobalHotkeyStoreEntry;
 
 pub struct ChordModule;
 
@@ -110,13 +110,7 @@ impl ModuleDef for ChordModule {
         .with_name("tap")?;
         exports.export("tap", tap)?;
 
-        let global_hotkeys_store = handle.global_hotkeys_store().map_err(|err| {
-            throw_js_error(
-                ctx.clone(),
-                format!("failed to open global hotkeys store: {err}"),
-            )
-        })?;
-
+        let global_hotkeys_store = handle.global_hotkey_store();
         let register_global_hotkey_store = global_hotkeys_store.clone();
         let register_global_hotkey = Function::new(
             ctx.clone(),

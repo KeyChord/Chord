@@ -110,8 +110,7 @@ macro_rules! define_observable {
                 handle: &$crate::feature::SafeAppHandle,
             ) -> ::anyhow::Result<::serde_json::Value> {
                 use crate::observables::Observable;
-                let observable = handle.observable::<$name>();
-                let state = observable.get_state()?;
+                let state = handle.observable_state::<$name>()?;
                 Ok(::serde_json::to_value(state.as_ref())?)
             }
         }
