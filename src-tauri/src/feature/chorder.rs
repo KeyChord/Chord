@@ -168,15 +168,12 @@ impl AppChorder {
                     }
                 }
 
-                if code == &KeyMappingCode::Space {
-                    if Self::should_execute_key_buffer_on_space_release(&state) {
-                        let _ = self.execute_key_buffer(
-                            handle.clone(),
-                            state.key_buffer.clone(),
-                            true,
-                        )?;
-                    }
-
+                if Self::should_execute_key_buffer_on_release(&state) {
+                    let _ = self.execute_key_buffer(
+                        handle.clone(),
+                        state.key_buffer.clone(),
+                        true,
+                    )?;
                     self.observable.set_state(ChorderState::default())?;
                 }
 
@@ -314,7 +311,7 @@ impl AppChorder {
         Ok(Some(chord_payload.chord.clone()))
     }
 
-    fn should_execute_key_buffer_on_space_release(state: &ChorderState) -> bool {
+    fn should_execute_key_buffer_on_release(state: &ChorderState) -> bool {
         !state.key_buffer.is_empty() && state.active_chord.is_none()
     }
 
@@ -417,13 +414,13 @@ mod tests {
     }
 
     #[test]
-    fn space_release_executes_only_when_buffered_chord_has_not_run_yet() {
+    fn release_executes_only_when_buffered_chord_has_not_run_yet() {
         let buffered_state = ChorderState {
             key_buffer: vec![Key(KeyA)],
             pressed_chord: None,
             active_chord: None,
         };
-        assert!(AppChorder::should_execute_key_buffer_on_space_release(
+        assert!(AppChorder::should_execute_key_buffer_on_release(
             &buffered_state
         ));
 
@@ -432,12 +429,12 @@ mod tests {
             pressed_chord: Some(test_chord()),
             active_chord: Some(test_chord()),
         };
-        assert!(!AppChorder::should_execute_key_buffer_on_space_release(
+        assert!(!AppChorder::should_execute_key_buffer_on_release(
             &executed_state
         ));
 
         let empty_state = ChorderState::default();
-        assert!(!AppChorder::should_execute_key_buffer_on_space_release(
+        assert!(!AppChorder::should_execute_key_buffer_on_release(
             &empty_state
         ));
     }

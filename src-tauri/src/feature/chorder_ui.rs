@@ -1,5 +1,6 @@
 use crate::IndicatorPanel;
 use anyhow::Result;
+use objc2::msg_send;
 use objc2_app_kit::{
     NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
     NSWindowAnimationBehavior, NSWindowOrderingMode,
@@ -68,10 +69,16 @@ impl ChorderIndicatorUi {
         panel.set_opaque(false);
         panel.set_transparent(true);
         panel.set_ignores_mouse_events(true);
+        panel.set_accepts_mouse_moved_events(false);
+        panel.set_movable_by_window_background(false);
+        panel.set_works_when_modal(false);
         panel.set_becomes_key_only_if_needed(false);
         panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().into());
         panel.set_floating_panel(true);
         panel.set_hides_on_deactivate(false);
+        let _ = panel.make_first_responder(None);
+        panel.resign_key_window();
+        panel.resign_main_window();
         panel
             .as_panel()
             .setAnimationBehavior(NSWindowAnimationBehavior::None);
@@ -161,7 +168,18 @@ impl ChorderIndicatorUi {
             }
 
             panel.set_alpha_value(0.0);
-            panel.show();
+            let _ = panel.make_first_responder(None);
+            panel.resign_key_window();
+            panel.resign_main_window();
+
+            // Present as a pure overlay window without activating this app.
+            unsafe {
+                let _: () = msg_send![native_panel, orderFront: objc2::ffi::nil];
+            }
+
+            let _ = panel.make_first_responder(None);
+            panel.resign_key_window();
+            panel.resign_main_window();
             is_visible.store(true, Ordering::Relaxed);
         })?;
 

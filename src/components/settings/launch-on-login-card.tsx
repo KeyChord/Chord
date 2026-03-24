@@ -30,8 +30,8 @@ export function LaunchOnLoginCard() {
             id="launch-on-login"
             checked={permissions.isAutostartEnabled}
             disabled={setAutostartMutation.isPending}
-            onCheckedChange={(checked) => {
-              void setAutostartMutation.mutate();
+            onCheckedChange={() => {
+              setAutostartMutation.mutate();
             }}
           />
           <div className="space-y-1">
