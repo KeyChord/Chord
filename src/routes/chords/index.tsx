@@ -16,6 +16,7 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 );
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
+const INDICATOR_TRANSITION_MS = 220;
 type RawChord = ReturnType<typeof useChordFile>[string];
 type ParsedChord = {
   keys: string[];
@@ -192,9 +193,6 @@ export function Chords() {
   const [surfaceVersion, setSurfaceVersion] = useState(0);
   const [isPreparingSurface, setIsPreparingSurface] = useState(false);
   const surfaceRef = useRef<HTMLDivElement>(null);
-  const currentPrefixLength = state.keyBuffer.length;
-
-  console.log(rawChords);
 
   const emitSurfaceRect = () => {
     const surface = surfaceRef.current;
@@ -210,6 +208,23 @@ export function Chords() {
       height: rect.height,
       radius: NATIVE_SURFACE_RADIUS,
     });
+  };
+
+  const emitSurfaceRectDuringTransition = () => {
+    const endTime = performance.now() + INDICATOR_TRANSITION_MS;
+    let frameId = 0;
+
+    const tick = () => {
+      emitSurfaceRect();
+      if (performance.now() < endTime) {
+        frameId = window.requestAnimationFrame(tick);
+      }
+    };
+
+    frameId = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
   };
 
   useEffect(() => {
@@ -295,6 +310,15 @@ export function Chords() {
   }
 
   const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
+  const normalizedActiveChordTokens = state.activeChord?.keys.map(normalizeToken) ?? [];
+  const shouldHighlightActiveChord =
+    state.isShiftPressed &&
+    normalizedBufferTokens.length === 0 &&
+    normalizedActiveChordTokens.length > 0;
+  const selectedTokens = shouldHighlightActiveChord
+    ? normalizedActiveChordTokens
+    : normalizedBufferTokens;
+  const currentPrefixLength = selectedTokens.length;
 
   const maxVisibleRows = 20;
   const availableHeight = Math.max(viewportHeight - 96, 240);
@@ -307,9 +331,13 @@ export function Chords() {
   );
   const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
   const keyColumns = Array.from(
-    { length: Math.max(1, currentPrefixLength + 1) },
+    {
+      length: shouldHighlightActiveChord
+        ? Math.max(1, currentPrefixLength)
+        : Math.max(1, currentPrefixLength + 1),
+    },
     (_, columnIndex) => {
-      const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
+      const prefixTokens = selectedTokens.slice(0, columnIndex);
       const matchingChords = parsedChords.filter((chord) =>
         prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
       );
@@ -333,8 +361,8 @@ export function Chords() {
       return {
         id: `column-${columnIndex}`,
         rows,
-        selectedToken: normalizedBufferTokens[columnIndex],
-        hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
+        selectedToken: selectedTokens[columnIndex],
+        hasSelection: Boolean(selectedTokens[columnIndex]),
       };
     },
   );
@@ -342,6 +370,8 @@ export function Chords() {
   useLayoutEffect(() => {
     emitSurfaceRect();
   }, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize]);
+
+  useLayoutEffect(() => emitSurfaceRectDuringTransition(), [state.isIndicatorVisible]);
 
   return (
     <div className="relative size-full bg-transparent">
@@ -353,6 +383,10 @@ export function Chords() {
             "relative isolate overflow-hidden rounded-r-[2rem] rounded-l-none border border-l-0 px-5 py-5 pl-7",
             "border-white/30 bg-white/22 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)]",
             "dark:border-white/10 dark:bg-zinc-950/24 dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]",
+            "transition-[transform,opacity] duration-200 ease-out",
+            state.isIndicatorVisible
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-[calc(100%+2.5rem)] opacity-0",
           )}
         >
           <div className="relative flex items-start">

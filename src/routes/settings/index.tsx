@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "#/components/ui/tabs.tsx";
 import { Toaster } from "#/components/ui/sonner.tsx";
 import { SettingsTab } from "#/components/settings/settings-tab.tsx";
-import { ActiveChordsTab } from "#/components/settings/active-chords-tab.tsx";
+import { ChordsTab } from "#/components/settings/chords-tab.tsx";
 import { GlobalShortcutsTab } from "#/components/settings/global-shortcuts-tab.tsx";
 import { FirstRunOnboarding } from "#/components/settings/first-run-onboarding.tsx";
 import { taurpc } from "#/api/taurpc.ts";
@@ -45,30 +45,44 @@ function Settings() {
           <div className="mx-auto flex max-w-[720px] flex-col gap-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h1 className="text-[20px] font-semibold">Chords</h1>
+                <h1 className="text-[20px] font-semibold">Settings</h1>
                 <p className="mt-1 text-muted-foreground">
-                  Configure the tray app, manage chord sources, and inspect the active chord
-                  registry.
+                  Configure permissions, manage chord sources, and review the app's shortcuts.
                 </p>
               </div>
             </div>
 
-            <Tabs defaultValue="settings" className="gap-4">
-              <TabsList>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
-                <TabsTrigger value="active-chords">Active Chords</TabsTrigger>
-                <TabsTrigger value="global-shortcuts">Global Shortcuts</TabsTrigger>
+            <Tabs defaultValue="general" className="gap-4">
+              <TabsList className="h-auto w-full justify-start gap-2 rounded-2xl bg-transparent p-0">
+                <TabsTrigger
+                  value="general"
+                  className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
+                >
+                  General
+                </TabsTrigger>
+                <TabsTrigger
+                  value="chords"
+                  className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
+                >
+                  Chords
+                </TabsTrigger>
+                <TabsTrigger
+                  value="shortcuts"
+                  className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
+                >
+                  Shortcuts
+                </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="settings">
+              <TabsContent value="general">
                 <SettingsTab />
               </TabsContent>
 
-              <TabsContent value="active-chords">
-                <ActiveChordsTab />
+              <TabsContent value="chords">
+                <ChordsTab />
               </TabsContent>
 
-              <TabsContent value="global-shortcuts">
+              <TabsContent value="shortcuts">
                 <GlobalShortcutsTab />
               </TabsContent>
             </Tabs>

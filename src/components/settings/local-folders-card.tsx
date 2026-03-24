@@ -1,5 +1,4 @@
 import { Button } from "#/components/ui/button.tsx";
-import { Badge } from "#/components/ui/badge.tsx";
 import {
   Card,
   CardContent,
@@ -7,13 +6,25 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-import { useMutation } from "@tanstack/react-query";
+import { Badge } from "#/components/ui/badge.tsx";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { taurpc } from "../../api/taurpc.ts";
 
 export function LocalFoldersCard() {
+  const queryClient = useQueryClient();
   const pickLocalChordFolderMutation = useMutation({
     mutationFn: taurpc.pickLocalChordFolder,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["local-chord-folders"],
+      });
+    },
   });
+  const localFoldersQuery = useQuery({
+    queryKey: ["local-chord-folders"],
+    queryFn: taurpc.listLocalChordFolders,
+  });
+  const folders = localFoldersQuery.data ?? [];
 
   return (
     <Card size="sm">
@@ -36,6 +47,29 @@ export function LocalFoldersCard() {
             {pickLocalChordFolderMutation.isPending ? "Adding..." : "Add Folder"}
           </Button>
         </div>
+
+        {localFoldersQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading local folders...</p>
+        ) : folders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No local folders added yet. Add one to load chords directly from disk.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {folders.map((folder) => (
+              <div
+                key={folder.path}
+                className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-medium">Local Chord Folder</p>
+                  <p className="truncate text-xs text-muted-foreground">{folder.path}</p>
+                </div>
+                <Badge variant="secondary">Local</Badge>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,6 +1,5 @@
-import { X } from "lucide-react";
-import { Button } from "#/components/ui/button.tsx";
 import { Badge } from "#/components/ui/badge.tsx";
+import { Button } from "#/components/ui/button.tsx";
 import {
   Card,
   CardContent,
@@ -9,26 +8,61 @@ import {
   CardTitle,
 } from "#/components/ui/card.tsx";
 import { Input } from "#/components/ui/input.tsx";
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { AppIcon } from "#/components/settings/app-icon.tsx";
+import { ShortcutKeys } from "#/components/settings/shortcut-keys.tsx";
+import { toast } from "sonner";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { X } from "lucide-react";
 import { taurpc } from "../../api/taurpc.ts";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export function GlobalShortcutsTab() {
   const [input, setInput] = useState("");
+  const queryClient = useQueryClient();
   const removeGlobalShortcutMappingMutation = useMutation({
     mutationFn: taurpc.removeGlobalShortcutMapping,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["global-shortcuts"],
+      });
+    },
   });
   const { data, isSuccess, isLoading } = useQuery({
     queryKey: ["global-shortcuts"],
-    queryFn: () => taurpc.listGlobalShortcutMappings(),
+    queryFn: taurpc.listGlobalShortcutMappings,
+  });
+  const mappings = data ?? [];
+  const appMetadataQueries = useQueries({
+    queries: mappings.map((mapping) => ({
+      queryKey: ["app-metadata", mapping.bundleId],
+      queryFn: () => taurpc.getAppMetadata(mapping.bundleId),
+      staleTime: 60_000,
+    })),
+  });
+  const appMetadataByBundleId = Object.fromEntries(
+    mappings.map((mapping, index) => [mapping.bundleId, appMetadataQueries[index]?.data]),
+  );
+
+  const normalizedFilter = input.trim().toLowerCase();
+  const filteredMappings = mappings.filter((mapping) => {
+    if (!normalizedFilter) {
+      return true;
+    }
+
+    return [
+      mapping.shortcut,
+      mapping.bundleId,
+      mapping.hotkeyId,
+      appMetadataByBundleId[mapping.bundleId]?.displayName ?? "",
+    ].some((value) => value.toLowerCase().includes(normalizedFilter));
   });
 
   return (
     <Card size="sm">
       <CardHeader className="flex items-center justify-between gap-3">
-        <CardTitle>Global Shortcut Mappings</CardTitle>
+        <CardTitle>Global Shortcuts</CardTitle>
         <CardDescription>
-          Current shortcut assignments stored in `global-hotkeys.json`.
+          Current shortcut assignments for apps and hotkeys loaded by Chord.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
@@ -47,65 +81,217 @@ export function GlobalShortcutsTab() {
           )}
         </div>
 
-        {/* {isLoading ? (
+        {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading global shortcut mappings...</p>
-        ) : globalShortcutMappings.length === 0 ? (
+        ) : mappings.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No global shortcut mappings are currently registered.
           </p>
-        ) : globalShortcuts.filteredGlobalShortcutMappings.length === 0 ? (
+        ) : filteredMappings.length === 0 ? (
           <p className="text-sm text-muted-foreground">No global shortcut mappings match that filter.</p>
         ) : (
           <div className="space-y-2">
-            {globalShortcuts.filteredGlobalShortcutMappings.map((mapping) => {
-              const isRemoving = globalShortcuts.removingGlobalShortcut === mapping.shortcut;
+            {filteredMappings.map((mapping) => {
               const appMetadata = appMetadataByBundleId[mapping.bundleId];
-              const appLabel = getAppLabel(mapping.bundleId, appMetadata);
+              const appLabel = appMetadata?.displayName?.trim() || mapping.bundleId;
 
               return (
-                <div
+                <GlobalShortcutRow
                   key={mapping.shortcut}
-                  className="flex items-start justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
-                >
-                  <div className="min-w-0 space-y-2">
-                    <ShortcutKeys shortcut={mapping.shortcut} />
-                    <div className="flex items-center gap-2">
-                      <AppIcon appMetadata={appMetadata} label={appLabel} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{appLabel}</p>
-                        {appLabel !== mapping.bundleId ? (
-                          <p className="truncate text-xs text-muted-foreground">{mapping.bundleId}</p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="space-y-1 text-xs text-muted-foreground">
-                      <p className="break-all">
-                        <span className="font-medium text-foreground">Hotkey:</span>{" "}
-                        {mapping.hotkeyId}
-                      </p>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Remove ${mapping.shortcut}`}
-                    title="Remove mapping"
-                    onClick={() => {
-                      removeGlobalShortcutMappingMutation.mutate(mapping.shortcut);
-                    }}
-                    disabled={removeGlobalShortcutMappingMutation.isPending}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <X />
-                  </Button>
-                </div>
+                  appLabel={appLabel}
+                  appMetadata={appMetadata}
+                  mapping={mapping}
+                  isRemoving={removeGlobalShortcutMappingMutation.isPending}
+                  onRemove={(shortcut) => {
+                    removeGlobalShortcutMappingMutation.mutate(shortcut);
+                  }}
+                />
               );
             })}
           </div>
-        )} */}
+        )}
       </CardContent>
     </Card>
   );
+}
+
+function GlobalShortcutRow({
+  appLabel,
+  appMetadata,
+  mapping,
+  isRemoving,
+  onRemove,
+}: {
+  appLabel: string;
+  appMetadata?: Awaited<ReturnType<typeof taurpc.getAppMetadata>>;
+  mapping: Awaited<ReturnType<typeof taurpc.listGlobalShortcutMappings>>[number];
+  isRemoving: boolean;
+  onRemove: (shortcut: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [draftShortcut, setDraftShortcut] = useState(mapping.shortcut);
+  const [isRecording, setIsRecording] = useState(false);
+  const isDirty = draftShortcut.trim() !== mapping.shortcut;
+  const updateGlobalShortcutMappingMutation = useMutation({
+    mutationFn: ({ oldShortcut, newShortcut }: { oldShortcut: string; newShortcut: string }) =>
+      taurpc.updateGlobalShortcutMapping(oldShortcut, newShortcut),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["global-shortcuts"],
+      });
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-background/80 px-3 py-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+        <AppIcon appMetadata={appMetadata} label={appLabel} tooltip={mapping.bundleId} />
+        <p className="truncate text-sm">
+          <span className="font-medium text-foreground">{appLabel}</span>
+          <span className="mx-2 text-muted-foreground">&gt;</span>
+          <span className="truncate text-muted-foreground">{mapping.hotkeyId}</span>
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onKeyDown={(event) => {
+            event.preventDefault();
+
+            if (event.key === "Escape") {
+              setIsRecording(false);
+              setDraftShortcut(mapping.shortcut);
+              return;
+            }
+
+            if (!isRecording) {
+              if (event.key === "Enter" || event.key === " ") {
+                setIsRecording(true);
+              }
+              return;
+            }
+
+            const nextShortcut = serializeShortcutEvent(event);
+            if (nextShortcut) {
+              setDraftShortcut(nextShortcut);
+              setIsRecording(false);
+            }
+          }}
+          onClick={(event) => {
+            event.currentTarget.focus();
+            setIsRecording(true);
+          }}
+          className="inline-flex h-8 min-w-36 items-center rounded-lg border border-border bg-background px-2.5 text-left text-sm shadow-xs outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          aria-label={`Shortcut for ${appLabel}`}
+        >
+          {isRecording ? (
+            <span className="text-xs text-muted-foreground">Press shortcut</span>
+          ) : (
+            <ShortcutKeys shortcut={draftShortcut} />
+          )}
+        </button>
+        {isDirty ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsRecording(false);
+                setDraftShortcut(mapping.shortcut);
+              }}
+              disabled={updateGlobalShortcutMappingMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                updateGlobalShortcutMappingMutation.mutate({
+                  oldShortcut: mapping.shortcut,
+                  newShortcut: draftShortcut.trim(),
+                });
+              }}
+              disabled={updateGlobalShortcutMappingMutation.isPending}
+            >
+              {updateGlobalShortcutMappingMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </>
+        ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Remove ${mapping.shortcut}`}
+          title="Remove mapping"
+          onClick={() => {
+            onRemove(mapping.shortcut);
+          }}
+          disabled={isRemoving || updateGlobalShortcutMappingMutation.isPending}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <X />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function serializeShortcutEvent(event: React.KeyboardEvent<HTMLButtonElement>) {
+  const key = normalizeShortcutKey(event.key);
+  if (!key) {
+    return null;
+  }
+
+  const modifiers = [
+    event.metaKey ? "cmd" : null,
+    event.ctrlKey ? "ctrl" : null,
+    event.altKey ? "option" : null,
+    event.shiftKey ? "shift" : null,
+  ].filter(Boolean);
+
+  const shortcutParts = isModifierKey(key) ? modifiers : [...modifiers, key];
+  if (shortcutParts.length === 0) {
+    return null;
+  }
+
+  return shortcutParts.join("+");
+}
+
+function normalizeShortcutKey(key: string) {
+  switch (key) {
+    case "Meta":
+      return "cmd";
+    case "Control":
+      return "ctrl";
+    case "Alt":
+      return "option";
+    case "Shift":
+      return "shift";
+    case " ":
+    case "Spacebar":
+      return "space";
+    case "CapsLock":
+      return "capslock";
+    case "ArrowUp":
+      return "up";
+    case "ArrowDown":
+      return "down";
+    case "ArrowLeft":
+      return "left";
+    case "ArrowRight":
+      return "right";
+    default:
+      return key.length === 1 ? key.toLowerCase() : key.toLowerCase();
+  }
+}
+
+function isModifierKey(key: string) {
+  return key === "cmd" || key === "ctrl" || key === "option" || key === "shift";
 }

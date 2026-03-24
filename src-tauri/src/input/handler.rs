@@ -62,6 +62,8 @@ mod tests {
             key_buffer: vec![Key(KeyA)],
             pressed_chord: None,
             active_chord: None,
+            is_shift_pressed: false,
+            is_indicator_visible: true,
         };
 
         assert!(should_finalize_chord_mode(
@@ -76,6 +78,8 @@ mod tests {
             key_buffer: vec![],
             pressed_chord: Some(test_chord()),
             active_chord: Some(test_chord()),
+            is_shift_pressed: false,
+            is_indicator_visible: true,
         };
 
         assert!(should_finalize_chord_mode(
@@ -97,6 +101,8 @@ mod tests {
                 key_buffer: vec![Key(KeyA)],
                 pressed_chord: None,
                 active_chord: None,
+                is_shift_pressed: false,
+                is_indicator_visible: true,
             }
         ));
     }

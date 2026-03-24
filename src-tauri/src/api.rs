@@ -1,3 +1,4 @@
+use crate::chords::Shortcut;
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::get_app_metadata;
 use crate::git::GitHubRepoRef;
@@ -70,6 +71,11 @@ pub trait Api {
     async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;
     #[taurpc(alias = "removeGlobalShortcutMapping")]
     async fn remove_global_shortcut_mapping(shortcut: String) -> AppResult<()>;
+    #[taurpc(alias = "updateGlobalShortcutMapping")]
+    async fn update_global_shortcut_mapping(
+        old_shortcut: String,
+        new_shortcut: String,
+    ) -> AppResult<()>;
     #[taurpc(alias = "listAppsNeedingRelaunch")]
     async fn list_apps_needing_relaunch() -> AppResult<Vec<AppNeedsRelaunchInfo>>;
     #[taurpc(alias = "relaunchApp")]
@@ -218,7 +224,29 @@ impl Api for ApiImpl {
             return Err(AppError::Message("cannot be empty".into()));
         }
 
-        store.remove(trimmed_shortcut);
+        store.remove(trimmed_shortcut)?;
+        Ok(())
+    }
+
+    async fn update_global_shortcut_mapping(
+        self,
+        old_shortcut: String,
+        new_shortcut: String,
+    ) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let store = handle.app_global_hotkey_store();
+        let old_shortcut = old_shortcut.trim();
+        let new_shortcut = new_shortcut.trim();
+
+        if old_shortcut.is_empty() || new_shortcut.is_empty() {
+            return Err(AppError::Message("shortcut cannot be empty".into()));
+        }
+
+        Shortcut::parse(new_shortcut).map_err(|err| {
+            AppError::Message(format!("invalid shortcut {new_shortcut:?}: {err}"))
+        })?;
+
+        store.update_shortcut(old_shortcut, new_shortcut)?;
         Ok(())
     }
 

@@ -57,6 +57,8 @@ export interface ChorderState {
 	keyBuffer: Key[];
 	pressedChord?: Chord;
 	activeChord?: Chord;
+	isShiftPressed: boolean;
+	isIndicatorVisible: boolean;
 }
 
 export interface FrontmostState {

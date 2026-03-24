@@ -112,10 +112,28 @@ impl AppChorder {
             return Ok(());
         }
 
-        self.observable.set_state(ChorderState::default())?;
+        self.observable.set_state(state.clear_session())?;
         if self.ui.ensure_hidden()? {
             self.emit_visibility_changed(false);
         }
+        Ok(())
+    }
+
+    fn sync_shift_state(&self, is_shift_pressed: bool) -> Result<()> {
+        let state = self.observable.get_state()?;
+        if state.is_shift_pressed == is_shift_pressed {
+            return Ok(());
+        }
+
+        self.observable
+            .set_state(state.with_shift_pressed(is_shift_pressed))?;
+        Ok(())
+    }
+
+    fn toggle_indicator_visibility(&self) -> Result<()> {
+        let state = self.observable.get_state()?;
+        self.observable
+            .set_state(state.toggled_indicator_visibility())?;
         Ok(())
     }
 
@@ -126,9 +144,21 @@ impl AppChorder {
             return Ok(());
         }
 
+        let (KeyEvent::Press(key) | KeyEvent::Release(key)) = key_event;
+        if key == &Key(KeyMappingCode::ShiftLeft) || key == &Key(KeyMappingCode::ShiftRight) {
+            self.sync_shift_state(matches!(key_event, KeyEvent::Press(_)))?;
+            return Ok(());
+        }
+
+        if key == &Key(KeyMappingCode::Tab) {
+            if matches!(key_event, KeyEvent::Press(_)) {
+                self.toggle_indicator_visibility()?;
+            }
+            return Ok(());
+        }
+
         // Don't handle any modifier key events
         let modifiers = Key::modifiers();
-        let (KeyEvent::Press(key) | KeyEvent::Release(key)) = key_event;
         if modifiers.contains(key) {
             log::debug!("Ignoring modifier key: {:?}", key);
             return Ok(());
@@ -175,7 +205,7 @@ impl AppChorder {
                             state.key_buffer.clone(),
                             true,
                         )?;
-                        self.observable.set_state(ChorderState::default())?;
+                        self.observable.set_state(state.clear_session())?;
                     }
                 }
 
@@ -212,19 +242,15 @@ impl AppChorder {
                                 num_times: 1,
                             },
                         )?;
-                        self.observable.set_state(ChorderState {
-                            pressed_chord: state.active_chord.clone(),
-                            key_buffer: vec![],
-                            active_chord: state.active_chord.clone(),
-                        })?;
+                        self.observable.set_state(state.with_session(
+                            vec![],
+                            state.active_chord.clone(),
+                            state.active_chord.clone(),
+                        ))?;
                     } else {
                         // e.g. we ran it on a different app
                         log::error!("Last chord no longer applies");
-                        self.observable.set_state(ChorderState {
-                            key_buffer: vec![],
-                            pressed_chord: None,
-                            active_chord: None,
-                        })?;
+                        self.observable.set_state(state.clear_session())?;
                     }
 
                     return Ok(());
@@ -235,19 +261,15 @@ impl AppChorder {
                 let Some(chord) =
                     self.execute_key_buffer(handle.clone(), key_buffer.clone(), false)?
                 else {
-                    self.observable.set_state(ChorderState {
-                        key_buffer: vec![],
-                        pressed_chord: None,
-                        active_chord: None,
-                    })?;
+                    self.observable.set_state(state.clear_session())?;
                     return Ok(());
                 };
 
-                self.observable.set_state(ChorderState {
-                    pressed_chord: Some(chord.clone()),
-                    key_buffer: vec![],
-                    active_chord: Some(chord),
-                })?;
+                self.observable.set_state(state.with_session(
+                    vec![],
+                    Some(chord.clone()),
+                    Some(chord),
+                ))?;
                 Ok(())
             }
             KeyEvent::Press(key) => {
@@ -315,18 +337,24 @@ impl AppChorder {
         !state.key_buffer.is_empty() && state.active_chord.is_none()
     }
 
-    // If an unshifted key is pressed, we append it to the key buffer, which always clears
+    fn next_key_buffer_for_unshifted_press(key_buffer: &[Key], key: &Key) -> Vec<Key> {
+        let mut next_key_buffer = key_buffer.to_vec();
+        if key == &Key(KeyMappingCode::Backspace) {
+            next_key_buffer.pop();
+        } else {
+            next_key_buffer.push(*key);
+        }
+        next_key_buffer
+    }
+
+    // If an unshifted key is pressed, we update the key buffer, which always clears
     // our `active_chord`
     fn handle_unshifted_key_press(&self, _handle: AppHandle, key: &Key) -> Result<()> {
         let state = self.observable.get_state()?;
-        let mut next_key_buffer = state.key_buffer.clone();
-        next_key_buffer.push(key.clone());
+        let next_key_buffer = Self::next_key_buffer_for_unshifted_press(&state.key_buffer, key);
         log::debug!("New key buffer: {:?}", next_key_buffer);
-        self.observable.set_state(ChorderState {
-            key_buffer: next_key_buffer,
-            pressed_chord: None,
-            active_chord: None,
-        })?;
+        self.observable
+            .set_state(state.with_session(next_key_buffer, None, None))?;
         Ok(())
     }
 
@@ -374,12 +402,12 @@ impl AppChorder {
 
         log::debug!("Pressing chord: {:?}", chord_payload);
         press_chord(handle.clone(), chord_runtime, &chord_payload)?;
-        self.observable.set_state(ChorderState {
+        self.observable.set_state(state.with_session(
             // We always clear the key_buffer if a chord is pressed
-            key_buffer: vec![],
-            pressed_chord: Some(chord_payload.chord.clone()),
-            active_chord: Some(chord_payload.chord.clone()),
-        })?;
+            vec![],
+            Some(chord_payload.chord.clone()),
+            Some(chord_payload.chord.clone()),
+        ))?;
 
         Ok(())
     }
@@ -416,6 +444,8 @@ mod tests {
             key_buffer: vec![Key(KeyA)],
             pressed_chord: None,
             active_chord: None,
+            is_shift_pressed: false,
+            is_indicator_visible: true,
         };
         assert!(AppChorder::should_execute_key_buffer_on_release(
             &buffered_state
@@ -425,6 +455,8 @@ mod tests {
             key_buffer: vec![Key(KeyA)],
             pressed_chord: Some(test_chord()),
             active_chord: Some(test_chord()),
+            is_shift_pressed: false,
+            is_indicator_visible: true,
         };
         assert!(!AppChorder::should_execute_key_buffer_on_release(
             &executed_state
@@ -457,5 +489,29 @@ mod tests {
             &mut held_keys,
             &KeyEvent::Press(key)
         ));
+    }
+
+    #[test]
+    fn unshifted_press_appends_non_backspace_keys() {
+        let next = AppChorder::next_key_buffer_for_unshifted_press(&[Key(KeyA)], &Key(KeyB));
+
+        assert_eq!(next, vec![Key(KeyA), Key(KeyB)]);
+    }
+
+    #[test]
+    fn unshifted_backspace_removes_last_buffered_key() {
+        let next = AppChorder::next_key_buffer_for_unshifted_press(
+            &[Key(KeyA), Key(KeyB)],
+            &Key(Backspace),
+        );
+
+        assert_eq!(next, vec![Key(KeyA)]);
+    }
+
+    #[test]
+    fn unshifted_backspace_on_empty_buffer_is_noop() {
+        let next = AppChorder::next_key_buffer_for_unshifted_press(&[], &Key(Backspace));
+
+        assert!(next.is_empty());
     }
 }

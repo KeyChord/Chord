@@ -134,13 +134,17 @@ impl ModuleDef for ChordModule {
 
                 let shortcut = next.serialize();
 
-                register_global_hotkey_store.set(
-                    &shortcut,
-                    GlobalHotkeyStoreEntry {
-                        bundle_id,
-                        hotkey_id,
-                    },
-                );
+                register_global_hotkey_store
+                    .set(
+                        &shortcut,
+                        GlobalHotkeyStoreEntry {
+                            bundle_id,
+                            hotkey_id,
+                        },
+                    )
+                    .map_err(|err| {
+                        throw_js_error(_ctx.clone(), format!("Failed to save global hotkey: {err}"))
+                    })?;
 
                 Ok(Some(shortcut))
             },

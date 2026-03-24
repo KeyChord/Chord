@@ -36,12 +36,41 @@ impl GlobalHotkeyStore {
             .collect()
     }
 
-    pub fn set(&self, shortcut: &str, entry: GlobalHotkeyStoreEntry) {
-        let value = serde_json::to_value(entry).unwrap();
-        self.store.set(shortcut, value);
+    pub fn entry(&self, shortcut: &str) -> Option<GlobalHotkeyStoreEntry> {
+        self.entries().get(shortcut).cloned()
     }
 
-    pub fn remove(&self, shortcut: &str) {
+    fn save(&self) -> Result<()> {
+        self.store.save()?;
+        Ok(())
+    }
+
+    pub fn set(&self, shortcut: &str, entry: GlobalHotkeyStoreEntry) -> Result<()> {
+        let value = serde_json::to_value(entry).unwrap();
+        self.store.set(shortcut, value);
+        self.save()?;
+        Ok(())
+    }
+
+    pub fn remove(&self, shortcut: &str) -> Result<()> {
         self.store.delete(shortcut);
+        self.save()?;
+        Ok(())
+    }
+
+    pub fn update_shortcut(&self, old_shortcut: &str, new_shortcut: &str) -> Result<()> {
+        let Some(entry) = self.entry(old_shortcut) else {
+            anyhow::bail!("global shortcut mapping not found");
+        };
+
+        if old_shortcut != new_shortcut && self.entry(new_shortcut).is_some() {
+            anyhow::bail!("shortcut is already assigned");
+        }
+
+        self.store.delete(old_shortcut);
+        let value = serde_json::to_value(entry).unwrap();
+        self.store.set(new_shortcut, value);
+        self.save()?;
+        Ok(())
     }
 }

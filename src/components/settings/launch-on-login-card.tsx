@@ -21,7 +21,7 @@ export function LaunchOnLoginCard() {
     <Card size="sm">
       <CardHeader>
         <CardTitle>Launch on Login</CardTitle>
-        <CardDescription>{permissions.isAutostartEnabled}</CardDescription>
+        <CardDescription>Control whether Chord starts automatically after you sign in.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
         <div className="flex items-start gap-3">
