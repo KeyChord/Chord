@@ -12,7 +12,13 @@ import { useAppPermissionsState } from "../../utils/permissions.ts";
 import { useMutation } from "@tanstack/react-query";
 import { taurpc } from "../../api/taurpc.ts";
 
-export function FirstRunOnboarding({ onSkip }: { onSkip: () => void }) {
+export function FirstRunOnboarding({
+  onSkip,
+  onComplete,
+}: {
+  onSkip: () => void;
+  onComplete: () => void;
+}) {
   const [state] = useAppPermissionsState();
   const openAccessibilitySettingsMutation = useMutation({
     mutationFn: taurpc.openAccessibilitySettings,
@@ -23,6 +29,7 @@ export function FirstRunOnboarding({ onSkip }: { onSkip: () => void }) {
   const canFinish = state.isAccessibilityEnabled && state.isInputMonitoringEnabled;
   const completeOnboardingMutation = useMutation({
     mutationFn: taurpc.completeOnboarding,
+    onSuccess: onComplete,
   });
 
   const permissionSteps = [
@@ -134,10 +141,10 @@ export function FirstRunOnboarding({ onSkip }: { onSkip: () => void }) {
                   onClick={() => {
                     completeOnboardingMutation.mutate();
                   }}
-                  disabled={!canFinish}
+                  disabled={!canFinish || completeOnboardingMutation.isPending}
                   className="bg-emerald-600 text-white hover:bg-emerald-700"
                 >
-                  Continue
+                  {completeOnboardingMutation.isPending ? "Continuing..." : "Continue"}
                   <ChevronRight className="size-4" />
                 </Button>
               </div>

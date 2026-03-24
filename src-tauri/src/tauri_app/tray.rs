@@ -1,9 +1,12 @@
-use crate::constants::OPEN_INSPECTOR_MENU_ID;
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::feature::app_handle_ext::AppHandleExt;
-use crate::settings::open_chords_inspector;
 use crate::tauri_app::settings::show_settings_window;
 use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
+
+#[cfg(debug_assertions)]
+use crate::constants::OPEN_INSPECTOR_MENU_ID;
+#[cfg(debug_assertions)]
+use crate::settings::open_chords_inspector;
 
 const TRAY_ICON_BYTES: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"));
@@ -13,14 +16,16 @@ fn load_tray_icon() -> tauri::Result<Image<'static>> {
 }
 
 pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
-    let mut menu = MenuBuilder::new(&handle)
+    #[cfg(debug_assertions)]
+    let menu = MenuBuilder::new(&handle)
+        .text(SETTINGS_MENU_ID, "Show Settings")
+        .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs")
+        .text(OPEN_INSPECTOR_MENU_ID, "Open Inspector");
+
+    #[cfg(not(debug_assertions))]
+    let menu = MenuBuilder::new(&handle)
         .text(SETTINGS_MENU_ID, "Show Settings")
         .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs");
-
-    #[cfg(debug_assertions)]
-    {
-        menu = menu.text(OPEN_INSPECTOR_MENU_ID, "Open Inspector");
-    }
 
     let menu = menu.separator().text(QUIT_MENU_ID, "Quit").build()?;
 
@@ -58,7 +63,7 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
 
     #[cfg(target_os = "macos")]
     {
-        tray = tray.icon_as_template(false);
+        tray = tray.icon_as_template(true);
     }
 
     tray.build(&handle)?;

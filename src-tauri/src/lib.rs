@@ -6,7 +6,7 @@ use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, RunEvent};
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
@@ -95,8 +95,12 @@ pub fn run() {
     let api_impl = ApiImpl::default();
     let api_impl_for_setup = api_impl.clone();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api_impl.into_handler()))
+        .menu(|handle| tauri_app::menu::build_app_menu(handle))
+        .on_menu_event(|handle, event| {
+            tauri_app::menu::handle_menu_event(handle, &event);
+        })
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
@@ -139,8 +143,17 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running tauri_app application");
+
+    app.run(|handle, event| {
+        #[cfg(target_os = "macos")]
+        if let RunEvent::Reopen { .. } = event {
+            if let Err(error) = tauri_app::settings::show_settings_window(handle.clone()) {
+                log::error!("Failed to show settings window after dock reopen: {error}");
+            }
+        }
+    });
 }
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
@@ -185,6 +198,11 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     // Create tray
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
         log::error!("Failed to create tray: {error:#}");
+    }
+
+    let startup_status = tauri_app::startup::get_startup_status(&handle)?;
+    if startup_status.should_show_onboarding {
+        tauri_app::settings::show_settings_window(handle.clone())?;
     }
 
     Ok(())

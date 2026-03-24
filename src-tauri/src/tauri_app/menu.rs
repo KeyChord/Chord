@@ -1,0 +1,39 @@
+use crate::constants::SHOW_SETTINGS_WINDOW_MENU_ID;
+use crate::tauri_app::settings::show_settings_window;
+use tauri::{
+    AppHandle, Runtime,
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, WINDOW_SUBMENU_ID},
+};
+
+pub fn build_app_menu<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let menu = Menu::default(handle)?;
+
+    #[cfg(target_os = "macos")]
+    if let Some(window_menu) = menu
+        .get(WINDOW_SUBMENU_ID)
+        .and_then(|item| item.as_submenu().cloned())
+    {
+        let separator = PredefinedMenuItem::separator(handle)?;
+        let show_settings_item = MenuItem::with_id(
+            handle,
+            SHOW_SETTINGS_WINDOW_MENU_ID,
+            "Show Settings Window",
+            true,
+            None::<&str>,
+        )?;
+
+        window_menu.append_items(&[&separator, &show_settings_item])?;
+    }
+
+    Ok(menu)
+}
+
+pub fn handle_menu_event<R: Runtime>(handle: &AppHandle<R>, event: &MenuEvent) {
+    if event.id().as_ref() != SHOW_SETTINGS_WINDOW_MENU_ID {
+        return;
+    }
+
+    if let Err(error) = show_settings_window(handle.clone()) {
+        log::error!("Failed to show settings window from app menu: {error}");
+    }
+}
