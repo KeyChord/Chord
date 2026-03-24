@@ -8,15 +8,11 @@ import {
 } from "#/components/ui/card.tsx";
 import { Input } from "#/components/ui/input.tsx";
 import { useState } from "react";
-import { taurpc } from "../../api/taurpc.ts";
-import { useQuery } from "@tanstack/react-query";
+import { useChordRegistryState } from "../../utils/state.ts";
 
 export function ActiveChordsTab() {
   const [searchInput, setSearchInput] = useState("");
-  const { data, isSuccess } = useQuery({
-    queryKey: ["listActiveChords"],
-    queryFn: () => taurpc.listActiveChords(),
-  });
+  const { chords } = useChordRegistryState()
 
   return (
     <Card size="sm">
@@ -35,11 +31,9 @@ export function ActiveChordsTab() {
             }}
             placeholder="Filter by app, trigger, name, or action"
           />
-          {isSuccess && (
-            <Badge variant="outline" className="self-start sm:self-center">
-              {data.length} matches
-            </Badge>
-          )}
+          <Badge variant="outline" className="self-start sm:self-center">
+            {chords.length} matches
+          </Badge>
         </div>
 
         {/* {isLoading ? (

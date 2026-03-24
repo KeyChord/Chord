@@ -40,10 +40,18 @@ export interface Chord {
 	js?: ChordJsInvocation;
 }
 
+export interface ChordRegistryState {
+	chords: Chord[];
+}
+
 export interface ChorderState {
 	keyBuffer: Key[];
 	pressedChord?: Chord;
 	activeChord?: Chord;
+}
+
+export interface FrontmostState {
+	frontmostAppBundleId?: string;
 }
 
 export interface GitRepo {

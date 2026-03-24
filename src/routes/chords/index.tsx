@@ -1,10 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { taurpc, type ActiveChordInfo } from "#/api/taurpc.ts";
 import { Kbd } from "#/components/ui/kbd.tsx";
-import { useChorderState } from "#/utils/state.ts";
+import { useChorderState, useChordRegistryState, useFrontmostState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { emit, listen } from "@tauri-apps/api/event";
-import { debug } from "@tauri-apps/plugin-log";
 import getPrettyKey from "pretty-key";
 import { cn } from "#/utils/style.ts";
 
@@ -18,14 +16,6 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
 
-function compareSymbolTokens(left: string, right: string) {
-  return left.localeCompare(right);
-}
-
-function isSingleCharacterToken(token: string) {
-  return token.length === 1;
-}
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -36,52 +26,6 @@ function normalizePrettyKey(token: string) {
   }
 
   return token;
-}
-
-function normalizeSequenceString(sequence: string) {
-  return sequence
-    .split(" ")
-    .map((token) => normalizePrettyKey(token))
-    .join(" ");
-}
-
-function compareSuggestionPriority(left: ActiveChordInfo, right: ActiveChordInfo) {
-  const leftDescriptionRank = left.isDescription ? 0 : 1;
-  const rightDescriptionRank = right.isDescription ? 0 : 1;
-  const leftScopeRank = left.scopeKind === "app" ? 0 : 1;
-  const rightScopeRank = right.scopeKind === "app" ? 0 : 1;
-
-  return (
-    leftDescriptionRank - rightDescriptionRank ||
-    leftScopeRank - rightScopeRank ||
-    left.sequence.localeCompare(right.sequence) ||
-    left.name.localeCompare(right.name)
-  );
-}
-
-function resolveTokenDescription(
-  suggestions: ActiveChordInfo[],
-  prefixTokens: string[],
-  token: string,
-) {
-  const sequence = [...prefixTokens, token].join(" ");
-  let bestMatch: ActiveChordInfo | undefined;
-
-  for (const suggestion of suggestions) {
-    if (suggestion.sequence !== sequence) {
-      continue;
-    }
-
-    if (!bestMatch || compareSuggestionPriority(suggestion, bestMatch) < 0) {
-      bestMatch = suggestion;
-    }
-  }
-
-  if (!bestMatch) {
-    return "";
-  }
-
-  return bestMatch.description ?? (!bestMatch.isDescription ? bestMatch.name : "");
 }
 
 function ChordKeyRow({
@@ -129,8 +73,8 @@ function ChordKeyRow({
 
 export function Chords() {
   const state = useChorderState();
-  const [allSuggestions, setAllSuggestions] = useState<ActiveChordInfo[]>([]);
-  const [suggestions, setSuggestions] = useState<ActiveChordInfo[]>([]);
+  const { chords } = useChordRegistryState();
+  const { frontmostAppBundleId } = useFrontmostState()
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const [surfaceVersion, setSurfaceVersion] = useState(0);
   const [isPreparingSurface, setIsPreparingSurface] = useState(false);
@@ -163,33 +107,6 @@ export function Chords() {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void taurpc
-      .listMatchingChords()
-      .then((items) => {
-        if (!cancelled) {
-          if (currentPrefixLength === 0) {
-            setAllSuggestions(items);
-          }
-          setSuggestions(items);
-        }
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setSuggestions([]);
-          void debug(
-            `Failed to load matching chords: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [currentPrefixLength, state.keyBuffer]);
 
   useEffect(() => {
     const unlistenPromise = listen("chorder-will-show", () => {
@@ -232,42 +149,12 @@ export function Chords() {
     };
   }, [surfaceVersion]);
 
-  const sequenceSource = (allSuggestions.length > 0 ? allSuggestions : suggestions).map(
-    (suggestion) => ({
-      ...suggestion,
-      sequence: normalizeSequenceString(suggestion.sequence),
-    }),
-  );
-  const allSequences = sequenceSource.map((suggestion) => suggestion.sequence.split(" "));
   const normalizedBufferTokens = state.keyBuffer.map((key) => {
     const pretty = normalizePrettyKey(getPrettyKey(key));
     return pretty.length === 1 ? pretty.toUpperCase() : pretty;
   });
 
-  const allSymbolTokens = [
-    ...new Set(
-      allSequences
-        .flatMap((sequence) => sequence)
-        .filter((token) => isSingleCharacterToken(token) && !/^[A-Z0-9]$/.test(token)),
-    ),
-  ].sort(compareSymbolTokens);
-  const maxVisibleRows = Math.max(
-    1,
-    ...Array.from({ length: Math.max(1, currentPrefixLength + 1) }, (_, columnIndex) => {
-      const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
-      const activeTokens = new Set(
-        allSequences
-          .filter((sequence) =>
-            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token),
-          )
-          .map((sequence) => sequence[columnIndex])
-          .filter((token): token is string => Boolean(token)),
-      );
-      const letterCount = LETTER_TOKENS.filter((token) => activeTokens.has(token)).length;
-      const symbolCount = allSymbolTokens.filter((token) => activeTokens.has(token)).length;
-      return letterCount + symbolCount + (symbolCount > 0 ? 2 : 0);
-    }),
-  );
+  const maxVisibleRows = 20;
   const availableHeight = Math.max(viewportHeight - 96, 240);
   const idealKeySize = availableHeight / (maxVisibleRows + Math.max(maxVisibleRows - 1, 0) * 0.18);
   const keySize = clamp(Math.floor(idealKeySize), 22, MAX_KEY_SIZE);
@@ -282,11 +169,11 @@ export function Chords() {
     (_, columnIndex) => {
       const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
       const activeTokens = new Set(
-        allSequences
-          .filter((sequence) =>
-            prefixTokens.every((token, tokenIndex) => sequence[tokenIndex] === token),
+        chords
+          .filter((chord) =>
+            prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
           )
-          .map((sequence) => sequence[columnIndex])
+          .map((chord) => chord.keys[columnIndex])
           .filter((token): token is string => Boolean(token)),
       );
 
@@ -328,11 +215,7 @@ export function Chords() {
                     <ChordKeyRow
                       key={`${column.id}-${token}`}
                       token={token}
-                      description={resolveTokenDescription(
-                        sequenceSource,
-                        column.prefixTokens,
-                        token,
-                      )}
+                      description='todo'
                       isSelected={column.selectedToken === token}
                       isDimmed={column.hasSelection && column.selectedToken !== token}
                       keySize={keySize}
@@ -340,21 +223,17 @@ export function Chords() {
                     />
                   ))}
 
-                  {allSymbolTokens.some((token) => column.activeTokens.has(token)) ? (
+                  {chords.some((chord) => column.activeTokens.has(chord.keys[0])) ? (
                     <div className="flex flex-col items-start" style={{ gap: `${rowGap}px` }}>
-                      {allSymbolTokens
-                        .filter((token) => column.activeTokens.has(token))
-                        .map((token) => (
+                      {chords
+                        .filter((chord) => column.activeTokens.has(chord.keys[0]))
+                        .map((chord) => (
                           <ChordKeyRow
-                            key={`${column.id}-${token}`}
-                            token={token}
-                            description={resolveTokenDescription(
-                              sequenceSource,
-                              column.prefixTokens,
-                              token,
-                            )}
-                            isSelected={column.selectedToken === token}
-                            isDimmed={column.hasSelection && column.selectedToken !== token}
+                            key={`${column.id}-${chord.keys[0]}`}
+                            token={chord.keys[0]}
+                            description='todo'
+                            isSelected={column.selectedToken === chord.keys[0]}
+                            isDimmed={column.hasSelection && column.selectedToken !== chord.keys[0]}
                             keySize={keySize}
                             descriptionFontSize={descriptionFontSize}
                           />
