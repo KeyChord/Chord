@@ -184,7 +184,7 @@ impl AppChorder {
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
                 self.ensure_active()?;
 
-                let chord_registry = handle.chord_registry();
+                let chord_registry = handle.app_chord_registry();
                 let frontmost = handle.observable_state::<FrontmostObservable>()?;
                 let state = self.observable.get_state()?;
                 let key_buffer = state.key_buffer.clone();
@@ -276,7 +276,7 @@ impl AppChorder {
         key_buffer: Vec<Key>,
         release_immediately: bool,
     ) -> Result<Option<Chord>> {
-        let chord_registry = handle.chord_registry();
+        let chord_registry = handle.app_chord_registry();
         let frontmost = handle.observable_state::<FrontmostObservable>()?;
         let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
         let Some(chord_runtime) =
@@ -357,7 +357,7 @@ impl AppChorder {
         };
 
         let frontmost = handle.observable_state::<FrontmostObservable>()?;
-        let chord_registry = handle.chord_registry();
+        let chord_registry = handle.app_chord_registry();
         let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
         let chord_runtime = chord_registry.get_chord_runtime(&sequence, frontmost_application_id);
         let (Some(chord_runtime), Some(chord_payload)) = (

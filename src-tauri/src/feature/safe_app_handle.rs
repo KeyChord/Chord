@@ -1,24 +1,77 @@
 use crate::feature::app_handle_ext::AppManaged;
-use crate::observables::{
-    AppPermissionsObservable, AppSettingsObservable, ChorderObservable, GitReposObservable,
-    Observable, get_all_observable_states,
-};
+use crate::observables::{Observable, get_all_observable_states};
 use anyhow::Result;
 use delegate::delegate;
 use serde::Serialize;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
-use tauri::{Emitter, Manager, Wry};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
 
-type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
+type OnSafeCallback = Box<dyn FnOnce(AppHandle) + Send + 'static>;
+type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
-/// A safe handle is a wrapper around AppHandle that is guaranteed to not panic (i.e. it only exposes
-/// "safe" methods). In contrast, calling `.state` on AppHandle will panic if the state hasn't been
-/// managed yet.
+pub trait OnSafeReturn: Send + 'static {
+    fn dispatch(self);
+}
+
+impl OnSafeReturn for () {
+    fn dispatch(self) {}
+}
+
+impl<T, E> OnSafeReturn for Result<T, E>
+where
+    T: OnSafeReturn,
+    E: std::fmt::Display + Send + 'static,
+{
+    fn dispatch(self) {
+        match self {
+            Ok(value) => value.dispatch(),
+            Err(err) => {
+                log::error!("on_safe callback failed: {err}");
+            }
+        }
+    }
+}
+
+pub struct AsyncOnSafe<R> {
+    future: BoxFuture<R>,
+}
+
+impl<R> AsyncOnSafe<R>
+where
+    R: OnSafeReturn,
+{
+    pub fn new<Fut>(future: Fut) -> Self
+    where
+        Fut: Future<Output = R> + Send + 'static,
+    {
+        Self {
+            future: Box::pin(future),
+        }
+    }
+}
+
+impl<R> OnSafeReturn for AsyncOnSafe<R>
+where
+    R: OnSafeReturn,
+{
+    fn dispatch(self) {
+        tauri::async_runtime::spawn(async move {
+            self.future.await.dispatch();
+        });
+    }
+}
+
+/// A safe handle is a wrapper around AppHandle that is guaranteed to not panic
+/// for operations that require managed state to already exist.
+///
+/// In contrast, calling `.state()` on `AppHandle` will panic if that state has
+/// not been managed yet.
 #[derive(Clone)]
 pub struct SafeAppHandle {
     inner: Arc<Inner>,
@@ -34,13 +87,13 @@ struct State {
     callbacks: Vec<OnSafeCallback>,
 }
 
-// If we're converting an AppHandle, it means we have access to an AppHandle which already means
-// it's safe
+// If we're converting from an AppHandle, we already have the fully initialized handle,
+// so treat it as safe immediately.
 impl From<AppHandle> for SafeAppHandle {
     fn from(handle: AppHandle) -> Self {
         Self {
             inner: Arc::new(Inner {
-                handle: handle.clone(),
+                handle,
                 state: Mutex::new(State {
                     is_safe: true,
                     callbacks: Vec::new(),
@@ -52,31 +105,49 @@ impl From<AppHandle> for SafeAppHandle {
 
 impl SafeAppHandle {
     pub fn new(handle: AppHandle) -> Result<Self> {
-        let safe_handle = Self {
+        Ok(Self {
             inner: Arc::new(Inner {
-                handle: handle.clone(),
+                handle,
                 state: Mutex::new(State {
                     is_safe: false,
                     callbacks: Vec::new(),
                 }),
             }),
-        };
-
-        Ok(safe_handle)
+        })
     }
 
-    pub fn on_safe<F>(&self, callback: F)
+    pub fn on_safe<F, R>(&self, callback: F)
     where
-        F: FnOnce(&AppHandle) + Send + 'static,
+        F: FnOnce(AppHandle) -> R + Send + 'static,
+        R: OnSafeReturn,
     {
-        let mut state = self.inner.state.lock().expect("state mutex poisoned");
+        let wrapped: OnSafeCallback = Box::new(move |app| {
+            callback(app).dispatch();
+        });
 
-        if state.is_safe {
-            drop(state);
-            callback(&self.inner.handle);
-        } else {
-            state.callbacks.push(Box::new(callback));
+        let maybe_run_now = {
+            let mut state = self.inner.state.lock().expect("state mutex poisoned");
+
+            if state.is_safe {
+                Some(wrapped)
+            } else {
+                state.callbacks.push(wrapped);
+                None
+            }
+        };
+
+        if let Some(callback) = maybe_run_now {
+            callback(self.inner.handle.clone());
         }
+    }
+
+    pub fn on_safe_async<F, Fut, R>(&self, callback: F)
+    where
+        F: FnOnce(AppHandle) -> Fut + Send + 'static,
+        Fut: Future<Output = R> + Send + 'static,
+        R: OnSafeReturn,
+    {
+        self.on_safe(move |app| AsyncOnSafe::new(callback(app)));
     }
 
     pub fn manage(&self, managed: AppManaged) {
@@ -94,14 +165,23 @@ impl SafeAppHandle {
         };
 
         for callback in callbacks {
-            callback(&self.inner.handle);
+            callback(self.inner.handle.clone());
         }
     }
 
-    /// This is intentionally read-only; only the observable "owner" can write to the observable
+    /// This is intentionally read-only; only the observable owner can write to it.
     pub fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>> {
         let observable = self.inner.handle.state::<Arc<T>>();
-        Ok(observable.get_state()?)
+        observable.get_state()
+    }
+
+    pub fn try_handle(&self) -> Option<&AppHandle> {
+        let mut state = self.inner.state.lock().expect("state mutex poisoned");
+        if state.is_safe {
+            Some(&self.inner.handle)
+        } else {
+            None
+        }
     }
 
     pub fn handle(&self) -> &AppHandle {
@@ -109,23 +189,24 @@ impl SafeAppHandle {
     }
 }
 
-// Methods that can be called without `.state`
+// Methods that can be called without `.state()`
 impl SafeAppHandle {
     pub fn new_webview_window_builder<L: Into<String>>(
         &self,
         label: L,
         url: WebviewUrl,
     ) -> Result<WebviewWindowBuilder<'_, Wry, AppHandle>> {
-        let label = label.into();
         let observables = get_all_observable_states(self.clone())?;
-        Ok(
-            WebviewWindowBuilder::new(self.handle(), label, url).initialization_script(format!(
+        let initial_states = serde_json::to_string(&observables)?;
+
+        Ok(WebviewWindowBuilder::new(self.handle(), label.into(), url).initialization_script(
+            format!(
                 r#"
-          window.__INITIAL_STATES__ = {}
-        "#,
-                &serde_json::to_string(&observables)?
-            )),
-        )
+window.__INITIAL_STATES__ = {};
+"#,
+                initial_states
+            ),
+        ))
     }
 
     delegate! {

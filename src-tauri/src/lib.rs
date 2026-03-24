@@ -172,7 +172,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             safe_handle.clone(),
             vec![ChordPackage::load_bundled()?],
             chord_registry_observable.clone(),
-        ),
+        )?,
     });
 
     let handle = app.handle();
@@ -186,15 +186,6 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             let permissions = handle.app_permissions();
             if let Err(e) = permissions.load().await {
                 log::error!("Failed to load permissions:\n{:#?}", e);
-            }
-        });
-    }
-
-    {
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            if let Err(e) = reload_loaded_app_chords(handle).await {
-                log::error!("Failed to reload app chords:\n{:#?}", e);
             }
         });
     }

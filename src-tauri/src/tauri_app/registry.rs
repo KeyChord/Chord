@@ -2,7 +2,7 @@ use crate::chords::{Chord, ChordPackage, ChordRegistry, GLOBAL_CHORD_RUNTIME_ID}
 use crate::feature::SafeAppHandle;
 use crate::git::GitHubRepoRef;
 use crate::observables::{
-    ActiveChordInfo, ChordRegistryObservable, GitReposObservable, Observable,
+    ChordRegistryObservable, GitReposObservable, Observable,
 };
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -43,20 +43,6 @@ impl GitPackageRegistry {
 
         Ok(packages)
     }
-
-    pub fn load_repo_chords(&self, repo_input: &str) -> anyhow::Result<ChordRegistry> {
-        let repo_ref = GitHubRepoRef::parse(repo_input)?;
-        let repo_path = repo_ref.local_path(&self.dir);
-
-        if !repo_path.join(".git").exists() {
-            anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-        }
-
-        let repo =
-            gix::open(&repo_path).context(format!("failed to open repo {}", repo_ref.slug()))?;
-        let package = ChordPackage::load_from_git_repo(&repo)?;
-        ChordRegistry::new(vec![package])
-    }
 }
 
 #[derive(Serialize, Type)]
@@ -75,10 +61,6 @@ impl LocalChordPackage {
 
     pub fn load(&self) -> anyhow::Result<ChordPackage> {
         ChordPackage::load_from_local_folder(&self.path)
-    }
-
-    pub fn load_chords(&self) -> anyhow::Result<ChordRegistry> {
-        ChordRegistry::from_folders(vec![self.load()?])
     }
 }
 
@@ -132,10 +114,6 @@ impl LocalPackageRegistry {
         }
 
         Ok(package)
-    }
-
-    pub fn load_folder_chords(&self, folder_path: &str) -> anyhow::Result<ChordRegistry> {
-        self.package_from_user_input(folder_path)?.load_chords()
     }
 
     pub fn load_all_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {

@@ -6,8 +6,8 @@ use crate::observables::GitRepo;
 use crate::tauri_app::registry::LocalChordPackage;
 use crate::tauri_app::startup::StartupStatusInfo;
 use crate::tauri_app::{
-    AppMetadataInfo, AppNeedsRelaunchInfo, list_active_chords, list_apps_needing_relaunch,
-    list_loaded_chords, list_matching_chords, relaunch_app, reload_loaded_app_chords, startup,
+    AppMetadataInfo, AppNeedsRelaunchInfo, list_apps_needing_relaunch,
+    relaunch_app, startup,
 };
 use parking_lot::Mutex;
 use serde::Serialize;
@@ -133,19 +133,23 @@ impl Api for ApiImpl {
 
     async fn add_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let store = handle.git_repos_store();
+        let store = handle.app_git_repos_store();
         let repo_ref = GitHubRepoRef::parse(&repo)?;
         store.add_repo(repo_ref.clone())?;
-        reload_loaded_app_chords(handle.clone()).await?;
+
+        let chord_registry = handle.app_chord_registry();
+        chord_registry.reload().await?;
         Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
     }
 
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
-        let store = handle.git_repos_store();
+        let store = handle.app_git_repos_store();
         let repo_ref = GitHubRepoRef::parse(&repo)?;
         store.sync_repo(repo_ref.clone())?;
-        reload_loaded_app_chords(handle.clone()).await?;
+
+        let chord_registry = handle.app_chord_registry();
+        chord_registry.reload().await?;
         Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
     }
 
@@ -165,10 +169,12 @@ impl Api for ApiImpl {
     }
 
     async fn add_local_chord_folder(self, path: String) -> AppResult<LocalChordPackage> {
-        let app_handle = self.app_handle()?;
-        let registry = app_handle.app_chord_package_registry();
+        let handle = self.app_handle()?;
+        let registry = handle.app_chord_package_registry();
         let folder_info = registry.local.add(&path)?;
-        reload_loaded_app_chords(app_handle).await?;
+
+        let chord_registry = handle.app_chord_registry();
+        chord_registry.reload().await?;
         Ok(folder_info)
     }
 
@@ -178,7 +184,7 @@ impl Api for ApiImpl {
 
     async fn list_global_shortcut_mappings(self) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
         let handle = self.app_handle()?;
-        let store = handle.global_hotkey_store();
+        let store = handle.app_global_hotkey_store();
         let mut mappings = store
             .entries()
             .into_iter()
@@ -201,7 +207,7 @@ impl Api for ApiImpl {
 
     async fn remove_global_shortcut_mapping(self, shortcut: String) -> AppResult<()> {
         let handle = self.app_handle()?;
-        let store = handle.global_hotkey_store();
+        let store = handle.app_global_hotkey_store();
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
             return Err(AppError::Message("cannot be empty".into()));

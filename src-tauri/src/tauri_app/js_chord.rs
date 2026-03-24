@@ -104,7 +104,7 @@ impl ModuleDef for ChordModule {
         .with_name("tap")?;
         exports.export("tap", tap)?;
 
-        let global_hotkeys_store = handle.global_hotkey_store();
+        let global_hotkeys_store = handle.app_global_hotkey_store();
         let register_global_hotkey_store = global_hotkeys_store.clone();
         let register_global_hotkey = Function::new(
             ctx.clone(),

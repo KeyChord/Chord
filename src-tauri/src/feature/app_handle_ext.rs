@@ -40,11 +40,11 @@ pub trait AppHandleExt {
     fn app_chorder(&self) -> &AppChorder;
     fn app_context(&self) -> &AppContext;
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry;
-    fn chord_registry(&self) -> &ChordRegistry;
+    fn app_chord_registry(&self) -> &ChordRegistry;
     fn app_frontmost(&self) -> &AppFrontmost;
     fn app_permissions(&self) -> &AppPermissions;
-    fn global_hotkey_store(&self) -> &GlobalHotkeyStore;
-    fn git_repos_store(&self) -> &GitReposStore;
+    fn app_global_hotkey_store(&self) -> &GlobalHotkeyStore;
+    fn app_git_repos_store(&self) -> &GitReposStore;
     fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>>;
 }
 
@@ -65,7 +65,7 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
         self.state::<ChordPackageRegistry>().inner()
     }
 
-    fn chord_registry(&self) -> &ChordRegistry {
+    fn app_chord_registry(&self) -> &ChordRegistry {
         self.state::<ChordRegistry>().inner()
     }
 
@@ -77,11 +77,11 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
         self.state::<AppPermissions>().inner()
     }
 
-    fn global_hotkey_store(&self) -> &GlobalHotkeyStore {
+    fn app_global_hotkey_store(&self) -> &GlobalHotkeyStore {
         self.state::<GlobalHotkeyStore>().inner()
     }
 
-    fn git_repos_store(&self) -> &GitReposStore {
+    fn app_git_repos_store(&self) -> &GitReposStore {
         self.state::<GitReposStore>().inner()
     }
 

@@ -270,66 +270,7 @@ pub async fn load_chord_files_runtime_modules(
     handle: AppHandle,
     loaded_app_chords: &ChordRegistry,
 ) {
-    for (bundle_id, runtime) in loaded_app_chords.runtimes.iter() {
-        let handle = handle.clone();
 
-        let Some(js) = runtime.config.as_ref().and_then(|c| c.js.as_ref()) else {
-            continue;
-        };
-
-        let Some(content) = js.module.clone() else {
-            continue;
-        };
-
-        let path = runtime.path.clone();
-        let raw_chords = runtime.raw_chords.lock().unwrap().clone();
-        let bundle_id = bundle_id.clone();
-
-        tauri::async_runtime::spawn(async move {
-            let path_ = path.clone();
-            let result = with_js(handle, move |ctx| {
-                Box::pin(async move {
-                    let load_module = || -> rquickjs::Result<rquickjs::Promise> {
-                        let module = Module::declare(ctx.clone(), path.clone(), content)?;
-                        let chords =
-                            rquickjs_serde::to_value(ctx.clone(), raw_chords).or_throw(&ctx)?;
-                        let chords_obj = chords.into_object().or_throw(&ctx);
-                        let meta = module.meta()?;
-                        meta.set("chords", chords_obj)?;
-                        meta.set("bundleId", bundle_id)?;
-                        let (_evaluated, promise) = module.eval()?;
-                        Ok(promise)
-                    };
-
-                    match load_module() {
-                        Ok(promise) => {
-                            if let Err(e) = promise.into_future::<()>().await {
-                                log::error!(
-                                    "failed to await module {}: {}",
-                                    path,
-                                    format_js_error(ctx.clone(), e)
-                                )
-                            }
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Failed to load module {}: {}",
-                                path,
-                                format_js_error(ctx.clone(), e)
-                            );
-                        }
-                    }
-
-                    Ok(())
-                })
-            })
-            .await;
-
-            if let Err(err) = result {
-                log::error!("load_module failed for {}: {}", path_, err);
-            }
-        });
-    }
 }
 
 fn format_action(chord: &crate::chords::Chord) -> String {

@@ -1,9 +1,9 @@
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::settings::open_chords_inspector;
-use crate::tauri_app::context::reload_loaded_app_chords;
 use crate::tauri_app::settings::show_settings_window;
 use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
+use crate::feature::app_handle_ext::AppHandleExt;
 
 const TRAY_ICON_BYTES: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"));
@@ -38,7 +38,8 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
             RELOAD_CONFIGS_MENU_ID => {
                 let handle = handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Err(error) = reload_loaded_app_chords(handle).await {
+                    let chord_registry = handle.app_chord_registry();
+                    if let Err(error) =  chord_registry.reload().await {
                         log::error!("Failed to reload configs: {error}");
                     }
                 });
