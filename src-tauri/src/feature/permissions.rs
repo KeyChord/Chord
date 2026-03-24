@@ -16,7 +16,7 @@ impl AppPermissions {
     pub fn new_unloaded(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
         let input_monitoring = AppPermissionsInputMonitoring::new(handle.clone(), observable.clone())?;
         let accessibility = AppPermissionsAccessibility::new(handle.clone(), observable.clone())?;
-        let is_autolaunch_enabled = handle.is_autolaunch_enabled()?;
+        let is_autolaunch_enabled = handle.autolaunch().is_enabled()?;
         observable.set_state(AppPermissionsState {
             is_input_monitoring_enabled: None,
             is_accessibility_enabled: None,
@@ -38,6 +38,10 @@ impl AppPermissions {
             is_autostart_enabled: state.is_autostart_enabled
         })?;
         Ok(())
+    }
+
+    pub fn enable_autostart(&self) -> Result<()> {
+        Ok(self.handle.autolaunch().enable()?)
     }
 }
 

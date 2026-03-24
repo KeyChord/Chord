@@ -116,10 +116,6 @@ impl SafeAppHandle {
 
 // Methods that can be called without `.state`
 impl SafeAppHandle {
-    pub fn is_autolaunch_enabled(&self) -> Result<bool> {
-        Ok(self.handle().autolaunch().is_enabled()?)
-    }
-
     pub fn new_webview_window_builder<L: Into<String>>(
         &self,
         label: L,
@@ -134,6 +130,7 @@ impl SafeAppHandle {
 
     delegate! {
         to self.handle() {
+            pub fn autolaunch(&self) -> tauri::State<'_, tauri_plugin_autostart::AutoLaunchManager>;
             pub fn store(&self, path: impl AsRef<std::path::Path>) -> tauri_plugin_store::Result<Arc<Store<Wry>>>;
             pub fn path(&self) -> &tauri::path::PathResolver<Wry>;
             pub fn dialog(&self) -> &Dialog<Wry>;

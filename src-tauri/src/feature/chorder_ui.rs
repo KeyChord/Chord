@@ -45,6 +45,8 @@ impl ChorderIndicatorUi {
             .title("Chords")
             .inner_size(640.0, 180.0)
             .visible(false)
+            .focused(false)
+            .focusable(false)
             .transparent(true)
             .decorations(false)
             .always_on_top(true)
@@ -54,8 +56,10 @@ impl ChorderIndicatorUi {
             .minimizable(false)
             .visible_on_all_workspaces(true)
             .shadow(false)
+            .accept_first_mouse(false)
             .build()?;
 
+        let _ = window.set_focusable(false);
         let _ = window.set_ignore_cursor_events(true);
 
         let panel = window.to_panel::<IndicatorPanel>()?;
@@ -158,7 +162,6 @@ impl ChorderIndicatorUi {
 
             panel.set_alpha_value(0.0);
             panel.show();
-            panel.order_front_regardless();
             is_visible.store(true, Ordering::Relaxed);
         })?;
 

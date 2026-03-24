@@ -12,6 +12,7 @@ use tauri::AppHandle;
 use crate::get_app_metadata;
 use crate::tauri_app::git::{LocalChordPackage};
 use specta::Type;
+use tauri_plugin_autostart::ManagerExt;
 use thiserror::Error;
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::observables::GitRepo;
@@ -84,6 +85,8 @@ pub trait Api {
     async fn list_apps_needing_relaunch() -> AppResult<Vec<AppNeedsRelaunchInfo>>;
     #[taurpc(alias = "relaunchApp")]
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
+    #[taurpc(alias = "enableAutostart")]
+    async fn enable_autostart() -> AppResult<()>;
 }
 
 #[derive(Clone, Default)]
@@ -111,6 +114,12 @@ impl Api for ApiImpl {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
             "accessibility",
         );
+    }
+
+    async fn enable_autostart(self) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let permissions = handle.app_permissions();
+        Ok(permissions.enable_autostart()?)
     }
 
     async fn open_input_monitoring_settings(self) {
