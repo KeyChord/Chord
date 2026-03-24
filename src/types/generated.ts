@@ -5,73 +5,66 @@
 export type Key = string;
 
 export interface AppChordsFileConfigJs {
-  module?: string;
+	module?: string;
 }
 
 export interface AppChordsFileConfig {
-  name?: string;
-  extends?: string;
-  js?: AppChordsFileConfigJs;
+	name?: string;
+	extends?: string;
+	js?: AppChordsFileConfigJs;
 }
 
 export interface AppPermissionsState {
-  isAutostartEnabled?: boolean;
-  isInputMonitoringEnabled?: boolean;
-  isAccessibilityEnabled?: boolean;
+	isAutostartEnabled?: boolean;
+	isInputMonitoringEnabled?: boolean;
+	isAccessibilityEnabled?: boolean;
 }
 
 export interface AppSettingsState {
-  bundleIdsNeedingRelaunch: string[];
+	bundleIdsNeedingRelaunch: string[];
 }
 
 export interface ShortcutChord {
-  keys: Key[];
+	keys: Key[];
 }
 
 /** Represents a parsed keyboard shortcut, e.g. "cmd+shift+n". */
 export interface Shortcut {
-  chords: ShortcutChord[];
-}
-
-export type ChordJsArgs = { type: "Values"; value: Value[] } | { type: "Eval"; value: string };
-
-export interface ChordJsInvocation {
-  export_name?: string;
-  args: ChordJsArgs;
+	chords: ShortcutChord[];
 }
 
 export interface Chord {
-  keys: Key[];
-  name: string;
-  shortcut?: Shortcut;
-  shell?: string;
-  js?: ChordJsInvocation;
+	keys: Key[];
+	name: string;
+	shortcut?: Shortcut;
+	shell?: string;
+	js?: any;
 }
 
 export interface ChordFilesState {
-  rawFilesAsJsonStrings: Record<string, string>;
+	rawFilesAsJsonStrings: Record<string, string>;
 }
 
 export interface ChorderState {
-  keyBuffer: Key[];
-  pressedChord?: Chord;
-  activeChord?: Chord;
+	keyBuffer: Key[];
+	pressedChord?: Chord;
+	activeChord?: Chord;
 }
 
 export interface FrontmostState {
-  frontmostAppBundleId?: string;
+	frontmostAppBundleId?: string;
 }
 
 export interface GitRepo {
-  owner: string;
-  name: string;
-  slug: string;
-  url: string;
-  localPath: string;
-  headShortSha?: string;
+	owner: string;
+	name: string;
+	slug: string;
+	url: string;
+	localPath: string;
+	headShortSha?: string;
 }
 
-export interface RawAppChordsFile {
-  config?: AppChordsFileConfig;
-  chords?: Record<string, AppChordMapValue>;
+export interface GitReposState {
+	repos: Record<string, GitRepo>;
 }
+

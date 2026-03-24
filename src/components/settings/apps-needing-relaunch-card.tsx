@@ -9,7 +9,6 @@ import {
 import { AppIcon } from "#/components/settings/app-icon.tsx";
 import { useSettingsState } from "../../utils/state.ts";
 import { RelaunchAppButton } from "./relaunch-app-button.tsx";
-import { useAppMetadataQuery } from "../../utils/app.ts";
 
 export function AppsNeedingRelaunchCard() {
   const { bundleIdsNeedingRelaunch } = useSettingsState();
@@ -38,14 +37,12 @@ export function AppsNeedingRelaunchCard() {
 }
 
 function AppNeedingRelaunchRow({ app }: { app: { bundleId: string } }) {
-  const { data } = useAppMetadataQuery(app.bundleId);
-  // TODO
   const appLabel = app.bundleId;
 
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
-        <AppIcon appMetadata={data} label={appLabel} />
+        <AppIcon label={appLabel} />
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <p className="truncate font-medium">{appLabel}</p>

@@ -14,7 +14,6 @@ pub struct AppChordsFile {
     pub raw_file_json: serde_json::Value,
 }
 
-#[typeshare]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RawAppChordsFile {
     pub config: Option<AppChordsFileConfig>,
