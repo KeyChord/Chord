@@ -1,7 +1,7 @@
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::get_app_metadata;
 use crate::git::GitHubRepoRef;
-use crate::observables::GitRepo;
+use crate::observables::{get_all_observable_states, GitRepo};
 use crate::tauri_app::registry::LocalChordPackage;
 use crate::tauri_app::startup::StartupStatusInfo;
 use crate::tauri_app::{
@@ -11,6 +11,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 use specta::Type;
 use std::sync::Arc;
+use llrt_core::libs::utils::result::ResultExt;
 use tauri::AppHandle;
 use thiserror::Error;
 
@@ -76,6 +77,8 @@ pub trait Api {
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
     #[taurpc(alias = "toggleAutostart")]
     async fn toggle_autostart() -> AppResult<()>;
+    #[taurpc(alias = "getCurrentStates")]
+    async fn get_current_states() -> AppResult<String>;
 }
 
 #[derive(Clone, Default)]
@@ -98,6 +101,12 @@ impl ApiImpl {
 
 #[taurpc::resolvers]
 impl Api for ApiImpl {
+    async fn get_current_states(self) -> AppResult<String> {
+        let handle = self.app_handle()?;
+        let states  = get_all_observable_states(handle.into())?;
+        Ok(serde_json::to_string(&states).map_err(|e| AppError::Message("what".into()))?)
+    }
+
     async fn open_accessibility_settings(self) {
         open_system_settings(
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",

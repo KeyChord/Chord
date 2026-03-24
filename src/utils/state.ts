@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import type { AppPermissionsState, AppSettingsState, ChorderState, ChordFilesState, FrontmostState } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 import renameFunction from "rename-fn";
+import { invoke } from "@tauri-apps/api/core";
+import { taurpc } from "../api/taurpc.ts";
 
-function createUseTauriState<T>(stateId: string) {
+async function createUseTauriState<T>(stateId: string) {
+  const initialStates = JSON.parse(await taurpc.getCurrentStates());
   const useTauriState = () => {
-    const [state, setState] = useState<T>((window as any).__INITIAL_STATES__[stateId] as T);
+    const [state, setState] = useState<T>(initialStates[stateId]);
     console.log(state)
 
     useEffect(() => {
@@ -25,9 +28,9 @@ function createUseTauriState<T>(stateId: string) {
   return renameFunction(useTauriState, stateId);
 }
 
-export const useChorderState = createUseTauriState<ChorderState>("chorder");
-export const useSettingsState = createUseTauriState<AppSettingsState>("settings");
-export const usePermissionsState = createUseTauriState<AppPermissionsState>("permissions");
-export const useGitRepoStoreState = createUseTauriState<any>("git-repos");
-export const useChordFilesState = createUseTauriState<ChordFilesState>("chord-files");
-export const useFrontmostState = createUseTauriState<FrontmostState>("frontmost");
+export const useChorderState = await createUseTauriState<ChorderState>("chorder");
+export const useSettingsState = await createUseTauriState<AppSettingsState>("settings");
+export const usePermissionsState = await createUseTauriState<AppPermissionsState>("permissions");
+export const useGitRepoStoreState = await createUseTauriState<any>("git-repos");
+export const useChordFilesState = await createUseTauriState<ChordFilesState>("chord-files");
+export const useFrontmostState = await createUseTauriState<FrontmostState>("frontmost");
