@@ -4,7 +4,7 @@ use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::Key;
 use crate::input::KeyEvent;
 use crate::observables::{
-    ChorderObservable, ChorderState, FrontmostObservable, FrontmostState, Observable,
+    ChorderObservable, ChorderState, FrontmostObservable, Observable,
 };
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};

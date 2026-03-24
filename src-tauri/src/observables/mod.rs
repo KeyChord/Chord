@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 mod chorder;
-mod chords;
+mod chord_files;
 mod frontmost;
 mod git_repos;
 mod permissions;
@@ -9,7 +9,7 @@ mod settings;
 
 use crate::feature::SafeAppHandle;
 pub use chorder::*;
-pub use chords::*;
+pub use chord_files::*;
 pub use frontmost::*;
 pub use git_repos::*;
 pub use permissions::*;
@@ -113,7 +113,6 @@ macro_rules! define_observable {
             pub fn get_json(
                 handle: &$crate::feature::SafeAppHandle,
             ) -> ::anyhow::Result<::serde_json::Value> {
-                use crate::observables::Observable;
                 let state = handle.observable_state::<$name>()?;
                 Ok(::serde_json::to_value(state.as_ref())?)
             }

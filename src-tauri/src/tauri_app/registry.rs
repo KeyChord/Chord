@@ -1,7 +1,6 @@
-use crate::chords::{Chord, ChordPackage, ChordRegistry, GLOBAL_CHORD_RUNTIME_ID};
+use crate::chords::ChordPackage;
 use crate::feature::SafeAppHandle;
-use crate::git::GitHubRepoRef;
-use crate::observables::{ChordRegistryObservable, GitReposObservable, Observable};
+use crate::observables::GitReposObservable;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use specta::Type;

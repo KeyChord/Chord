@@ -1,6 +1,6 @@
 use crate::feature::SafeAppHandle;
 use anyhow::Result;
-use tauri::{Emitter, WebviewUrl, WebviewWindow};
+use tauri::{WebviewUrl, WebviewWindow};
 
 pub struct AppSettings {
     pub ui: SettingsUi,
@@ -28,6 +28,7 @@ impl SettingsUi {
             .inner_size(920.0, 760.0)
             .min_inner_size(760.0, 620.0)
             .visible(false)
+            .focused(false)
             .resizable(true)
             .center()
             .build()?;

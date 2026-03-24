@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Kbd } from "#/components/ui/kbd.tsx";
-import { useChorderState, useChordRegistryState, useFrontmostState } from "#/utils/state.ts";
+import { useChorderState, useFrontmostState } from "#/utils/state.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { emit, listen } from "@tauri-apps/api/event";
 import getPrettyKey from "pretty-key";
 import { cn } from "#/utils/style.ts";
+import { useChordFile } from "#/utils/chord-files.ts";
 
 export const Route = createFileRoute("/chords/")({
   component: Chords,
@@ -73,8 +74,8 @@ function ChordKeyRow({
 
 export function Chords() {
   const state = useChorderState();
-  const { chords } = useChordRegistryState();
   const { frontmostAppBundleId } = useFrontmostState()
+  const chords = useChordFile(frontmostAppBundleId)
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const [surfaceVersion, setSurfaceVersion] = useState(0);
   const [isPreparingSurface, setIsPreparingSurface] = useState(false);

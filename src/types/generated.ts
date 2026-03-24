@@ -4,6 +4,16 @@
 
 export type Key = string;
 
+export interface AppChordsFileConfigJs {
+	module?: string;
+}
+
+export interface AppChordsFileConfig {
+	name?: string;
+	extends?: string;
+	js?: AppChordsFileConfigJs;
+}
+
 export interface AppPermissionsState {
 	isAutostartEnabled?: boolean;
 	isInputMonitoringEnabled?: boolean;
@@ -40,8 +50,8 @@ export interface Chord {
 	js?: ChordJsInvocation;
 }
 
-export interface ChordRegistryState {
-	chords: Chord[];
+export interface ChordFilesState {
+	rawFilesAsJsonStrings: Record<string, string>;
 }
 
 export interface ChorderState {
@@ -61,5 +71,10 @@ export interface GitRepo {
 	url: string;
 	localPath: string;
 	headShortSha?: string;
+}
+
+export interface RawAppChordsFile {
+	config?: AppChordsFileConfig;
+	chords?: Record<string, AppChordMapValue>;
 }
 

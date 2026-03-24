@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AppPermissionsState, AppSettingsState, ChorderState, ChordRegistryState, FrontmostState } from "../types/generated.ts";
+import type { AppPermissionsState, AppSettingsState, ChorderState, ChordFilesState, FrontmostState } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 import renameFunction from "rename-fn";
 
@@ -27,5 +27,5 @@ export const useChorderState = createUseTauriState<ChorderState>("chorder");
 export const useSettingsState = createUseTauriState<AppSettingsState>("settings");
 export const usePermissionsState = createUseTauriState<AppPermissionsState>("permissions");
 export const useGitRepoStoreState = createUseTauriState<any>("git-repos");
-export const useChordRegistryState = createUseTauriState<ChordRegistryState>("chord-registry");
+export const useChordFilesState = createUseTauriState<ChordFilesState>("chord-files");
 export const useFrontmostState = createUseTauriState<FrontmostState>("frontmost");

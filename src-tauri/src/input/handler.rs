@@ -1,7 +1,7 @@
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::{Key, KeyEvent};
 use crate::mode::AppMode;
-use crate::observables::{ChorderObservable, Observable};
+use crate::observables::ChorderObservable;
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use tauri::AppHandle;

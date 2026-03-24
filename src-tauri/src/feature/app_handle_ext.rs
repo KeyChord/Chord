@@ -3,11 +3,11 @@ use crate::chords::ChordRegistry;
 use crate::feature::global_hotkey::GlobalHotkeyStore;
 use crate::feature::repos::GitReposStore;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
-use crate::observables::{ChordRegistryState, Observable};
+use crate::observables::Observable;
 use crate::tauri_app::registry::ChordPackageRegistry;
 use anyhow::Result;
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, Runtime, State};
+use tauri::{AppHandle, Manager, Runtime};
 
 pub struct AppManaged {
     pub settings: AppSettings,

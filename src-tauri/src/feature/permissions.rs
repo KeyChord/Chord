@@ -1,11 +1,8 @@
 use crate::feature::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
-use crate::observables::{
-    AppPermissionsObservable, AppPermissionsState, AppSettingsObservable, Observable,
-};
+use crate::observables::{AppPermissionsObservable, AppPermissionsState, Observable};
 use anyhow::Result;
 use std::sync::Arc;
-use tauri::App;
 
 pub struct AppPermissions {
     _input_monitoring: AppPermissionsInputMonitoring,

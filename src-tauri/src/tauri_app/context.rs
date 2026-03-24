@@ -1,7 +1,4 @@
-use crate::chords::{Chord, ChordPackage, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::app_handle_ext::AppHandleExt;
-use crate::js::{format_js_error, reset_js, with_js};
-use crate::observables::{ChorderObservable, FrontmostObservable, Observable};
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
@@ -9,7 +6,6 @@ use crate::{
 use anyhow::Result;
 use base64::Engine;
 use device_query::DeviceState;
-use llrt_core::libs::utils::result::ResultExt;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
@@ -17,9 +13,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
 use parking_lot::RwLock;
-use rquickjs::{Ctx, Module};
-use std::collections::{BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};

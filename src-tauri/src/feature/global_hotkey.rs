@@ -1,9 +1,9 @@
-use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
+use crate::feature::SafeAppHandle;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::{Runtime, Wry};
+use tauri::Wry;
 use tauri_plugin_store::Store;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

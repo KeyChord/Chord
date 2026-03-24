@@ -1,10 +1,10 @@
 use crate::chords::shortcut::{Shortcut, press_shortcut, release_shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
 use crate::feature::app_handle_ext::AppHandleExt;
-use crate::feature::{AppSettings, SafeAppHandle};
+use crate::feature::SafeAppHandle;
 use crate::input::Key;
 use crate::js::{format_js_error, reset_js, with_js};
-use crate::observables::{ChordRegistryObservable, ChordRegistryState, Observable};
+use crate::observables::{ChordFilesObservable, ChordFilesState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
 use rquickjs::function::Args;
@@ -48,7 +48,7 @@ pub struct ChordRegistry {
     pub runtimes: Mutex<HashMap<String, Arc<ChordRuntime>>>,
 
     handle: SafeAppHandle,
-    observable: Arc<ChordRegistryObservable>,
+    observable: Arc<ChordFilesObservable>,
 }
 
 #[derive(Debug, Clone)]
@@ -295,10 +295,11 @@ fn resolve_runtime_extends(
 impl ChordRegistry {
     fn parse_packages(
         chord_packages: Vec<ChordPackage>,
-    ) -> Result<(HashMap<Vec<Key>, String>, HashMap<String, ChordRuntime>)> {
+    ) -> Result<(HashMap<Vec<Key>, String>, HashMap<String, ChordRuntime>, HashMap<String, serde_json::Value>)> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
+        let mut raw_files_json_map = HashMap::new();
 
         for chord_folder in chord_packages {
             if let Some(root_dir) = chord_folder.root_dir {
@@ -309,6 +310,8 @@ impl ChordRegistry {
 
             for (chord_file_path, file) in chord_folder.chords_files {
                 log::debug!( "Loading {:?}", chord_file_path);
+
+                raw_files_json_map.insert(chord_file_path.clone(), file.raw_file_json.clone());
 
                 let Some(runtime_id) = runtime_id_from_chords_path(Path::new(&chord_file_path))
                 else {
@@ -349,7 +352,7 @@ impl ChordRegistry {
             global_chords_to_runtime_key.keys()
         );
 
-        Ok((global_chords_to_runtime_key, app_runtime_map))
+        Ok((global_chords_to_runtime_key, app_runtime_map, raw_files_json_map))
     }
 
     pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
@@ -392,15 +395,8 @@ impl ChordRegistry {
                 .map_err(|e| anyhow::anyhow!(e))?;
         }
 
-        let (global_chords_to_runtime_key, app_runtime_map) =
+        let (global_chords_to_runtime_key, app_runtime_map, raw_files_map) =
             ChordRegistry::parse_packages(chord_packages)?;
-
-        let mut chords = Vec::new();
-        for (_, runtime) in &app_runtime_map {
-            for (_, chord) in &runtime.chords {
-                chords.push(chord.clone());
-            }
-        }
 
         // Set state before setting observable
         {
@@ -417,7 +413,14 @@ impl ChordRegistry {
             );
         }
 
-        self.observable.set_state(ChordRegistryState { chords })?;
+        let state = self.observable.get_state()?;
+        let mut raw_files_as_json_strings = state.raw_files_as_json_strings.clone();
+        let new_entries = raw_files_map
+            .iter()
+            .map(|(k, v)| Ok((k.clone(), serde_json::to_string(v)?)))
+            .collect::<Result<Vec<_>>>()?;
+        raw_files_as_json_strings.extend(new_entries);
+        self.observable.set_state(ChordFilesState { raw_files_as_json_strings })?;
 
         // We should only load `macos.toml` modules AFTER the js files have been loaded
         self.load_chord_config_modules().await;
@@ -425,7 +428,7 @@ impl ChordRegistry {
         Ok(())
     }
 
-    pub fn new_empty(handle: SafeAppHandle, observable: Arc<ChordRegistryObservable>) -> Self {
+    pub fn new_empty(handle: SafeAppHandle, observable: Arc<ChordFilesObservable>) -> Self {
         ChordRegistry {
             handle,
             global_chords_to_runtime_key: Mutex::new(HashMap::new()),

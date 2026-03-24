@@ -3,14 +3,18 @@ use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use typeshare::typeshare;
 
 #[derive(Debug, Serialize)]
 pub struct AppChordsFile {
     pub config: Option<AppChordsFileConfig>,
     pub chords: HashMap<String, AppChordMapValue>,
     pub descriptions: HashMap<String, String>,
+
+    pub raw_file_json: serde_json::Value
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RawAppChordsFile {
     pub config: Option<AppChordsFileConfig>,
@@ -19,6 +23,9 @@ pub struct RawAppChordsFile {
 
 impl AppChordsFile {
     pub fn parse(content: &str) -> Result<Self> {
+        let toml_value: toml::Value = toml::from_str(content)?;
+        let json_value: serde_json::Value = serde_json::to_value(toml_value)?;
+
         let file = toml::from_str::<RawAppChordsFile>(content)?;
         let mut chords = HashMap::new();
         let mut descriptions = HashMap::new();
@@ -57,6 +64,7 @@ impl AppChordsFile {
             config: file.config,
             chords,
             descriptions,
+            raw_file_json: json_value
         })
     }
 
@@ -127,6 +135,7 @@ impl AppChordsFile {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppChordsFileConfig {
     pub name: Option<String>,
@@ -134,6 +143,7 @@ pub struct AppChordsFileConfig {
     pub js: Option<AppChordsFileConfigJs>,
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppChordsFileConfigJs {
     pub module: Option<String>,

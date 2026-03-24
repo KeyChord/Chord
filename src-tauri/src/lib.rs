@@ -1,5 +1,5 @@
 use crate::api::{Api, ApiImpl};
-use crate::observables::{ChordRegistryObservable, FrontmostObservable, Observable};
+use crate::observables::{ChordFilesObservable, FrontmostObservable, Observable};
 use crate::tauri_app::registry::ChordPackageRegistry;
 use anyhow::Result;
 use parking_lot::deadlock;
@@ -27,8 +27,7 @@ use crate::feature::global_hotkey::GlobalHotkeyStore;
 use crate::feature::repos::GitReposStore;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
 use crate::observables::{
-    AppPermissionsObservable, AppSettingsObservable, AppSettingsState, ChorderObservable,
-    ChorderState, GitReposObservable,
+    AppPermissionsObservable, AppSettingsObservable, ChorderObservable, GitReposObservable,
 };
 use crate::registry::GitPackageRegistry;
 use tauri_nspanel::tauri_panel;
@@ -152,14 +151,14 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let permissions_observable = Arc::new(AppPermissionsObservable::new(safe_handle.clone())?);
     let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
     let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
-    let chord_registry_observable = Arc::new(ChordRegistryObservable::new(safe_handle.clone())?);
+    let chord_files_observable = Arc::new(ChordFilesObservable::new(safe_handle.clone())?);
     let git_package_registry = Arc::new(GitPackageRegistry::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
     app.handle().manage(git_repos_observable.clone());
     app.handle().manage(permissions_observable.clone());
     app.handle().manage(settings_observable.clone());
     app.handle().manage(frontmost_observable.clone());
-    app.handle().manage(chord_registry_observable.clone());
+    app.handle().manage(chord_files_observable.clone());
     app.handle().manage(git_package_registry.clone());
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
@@ -173,7 +172,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRegistry::new_empty(safe_handle.clone(), chord_registry_observable.clone())
+        chord_registry: ChordRegistry::new_empty(safe_handle.clone(), chord_files_observable.clone())
     });
 
     let handle = app.handle();

@@ -1,4 +1,3 @@
-use crate::chords::Chord;
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::get_app_metadata;
 use crate::git::GitHubRepoRef;
@@ -13,7 +12,6 @@ use serde::Serialize;
 use specta::Type;
 use std::sync::Arc;
 use tauri::AppHandle;
-use tauri_plugin_autostart::ManagerExt;
 use thiserror::Error;
 
 #[derive(Debug)]
