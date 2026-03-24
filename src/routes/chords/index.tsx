@@ -192,6 +192,8 @@ export function Chords() {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const currentPrefixLength = state.keyBuffer.length;
 
+  console.log(rawChords);
+
   const emitSurfaceRect = () => {
     const surface = surfaceRef.current;
     if (!surface) {

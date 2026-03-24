@@ -420,6 +420,7 @@ impl ChordRegistry {
             .map(|(k, v)| Ok((k.clone(), serde_json::to_string(v)?)))
             .collect::<Result<Vec<_>>>()?;
         raw_files_as_json_strings.extend(new_entries);
+        log::debug!("Setting {} raw files", raw_files_as_json_strings.len());
         self.observable.set_state(ChordFilesState { raw_files_as_json_strings })?;
 
         // We should only load `macos.toml` modules AFTER the js files have been loaded

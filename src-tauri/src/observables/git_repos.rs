@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use typeshare::typeshare;
 
+#[typeshare]
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitReposState {

@@ -6,9 +6,11 @@ import renameFunction from "rename-fn";
 function createUseTauriState<T>(stateId: string) {
   const useTauriState = () => {
     const [state, setState] = useState<T>((window as any).__INITIAL_STATES__[stateId] as T);
+    console.log(state)
 
     useEffect(() => {
       const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
+        console.log(event.payload)
         setState(event.payload);
       });
 

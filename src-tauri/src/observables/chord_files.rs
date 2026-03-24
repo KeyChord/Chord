@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use crate::chords::Chord;
 use crate::define_observable;
 use serde::Serialize;
 use typeshare::typeshare;

@@ -16,19 +16,22 @@ interface RawChordFile {
 // The reason why we do one chord file at a time is because resolving is expensive
 export function useChordFile(bundleId: string | undefined): Record<string, RawChord> {
   const { rawFilesAsJsonStrings } = useChordFilesState()
+  console.log('raw', rawFilesAsJsonStrings)
   const rawFilesAsJson = mapObject(rawFilesAsJsonStrings, (key, value) => [key, JSON.parse(value)])
-  if (bundleId === undefined) {
-    return getGlobalChords(rawFilesAsJson);
+  const chords = getGlobalChords(rawFilesAsJson);
+  if (bundleId !== undefined) {
+    for (const [sequence, chord] of Object.entries(resolveChords(rawFilesAsJson, bundleId))) {
+      chords[sequence] = chord
+    }
   }
-
-  return resolveChords(rawFilesAsJson, bundleId)
+  return chords;
 }
 
 function getGlobalChords(rawFilesAsJson: Record<string, RawChordFile>) {
   const chords: Record<string, RawChord> = {}
   for (const file of Object.values(rawFilesAsJson)) {
     for (const [sequence, chord] of Object.entries(file.chords ?? {})) {
-      if (sequence[0].toUpperCase() === sequence[0].toUpperCase()) {
+      if (sequence[0].toUpperCase() === sequence[0]) {
         chords[sequence] = Array.isArray(chord) ? chord[0] : chord;
       }
     }
@@ -37,8 +40,12 @@ function getGlobalChords(rawFilesAsJson: Record<string, RawChordFile>) {
   return chords;
 }
 
+const bundleIdToFilepath = (bundleId: string) => `chords/${bundleId.replaceAll('.', '/')}/macos.toml`;
+
 function resolveChords(rawFilesAsJsonStrings: Record<string, RawChordFile>, bundleId: string): Record<string, RawChord> {
-  const file = rawFilesAsJsonStrings[bundleId] ?? {};
+  const filepath = bundleIdToFilepath(bundleId);
+  console.log(bundleId, filepath)
+  const file = rawFilesAsJsonStrings[filepath] ?? {};
   const chords: Record<string, RawChord> = mapObject(file.chords ?? {}, (key, value) => {
     if (Array.isArray(value)) {
       return [key, value[0]];
