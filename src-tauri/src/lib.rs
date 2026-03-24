@@ -182,7 +182,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
             safe_handle.clone(),
             permissions_observable.clone(),
         )?,
-        settings: AppSettings::new(safe_handle.clone())?,
+        settings: AppSettings::new(safe_handle.clone(), settings_observable.clone())?,
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
@@ -202,6 +202,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
         log::error!("Failed to create tray: {error:#}");
     }
+    handle.app_settings().apply_all()?;
 
     let startup_status = tauri_app::startup::get_startup_status(&handle)?;
     if startup_status.should_show_onboarding {

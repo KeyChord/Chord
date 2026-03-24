@@ -1,6 +1,6 @@
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
-use crate::tauri_app::settings::show_settings_window;
 use crate::tauri_app::scripting::reload_configs;
+use crate::tauri_app::settings::show_settings_window;
 use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
 
 #[cfg(debug_assertions)]
@@ -8,6 +8,7 @@ use crate::constants::OPEN_INSPECTOR_MENU_ID;
 #[cfg(debug_assertions)]
 use crate::settings::open_chords_inspector;
 
+pub const TRAY_ID: &str = "chord-tray";
 const TRAY_ICON_BYTES: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"));
 
@@ -29,7 +30,7 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
 
     let menu = menu.separator().text(QUIT_MENU_ID, "Quit").build()?;
 
-    let mut tray = TrayIconBuilder::with_id("chord-tray")
+    let mut tray = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .tooltip("Chord")
         .show_menu_on_left_click(true)

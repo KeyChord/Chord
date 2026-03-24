@@ -31,6 +31,12 @@ export function FirstRunOnboarding({
     mutationFn: taurpc.completeOnboarding,
     onSuccess: onComplete,
   });
+  const skipOnboardingMutation = useMutation({
+    mutationFn: taurpc.completeOnboarding,
+    onSuccess: onSkip,
+  });
+  const isPersistingOnboardingState =
+    completeOnboardingMutation.isPending || skipOnboardingMutation.isPending;
 
   const permissionSteps = [
     {
@@ -127,8 +133,15 @@ export function FirstRunOnboarding({
             </div>
 
             <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <Button type="button" variant="ghost" onClick={onSkip}>
-                Finish Later
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  skipOnboardingMutation.mutate();
+                }}
+                disabled={isPersistingOnboardingState}
+              >
+                {skipOnboardingMutation.isPending ? "Skipping..." : "Skip"}
               </Button>
               <div className="flex items-center gap-2 self-end sm:self-auto">
                 {!canFinish ? (
@@ -141,7 +154,7 @@ export function FirstRunOnboarding({
                   onClick={() => {
                     completeOnboardingMutation.mutate();
                   }}
-                  disabled={!canFinish || completeOnboardingMutation.isPending}
+                  disabled={!canFinish || isPersistingOnboardingState}
                   className="bg-emerald-600 text-white hover:bg-emerald-700"
                 >
                   {completeOnboardingMutation.isPending ? "Continuing..." : "Continue"}

@@ -35,7 +35,9 @@ fn open_system_settings(url: &str, permission_name: &str) {
 fn normalize_placeholder_sequence(sequence: &str) -> AppResult<String> {
     let normalized = sequence.trim().to_ascii_lowercase();
     if normalized.is_empty() {
-        return Err(AppError::Message("placeholder sequence cannot be empty".into()));
+        return Err(AppError::Message(
+            "placeholder sequence cannot be empty".into(),
+        ));
     }
 
     if !normalized.chars().all(|ch| ch.is_ascii_lowercase()) {
@@ -109,6 +111,12 @@ pub trait Api {
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
     #[taurpc(alias = "toggleAutostart")]
     async fn toggle_autostart() -> AppResult<()>;
+    #[taurpc(alias = "toggleMenuBarIcon")]
+    async fn toggle_menu_bar_icon() -> AppResult<()>;
+    #[taurpc(alias = "toggleDockIcon")]
+    async fn toggle_dock_icon() -> AppResult<()>;
+    #[taurpc(alias = "toggleHideGuideByDefault")]
+    async fn toggle_hide_guide_by_default() -> AppResult<()>;
     #[taurpc(alias = "getCurrentStates")]
     async fn get_current_states() -> AppResult<String>;
 }
@@ -150,6 +158,24 @@ impl Api for ApiImpl {
         let handle = self.app_handle()?;
         let permissions = handle.app_permissions();
         Ok(permissions.toggle_autostart()?)
+    }
+
+    async fn toggle_menu_bar_icon(self) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let settings = handle.app_settings();
+        Ok(settings.toggle_menu_bar_icon()?)
+    }
+
+    async fn toggle_dock_icon(self) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let settings = handle.app_settings();
+        Ok(settings.toggle_dock_icon()?)
+    }
+
+    async fn toggle_hide_guide_by_default(self) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let settings = handle.app_settings();
+        Ok(settings.toggle_hide_guide_by_default()?)
     }
 
     async fn open_input_monitoring_settings(self) {
