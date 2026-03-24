@@ -2,9 +2,10 @@ use crate::chords::shortcut::{Shortcut, press_shortcut, release_shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
 use crate::feature::SafeAppHandle;
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::feature::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::input::Key;
 use crate::js::{format_js_error, reset_js, with_js};
-use crate::observables::{ChordFilesObservable, ChordFilesState, Observable};
+use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
 use rquickjs::function::Args;
@@ -101,12 +102,16 @@ impl ChordRuntime {
     }
 
     // Doesn't resolve _config.extends
-    pub fn from_file_shallow(path: String, chord_file: AppChordsFile) -> Result<Self> {
-        let raw_chords = Arc::new(Mutex::new(chord_file.chords.clone()));
+    pub fn from_file_shallow(
+        path: String,
+        chord_file: AppChordsFile,
+        placeholder_bindings: &HashMap<String, String>,
+    ) -> Result<Self> {
+        let raw_chords = Arc::new(Mutex::new(chord_file.get_raw_chords()));
         let config = chord_file.config.clone();
 
         // We intentionally keep global chords because they execute in this runtime
-        let chords = chord_file.get_chords_shallow();
+        let chords = chord_file.get_chords_shallow(placeholder_bindings);
         let descriptions = chord_file.get_descriptions_shallow();
 
         Ok(Self {
@@ -292,18 +297,42 @@ fn resolve_runtime_extends(
     Ok(())
 }
 
+fn placeholder_bindings_for_file(
+    entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
+    file_path: &str,
+) -> HashMap<String, String> {
+    entries
+        .iter()
+        .filter_map(|(key, entry)| {
+            (key.file_path == file_path)
+                .then_some((key.sequence_template.clone(), entry.sequence.clone()))
+        })
+        .collect()
+}
+
+fn scope_info_from_runtime_id(runtime_id: &str) -> (String, String) {
+    if runtime_id == GLOBAL_CHORD_RUNTIME_ID {
+        ("Global".to_string(), "global".to_string())
+    } else {
+        (runtime_id.to_string(), "app".to_string())
+    }
+}
+
 impl ChordRegistry {
     fn parse_packages(
         chord_packages: Vec<ChordPackage>,
+        placeholder_entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
     ) -> Result<(
         HashMap<Vec<Key>, String>,
         HashMap<String, ChordRuntime>,
         HashMap<String, serde_json::Value>,
+        Vec<PlaceholderChordInfo>,
     )> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
         let mut raw_files_json_map = HashMap::new();
+        let mut placeholder_chords = Vec::new();
 
         for chord_folder in chord_packages {
             if let Some(root_dir) = chord_folder.root_dir {
@@ -323,7 +352,31 @@ impl ChordRegistry {
                     continue;
                 };
 
-                let chords = file.get_chords_shallow();
+                let placeholder_bindings =
+                    placeholder_bindings_for_file(placeholder_entries, &chord_file_path);
+                let (scope, scope_kind) = scope_info_from_runtime_id(&runtime_id);
+
+                placeholder_chords.extend(file.placeholder_chords.iter().filter_map(|placeholder| {
+                    let Some(name) = placeholder.name() else {
+                        return None;
+                    };
+
+                    Some(PlaceholderChordInfo {
+                        file_path: chord_file_path.clone(),
+                        scope: scope.clone(),
+                        scope_kind: scope_kind.clone(),
+                        name,
+                        placeholder: placeholder.placeholder.clone(),
+                        sequence_template: placeholder.sequence_template.clone(),
+                        sequence_prefix: placeholder.sequence_prefix.clone(),
+                        sequence_suffix: placeholder.sequence_suffix.clone(),
+                        assigned_sequence: placeholder_bindings
+                            .get(&placeholder.sequence_template)
+                            .cloned(),
+                    })
+                }));
+
+                let chords = file.get_chords_shallow(&placeholder_bindings);
                 for sequence in chords.keys() {
                     if is_global_chord_sequence(sequence) {
                         global_chords_to_runtime_key.insert(sequence.clone(), runtime_id.clone());
@@ -331,7 +384,8 @@ impl ChordRegistry {
                 }
 
                 let config = file.config.clone();
-                let app_chord_runtime = ChordRuntime::from_file_shallow(chord_file_path, file)?;
+                let app_chord_runtime =
+                    ChordRuntime::from_file_shallow(chord_file_path, file, &placeholder_bindings)?;
                 app_runtime_map.insert(runtime_id.clone(), app_chord_runtime);
                 app_config_map.insert(runtime_id, config);
             }
@@ -360,6 +414,7 @@ impl ChordRegistry {
             global_chords_to_runtime_key,
             app_runtime_map,
             raw_files_json_map,
+            placeholder_chords,
         ))
     }
 
@@ -403,34 +458,40 @@ impl ChordRegistry {
             .map_err(|e| anyhow::anyhow!(e))?;
         }
 
-        let (global_chords_to_runtime_key, app_runtime_map, raw_files_map) =
-            ChordRegistry::parse_packages(chord_packages)?;
+        let placeholder_entries = handle.app_placeholder_chord_store().entries();
+        let (global_chords_to_runtime_key, app_runtime_map, raw_files_map, mut placeholder_chords) =
+            ChordRegistry::parse_packages(chord_packages, &placeholder_entries)?;
+        placeholder_chords.sort_by(|left, right| {
+            left.scope_kind
+                .cmp(&right.scope_kind)
+                .then(left.scope.cmp(&right.scope))
+                .then(left.name.cmp(&right.name))
+                .then(left.placeholder.cmp(&right.placeholder))
+        });
 
         // Set state before setting observable
         {
             let mut map = self.global_chords_to_runtime_key.lock().expect("poisoned");
-            map.extend(global_chords_to_runtime_key);
+            *map = global_chords_to_runtime_key;
         }
 
         {
             let mut map = self.runtimes.lock().expect("poisoned");
-            map.extend(
+            *map =
                 app_runtime_map
                     .into_iter()
-                    .map(|(key, value)| (key, Arc::new(value))),
-            );
+                    .map(|(key, value)| (key, Arc::new(value)))
+                    .collect();
         }
 
-        let state = self.observable.get_state()?;
-        let mut raw_files_as_json_strings = state.raw_files_as_json_strings.clone();
-        let new_entries = raw_files_map
+        let raw_files_as_json_strings = raw_files_map
             .iter()
             .map(|(k, v)| Ok((k.clone(), serde_json::to_string(v)?)))
-            .collect::<Result<Vec<_>>>()?;
-        raw_files_as_json_strings.extend(new_entries);
+            .collect::<Result<HashMap<_, _>>>()?;
         log::debug!("Setting {} raw files", raw_files_as_json_strings.len());
         self.observable.set_state(ChordFilesState {
             raw_files_as_json_strings,
+            placeholder_chords,
         })?;
 
         // We should only load `macos.toml` modules AFTER the js files have been loaded

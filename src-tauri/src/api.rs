@@ -1,5 +1,6 @@
 use crate::chords::Shortcut;
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::feature::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::get_app_metadata;
 use crate::git::GitHubRepoRef;
 use crate::observables::{GitRepo, get_all_observable_states};
@@ -29,6 +30,21 @@ fn open_system_settings(url: &str, permission_name: &str) {
     if let Err(error) = std::process::Command::new("open").arg(url).spawn() {
         log::error!("Failed to open {permission_name} settings: {error}");
     }
+}
+
+fn normalize_placeholder_sequence(sequence: &str) -> AppResult<String> {
+    let normalized = sequence.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return Err(AppError::Message("placeholder sequence cannot be empty".into()));
+    }
+
+    if !normalized.chars().all(|ch| ch.is_ascii_lowercase()) {
+        return Err(AppError::Message(
+            "placeholder sequence must only contain letters a-z".into(),
+        ));
+    }
+
+    Ok(normalized)
 }
 
 #[derive(Debug, Error, Serialize, Type)]
@@ -76,6 +92,17 @@ pub trait Api {
         old_shortcut: String,
         new_shortcut: String,
     ) -> AppResult<()>;
+    #[taurpc(alias = "setPlaceholderChordBinding")]
+    async fn set_placeholder_chord_binding(
+        file_path: String,
+        sequence_template: String,
+        sequence: String,
+    ) -> AppResult<()>;
+    #[taurpc(alias = "removePlaceholderChordBinding")]
+    async fn remove_placeholder_chord_binding(
+        file_path: String,
+        sequence_template: String,
+    ) -> AppResult<()>;
     #[taurpc(alias = "listAppsNeedingRelaunch")]
     async fn list_apps_needing_relaunch() -> AppResult<Vec<AppNeedsRelaunchInfo>>;
     #[taurpc(alias = "relaunchApp")]
@@ -109,7 +136,7 @@ impl Api for ApiImpl {
     async fn get_current_states(self) -> AppResult<String> {
         let handle = self.app_handle()?;
         let states = get_all_observable_states(handle.into())?;
-        Ok(serde_json::to_string(&states).map_err(|e| AppError::Message("what".into()))?)
+        Ok(serde_json::to_string(&states).map_err(|_err| AppError::Message("what".into()))?)
     }
 
     async fn open_accessibility_settings(self) {
@@ -247,6 +274,42 @@ impl Api for ApiImpl {
         })?;
 
         store.update_shortcut(old_shortcut, new_shortcut)?;
+        Ok(())
+    }
+
+    async fn set_placeholder_chord_binding(
+        self,
+        file_path: String,
+        sequence_template: String,
+        sequence: String,
+    ) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let store = handle.app_placeholder_chord_store();
+        let key = PlaceholderChordStoreKey {
+            file_path,
+            sequence_template,
+        };
+        let entry = PlaceholderChordStoreEntry {
+            sequence: normalize_placeholder_sequence(&sequence)?,
+        };
+
+        store.set(key, entry)?;
+        handle.app_chord_registry().reload().await?;
+        Ok(())
+    }
+
+    async fn remove_placeholder_chord_binding(
+        self,
+        file_path: String,
+        sequence_template: String,
+    ) -> AppResult<()> {
+        let handle = self.app_handle()?;
+        let store = handle.app_placeholder_chord_store();
+        store.remove(&PlaceholderChordStoreKey {
+            file_path,
+            sequence_template,
+        })?;
+        handle.app_chord_registry().reload().await?;
         Ok(())
     }
 

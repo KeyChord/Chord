@@ -9,8 +9,8 @@ use typeshare::typeshare;
 pub struct AppChordsFile {
     pub config: Option<AppChordsFileConfig>,
     pub chords: HashMap<String, AppChordMapValue>,
+    pub placeholder_chords: Vec<AppChordPlaceholder>,
     pub descriptions: HashMap<String, String>,
-
     pub raw_file_json: serde_json::Value,
 }
 
@@ -27,19 +27,24 @@ impl AppChordsFile {
 
         let file = toml::from_str::<RawAppChordsFile>(content)?;
         let mut chords = HashMap::new();
+        let mut placeholder_chords = Vec::new();
         let mut descriptions = HashMap::new();
 
         for (sequence, value) in file.chords.unwrap_or_default() {
             let Some(description_sequence) = sequence.strip_prefix('?') else {
+                if let Some(placeholder) =
+                    AppChordPlaceholder::parse(sequence.clone(), value.clone())
+                {
+                    placeholder_chords.push(placeholder);
+                    continue;
+                }
+
                 chords.insert(sequence, value);
                 continue;
             };
 
             let Some(description) = description_text_from_value(&value) else {
-                log::warn!(
-                    "Skipping empty description entry for sequence: {}",
-                    sequence
-                );
+                log::warn!("Skipping empty description entry for sequence: {}", sequence);
                 continue;
             };
 
@@ -62,55 +67,55 @@ impl AppChordsFile {
         Ok(Self {
             config: file.config,
             chords,
+            placeholder_chords,
             descriptions,
             raw_file_json: json_value,
         })
     }
 
-    pub fn get_chords_shallow(&self) -> HashMap<Vec<Key>, Chord> {
+    pub fn get_raw_chords(&self) -> HashMap<String, AppChordMapValue> {
+        let mut raw_chords = self.chords.clone();
+
+        for placeholder in &self.placeholder_chords {
+            raw_chords.insert(
+                placeholder.sequence_template.clone(),
+                placeholder.value.clone(),
+            );
+        }
+
+        raw_chords
+    }
+
+    pub fn get_chords_shallow(
+        &self,
+        placeholder_bindings: &HashMap<String, String>,
+    ) -> HashMap<Vec<Key>, Chord> {
         let mut chords = HashMap::new();
 
         for (sequence, value) in &self.chords {
-            let entry = match value {
-                AppChordMapValue::Single(entry) => Some(entry),
-                AppChordMapValue::Multiple(entries) => entries.first(),
-            };
+            if let Some((keys, chord)) = build_chord(sequence, value) {
+                chords.insert(keys, chord);
+            }
+        }
 
-            let Some(entry) = entry else {
-                log::warn!("Skipping invalid chord entry for sequence: {}", sequence);
+        for placeholder in &self.placeholder_chords {
+            let Some(sequence) = placeholder_bindings.get(&placeholder.sequence_template) else {
                 continue;
             };
 
-            let Ok(keys) = Key::parse_sequence(sequence) else {
-                log::warn!("Skipping invalid sequence for chord: {}", sequence);
+            let resolved_sequence = placeholder.resolved_sequence(sequence);
+            let Some((keys, chord)) = build_chord(&resolved_sequence, &placeholder.value) else {
                 continue;
             };
 
-            let Ok(shortcut) = entry
-                .shortcut
-                .as_ref()
-                .map(|s| Shortcut::parse(s))
-                .transpose()
-            else {
-                log::warn!("Skipping invalid shortcut for sequence: {}", sequence);
-                continue;
-            };
-
-            let Ok(js) = entry.js_invocation() else {
+            if chords.contains_key(&keys) {
                 log::warn!(
-                    "Skipping invalid JS action configuration for sequence: {}",
-                    sequence
+                    "Skipping placeholder chord {} because {} is already assigned",
+                    placeholder.sequence_template,
+                    resolved_sequence
                 );
                 continue;
-            };
-
-            let chord = Chord {
-                keys: keys.clone(),
-                name: entry.name.clone(),
-                shortcut,
-                shell: entry.shell.clone(),
-                js,
-            };
+            }
 
             chords.insert(keys, chord);
         }
@@ -167,13 +172,13 @@ pub struct AppChord {
 
 impl AppChord {
     fn js_invocation(&self) -> Result<Option<crate::chords::ChordJsInvocation>> {
-        let mut invocation = self
-            .args
-            .clone()
-            .map(|args| crate::chords::ChordJsInvocation {
-                export_name: None,
-                args: parse_js_args(args),
-            });
+        let mut invocation =
+            self.args
+                .clone()
+                .map(|args| crate::chords::ChordJsInvocation {
+                    export_name: None,
+                    args: parse_js_args(args),
+                });
 
         for (key, value) in &self.extra {
             let Some(export_name) = key.strip_prefix("args:") else {
@@ -221,11 +226,106 @@ pub enum AppChordMapValue {
     Multiple(Vec<AppChord>),
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AppChordPlaceholder {
+    pub sequence_template: String,
+    pub placeholder: String,
+    pub sequence_prefix: String,
+    pub sequence_suffix: String,
+    pub value: AppChordMapValue,
+}
+
+impl AppChordPlaceholder {
+    fn parse(sequence_template: String, value: AppChordMapValue) -> Option<Self> {
+        let start = sequence_template.find('<')?;
+        let end = sequence_template[start + 1..].find('>')? + start + 1;
+        let placeholder = sequence_template[start + 1..end].trim().to_string();
+
+        if placeholder.is_empty() {
+            return None;
+        }
+
+        if sequence_template[..start].contains(['<', '>'])
+            || sequence_template[end + 1..].contains(['<', '>'])
+        {
+            log::warn!(
+                "Skipping placeholder sequence with multiple placeholders: {}",
+                sequence_template
+            );
+            return None;
+        }
+
+        Some(Self {
+            sequence_prefix: sequence_template[..start].to_string(),
+            sequence_suffix: sequence_template[end + 1..].to_string(),
+            sequence_template,
+            placeholder,
+            value,
+        })
+    }
+
+    pub fn name(&self) -> Option<String> {
+        description_text_from_value(&self.value)
+    }
+
+    pub fn resolved_sequence(&self, sequence: &str) -> String {
+        format!(
+            "{}{}{}",
+            self.sequence_prefix, sequence, self.sequence_suffix
+        )
+    }
+}
+
 fn description_text_from_value(value: &AppChordMapValue) -> Option<String> {
     match value {
         AppChordMapValue::Single(entry) => Some(entry.name.clone()),
         AppChordMapValue::Multiple(entries) => entries.first().map(|entry| entry.name.clone()),
     }
+}
+
+fn build_chord(sequence: &str, value: &AppChordMapValue) -> Option<(Vec<Key>, Chord)> {
+    let entry = match value {
+        AppChordMapValue::Single(entry) => Some(entry),
+        AppChordMapValue::Multiple(entries) => entries.first(),
+    };
+
+    let Some(entry) = entry else {
+        log::warn!("Skipping invalid chord entry for sequence: {}", sequence);
+        return None;
+    };
+
+    let Ok(keys) = Key::parse_sequence(sequence) else {
+        log::warn!("Skipping invalid sequence for chord: {}", sequence);
+        return None;
+    };
+
+    let Ok(shortcut) = entry
+        .shortcut
+        .as_ref()
+        .map(|s| Shortcut::parse(s))
+        .transpose()
+    else {
+        log::warn!("Skipping invalid shortcut for sequence: {}", sequence);
+        return None;
+    };
+
+    let Ok(js) = entry.js_invocation() else {
+        log::warn!(
+            "Skipping invalid JS action configuration for sequence: {}",
+            sequence
+        );
+        return None;
+    };
+
+    let chord = Chord {
+        keys: keys.clone(),
+        name: entry.name.clone(),
+        shortcut,
+        shell: entry.shell.clone(),
+        js,
+    };
+
+    Some((keys, chord))
 }
 
 fn expand_description_sequence(sequence: &str) -> Result<Vec<String>> {
@@ -337,6 +437,7 @@ mod tests {
     use super::{AppChord, AppChordArgs, AppChordsFile};
     use crate::chords::{ChordJsArgs, ChordJsInvocation};
     use crate::input::Key;
+    use std::collections::HashMap;
 
     #[test]
     fn parses_default_export_args() {
@@ -463,5 +564,43 @@ f = { name = "Find" }
             let keys = Key::parse_sequence(sequence).unwrap();
             assert_eq!(descriptions.get(&keys), Some(&"Folding: Level".to_string()));
         }
+    }
+
+    #[test]
+    fn parses_placeholder_chords_separately() {
+        let file = AppChordsFile::parse(
+            r#"
+[chords]
+'\<' = { name = "Literal Slash" }
+'\<Dark Mode>' = { name = "Dark Mode" }
+"#,
+        )
+        .unwrap();
+
+        assert!(file.chords.contains_key("\\<"));
+        assert_eq!(file.placeholder_chords.len(), 1);
+        assert_eq!(file.placeholder_chords[0].placeholder, "Dark Mode");
+        assert_eq!(file.placeholder_chords[0].sequence_prefix, "\\");
+        assert_eq!(file.placeholder_chords[0].sequence_suffix, "");
+    }
+
+    #[test]
+    fn resolves_placeholder_chords_with_bindings() {
+        let file = AppChordsFile::parse(
+            r#"
+[chords]
+'\<' = { name = "Literal Slash" }
+'\<Dark Mode>' = { name = "Dark Mode", shortcut = "cmd+shift+d" }
+"#,
+        )
+        .unwrap();
+
+        let chords = file.get_chords_shallow(&HashMap::from([(
+            "\\<Dark Mode>".to_string(),
+            "dm".to_string(),
+        )]));
+
+        let keys = Key::parse_sequence("\\dm").unwrap();
+        assert_eq!(chords.get(&keys).map(|chord| chord.name.as_str()), Some("Dark Mode"));
     }
 }

@@ -3,6 +3,7 @@ mod chorder;
 mod chorder_ui;
 mod frontmost;
 pub mod global_hotkey;
+pub mod placeholder_chords;
 mod permissions;
 pub mod repos;
 mod safe_app_handle;

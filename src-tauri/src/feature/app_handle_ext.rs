@@ -1,6 +1,7 @@
 use crate::AppContext;
 use crate::chords::ChordRegistry;
 use crate::feature::global_hotkey::GlobalHotkeyStore;
+use crate::feature::placeholder_chords::PlaceholderChordStore;
 use crate::feature::repos::GitReposStore;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
 use crate::observables::Observable;
@@ -17,6 +18,7 @@ pub struct AppManaged {
     pub frontmost: AppFrontmost,
     pub permissions: AppPermissions,
     pub global_hotkey_store: GlobalHotkeyStore,
+    pub placeholder_chord_store: PlaceholderChordStore,
     pub git_repos_store: GitReposStore,
     pub chord_registry: ChordRegistry,
 }
@@ -30,6 +32,7 @@ impl AppManaged {
         handle.manage(self.context);
         handle.manage(self.chord_package_registry);
         handle.manage(self.global_hotkey_store);
+        handle.manage(self.placeholder_chord_store);
         handle.manage(self.git_repos_store);
         handle.manage(self.chord_registry);
     }
@@ -44,6 +47,7 @@ pub trait AppHandleExt {
     fn app_frontmost(&self) -> &AppFrontmost;
     fn app_permissions(&self) -> &AppPermissions;
     fn app_global_hotkey_store(&self) -> &GlobalHotkeyStore;
+    fn app_placeholder_chord_store(&self) -> &PlaceholderChordStore;
     fn app_git_repos_store(&self) -> &GitReposStore;
     fn observable_state<T: Observable>(&self) -> Result<Arc<T::State>>;
 }
@@ -79,6 +83,10 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
 
     fn app_global_hotkey_store(&self) -> &GlobalHotkeyStore {
         self.state::<GlobalHotkeyStore>().inner()
+    }
+
+    fn app_placeholder_chord_store(&self) -> &PlaceholderChordStore {
+        self.state::<PlaceholderChordStore>().inner()
     }
 
     fn app_git_repos_store(&self) -> &GitReposStore {

@@ -49,8 +49,21 @@ export interface Chord {
 	js?: ChordJsInvocation;
 }
 
+export interface PlaceholderChordInfo {
+	filePath: string;
+	scope: string;
+	scopeKind: string;
+	name: string;
+	placeholder: string;
+	sequenceTemplate: string;
+	sequencePrefix: string;
+	sequenceSuffix: string;
+	assignedSequence?: string;
+}
+
 export interface ChordFilesState {
 	rawFilesAsJsonStrings: Record<string, string>;
+	placeholderChords: PlaceholderChordInfo[];
 }
 
 export interface ChorderState {
@@ -77,4 +90,3 @@ export interface GitRepo {
 export interface GitReposState {
 	repos: Record<string, GitRepo>;
 }
-

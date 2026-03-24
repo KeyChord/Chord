@@ -24,6 +24,7 @@ mod tauri_app;
 use crate::chords::{ChordPackage, ChordRegistry};
 use crate::feature::app_handle_ext::{AppHandleExt, AppManaged};
 use crate::feature::global_hotkey::GlobalHotkeyStore;
+use crate::feature::placeholder_chords::PlaceholderChordStore;
 use crate::feature::repos::GitReposStore;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
 use crate::observables::{
@@ -184,6 +185,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         settings: AppSettings::new(safe_handle.clone())?,
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
+        placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
         chord_registry: ChordRegistry::new_empty(
             safe_handle.clone(),
