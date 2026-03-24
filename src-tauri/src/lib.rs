@@ -134,7 +134,7 @@ pub fn run() {
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 fn setup(app: &mut tauri::App) -> Result<()> {
-    let safe_handle = SafeAppHandle::new(app.handle().clone());
+    let safe_handle = SafeAppHandle::with_managed_observables(app.handle().clone())?;
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(),
         chorder: AppChorder::new(safe_handle.clone())?,

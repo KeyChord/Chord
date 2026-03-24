@@ -13,7 +13,6 @@ use tauri::{WebviewUrl, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 use crate::feature::{SafeAppHandle};
-use crate::observables::ChorderState;
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;

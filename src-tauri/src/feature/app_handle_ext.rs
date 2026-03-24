@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Manager, Runtime};
 use crate::AppContext;
 use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
+use crate::observables::Observable;
 use crate::tauri_app::git::ChordPackageRegistry;
 
 pub struct AppManaged {
@@ -30,6 +31,7 @@ pub trait AppHandleExt {
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry;
     fn app_frontmost(&self) -> &AppFrontmost;
     fn app_permissions(&self) -> &AppPermissions;
+    fn observable<T: Observable>(&self) -> tauri::State<'_, T>;
 }
 
 impl<R: Runtime> AppHandleExt for AppHandle<R> {
@@ -55,5 +57,10 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
 
     fn app_permissions(&self) -> &AppPermissions {
         self.state::<AppPermissions>().inner()
+    }
+
+    fn observable<T: Observable>(&self) -> tauri::State<'_, T> {
+        let observable = self.state::<T>();
+        observable
     }
 }

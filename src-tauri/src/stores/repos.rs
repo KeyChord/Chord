@@ -4,12 +4,11 @@ use tauri::Wry;
 use tauri_plugin_store::Store;
 use crate::feature::SafeAppHandle;
 use crate::git::{clone_repo, GitHubRepoRef};
-use crate::observables::{GitRepo, GitReposObservable, GitReposState};
+use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::Result;
 
 pub struct GitReposStore {
     pub store: Arc<Store<Wry>>,
-    pub observable: Arc<GitReposObservable>,
 
     handle: SafeAppHandle
 }
@@ -18,7 +17,6 @@ impl Clone for GitReposStore {
     fn clone(&self) -> Self {
         Self {
             store: self.store.clone(),
-            observable: self.observable.clone(),
             handle: self.handle.clone()
         }
     }
@@ -37,10 +35,10 @@ impl GitReposStore {
                     .map(|entry| (k.to_string(), entry))
             })
             .collect();
-        let observable = Arc::new(GitReposObservable::new(handle.clone())?);
+        let observable = handle.observable::<GitReposObservable>();
         log::debug!("repos: {:?}", repos);
         observable.set_state(GitReposState { repos })?;
-        Ok(Self { handle, store, observable: observable.clone() })
+        Ok(Self { handle, store })
     }
 
     fn add(&self, repo: GitRepo) -> Result<()> {
@@ -49,10 +47,11 @@ impl GitReposStore {
         let value = serde_json::to_value(repo.clone())?;
         self.store.set(id.clone(), value);
 
-        let state = self.observable.get_state()?;
+        let observable = self.handle.observable::<GitReposObservable>();
+        let state = observable.get_state()?;
         let mut repos = state.repos.clone();
         repos.insert(id, repo);
-        self.observable.set_state(GitReposState { repos })?;
+        observable.set_state(GitReposState { repos })?;
 
         Ok(())
     }
@@ -62,10 +61,11 @@ impl GitReposStore {
         let id = format!("{}/{}", owner, slug);
         self.store.delete(id.clone());
 
-        let state = self.observable.get_state()?;
+        let observable = self.handle.observable::<GitReposObservable>();
+        let state = observable.get_state()?;
         let mut repos = state.repos.clone();
         repos.remove(&id);
-        self.observable.set_state(GitReposState { repos })?;
+        observable.set_state(GitReposState { repos })?;
 
         Ok(())
     }
@@ -101,13 +101,14 @@ impl GitReposStore {
         let repo = repo_ref.into_repo(&repos_root);
         let key = format!("{}/{}", repo.owner, repo.slug);
 
-        let state = self.observable.get_state()?;
+        let observable = self.handle.observable::<GitReposObservable>();
+        let state = observable.get_state()?;
         let mut repos = state.repos.clone();
 
         // 🔥 hashmap makes this trivial
         repos.insert(key, repo);
 
-        self.observable.set_state(GitReposState { repos })?;
+        observable.set_state(GitReposState { repos })?;
         Ok(())
     }
 }

@@ -4,7 +4,6 @@ use crate::feature::SafeAppHandle;
 use crate::observables::AppSettingsObservable;
 
 pub struct AppSettings {
-    _observable: AppSettingsObservable,
     pub ui: SettingsUi
 }
 
@@ -40,9 +39,7 @@ impl SettingsUi {
 impl AppSettings {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let ui = SettingsUi::new(handle.clone())?;
-        let observable = AppSettingsObservable::new(handle)?;
         Ok(Self {
-            _observable: observable,
             ui
         })
     }

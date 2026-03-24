@@ -1,4 +1,3 @@
-use std::any::Any;
 use std::collections::HashMap;
 
 mod chorder;
@@ -10,19 +9,37 @@ pub use chorder::*;
 pub use git_repos::*;
 pub use permissions::*;
 pub use settings::*;
+use crate::feature::SafeAppHandle;
 
 pub struct ObservableRegistration {
     pub id: &'static str,
-    pub default_json: fn() -> anyhow::Result<serde_json::Value>,
+    pub get_json: fn(&SafeAppHandle) -> anyhow::Result<serde_json::Value>,
 }
 
 inventory::collect!(ObservableRegistration);
 
-pub fn get_all_observable_defaults(
+pub trait Observable: Sized + Send + Sync + 'static {
+    type State: Default + serde::Serialize + Send + Sync + 'static;
+
+    const ID: &'static str;
+    const EVENT: &'static str;
+
+    fn get_state(&self) -> anyhow::Result<std::sync::Arc<Self::State>>;
+    fn set_state(&self, state: Self::State) -> anyhow::Result<()>;
+    fn subscribe(
+        &self,
+        observer: observable_property::Observer<std::sync::Arc<Self::State>>,
+    ) -> Result<observable_property::ObserverId, observable_property::PropertyError>;
+
+    fn new(handle: crate::feature::SafeAppHandle) -> anyhow::Result<Self>;
+}
+
+pub fn get_all_observable_states(
+    handle: SafeAppHandle,
 ) -> anyhow::Result<HashMap<&'static str, serde_json::Value>> {
     inventory::iter::<ObservableRegistration>
         .into_iter()
-        .map(|reg| Ok((reg.id, (reg.default_json)()?)))
+        .map(|reg| Ok((reg.id, (reg.get_json)(&handle)?)))
         .collect()
 }
 
@@ -38,35 +55,27 @@ macro_rules! define_observable {
             state: ::observable_property::ObservableProperty<::std::sync::Arc<$state>>,
         }
 
-        impl $name {
-            pub const ID: &'static str = $id;
-            pub const EVENT: &'static str = ::std::concat!("state:", $id);
+        impl $crate::observables::Observable for $name {
+            type State = $state;
 
-            $vis fn get_state(&self) -> ::anyhow::Result<::std::sync::Arc<$state>> {
+            const ID: &'static str = $id;
+            const EVENT: &'static str = ::std::concat!("state:", $id);
+
+            fn get_state(&self) -> ::anyhow::Result<::std::sync::Arc<Self::State>> {
                 Ok(self.state.get()?)
             }
 
-            $vis fn set_state(&self, state: $state) -> ::anyhow::Result<()> {
+            fn set_state(&self, state: Self::State) -> ::anyhow::Result<()> {
                 Ok(self.state.set(::std::sync::Arc::new(state))?)
             }
 
-            $vis fn default_json() -> ::anyhow::Result<::serde_json::Value>
-            where
-                $state: ::std::default::Default + ::serde::Serialize,
-            {
-                Ok(::serde_json::to_value(<$state as ::std::default::Default>::default())?)
-            }
-
-            $vis fn new(handle: $crate::feature::SafeAppHandle) -> ::anyhow::Result<Self>
-            where
-                $state: ::serde::Serialize + Send + Sync + 'static,
-            {
-                let state = <$state as ::std::default::Default>::default();
+            fn new(handle: $crate::feature::SafeAppHandle) -> ::anyhow::Result<Self> {
+                let state = <Self::State as ::std::default::Default>::default();
                 let state =
                     ::observable_property::ObservableProperty::new(::std::sync::Arc::new(state));
 
                 state.subscribe(::std::sync::Arc::new(move |_, new_state| {
-                    if let Err(e) = handle.emit(Self::EVENT, new_state) {
+                    if let Err(e) = handle.emit(Self::EVENT, new_state.as_ref()) {
                         ::log::error!(
                             "Failed to emit {} for {}: {}",
                             Self::EVENT,
@@ -79,9 +88,9 @@ macro_rules! define_observable {
                 Ok(Self { state })
             }
 
-            $vis fn subscribe(
+            fn subscribe(
                 &self,
-                observer: ::observable_property::Observer<::std::sync::Arc<$state>>,
+                observer: ::observable_property::Observer<::std::sync::Arc<Self::State>>,
             ) -> ::std::result::Result<
                 ::observable_property::ObserverId,
                 ::observable_property::PropertyError,
@@ -90,10 +99,27 @@ macro_rules! define_observable {
             }
         }
 
+        impl $name {
+            pub const ID: &'static str =
+                <$name as $crate::observables::Observable>::ID;
+
+            pub const EVENT: &'static str =
+                <$name as $crate::observables::Observable>::EVENT;
+
+            pub fn get_json(
+                handle: &$crate::feature::SafeAppHandle,
+            ) -> ::anyhow::Result<::serde_json::Value> {
+                use crate::observables::Observable;
+                let observable = handle.observable::<$name>();
+                let state = observable.get_state()?;
+                Ok(::serde_json::to_value(state.as_ref())?)
+            }
+        }
+
         ::inventory::submit! {
             $crate::observables::ObservableRegistration {
-                id: $name::ID,
-                default_json: $name::default_json,
+                id: <$name as $crate::observables::Observable>::ID,
+                get_json: <$name>::get_json,
             }
         }
     };

@@ -18,13 +18,11 @@ pub trait AppHandleStoreExt {
 
 impl AppHandleStoreExt for AppHandle<Wry> {
     fn global_hotkeys_store(&self) -> Result<GlobalHotkeyStore> {
-        let handle = SafeAppHandle::new(self.clone());
-        Ok(GlobalHotkeyStore::new(handle)?)
+        Ok(GlobalHotkeyStore::new(self.clone().into())?)
     }
 
     fn git_repos_store(&self) -> Result<GitReposStore> {
-        let handle = SafeAppHandle::new(self.clone());
-        Ok(GitReposStore::new(handle)?)
+        Ok(GitReposStore::new(self.clone().into())?)
     }
 }
 

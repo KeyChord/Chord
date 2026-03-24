@@ -23,6 +23,7 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
 use std::time::{Duration, Instant};
+use crate::observables::{ChorderObservable, Observable};
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
 
@@ -501,9 +502,9 @@ pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
 
 pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
     let context = app.app_context();
-    let chorder = app.app_chorder();
     let frontmost = app.app_frontmost();
-    let state = chorder.observable.get_state()?;
+    let observable = app.observable::<ChorderObservable>();
+    let state = observable.get_state()?;
     let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
     let loaded_app_chords = context.loaded_app_chords.read();
 
