@@ -42,3 +42,51 @@ export function setAppNeedsRelaunch(bundleId: string, needsRelaunch: boolean): v
 ```
 
 This marks or clears an app in the settings UI and gives the user a one-click relaunch button.
+
+## URL Scheme
+
+Chord registers the `chord:` URL scheme on macOS so scripts and launcher tools can trigger app actions.
+
+### Commands
+
+- `settings`
+- `open-settings`
+- `show-settings`
+- `reload-config`
+- `reload-configs`
+
+### Examples
+
+```sh
+# Open the settings window
+open --background 'chord:settings'
+
+# Open the settings window (host-style form)
+open --background 'chord://settings'
+
+# Reload chord configs
+open --background 'chord:reload-config'
+```
+
+## CLI
+
+This repo also includes a small `chord` CLI wrapper that forwards commands to the `chord:` URL scheme.
+
+### Commands
+
+- `settings`
+- `open-settings`
+- `show-settings`
+- `reload-config`
+- `reload-configs`
+
+### Examples
+
+```sh
+./chord settings
+./chord reload-configs
+```
+
+If you want to run it as `chord` from anywhere, add the repo copy to your `PATH` or symlink it into a directory that is already on your `PATH`.
+
+The CLI depends on macOS recognizing the bundled Chord app as the handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once first.

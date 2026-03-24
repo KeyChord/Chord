@@ -192,6 +192,7 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     });
 
     let handle = app.handle();
+    tauri_app::scripting::init(handle.clone());
     tauri::async_runtime::spawn(load_chords(handle.clone(), git_package_registry));
     tauri::async_runtime::spawn(load_permissions(handle.clone()));
 

@@ -26,7 +26,8 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "macOS": {
-      "signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)"
+      "signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
+      "infoPlist": "Info.plist"
     },
     "icon": [
       "icons/32x32.png",
