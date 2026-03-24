@@ -33,12 +33,20 @@ export interface Shortcut {
 	chords: ShortcutChord[];
 }
 
+export type ChordJsArgs = 
+	| { type: "Eval", value: string };
+
+export interface ChordJsInvocation {
+	export_name?: string;
+	args: ChordJsArgs;
+}
+
 export interface Chord {
 	keys: Key[];
 	name: string;
 	shortcut?: Shortcut;
 	shell?: string;
-	js?: any;
+	js?: ChordJsInvocation;
 }
 
 export interface ChordFilesState {

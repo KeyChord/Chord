@@ -17,14 +17,16 @@ use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
 use typeshare::typeshare;
 
+#[typeshare(typescript(type = "any"))]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "type", content = "value")]
 pub enum ChordJsArgs {
-    #[typeshare(typescript(type = "any"))]
+    #[typeshare(skip)]
     Values(Vec<toml::Value>),
     Eval(String),
 }
 
+#[typeshare(typescript(type = "any"))]
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ChordJsInvocation {
     pub export_name: Option<String>,
@@ -38,7 +40,6 @@ pub struct Chord {
     pub name: String,
     pub shortcut: Option<Shortcut>,
     pub shell: Option<String>,
-    #[typeshare(typescript(type = "any"))]
     pub js: Option<ChordJsInvocation>,
 }
 
