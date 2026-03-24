@@ -4,7 +4,6 @@ use crate::feature::app_handle_ext::AppHandleExt;
 use crate::feature::{AppSettings, SafeAppHandle};
 use crate::input::Key;
 use crate::js::{format_js_error, reset_js, with_js};
-use crate::load_chord_files_runtime_modules;
 use crate::observables::{ChordRegistryObservable, ChordRegistryState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;

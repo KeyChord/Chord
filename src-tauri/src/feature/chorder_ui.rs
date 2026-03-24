@@ -3,10 +3,10 @@ use crate::feature::SafeAppHandle;
 use anyhow::Result;
 use objc2::msg_send;
 use objc2_app_kit::{
-    NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
-    NSWindowAnimationBehavior, NSWindowOrderingMode,
+    NSRunningApplication, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
+    NSVisualEffectState, NSWindowAnimationBehavior, NSWindowOrderingMode, NSWorkspace,
 };
-use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
+use objc2_foundation::{MainThreadMarker, NSInteger, NSString, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -37,6 +37,23 @@ pub struct ChorderIndicatorUi {
 }
 
 impl ChorderIndicatorUi {
+    fn restore_frontmost_app(bundle_id: &str, pid: i32) {
+        let bundle_id = NSString::from_str(bundle_id);
+        let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        let app = running_apps
+            .iter()
+            .find(|app| app.processIdentifier() == pid)
+            .or_else(|| running_apps.iter().next());
+
+        let Some(app) = app else {
+            return;
+        };
+
+        unsafe {
+            let _: bool = msg_send![&**app, activateWithOptions: 0usize];
+        }
+    }
+
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let window = handle
             .new_webview_window_builder("chords", WebviewUrl::App("index.html".into()))?
@@ -151,6 +168,14 @@ impl ChorderIndicatorUi {
         let is_visible = self.is_visible.clone();
 
         self.handle.clone().run_on_main_thread(move || {
+            let current_pid = std::process::id() as i32;
+            let previous_frontmost = NSWorkspace::sharedWorkspace()
+                .frontmostApplication()
+                .and_then(|app| {
+                    let pid = app.processIdentifier();
+                    let bundle_id = app.bundleIdentifier()?.to_string();
+                    (pid > 0 && pid != current_pid).then_some((bundle_id, pid))
+                });
             let native_panel = panel.as_panel();
             if let Some(screen) = native_panel.screen() {
                 let visible_frame = screen.visibleFrame();
@@ -169,7 +194,7 @@ impl ChorderIndicatorUi {
             panel.resign_key_window();
             panel.resign_main_window();
 
-            // Present as a pure overlay window without activating this app.
+            // Order the window without ever requesting key or main-window status.
             unsafe {
                 let _: () = msg_send![native_panel, orderFront: objc2::ffi::nil];
             }
@@ -177,6 +202,18 @@ impl ChorderIndicatorUi {
             let _ = panel.make_first_responder(None);
             panel.resign_key_window();
             panel.resign_main_window();
+
+            // NSPanel's non-activating flags are not always sufficient when the
+            // underlying webview window is reordered. If AppKit still activates
+            // Chord, explicitly hand focus back to the previously frontmost app.
+            let chord_stole_activation = NSWorkspace::sharedWorkspace()
+                .frontmostApplication()
+                .is_some_and(|app| app.processIdentifier() == current_pid);
+            if chord_stole_activation {
+                if let Some((bundle_id, pid)) = previous_frontmost {
+                    Self::restore_frontmost_app(&bundle_id, pid);
+                }
+            }
             is_visible.store(true, Ordering::Relaxed);
         })?;
 

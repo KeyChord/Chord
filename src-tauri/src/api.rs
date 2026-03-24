@@ -76,8 +76,8 @@ pub trait Api {
     async fn list_apps_needing_relaunch() -> AppResult<Vec<AppNeedsRelaunchInfo>>;
     #[taurpc(alias = "relaunchApp")]
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
-    #[taurpc(alias = "enableAutostart")]
-    async fn enable_autostart() -> AppResult<()>;
+    #[taurpc(alias = "toggleAutostart")]
+    async fn toggle_autostart() -> AppResult<()>;
 }
 
 #[derive(Clone, Default)]
@@ -107,10 +107,10 @@ impl Api for ApiImpl {
         );
     }
 
-    async fn enable_autostart(self) -> AppResult<()> {
+    async fn toggle_autostart(self) -> AppResult<()> {
         let handle = self.app_handle()?;
         let permissions = handle.app_permissions();
-        Ok(permissions.enable_autostart()?)
+        Ok(permissions.toggle_autostart()?)
     }
 
     async fn open_input_monitoring_settings(self) {

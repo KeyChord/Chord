@@ -1,4 +1,4 @@
-use crate::chords::{Chord, ChordPackage, ChordRegistry, GLOBAL_CHORD_RUNTIME_ID};
+use crate::chords::{Chord, ChordPackage, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::observables::{ChorderObservable, FrontmostObservable, Observable};
@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use base64::Engine;
 use device_query::DeviceState;
-use keycode::KeyMappingCode::*;
 use llrt_core::libs::utils::result::ResultExt;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
@@ -263,89 +262,4 @@ fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
 #[cfg(not(target_os = "macos"))]
 fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
     anyhow::bail!("relaunching apps is not supported on this platform: {bundle_id}");
-}
-
-// Load all the modules specified in the config.js.module of the `macos.toml` files.
-pub async fn load_chord_files_runtime_modules(
-    handle: AppHandle,
-    loaded_app_chords: &ChordRegistry,
-) {
-}
-
-fn format_action(chord: &crate::chords::Chord) -> String {
-    if let Some(shortcut) = &chord.shortcut {
-        return format!("Shortcut: {}", format_shortcut(shortcut));
-    }
-
-    if let Some(shell) = &chord.shell {
-        return format!("Shell: {shell}");
-    }
-
-    if let Some(js) = &chord.js {
-        let export_name = js.export_name.as_deref().unwrap_or("default");
-        let args = match &js.args {
-            crate::chords::ChordJsArgs::Values(values) => format!("{values:?}"),
-            crate::chords::ChordJsArgs::Eval(source) => format!("<eval: {source}>"),
-        };
-        return format!("JS: {}({})", export_name, args);
-    }
-
-    "No action".to_string()
-}
-
-fn format_shortcut(shortcut: &crate::chords::Shortcut) -> String {
-    shortcut
-        .chords
-        .iter()
-        .map(|chord| {
-            chord
-                .keys
-                .iter()
-                .map(|key| format_key(*key))
-                .collect::<Vec<_>>()
-                .join(" + ")
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn format_sequence(keys: &[crate::input::Key]) -> String {
-    keys.iter()
-        .map(|key| {
-            key.to_char(false)
-                .map(|ch| ch.to_ascii_uppercase().to_string())
-                .unwrap_or_else(|| format_key(*key))
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn format_key(key: crate::input::Key) -> String {
-    if let Some(ch) = key.to_char(false) {
-        return ch.to_ascii_uppercase().to_string();
-    }
-
-    match key.0 {
-        ShiftLeft | ShiftRight => "Shift".to_string(),
-        ControlLeft | ControlRight => "Ctrl".to_string(),
-        MetaLeft | MetaRight => "Cmd".to_string(),
-        AltLeft | AltRight => "Alt".to_string(),
-        CapsLock => "Caps Lock".to_string(),
-        Space => "Space".to_string(),
-        Enter => "Enter".to_string(),
-        Tab => "Tab".to_string(),
-        Escape => "Esc".to_string(),
-        ArrowUp => "Up".to_string(),
-        ArrowDown => "Down".to_string(),
-        ArrowLeft => "Left".to_string(),
-        ArrowRight => "Right".to_string(),
-        Backspace => "Backspace".to_string(),
-        Delete => "Delete".to_string(),
-        Home => "Home".to_string(),
-        End => "End".to_string(),
-        PageUp => "Page Up".to_string(),
-        PageDown => "Page Down".to_string(),
-        Fn => "Fn".to_string(),
-        other => format!("{other:?}"),
-    }
 }

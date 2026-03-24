@@ -38,6 +38,8 @@ tauri_panel! {
         config: {
             can_become_key_window: false,
             can_become_main_window: false,
+            accepts_first_responder: false,
+            becomes_key_only_if_needed: false,
             is_floating_panel: true,
             hides_on_deactivate: false
         }

@@ -170,7 +170,7 @@ impl AppChorder {
                     }
                 }
 
-                if code == &KeyMappingCode::CapsLock {
+                if code == &KeyMappingCode::Space {
                     if Self::should_execute_key_buffer_on_release(&state) {
                         let _ = self.execute_key_buffer(
                             handle.clone(),

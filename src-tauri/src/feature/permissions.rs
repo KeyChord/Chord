@@ -5,6 +5,7 @@ use crate::observables::{
 };
 use anyhow::Result;
 use std::sync::Arc;
+use tauri::App;
 
 pub struct AppPermissions {
     _input_monitoring: AppPermissionsInputMonitoring,
@@ -50,8 +51,25 @@ impl AppPermissions {
         Ok(())
     }
 
-    pub fn enable_autostart(&self) -> Result<()> {
-        Ok(self.handle.autolaunch().enable()?)
+    pub fn toggle_autostart(&self) -> Result<()> {
+        let state = self.observable.get_state()?;
+        let Some(is_autostart_enabled) = state.is_autostart_enabled else {
+            anyhow::bail!("app not ready")
+        };
+        if is_autostart_enabled {
+            self.handle.autolaunch().disable()?;
+            self.observable.set_state(AppPermissionsState {
+                is_autostart_enabled: Some(false),
+                ..*state
+            })?;
+        } else {
+            self.handle.autolaunch().enable()?;
+            self.observable.set_state(AppPermissionsState {
+                is_autostart_enabled: Some(true),
+                ..*state
+            })?;
+        }
+        Ok(())
     }
 }
 
