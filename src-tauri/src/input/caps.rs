@@ -13,6 +13,7 @@ static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
 unsafe extern "C" {
     fn start_caps_lock_listener(cb: extern "C" fn(c_int));
+    fn toggle_caps() -> c_int;
 }
 
 extern "C" fn caps_lock_changed(pressed: c_int) {
@@ -69,6 +70,17 @@ pub fn register_caps_lock_input_handler(handle: AppHandle) -> Result<()> {
     });
 
     Ok(())
+}
+
+pub fn emit_caps_lock() -> Result<()> {
+    let rc = unsafe { toggle_caps() };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "failed to toggle caps lock state via native layer: {rc}"
+        ))
+    }
 }
 
 fn run_hidutil(args: &[&str]) -> Result<String> {

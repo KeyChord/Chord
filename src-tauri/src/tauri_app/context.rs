@@ -1,6 +1,6 @@
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::{
-    input::KeyEventState,
+    input::{KeyEvent, KeyEventState},
     mode::{AppMode, AppModeStateMachine},
 };
 use anyhow::Result;
@@ -75,6 +75,11 @@ impl AppContext {
         self.app_mode_state_machine
             .is_shift_pressed
             .load(Ordering::SeqCst)
+    }
+
+    pub fn take_caps_lock_passthrough_on_release(&self, event: &KeyEvent) -> bool {
+        self.app_mode_state_machine
+            .take_caps_lock_passthrough_on_release(event)
     }
 }
 

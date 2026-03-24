@@ -1,5 +1,5 @@
 use crate::feature::app_handle_ext::AppHandleExt;
-use crate::input::{Key, KeyEvent};
+use crate::input::{Key, KeyEvent, emit_caps_lock};
 use crate::mode::AppMode;
 use crate::observables::{ChorderObservable, ChorderState};
 use anyhow::Result;
@@ -15,6 +15,9 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
             chorder.handle_key_event(handle.clone(), &key_event)?;
         }
         AppMode::None => {
+            let should_emit_caps_lock = handle
+                .app_context()
+                .take_caps_lock_passthrough_on_release(&key_event);
             let state = handle.observable_state::<ChorderObservable>()?;
             let should_finalize_chord_mode = should_finalize_chord_mode(&key_event, &state);
 
@@ -23,6 +26,10 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
             }
 
             chorder.ensure_inactive()?;
+
+            if should_emit_caps_lock {
+                emit_caps_lock()?;
+            }
         }
     }
 

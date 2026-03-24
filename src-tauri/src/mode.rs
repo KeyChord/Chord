@@ -54,6 +54,12 @@ impl AppModeStateMachine {
         AppMode::from_u8(self.mode.load(Ordering::Relaxed))
     }
 
+    pub fn take_caps_lock_passthrough_on_release(&self, event: &KeyEvent) -> bool {
+        matches!(event, KeyEvent::Release(Key(KeyMappingCode::CapsLock)))
+            && self.get_app_mode() == AppMode::None
+            && self.caps_lock_just_pressed.swap(false, Ordering::Relaxed)
+    }
+
     pub fn handle_event(&self, event: &KeyEvent) -> bool {
         let previous_mode = self.get_app_mode();
         log::debug!("Handling {:?} mode event: {:?}", event, previous_mode);
@@ -151,5 +157,41 @@ impl AppModeStateMachine {
         };
 
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn standalone_caps_lock_emits_on_release() {
+        let state_machine = AppModeStateMachine::new(None);
+
+        assert!(state_machine.handle_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock))));
+        assert!(
+            state_machine.take_caps_lock_passthrough_on_release(&KeyEvent::Release(Key(
+                KeyMappingCode::CapsLock,
+            )))
+        );
+        assert!(
+            !state_machine.take_caps_lock_passthrough_on_release(&KeyEvent::Release(Key(
+                KeyMappingCode::CapsLock,
+            )))
+        );
+    }
+
+    #[test]
+    fn caps_lock_space_does_not_emit_caps_lock() {
+        let state_machine = AppModeStateMachine::new(None);
+
+        assert!(state_machine.handle_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock))));
+        assert!(state_machine.handle_event(&KeyEvent::Press(Key(KeyMappingCode::Space))));
+        assert_eq!(state_machine.get_app_mode(), AppMode::Chord);
+        assert!(
+            !state_machine.take_caps_lock_passthrough_on_release(&KeyEvent::Release(Key(
+                KeyMappingCode::CapsLock,
+            )))
+        );
     }
 }

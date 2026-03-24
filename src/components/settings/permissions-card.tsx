@@ -7,9 +7,9 @@ import {
   CardHeader,
   CardTitle,
 } from "#/components/ui/card.tsx";
-import { usePermissionsState, useSettingsState } from "../../utils/state.ts";
-import { useMutation } from "node_modules/@tanstack/react-query/build/modern/_tsup-dts-rollup";
-import { taurpc } from "../../api/taurpc.ts";
+import { usePermissionsState, } from "#/utils/state.ts";
+import { taurpc } from "#/api/taurpc.ts";
+import { useMutation } from "@tanstack/react-query";
 
 export function PermissionsCard() {
   const permissions = usePermissionsState();
