@@ -1,7 +1,7 @@
 use crate::chords::shortcut::{Shortcut, press_shortcut, release_shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
-use crate::feature::app_handle_ext::AppHandleExt;
 use crate::feature::SafeAppHandle;
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::Key;
 use crate::js::{format_js_error, reset_js, with_js};
 use crate::observables::{ChordFilesObservable, ChordFilesState, Observable};
@@ -295,7 +295,11 @@ fn resolve_runtime_extends(
 impl ChordRegistry {
     fn parse_packages(
         chord_packages: Vec<ChordPackage>,
-    ) -> Result<(HashMap<Vec<Key>, String>, HashMap<String, ChordRuntime>, HashMap<String, serde_json::Value>)> {
+    ) -> Result<(
+        HashMap<Vec<Key>, String>,
+        HashMap<String, ChordRuntime>,
+        HashMap<String, serde_json::Value>,
+    )> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
@@ -309,7 +313,7 @@ impl ChordRegistry {
             }
 
             for (chord_file_path, file) in chord_folder.chords_files {
-                log::debug!( "Loading {:?}", chord_file_path);
+                log::debug!("Loading {:?}", chord_file_path);
 
                 raw_files_json_map.insert(chord_file_path.clone(), file.raw_file_json.clone());
 
@@ -352,7 +356,11 @@ impl ChordRegistry {
             global_chords_to_runtime_key.keys()
         );
 
-        Ok((global_chords_to_runtime_key, app_runtime_map, raw_files_json_map))
+        Ok((
+            global_chords_to_runtime_key,
+            app_runtime_map,
+            raw_files_json_map,
+        ))
     }
 
     pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
@@ -391,8 +399,8 @@ impl ChordRegistry {
                     Ok(())
                 })
             })
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
         }
 
         let (global_chords_to_runtime_key, app_runtime_map, raw_files_map) =
@@ -421,7 +429,9 @@ impl ChordRegistry {
             .collect::<Result<Vec<_>>>()?;
         raw_files_as_json_strings.extend(new_entries);
         log::debug!("Setting {} raw files", raw_files_as_json_strings.len());
-        self.observable.set_state(ChordFilesState { raw_files_as_json_strings })?;
+        self.observable.set_state(ChordFilesState {
+            raw_files_as_json_strings,
+        })?;
 
         // We should only load `macos.toml` modules AFTER the js files have been loaded
         self.load_chord_config_modules().await;

@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
-mod chorder;
 mod chord_files;
+mod chorder;
 mod frontmost;
 mod git_repos;
 mod permissions;
 mod settings;
 
 use crate::feature::SafeAppHandle;
-pub use chorder::*;
 pub use chord_files::*;
+pub use chorder::*;
 pub use frontmost::*;
 pub use git_repos::*;
 pub use permissions::*;

@@ -3,9 +3,7 @@ use crate::chords::{Chord, ChordPayload, press_chord, release_chord};
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::Key;
 use crate::input::KeyEvent;
-use crate::observables::{
-    ChorderObservable, ChorderState, FrontmostObservable, Observable,
-};
+use crate::observables::{ChorderObservable, ChorderState, FrontmostObservable, Observable};
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;

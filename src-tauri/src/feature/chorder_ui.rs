@@ -6,7 +6,7 @@ use objc2_app_kit::{
     NSRunningApplication, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
     NSVisualEffectState, NSWindowAnimationBehavior, NSWindowOrderingMode, NSWorkspace,
 };
-use objc2_foundation::{MainThreadMarker, NSInteger, NSString, NSPoint, NSRect, NSSize};
+use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize, NSString};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::Arc;
@@ -39,7 +39,8 @@ pub struct ChorderIndicatorUi {
 impl ChorderIndicatorUi {
     fn restore_frontmost_app(bundle_id: &str, pid: i32) {
         let bundle_id = NSString::from_str(bundle_id);
-        let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        let running_apps =
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
         let app = running_apps
             .iter()
             .find(|app| app.processIdentifier() == pid)

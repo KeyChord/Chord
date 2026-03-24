@@ -11,7 +11,7 @@ pub struct AppChordsFile {
     pub chords: HashMap<String, AppChordMapValue>,
     pub descriptions: HashMap<String, String>,
 
-    pub raw_file_json: serde_json::Value
+    pub raw_file_json: serde_json::Value,
 }
 
 #[typeshare]
@@ -64,7 +64,7 @@ impl AppChordsFile {
             config: file.config,
             chords,
             descriptions,
-            raw_file_json: json_value
+            raw_file_json: json_value,
         })
     }
 

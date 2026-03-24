@@ -176,7 +176,7 @@ impl SafeAppHandle {
     }
 
     pub fn try_handle(&self) -> Option<&AppHandle> {
-        let mut state = self.inner.state.lock().expect("state mutex poisoned");
+        let state = self.inner.state.lock().expect("state mutex poisoned");
         if state.is_safe {
             Some(&self.inner.handle)
         } else {

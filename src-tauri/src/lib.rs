@@ -172,7 +172,10 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRegistry::new_empty(safe_handle.clone(), chord_files_observable.clone())
+        chord_registry: ChordRegistry::new_empty(
+            safe_handle.clone(),
+            chord_files_observable.clone(),
+        ),
     });
 
     let handle = app.handle();
@@ -187,11 +190,20 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     Ok(())
 }
 
-async fn load_chords(handle: AppHandle, git_package_registry: Arc<GitPackageRegistry>) -> Result<()> {
+async fn load_chords(
+    handle: AppHandle,
+    git_package_registry: Arc<GitPackageRegistry>,
+) -> Result<()> {
     let mut chord_packages = git_package_registry.load_all_packages()?;
     chord_packages.push(ChordPackage::load_bundled()?);
     let chord_registry = handle.app_chord_registry();
-    log::debug!("Loading packages: {:?}", chord_packages.iter().map(|p| p.root_dir.clone()).collect::<Vec<_>>());
+    log::debug!(
+        "Loading packages: {:?}",
+        chord_packages
+            .iter()
+            .map(|p| p.root_dir.clone())
+            .collect::<Vec<_>>()
+    );
     chord_registry.load_packages(chord_packages).await?;
     Ok(())
 }

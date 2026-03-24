@@ -1,17 +1,17 @@
 use crate::feature::app_handle_ext::AppHandleExt;
 use crate::get_app_metadata;
 use crate::git::GitHubRepoRef;
-use crate::observables::{get_all_observable_states, GitRepo};
+use crate::observables::{GitRepo, get_all_observable_states};
 use crate::tauri_app::registry::LocalChordPackage;
 use crate::tauri_app::startup::StartupStatusInfo;
 use crate::tauri_app::{
     AppMetadataInfo, AppNeedsRelaunchInfo, list_apps_needing_relaunch, relaunch_app, startup,
 };
+use llrt_core::libs::utils::result::ResultExt;
 use parking_lot::Mutex;
 use serde::Serialize;
 use specta::Type;
 use std::sync::Arc;
-use llrt_core::libs::utils::result::ResultExt;
 use tauri::AppHandle;
 use thiserror::Error;
 
@@ -103,7 +103,7 @@ impl ApiImpl {
 impl Api for ApiImpl {
     async fn get_current_states(self) -> AppResult<String> {
         let handle = self.app_handle()?;
-        let states  = get_all_observable_states(handle.into())?;
+        let states = get_all_observable_states(handle.into())?;
         Ok(serde_json::to_string(&states).map_err(|e| AppError::Message("what".into()))?)
     }
 
