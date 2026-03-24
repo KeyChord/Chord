@@ -30,6 +30,7 @@ use crate::observables::{
     AppPermissionsObservable, AppSettingsObservable, AppSettingsState, ChorderObservable,
     ChorderState, GitReposObservable,
 };
+use crate::registry::GitPackageRegistry;
 use tauri_nspanel::tauri_panel;
 
 tauri_panel! {
@@ -150,12 +151,14 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
     let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
     let chord_registry_observable = Arc::new(ChordRegistryObservable::new(safe_handle.clone())?);
+    let git_package_registry = Arc::new(GitPackageRegistry::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
     app.handle().manage(git_repos_observable.clone());
     app.handle().manage(permissions_observable.clone());
     app.handle().manage(settings_observable.clone());
     app.handle().manage(frontmost_observable.clone());
     app.handle().manage(chord_registry_observable.clone());
+    app.handle().manage(git_package_registry.clone());
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
         chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
@@ -168,12 +171,13 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRegistry::new(
-            safe_handle.clone(),
-            vec![ChordPackage::load_bundled()?],
-            chord_registry_observable.clone(),
-        )?,
+        chord_registry: ChordRegistry::new(safe_handle.clone(), chord_registry_observable.clone())?,
     });
+
+    // Load the
+    let chord_packages = git_package_registry.load_all_packages()?;
+    let chord_registry = app.handle().app_chord_registry();
+    chord_registry.load_packages(chord_packages)?;
 
     let handle = app.handle();
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {

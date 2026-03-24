@@ -170,10 +170,15 @@ impl AppChorder {
                     }
                 }
 
-                if Self::should_execute_key_buffer_on_release(&state) {
-                    let _ =
-                        self.execute_key_buffer(handle.clone(), state.key_buffer.clone(), true)?;
-                    self.observable.set_state(ChorderState::default())?;
+                if code == &KeyMappingCode::CapsLock {
+                    if Self::should_execute_key_buffer_on_release(&state) {
+                        let _ = self.execute_key_buffer(
+                            handle.clone(),
+                            state.key_buffer.clone(),
+                            true,
+                        )?;
+                        self.observable.set_state(ChorderState::default())?;
+                    }
                 }
 
                 Ok(())
@@ -299,7 +304,7 @@ impl AppChorder {
             return Ok(None);
         };
 
-        press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
+        press_chord(handle.clone(), chord_runtime, &chord_payload)?;
 
         if release_immediately {
             release_chord(handle.clone(), &chord_payload.chord)?;
@@ -361,7 +366,7 @@ impl AppChorder {
         let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
         let chord_runtime = chord_registry.get_chord_runtime(&sequence, frontmost_application_id);
         let (Some(chord_runtime), Some(chord_payload)) = (
-            chord_runtime,
+            chord_runtime.clone(),
             chord_runtime.and_then(|r| r.get_chord(&sequence)),
         ) else {
             // We don't change the state for an invalid sequence
@@ -370,7 +375,7 @@ impl AppChorder {
         };
 
         log::debug!("Pressing chord: {:?}", chord_payload);
-        press_chord(handle.clone(), &chord_runtime, &chord_payload)?;
+        press_chord(handle.clone(), chord_runtime, &chord_payload)?;
         self.observable.set_state(ChorderState {
             // We always clear the key_buffer if a chord is pressed
             key_buffer: vec![],

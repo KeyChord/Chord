@@ -6,8 +6,7 @@ use crate::observables::GitRepo;
 use crate::tauri_app::registry::LocalChordPackage;
 use crate::tauri_app::startup::StartupStatusInfo;
 use crate::tauri_app::{
-    AppMetadataInfo, AppNeedsRelaunchInfo, list_apps_needing_relaunch,
-    relaunch_app, startup,
+    AppMetadataInfo, AppNeedsRelaunchInfo, list_apps_needing_relaunch, relaunch_app, startup,
 };
 use parking_lot::Mutex;
 use serde::Serialize;

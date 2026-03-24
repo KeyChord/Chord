@@ -270,7 +270,6 @@ pub async fn load_chord_files_runtime_modules(
     handle: AppHandle,
     loaded_app_chords: &ChordRegistry,
 ) {
-
 }
 
 fn format_action(chord: &crate::chords::Chord) -> String {

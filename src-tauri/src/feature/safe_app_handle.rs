@@ -199,14 +199,16 @@ impl SafeAppHandle {
         let observables = get_all_observable_states(self.clone())?;
         let initial_states = serde_json::to_string(&observables)?;
 
-        Ok(WebviewWindowBuilder::new(self.handle(), label.into(), url).initialization_script(
-            format!(
-                r#"
+        Ok(
+            WebviewWindowBuilder::new(self.handle(), label.into(), url).initialization_script(
+                format!(
+                    r#"
 window.__INITIAL_STATES__ = {};
 "#,
-                initial_states
+                    initial_states
+                ),
             ),
-        ))
+        )
     }
 
     delegate! {
