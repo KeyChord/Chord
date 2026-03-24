@@ -7,7 +7,6 @@ use crate::tauri_app::startup::StartupStatusInfo;
 use crate::tauri_app::{
     AppMetadataInfo, AppNeedsRelaunchInfo, list_apps_needing_relaunch, relaunch_app, startup,
 };
-use llrt_core::libs::utils::result::ResultExt;
 use parking_lot::Mutex;
 use serde::Serialize;
 use specta::Type;

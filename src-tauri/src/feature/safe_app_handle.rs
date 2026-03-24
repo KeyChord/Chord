@@ -1,5 +1,5 @@
 use crate::feature::app_handle_ext::AppManaged;
-use crate::observables::{Observable, get_all_observable_states};
+use crate::observables::Observable;
 use anyhow::Result;
 use delegate::delegate;
 use serde::Serialize;

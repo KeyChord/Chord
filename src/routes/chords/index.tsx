@@ -136,7 +136,9 @@ function expandDescriptionSequence(sequence: string): string[] {
   const variants = expandBraceVariants(inner);
   const suffixes = expandDescriptionSequence(suffix);
 
-  return variants.flatMap((variant) => suffixes.map((suffixValue) => `${prefix}${variant}${suffixValue}`));
+  return variants.flatMap((variant) =>
+    suffixes.map((suffixValue) => `${prefix}${variant}${suffixValue}`),
+  );
 }
 
 function ChordKeyRow({

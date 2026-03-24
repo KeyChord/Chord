@@ -12,7 +12,7 @@ import { useChordFilesState } from "../../utils/state.ts";
 
 export function ActiveChordsTab() {
   const [searchInput, setSearchInput] = useState("");
-  const { rawFilesAsJsonStrings } = useChordFilesState()
+  const { rawFilesAsJsonStrings } = useChordFilesState();
 
   return (
     <Card size="sm">

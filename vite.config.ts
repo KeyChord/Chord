@@ -1,13 +1,13 @@
 import { defineConfig } from "vite-plus";
-import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig({
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
@@ -16,7 +16,8 @@ export default defineConfig(async () => ({
       target: "react",
     }),
   ],
-  lint: {},
+  lint: { ignorePatterns: ["src-tauri/**"] },
+  fmt: { ignorePatterns: ["src-tauri/**"] },
 
   // Vite options tailored for Tauri development and only applied in `tauri_app dev` or `tauri_app build`
   //
@@ -40,4 +41,4 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri_app/**"],
     },
   },
-}));
+});

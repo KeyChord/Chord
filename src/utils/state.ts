@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import type { AppPermissionsState, AppSettingsState, ChorderState, ChordFilesState, FrontmostState } from "../types/generated.ts";
+import type {
+  AppPermissionsState,
+  AppSettingsState,
+  ChorderState,
+  ChordFilesState,
+  FrontmostState,
+} from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 import renameFunction from "rename-fn";
 import { taurpc } from "../api/taurpc.ts";
@@ -10,7 +16,7 @@ async function createUseTauriState<T>(stateId: string) {
     const [state, setState] = useState<T>(initialStates[stateId]);
     useEffect(() => {
       const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
-        console.log(event.payload)
+        console.log(event.payload);
         setState(event.payload);
       });
 
