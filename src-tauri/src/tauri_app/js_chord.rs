@@ -1,14 +1,14 @@
-use crate::chords::{press_shortcut, release_shortcut, Shortcut};
+use crate::chords::{Shortcut, press_shortcut, release_shortcut};
 use crate::constants::GLOBAL_HOTKEYS_POOL;
-use crate::js::{throw_js_error, AppUserData};
+use crate::feature::app_handle_ext::AppHandleExt;
+use crate::feature::global_hotkey::GlobalHotkeyStoreEntry;
+use crate::js::{AppUserData, throw_js_error};
 use crate::tauri_app::app_lifecycle::{
     init as init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::{Ctx, Function};
 use std::collections::HashSet;
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::feature::global_hotkey::GlobalHotkeyStoreEntry;
 
 pub struct ChordModule;
 
@@ -91,17 +91,11 @@ impl ModuleDef for ChordModule {
                 })?;
 
                 press_shortcut(shortcut.clone(), 1).map_err(|err| {
-                    throw_js_error(
-                        ctx.clone(),
-                        format!("tap({key:?}) press failed: {err}"),
-                    )
+                    throw_js_error(ctx.clone(), format!("tap({key:?}) press failed: {err}"))
                 })?;
 
                 release_shortcut(shortcut).map_err(|err| {
-                    throw_js_error(
-                        ctx.clone(),
-                        format!("tap({key:?}) release failed: {err}"),
-                    )
+                    throw_js_error(ctx.clone(), format!("tap({key:?}) release failed: {err}"))
                 })?;
 
                 Ok(())

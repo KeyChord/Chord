@@ -1,15 +1,18 @@
-use tauri::{Emitter, Manager, Wry};
-use tauri::{WebviewUrl, WebviewWindowBuilder};
-use std::sync::{Arc, Mutex};
+use crate::feature::app_handle_ext::AppManaged;
+use crate::observables::{
+    AppPermissionsObservable, AppSettingsObservable, ChorderObservable, GitReposObservable,
+    Observable, get_all_observable_states,
+};
 use anyhow::Result;
-use tauri::AppHandle;
-use tauri_plugin_autostart::ManagerExt;
 use delegate::delegate;
 use serde::Serialize;
+use std::sync::{Arc, Mutex};
+use tauri::AppHandle;
+use tauri::{Emitter, Manager, Wry};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::feature::app_handle_ext::AppManaged;
-use crate::observables::{get_all_observable_states, AppPermissionsObservable, AppSettingsObservable, ChorderObservable, GitReposObservable, Observable};
 
 type OnSafeCallback = Box<dyn FnOnce(&AppHandle) + Send + 'static>;
 
@@ -66,11 +69,7 @@ impl SafeAppHandle {
     where
         F: FnOnce(&AppHandle) + Send + 'static,
     {
-        let mut state = self
-            .inner
-            .state
-            .lock()
-            .expect("state mutex poisoned");
+        let mut state = self.inner.state.lock().expect("state mutex poisoned");
 
         if state.is_safe {
             drop(state);
@@ -84,11 +83,7 @@ impl SafeAppHandle {
         managed.register(&self.inner.handle);
 
         let callbacks = {
-            let mut state = self
-                .inner
-                .state
-                .lock()
-                .expect("state mutex poisoned");
+            let mut state = self.inner.state.lock().expect("state mutex poisoned");
 
             if state.is_safe {
                 return;
@@ -123,9 +118,14 @@ impl SafeAppHandle {
     ) -> Result<WebviewWindowBuilder<'_, Wry, AppHandle>> {
         let label = label.into();
         let observables = get_all_observable_states(self.clone())?;
-        Ok(WebviewWindowBuilder::new(self.handle(), label, url).initialization_script(format!(r#"
+        Ok(
+            WebviewWindowBuilder::new(self.handle(), label, url).initialization_script(format!(
+                r#"
           window.__INITIAL_STATES__ = {}
-        "#, &serde_json::to_string(&observables)?)))
+        "#,
+                &serde_json::to_string(&observables)?
+            )),
+        )
     }
 
     delegate! {

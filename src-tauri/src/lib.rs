@@ -1,15 +1,15 @@
 use crate::api::{Api, ApiImpl};
-use crate::tauri_app::git::ChordPackageRegistry;
+use crate::observables::{ChordRegistryObservable, FrontmostObservable, Observable};
+use crate::tauri_app::registry::ChordPackageRegistry;
 use anyhow::Result;
 use parking_lot::deadlock;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tauri::Manager;
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
-use std::sync::Arc;
-use crate::observables::Observable;
 
 mod api;
 mod chords;
@@ -18,15 +18,19 @@ mod feature;
 pub mod git;
 mod input;
 mod mode;
-mod tauri_app;
 mod observables;
+mod tauri_app;
 
-use tauri_nspanel::tauri_panel;
+use crate::chords::{ChordPackage, ChordRegistry};
 use crate::feature::app_handle_ext::{AppHandleExt, AppManaged};
-use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
 use crate::feature::global_hotkey::GlobalHotkeyStore;
 use crate::feature::repos::GitReposStore;
-use crate::observables::{AppPermissionsObservable, AppSettingsObservable, AppSettingsState, ChorderObservable, ChorderState, GitReposObservable};
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
+use crate::observables::{
+    AppPermissionsObservable, AppSettingsObservable, AppSettingsState, ChorderObservable,
+    ChorderState, GitReposObservable,
+};
+use tauri_nspanel::tauri_panel;
 
 tauri_panel! {
     panel!(IndicatorPanel {
@@ -55,19 +59,21 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     rdev::set_is_main_thread(false);
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(10));
-        let deadlocks = deadlock::check_deadlock();
-        if deadlocks.is_empty() {
-            continue;
-        }
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(10));
+            let deadlocks = deadlock::check_deadlock();
+            if deadlocks.is_empty() {
+                continue;
+            }
 
-        log::warn!("{} deadlocks detected", deadlocks.len());
-        for (i, threads) in deadlocks.iter().enumerate() {
-            log::warn!("Deadlock #{}", i);
-            for t in threads {
-                log::warn!("Thread Id {:#?}", t.thread_id());
-                log::warn!("{:#?}", t.backtrace());
+            log::warn!("{} deadlocks detected", deadlocks.len());
+            for (i, threads) in deadlocks.iter().enumerate() {
+                log::warn!("Deadlock #{}", i);
+                for t in threads {
+                    log::warn!("Thread Id {:#?}", t.thread_id());
+                    log::warn!("{:#?}", t.backtrace());
+                }
             }
         }
     });
@@ -142,19 +148,31 @@ fn setup(app: &mut tauri::App) -> Result<()> {
     let git_repos_observable = Arc::new(GitReposObservable::new(safe_handle.clone())?);
     let permissions_observable = Arc::new(AppPermissionsObservable::new(safe_handle.clone())?);
     let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
+    let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
+    let chord_registry_observable = Arc::new(ChordRegistryObservable::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
     app.handle().manage(git_repos_observable.clone());
     app.handle().manage(permissions_observable.clone());
     app.handle().manage(settings_observable.clone());
+    app.handle().manage(frontmost_observable.clone());
+    app.handle().manage(chord_registry_observable.clone());
     safe_handle.manage(AppManaged {
-        frontmost: AppFrontmost::new_with_detector(),
+        frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
         chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
         context: AppContext::new()?,
-        permissions: AppPermissions::new_unloaded(safe_handle.clone(), permissions_observable.clone())?,
+        permissions: AppPermissions::new_unloaded(
+            safe_handle.clone(),
+            permissions_observable.clone(),
+        )?,
         settings: AppSettings::new(safe_handle.clone())?,
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
+        chord_registry: ChordRegistry::new(
+            safe_handle.clone(),
+            vec![ChordPackage::load_bundled()?],
+            chord_registry_observable.clone(),
+        ),
     });
 
     let handle = app.handle();

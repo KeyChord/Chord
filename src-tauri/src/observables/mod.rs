@@ -1,15 +1,19 @@
 use std::collections::HashMap;
 
 mod chorder;
+mod chords;
+mod frontmost;
 mod git_repos;
 mod permissions;
 mod settings;
 
+use crate::feature::SafeAppHandle;
 pub use chorder::*;
+pub use chords::*;
+pub use frontmost::*;
 pub use git_repos::*;
 pub use permissions::*;
 pub use settings::*;
-use crate::feature::SafeAppHandle;
 
 pub struct ObservableRegistration {
     pub id: &'static str,

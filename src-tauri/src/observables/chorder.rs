@@ -1,8 +1,8 @@
-use serde::Serialize;
-use typeshare::typeshare;
 use crate::chords::Chord;
 use crate::define_observable;
 use crate::input::Key;
+use serde::Serialize;
+use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Default)]

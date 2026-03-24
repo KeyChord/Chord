@@ -1,12 +1,13 @@
-use tauri::{AppHandle, Manager, Runtime, State};
 use crate::AppContext;
-use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
+use crate::chords::ChordRegistry;
 use crate::feature::global_hotkey::GlobalHotkeyStore;
 use crate::feature::repos::GitReposStore;
-use crate::observables::Observable;
-use crate::tauri_app::git::ChordPackageRegistry;
-use std::sync::Arc;
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
+use crate::observables::{ChordRegistryState, Observable};
+use crate::tauri_app::registry::ChordPackageRegistry;
 use anyhow::Result;
+use std::sync::Arc;
+use tauri::{AppHandle, Manager, Runtime, State};
 
 pub struct AppManaged {
     pub settings: AppSettings,
@@ -16,7 +17,8 @@ pub struct AppManaged {
     pub frontmost: AppFrontmost,
     pub permissions: AppPermissions,
     pub global_hotkey_store: GlobalHotkeyStore,
-    pub git_repos_store: GitReposStore
+    pub git_repos_store: GitReposStore,
+    pub chord_registry: ChordRegistry,
 }
 
 impl AppManaged {
@@ -29,6 +31,7 @@ impl AppManaged {
         handle.manage(self.chord_package_registry);
         handle.manage(self.global_hotkey_store);
         handle.manage(self.git_repos_store);
+        handle.manage(self.chord_registry);
     }
 }
 
@@ -37,6 +40,7 @@ pub trait AppHandleExt {
     fn app_chorder(&self) -> &AppChorder;
     fn app_context(&self) -> &AppContext;
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry;
+    fn chord_registry(&self) -> &ChordRegistry;
     fn app_frontmost(&self) -> &AppFrontmost;
     fn app_permissions(&self) -> &AppPermissions;
     fn global_hotkey_store(&self) -> &GlobalHotkeyStore;
@@ -59,6 +63,10 @@ impl<R: Runtime> AppHandleExt for AppHandle<R> {
 
     fn app_chord_package_registry(&self) -> &ChordPackageRegistry {
         self.state::<ChordPackageRegistry>().inner()
+    }
+
+    fn chord_registry(&self) -> &ChordRegistry {
+        self.state::<ChordRegistry>().inner()
     }
 
     fn app_frontmost(&self) -> &AppFrontmost {

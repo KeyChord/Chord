@@ -1,25 +1,27 @@
 use super::{ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle};
-use crate::chords::{press_chord, release_chord, Chord, ChordPayload};
+use crate::chords::{Chord, ChordPayload, press_chord, release_chord};
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::Key;
 use crate::input::KeyEvent;
+use crate::observables::{
+    ChorderObservable, ChorderState, FrontmostObservable, FrontmostState, Observable,
+};
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
 use parking_lot::Mutex;
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener};
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::observables::{ChorderObservable, ChorderState, Observable};
-use std::sync::Arc;
 
 pub struct AppChorder {
     pub ui: ChorderIndicatorUi,
     held_keys: Mutex<HashSet<Key>>,
 
     observable: Arc<ChorderObservable>,
-    handle: SafeAppHandle
+    handle: SafeAppHandle,
 }
 
 impl AppChorder {
@@ -169,11 +171,8 @@ impl AppChorder {
                 }
 
                 if Self::should_execute_key_buffer_on_release(&state) {
-                    let _ = self.execute_key_buffer(
-                        handle.clone(),
-                        state.key_buffer.clone(),
-                        true,
-                    )?;
+                    let _ =
+                        self.execute_key_buffer(handle.clone(), state.key_buffer.clone(), true)?;
                     self.observable.set_state(ChorderState::default())?;
                 }
 
@@ -185,9 +184,8 @@ impl AppChorder {
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
                 self.ensure_active()?;
 
-                let context = handle.app_context();
-                let frontmost = handle.app_frontmost();
-                let loaded_app_chords = context.loaded_app_chords.read();
+                let chord_registry = handle.chord_registry();
+                let frontmost = handle.observable_state::<FrontmostObservable>()?;
                 let state = self.observable.get_state()?;
                 let key_buffer = state.key_buffer.clone();
 
@@ -199,9 +197,9 @@ impl AppChorder {
                         return Ok(());
                     };
 
-                    let application_id = frontmost.frontmost_application_id.load().as_ref().clone();
+                    let application_id = frontmost.frontmost_app_bundle_id.clone();
                     let chord_runtime =
-                        loaded_app_chords.get_chord_runtime(&last_chord.keys, application_id);
+                        chord_registry.get_chord_runtime(&last_chord.keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
                         press_chord(
                             handle.clone(),
@@ -278,12 +276,11 @@ impl AppChorder {
         key_buffer: Vec<Key>,
         release_immediately: bool,
     ) -> Result<Option<Chord>> {
-        let context = handle.app_context();
-        let frontmost = handle.app_frontmost();
-        let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
-        let loaded_app_chords = context.loaded_app_chords.read();
+        let chord_registry = handle.chord_registry();
+        let frontmost = handle.observable_state::<FrontmostObservable>()?;
+        let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
         let Some(chord_runtime) =
-            loaded_app_chords.get_chord_runtime(&key_buffer, frontmost_application_id.clone())
+            chord_registry.get_chord_runtime(&key_buffer, frontmost_application_id.clone())
         else {
             log::error!(
                 "Missing chord runtime for chord {:?} in application: {:?}",
@@ -359,12 +356,10 @@ impl AppChorder {
             }
         };
 
-        let frontmost = handle.app_frontmost();
-        let context = handle.app_context();
-        let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
-        let loaded_app_chords = context.loaded_app_chords.read();
-        let chord_runtime =
-            loaded_app_chords.get_chord_runtime(&sequence, frontmost_application_id);
+        let frontmost = handle.observable_state::<FrontmostObservable>()?;
+        let chord_registry = handle.chord_registry();
+        let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
+        let chord_runtime = chord_registry.get_chord_runtime(&sequence, frontmost_application_id);
         let (Some(chord_runtime), Some(chord_payload)) = (
             chord_runtime,
             chord_runtime.and_then(|r| r.get_chord(&sequence)),
@@ -386,7 +381,6 @@ impl AppChorder {
         Ok(())
     }
 }
-
 
 fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
     match key_event {

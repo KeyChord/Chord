@@ -1,13 +1,17 @@
-use crate::chords::shortcut::{press_shortcut, release_shortcut, Shortcut};
+use crate::chords::shortcut::{Shortcut, press_shortcut, release_shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
+use crate::feature::app_handle_ext::AppHandleExt;
+use crate::feature::{AppSettings, SafeAppHandle};
 use crate::input::Key;
-use crate::js::{format_js_error, with_js};
+use crate::js::{format_js_error, reset_js, with_js};
+use crate::load_chord_files_runtime_modules;
+use crate::observables::{ChordRegistryObservable, ChordRegistryState, Observable};
 use anyhow::Result;
 use rquickjs::function::Args;
 use rquickjs::{Array, Ctx, Function, Module, Object, Promise, Value};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use tauri::AppHandle;
@@ -39,9 +43,11 @@ pub struct Chord {
     pub js: Option<ChordJsInvocation>,
 }
 
-pub struct LoadedAppChords {
+pub struct ChordRegistry {
     pub global_chords_to_runtime_key: HashMap<Vec<Key>, String>,
     pub runtimes: HashMap<String, ChordRuntime>,
+
+    observable: ChordRegistryObservable,
 }
 
 #[derive(Debug, Clone)]
@@ -285,13 +291,15 @@ fn resolve_runtime_extends(
     Ok(())
 }
 
-impl LoadedAppChords {
-    pub fn from_folders(chord_folders: Vec<ChordPackage>) -> Result<Self> {
+impl ChordRegistry {
+    fn load_packages(
+        chord_packages: Vec<ChordPackage>,
+    ) -> Result<(HashMap<Vec<Key>, String>, HashMap<String, ChordRuntime>)> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
 
-        for chord_folder in chord_folders {
+        for chord_folder in chord_packages {
             log::debug!("Loading folder from root {:?}", chord_folder.root_dir);
 
             for (chord_file_path, file) in chord_folder.chords_files {
@@ -346,9 +354,29 @@ impl LoadedAppChords {
             global_chords_to_runtime_key.keys()
         );
 
-        Ok(LoadedAppChords {
+        Ok((global_chords_to_runtime_key, app_runtime_map))
+    }
+
+    pub fn new(
+        safe_handle: SafeAppHandle,
+        chord_packages: Vec<ChordPackage>,
+        observable: ChordRegistryObservable,
+    ) -> Result<Self> {
+        let (global_chords_to_runtime_key, app_runtime_map) =
+            ChordRegistry::load_packages(chord_packages)?;
+        let mut chords = Vec::new();
+        for (_, runtime) in &app_runtime_map {
+            for (_, chord) in &runtime.chords {
+                chords.push(chord.clone());
+            }
+        }
+
+        observable.set_state(ChordRegistryState { chords })?;
+
+        Ok(ChordRegistry {
             global_chords_to_runtime_key,
             runtimes: app_runtime_map,
+            observable,
         })
     }
 
@@ -529,12 +557,80 @@ impl LoadedAppChords {
 
         matches
     }
+
+    /// Also re-evaluates JavaScript
+    pub async fn reload(self, handle: AppHandle) -> Result<()> {
+        let context = handle.app_context();
+        let chorder = handle.app_chorder();
+        let chord_package_registry = handle.app_chord_package_registry();
+        chorder.ensure_inactive()?;
+
+        let chord_packages = chord_package_registry.load_all_chord_packages()?;
+        reset_js(handle.clone()).await?;
+
+        for chord_package in &chord_packages {
+            let js_files = chord_package.js_files.clone();
+            let root_dir = chord_package.root_dir.clone();
+
+            with_js(handle.clone(), move |ctx| {
+                Box::pin(async move {
+                    let load_module =
+                        |filepath: &String, js: String| -> rquickjs::Result<Promise> {
+                            let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
+                            let module = Module::declare(ctx.clone(), filepath.clone(), js)?;
+                            let meta = module.meta()?;
+                            meta.set("url", module_disk_path)?;
+                            let (_evaluated, promise) = module.eval()?;
+                            Ok(promise)
+                        };
+                    for (filepath, js) in js_files {
+                        match load_module(&filepath, js) {
+                            Ok(promise) => {
+                                if let Err(e) = promise.into_future().await {
+                                    log::error!("failed to await module {}: {:?}", filepath, e);
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to load module {}: {:?}", filepath, e);
+                            }
+                        };
+                    }
+
+                    Ok(())
+                })
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
+        }
+
+        let (global, app_runtime_map) = ChordRegistry::load_packages(chord_packages)?;
+        let mut chords = Vec::new();
+        for (_, runtime) in &app_runtime_map {
+            for (_, chord) in &runtime.chords {
+                chords.push(chord.clone());
+            }
+        }
+        self.observable.set_state(ChordRegistryState { chords })?;
+
+        // We should only load `macos.toml` modules AFTER the js files have been loaded
+        load_chord_files_runtime_modules(handle.clone(), &self).await;
+
+        Ok(())
+    }
+}
+
+fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
+    root_dir
+        .map(|root_dir| root_dir.join(module_path))
+        .unwrap_or_else(|| PathBuf::from(module_path))
+        .display()
+        .to_string()
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        runtime_id_from_chords_path, ChordRuntime, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID,
+        ChordRegistry, ChordRuntime, GLOBAL_CHORD_RUNTIME_ID, runtime_id_from_chords_path,
     };
     use crate::chords::Chord;
     use crate::input::Key;
@@ -601,7 +697,7 @@ mod tests {
             ),
         ]);
 
-        let loaded = LoadedAppChords {
+        let loaded = ChordRegistry {
             global_chords_to_runtime_key: HashMap::new(),
             runtimes: HashMap::from([(
                 "com.example.app".to_string(),
@@ -632,7 +728,7 @@ mod tests {
             },
         )]);
 
-        let loaded = LoadedAppChords {
+        let loaded = ChordRegistry {
             global_chords_to_runtime_key: HashMap::from([(
                 global_sequence.clone(),
                 GLOBAL_CHORD_RUNTIME_ID.to_string(),

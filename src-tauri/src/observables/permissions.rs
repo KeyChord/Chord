@@ -1,6 +1,6 @@
+use crate::define_observable;
 use serde::Serialize;
 use typeshare::typeshare;
-use crate::define_observable;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Default)]

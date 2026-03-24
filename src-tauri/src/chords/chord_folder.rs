@@ -1,7 +1,7 @@
 use crate::chords::AppChordsFile;
 use anyhow::Result;
 use fast_radix_trie::StringRadixMap;
-use include_dir::{include_dir, Dir};
+use include_dir::{Dir, include_dir};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 

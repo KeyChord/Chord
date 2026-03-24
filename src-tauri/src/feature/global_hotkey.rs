@@ -1,11 +1,10 @@
+use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{Runtime, Wry};
 use tauri_plugin_store::Store;
-use crate::feature::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
-use anyhow::Result;
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHotkeyStoreEntry {
@@ -46,5 +45,3 @@ impl GlobalHotkeyStore {
         self.store.delete(shortcut);
     }
 }
-
-

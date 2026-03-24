@@ -3,8 +3,8 @@ use anyhow::Result;
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::AppHandle;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
@@ -220,11 +220,11 @@ async fn await_promise_if_needed<'js>(result: Value<'js>) -> rquickjs::Result<()
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{dispatch_app_launch, dispatch_app_terminate, ObservedApp};
+    use super::{ObservedApp, dispatch_app_launch, dispatch_app_terminate};
     use block2::RcBlock;
     use core::ptr::NonNull;
-    use objc2::runtime::AnyObject;
     use objc2::MainThreadMarker;
+    use objc2::runtime::AnyObject;
     use objc2_app_kit::{
         NSRunningApplication, NSWorkspace, NSWorkspaceApplicationKey,
         NSWorkspaceDidLaunchApplicationNotification,

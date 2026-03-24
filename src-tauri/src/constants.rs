@@ -1,5 +1,5 @@
 use crate::input::{Key, KeyCombination, KeyCombinationModifiers};
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use jsonc_parser::{JsonValue, ParseOptions};
 use std::str::FromStr;
 use std::sync::LazyLock;

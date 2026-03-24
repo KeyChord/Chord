@@ -1,21 +1,21 @@
-use crate::git::{GitHubRepoRef};
-use crate::tauri_app::{
-    list_active_chords, list_apps_needing_relaunch, list_loaded_chords,
-    list_matching_chords, relaunch_app, reload_loaded_app_chords, startup, ActiveChordInfo,
-    AppMetadataInfo, AppNeedsRelaunchInfo,
-};
+use crate::chords::Chord;
+use crate::feature::app_handle_ext::AppHandleExt;
+use crate::get_app_metadata;
+use crate::git::GitHubRepoRef;
+use crate::observables::GitRepo;
+use crate::tauri_app::registry::LocalChordPackage;
 use crate::tauri_app::startup::StartupStatusInfo;
+use crate::tauri_app::{
+    AppMetadataInfo, AppNeedsRelaunchInfo, list_active_chords, list_apps_needing_relaunch,
+    list_loaded_chords, list_matching_chords, relaunch_app, reload_loaded_app_chords, startup,
+};
 use parking_lot::Mutex;
 use serde::Serialize;
+use specta::Type;
 use std::sync::Arc;
 use tauri::AppHandle;
-use crate::get_app_metadata;
-use crate::tauri_app::git::{LocalChordPackage};
-use specta::Type;
 use tauri_plugin_autostart::ManagerExt;
 use thiserror::Error;
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::observables::GitRepo;
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -67,16 +67,8 @@ pub trait Api {
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     #[taurpc(alias = "addLocalChordFolder")]
     async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;
-    #[taurpc(alias = "listActiveChords")]
-    async fn list_active_chords() -> AppResult<Vec<ActiveChordInfo>>;
-    #[taurpc(alias = "listMatchingChords")]
-    async fn list_matching_chords() -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "getAppMetadata")]
     async fn get_app_metadata(bundle_id: String) -> AppResult<AppMetadataInfo>;
-    #[taurpc(alias = "listRepoChords")]
-    async fn list_repo_chords(repo: String) -> AppResult<Vec<ActiveChordInfo>>;
-    #[taurpc(alias = "listLocalChordFolderChords")]
-    async fn list_local_chord_folder_chords(path: String) -> AppResult<Vec<ActiveChordInfo>>;
     #[taurpc(alias = "listGlobalShortcutMappings")]
     async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;
     #[taurpc(alias = "removeGlobalShortcutMapping")]
@@ -151,7 +143,7 @@ impl Api for ApiImpl {
     async fn sync_git_repo(self, repo: String) -> AppResult<GitRepo> {
         let handle = self.app_handle()?;
         let store = handle.git_repos_store();
-        let repo_ref  = GitHubRepoRef::parse(&repo)?;
+        let repo_ref = GitHubRepoRef::parse(&repo)?;
         store.sync_repo(repo_ref.clone())?;
         reload_loaded_app_chords(handle.clone()).await?;
         Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
@@ -160,7 +152,7 @@ impl Api for ApiImpl {
     async fn list_local_chord_folders(self) -> AppResult<Vec<LocalChordPackage>> {
         let handle = self.app_handle()?;
         let registry = handle.app_chord_package_registry();
-        Ok(registry .local .list()?)
+        Ok(registry.local.list()?)
     }
 
     async fn pick_local_chord_folder(self) -> AppResult<Option<String>> {
@@ -180,38 +172,8 @@ impl Api for ApiImpl {
         Ok(folder_info)
     }
 
-    async fn list_active_chords(self) -> AppResult<Vec<ActiveChordInfo>> {
-        let app_handle = self.app_handle()?;
-        Ok(list_active_chords(app_handle)?)
-    }
-
-    async fn list_matching_chords(self) -> AppResult<Vec<ActiveChordInfo>> {
-        let app_handle = self.app_handle()?;
-        Ok(list_matching_chords(app_handle)?)
-    }
-
-    async fn get_app_metadata(
-        self,
-        bundle_id: String,
-    ) -> AppResult<AppMetadataInfo> {
+    async fn get_app_metadata(self, bundle_id: String) -> AppResult<AppMetadataInfo> {
         Ok(get_app_metadata(bundle_id)?)
-    }
-
-    async fn list_repo_chords(self, repo: String) -> AppResult<Vec<ActiveChordInfo>> {
-        let app_handle = self.app_handle()?;
-        let registry = app_handle.app_chord_package_registry();
-        let loaded_chords = registry.git.load_repo_chords(&repo)?;
-        Ok(list_loaded_chords(&loaded_chords))
-    }
-
-    async fn list_local_chord_folder_chords(
-        self,
-        path: String,
-    ) -> AppResult<Vec<ActiveChordInfo>> {
-        let app_handle = self.app_handle()?;
-        let registry = app_handle.app_chord_package_registry();
-        let loaded_chords = registry.local.load_folder_chords(&path)?;
-        Ok(list_loaded_chords(&loaded_chords))
     }
 
     async fn list_global_shortcut_mappings(self) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
@@ -242,7 +204,7 @@ impl Api for ApiImpl {
         let store = handle.global_hotkey_store();
         let trimmed_shortcut = shortcut.trim();
         if trimmed_shortcut.is_empty() {
-            return Err(AppError::Message("cannot be empty".into()))
+            return Err(AppError::Message("cannot be empty".into()));
         }
 
         store.remove(trimmed_shortcut);

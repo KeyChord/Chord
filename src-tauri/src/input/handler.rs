@@ -1,10 +1,10 @@
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::{Key, KeyEvent};
 use crate::mode::AppMode;
+use crate::observables::{ChorderObservable, Observable};
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use tauri::AppHandle;
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::observables::{Observable, ChorderObservable};
 
 pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
     let app_mode = handle.app_context().get_app_mode();
@@ -12,17 +12,16 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
 
     match app_mode {
         AppMode::Chord => {
-                chorder
-                .handle_key_event(handle.clone(), &key_event)?;
+            chorder.handle_key_event(handle.clone(), &key_event)?;
         }
         AppMode::None => {
             let state = handle.observable_state::<ChorderObservable>()?;
             let should_finalize_chord_mode =
-                matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space))) && state.is_idle();
+                matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space)))
+                    && state.is_idle();
 
             if should_finalize_chord_mode {
-                    chorder
-                    .handle_key_event(handle.clone(), &key_event)?;
+                chorder.handle_key_event(handle.clone(), &key_event)?;
             }
 
             chorder.ensure_inactive()?;

@@ -1,11 +1,11 @@
-use crate::input::Key;
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::input::Key;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
 use bitflags::bitflags;
 use keycode::KeyMappingCode;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use tauri::AppHandle;
 
 #[derive(Debug)]

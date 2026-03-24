@@ -1,15 +1,17 @@
+use crate::chords::{Chord, ChordPackage, ChordRegistry, GLOBAL_CHORD_RUNTIME_ID};
+use crate::feature::SafeAppHandle;
+use crate::git::GitHubRepoRef;
+use crate::observables::{
+    ActiveChordInfo, ChordRegistryObservable, GitReposObservable, Observable,
+};
+use anyhow::{Context, Result};
+use serde::Serialize;
+use specta::Type;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use anyhow::{Result, Context};
-use serde::Serialize;
-use specta::Type;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::chords::{ChordPackage, LoadedAppChords};
-use crate::feature::SafeAppHandle;
-use crate::git::{GitHubRepoRef};
-use crate::observables::{Observable, GitReposObservable};
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -23,10 +25,7 @@ pub struct GitPackageRegistry {
 impl GitPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let dir = handle.path().app_cache_dir()?;
-        Ok(Self {
-            dir,
-            handle
-        })
+        Ok(Self { dir, handle })
     }
 
     pub fn load_all_packages(&self) -> Result<Vec<ChordPackage>> {
@@ -45,7 +44,7 @@ impl GitPackageRegistry {
         Ok(packages)
     }
 
-    pub fn load_repo_chords(&self, repo_input: &str) -> anyhow::Result<LoadedAppChords> {
+    pub fn load_repo_chords(&self, repo_input: &str) -> anyhow::Result<ChordRegistry> {
         let repo_ref = GitHubRepoRef::parse(repo_input)?;
         let repo_path = repo_ref.local_path(&self.dir);
 
@@ -56,7 +55,7 @@ impl GitPackageRegistry {
         let repo =
             gix::open(&repo_path).context(format!("failed to open repo {}", repo_ref.slug()))?;
         let package = ChordPackage::load_from_git_repo(&repo)?;
-        LoadedAppChords::from_folders(vec![package])
+        ChordRegistry::new(vec![package])
     }
 }
 
@@ -78,13 +77,13 @@ impl LocalChordPackage {
         ChordPackage::load_from_local_folder(&self.path)
     }
 
-    pub fn load_chords(&self) -> anyhow::Result<LoadedAppChords> {
-        LoadedAppChords::from_folders(vec![self.load()?])
+    pub fn load_chords(&self) -> anyhow::Result<ChordRegistry> {
+        ChordRegistry::from_folders(vec![self.load()?])
     }
 }
 
 pub struct LocalPackageRegistry {
-    safe_handle: SafeAppHandle
+    safe_handle: SafeAppHandle,
 }
 
 impl LocalPackageRegistry {
@@ -105,24 +104,23 @@ impl LocalPackageRegistry {
     }
 
     pub fn pick(&self) -> Result<Option<LocalChordPackage>> {
-        let Some(folder_path) = self.safe_handle
+        let Some(folder_path) = self
+            .safe_handle
             .dialog()
             .file()
             .set_title("Select Local Chord Folder")
             .blocking_pick_folder()
             .and_then(|folder_path| folder_path.into_path().ok())
-
         else {
             return Ok(None);
         };
 
-        Ok(Some(self.package_from_user_input(&folder_path.display().to_string())?))
+        Ok(Some(self.package_from_user_input(
+            &folder_path.display().to_string(),
+        )?))
     }
 
-    pub fn add(
-        &self,
-        folder_path: &str,
-    ) -> Result<LocalChordPackage> {
+    pub fn add(&self, folder_path: &str) -> Result<LocalChordPackage> {
         let package = self.package_from_user_input(folder_path)?;
         let canonical_path = package.path().display().to_string();
         let mut paths = self.read_paths()?;
@@ -136,7 +134,7 @@ impl LocalPackageRegistry {
         Ok(package)
     }
 
-    pub fn load_folder_chords(&self, folder_path: &str) -> anyhow::Result<LoadedAppChords> {
+    pub fn load_folder_chords(&self, folder_path: &str) -> anyhow::Result<ChordRegistry> {
         self.package_from_user_input(folder_path)?.load_chords()
     }
 
@@ -163,7 +161,8 @@ impl LocalPackageRegistry {
     }
 
     fn sources_store(&self) -> anyhow::Result<Arc<Store<Wry>>> {
-        self.safe_handle.store(CHORD_SOURCES_STORE_PATH)
+        self.safe_handle
+            .store(CHORD_SOURCES_STORE_PATH)
             .context("failed to open chord sources store")
     }
 
@@ -176,10 +175,7 @@ impl LocalPackageRegistry {
         serde_json::from_value(value).context("failed to parse local chord folder list")
     }
 
-    fn write_paths(
-        &self,
-        paths: &[String],
-    ) -> anyhow::Result<()> {
+    fn write_paths(&self, paths: &[String]) -> anyhow::Result<()> {
         let store = self.sources_store()?;
         let value =
             serde_json::to_value(paths).context("failed to serialize local chord folder list")?;
@@ -216,7 +212,7 @@ impl ChordPackageRegistry {
         })
     }
 
-    pub fn load_all_chord_packages( &self ) -> Result<Vec<ChordPackage>> {
+    pub fn load_all_chord_packages(&self) -> Result<Vec<ChordPackage>> {
         let mut packages = vec![ChordPackage::load_bundled()?];
         packages.extend(self.git.load_all_packages()?);
         packages.extend(self.local.load_all_packages()?);

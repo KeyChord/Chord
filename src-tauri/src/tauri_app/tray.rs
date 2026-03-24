@@ -3,12 +3,10 @@ use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::settings::open_chords_inspector;
 use crate::tauri_app::context::reload_loaded_app_chords;
 use crate::tauri_app::settings::show_settings_window;
-use tauri::{image::Image, menu::MenuBuilder, tray::TrayIconBuilder, AppHandle};
+use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
 
-const TRAY_ICON_BYTES: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/icons/32x32.png"
-));
+const TRAY_ICON_BYTES: &[u8] =
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"));
 
 fn load_tray_icon() -> tauri::Result<Image<'static>> {
     Image::from_bytes(TRAY_ICON_BYTES).map(|image| image.to_owned())

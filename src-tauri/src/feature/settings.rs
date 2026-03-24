@@ -1,9 +1,9 @@
+use crate::feature::SafeAppHandle;
 use anyhow::Result;
 use tauri::{Emitter, WebviewUrl, WebviewWindow};
-use crate::feature::SafeAppHandle;
 
 pub struct AppSettings {
-    pub ui: SettingsUi
+    pub ui: SettingsUi,
 }
 
 pub struct SettingsUi {
@@ -21,7 +21,8 @@ impl SettingsUi {
         }
 
         // 🔥 otherwise create it
-        let window = self.handle
+        let window = self
+            .handle
             .new_webview_window_builder("settings", WebviewUrl::App("index.html".into()))?
             .title("Settings")
             .inner_size(920.0, 760.0)
@@ -38,9 +39,6 @@ impl SettingsUi {
 impl AppSettings {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let ui = SettingsUi::new(handle.clone())?;
-        Ok(Self {
-            ui
-        })
+        Ok(Self { ui })
     }
 }
-

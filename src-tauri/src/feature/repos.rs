@@ -1,18 +1,18 @@
+use crate::feature::SafeAppHandle;
+use crate::git::{GitHubRepoRef, clone_repo};
+use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
+use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::feature::SafeAppHandle;
-use crate::git::{clone_repo, GitHubRepoRef};
-use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
-use anyhow::Result;
 
 #[derive(Clone)]
 pub struct GitReposStore {
     pub store: Arc<Store<Wry>>,
     observable: Arc<GitReposObservable>,
 
-    handle: SafeAppHandle
+    handle: SafeAppHandle,
 }
 
 impl GitReposStore {
@@ -30,7 +30,11 @@ impl GitReposStore {
             .collect();
         log::debug!("repos: {:?}", repos);
         observable.set_state(GitReposState { repos })?;
-        Ok(Self { handle, store, observable })
+        Ok(Self {
+            handle,
+            store,
+            observable,
+        })
     }
 
     fn add(&self, repo: GitRepo) -> Result<()> {

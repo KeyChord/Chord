@@ -1,6 +1,7 @@
-use crate::chords::{Chord, ChordPackage, LoadedAppChords, GLOBAL_CHORD_RUNTIME_ID};
-use crate::js::{format_js_error, reset_js, with_js};
+use crate::chords::{Chord, ChordPackage, ChordRegistry, GLOBAL_CHORD_RUNTIME_ID};
 use crate::feature::app_handle_ext::AppHandleExt;
+use crate::js::{format_js_error, reset_js, with_js};
+use crate::observables::{ChorderObservable, FrontmostObservable, Observable};
 use crate::{
     input::KeyEventState,
     mode::{AppMode, AppModeStateMachine},
@@ -9,37 +10,23 @@ use anyhow::Result;
 use base64::Engine;
 use device_query::DeviceState;
 use keycode::KeyMappingCode::*;
-use parking_lot::RwLock;
-use rquickjs::Module;
-use std::collections::{BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::Ordering;
-use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Runtime};
+use llrt_core::libs::utils::result::ResultExt;
 use objc2::runtime::AnyObject;
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
     NSWorkspaceLaunchOptions,
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
+use parking_lot::RwLock;
+use rquickjs::{Ctx, Module};
+use std::collections::{BTreeSet, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
-use crate::observables::{ChorderObservable, Observable};
+use tauri::{AppHandle, Emitter, Runtime};
 
 const APPS_NEEDING_RELAUNCH_CHANGED_EVENT: &str = "apps-needing-relaunch-changed";
-
-#[derive(Debug)]
-#[taurpc::ipc_type]
-#[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
-pub struct ActiveChordInfo {
-    pub scope: String,
-    pub scope_kind: String,
-    pub sequence: String,
-    pub name: String,
-    pub action: String,
-    pub description: Option<String>,
-    pub is_description: bool,
-}
 
 #[derive(Debug)]
 #[taurpc::ipc_type]
@@ -62,7 +49,6 @@ pub struct AppMetadataInfo {
 
 pub struct AppContext {
     pub device_state: Option<DeviceState>,
-    pub loaded_app_chords: RwLock<LoadedAppChords>,
     pub apps_needing_relaunch: RwLock<BTreeSet<String>>,
     pub key_event_state: KeyEventState,
 
@@ -72,8 +58,6 @@ pub struct AppContext {
 
 impl AppContext {
     pub fn new() -> Result<Self> {
-        let bundled_app_chords = LoadedAppChords::from_folders(vec![ChordPackage::load_bundled()?])?;
-
         let device_state = if macos_accessibility_client::accessibility::application_is_trusted() {
             Some(DeviceState {})
         } else {
@@ -86,7 +70,6 @@ impl AppContext {
             device_state,
             apps_needing_relaunch: RwLock::new(BTreeSet::new()),
             key_event_state: KeyEventState::new(app_mode_state_machine.clone()),
-            loaded_app_chords: RwLock::new(bundled_app_chords),
             app_mode_state_machine,
         })
     }
@@ -163,7 +146,7 @@ pub fn list_apps_needing_relaunch(app: AppHandle) -> Result<Vec<AppNeedsRelaunch
 }
 
 pub fn get_app_metadata(bundle_id: String) -> Result<AppMetadataInfo> {
-    Ok( AppMetadataInfo {
+    Ok(AppMetadataInfo {
         display_name: resolve_app_display_name(&bundle_id),
         icon_data_url: resolve_app_icon_data_url(&bundle_id),
         bundle_id,
@@ -282,112 +265,10 @@ fn relaunch_bundle_id(bundle_id: &str) -> Result<()> {
     anyhow::bail!("relaunching apps is not supported on this platform: {bundle_id}");
 }
 
-fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
-    root_dir
-        .map(|root_dir| root_dir.join(module_path))
-        .unwrap_or_else(|| PathBuf::from(module_path))
-        .display()
-        .to_string()
-}
-
-// Also evaluates JavaScript
-pub async fn reload_loaded_app_chords(app: AppHandle) -> Result<()> {
-    let context = app.app_context();
-    let chorder = app.app_chorder();
-    let chord_package_registry = app.app_chord_package_registry();
-    chorder.ensure_inactive()?;
-
-    // Load all JS files as modules
-    let chord_folders = chord_package_registry.load_all_chord_packages()?;
-    reset_js(app.clone()).await?;
-
-    // Load all JS files as modules, but keep `chord_folders` so we can use it later.
-    for chord_folder in &chord_folders {
-        let js_files = chord_folder.js_files.clone();
-        let root_dir = chord_folder.root_dir.clone();
-
-        with_js(app.clone(), move |ctx| {
-            Box::pin(async move {
-                for (filepath, js) in js_files {
-                    let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
-                    let module = match Module::declare(ctx.clone(), filepath.clone(), js) {
-                        Ok(m) => {
-                            log::debug!("Declared module {}", filepath);
-                            m
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "Failed to declare JS module {}: {}",
-                                filepath,
-                                format_js_error(ctx.clone(), e)
-                            );
-                            continue;
-                        }
-                    };
-
-                    let meta = match module.meta() {
-                        Ok(meta) => meta,
-                        Err(e) => {
-                            log::error!(
-                                "Failed to get import.meta for JS module {}: {}",
-                                filepath,
-                                format_js_error(ctx.clone(), e)
-                            );
-                            continue;
-                        }
-                    };
-
-                    if let Err(e) = meta.set("url", module_disk_path) {
-                        log::error!(
-                            "Failed to set import.meta.url for JS module {}: {}",
-                            filepath,
-                            format_js_error(ctx.clone(), e)
-                        );
-                        continue;
-                    }
-
-                    let (_evaluated, promise) = match module.eval() {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!(
-                                "Failed to start evaluating JS module {}: {}",
-                                filepath,
-                                format_js_error(ctx.clone(), e)
-                            );
-                            continue;
-                        }
-                    };
-
-                    if let Err(e) = promise.into_future::<()>().await {
-                        log::error!(
-                            "Failed to evaluate JS module {}: {}",
-                            filepath,
-                            format_js_error(ctx.clone(), e)
-                        );
-                    }
-                }
-
-                Ok(())
-            })
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
-    }
-
-    let loaded_chords = LoadedAppChords::from_folders(chord_folders)?;
-    // We should only load `macos.toml` modules AFTER the js files have been loaded
-    load_chord_files_runtime_modules(app.clone(), &loaded_chords).await;
-
-    log::debug!("Loaded chord files: {:?}", loaded_chords.runtimes.keys());
-    *context.loaded_app_chords.write() = loaded_chords;
-
-    Ok(())
-}
-
 // Load all the modules specified in the config.js.module of the `macos.toml` files.
 pub async fn load_chord_files_runtime_modules(
     handle: AppHandle,
-    loaded_app_chords: &LoadedAppChords,
+    loaded_app_chords: &ChordRegistry,
 ) {
     for (bundle_id, runtime) in loaded_app_chords.runtimes.iter() {
         let handle = handle.clone();
@@ -408,78 +289,35 @@ pub async fn load_chord_files_runtime_modules(
             let path_ = path.clone();
             let result = with_js(handle, move |ctx| {
                 Box::pin(async move {
-                    let module = match Module::declare(ctx.clone(), path.clone(), content) {
-                        Ok(m) => m,
+                    let load_module = || -> rquickjs::Result<rquickjs::Promise> {
+                        let module = Module::declare(ctx.clone(), path.clone(), content)?;
+                        let chords =
+                            rquickjs_serde::to_value(ctx.clone(), raw_chords).or_throw(&ctx)?;
+                        let chords_obj = chords.into_object().or_throw(&ctx);
+                        let meta = module.meta()?;
+                        meta.set("chords", chords_obj)?;
+                        meta.set("bundleId", bundle_id)?;
+                        let (_evaluated, promise) = module.eval()?;
+                        Ok(promise)
+                    };
+
+                    match load_module() {
+                        Ok(promise) => {
+                            if let Err(e) = promise.into_future::<()>().await {
+                                log::error!(
+                                    "failed to await module {}: {}",
+                                    path,
+                                    format_js_error(ctx.clone(), e)
+                                )
+                            }
+                        }
                         Err(e) => {
                             log::error!(
-                                "Failed to declare module {}: {}",
+                                "Failed to load module {}: {}",
                                 path,
                                 format_js_error(ctx.clone(), e)
                             );
-                            return Ok(());
                         }
-                    };
-
-                    let chords = match rquickjs_serde::to_value(ctx.clone(), raw_chords) {
-                        Ok(value) => value,
-                        Err(error) => {
-                            log::error!("Failed to serialize chords: {error}");
-                            return Ok(());
-                        }
-                    };
-
-                    let chords_obj = match chords.into_object() {
-                        Some(value) => value,
-                        None => {
-                            log::error!("Failed to convert chords to object");
-                            return Ok(());
-                        }
-                    };
-
-                    let meta = match module.meta() {
-                        Ok(meta) => meta,
-                        Err(error) => {
-                            log::error!("Failed to get import.meta for module {}: {error}", path);
-                            return Ok(());
-                        }
-                    };
-
-                    if let Err(e) = meta.set("chords", chords_obj) {
-                        log::error!(
-                            "Failed to set `import.meta.chords` for module {}: {}",
-                            path,
-                            format_js_error(ctx.clone(), e)
-                        );
-                        return Ok(());
-                    }
-
-                    if let Err(e) = meta.set("bundleId", bundle_id) {
-                        log::error!(
-                            "Failed to set `import.meta.bundleId` for module {}: {}",
-                            path,
-                            format_js_error(ctx.clone(), e)
-                        );
-                        return Ok(());
-                    }
-
-                    let (_evaluated, promise) = match module.eval() {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!(
-                                "Failed to start evaluating module {}: {}",
-                                path,
-                                format_js_error(ctx.clone(), e)
-                            );
-                            return Ok(());
-                        }
-                    };
-
-                    if let Err(e) = promise.into_future::<()>().await {
-                        log::error!(
-                            "Failed to evaluate module {}: {}",
-                            path,
-                            format_js_error(ctx.clone(), e)
-                        );
                     }
 
                     Ok(())
@@ -491,139 +329,6 @@ pub async fn load_chord_files_runtime_modules(
                 log::error!("load_module failed for {}: {}", path_, err);
             }
         });
-    }
-}
-
-pub fn list_active_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
-    let context = app.app_context();
-    let loaded_app_chords = context.loaded_app_chords.read();
-    Ok(list_loaded_chords(&loaded_app_chords))
-}
-
-pub fn list_matching_chords(app: AppHandle) -> Result<Vec<ActiveChordInfo>> {
-    let context = app.app_context();
-    let frontmost = app.app_frontmost();
-    let state = app.observable_state::<ChorderObservable>()?;
-    let frontmost_application_id = frontmost.frontmost_application_id.load().as_ref().clone();
-    let loaded_app_chords = context.loaded_app_chords.read();
-
-    Ok(list_matching_loaded_chords(
-        &loaded_app_chords,
-        &state.key_buffer,
-        frontmost_application_id.as_deref(),
-    ))
-}
-
-pub fn list_loaded_chords(loaded_app_chords: &LoadedAppChords) -> Vec<ActiveChordInfo> {
-    let mut chords = Vec::new();
-    let mut seen = HashSet::new();
-
-    for (application_id, runtime) in &loaded_app_chords.runtimes {
-        for chord in runtime.chords.values() {
-            let item = build_active_chord_info(
-                application_scope(application_id),
-                application_scope_kind(application_id),
-                &chord.keys,
-                chord,
-            );
-            let fingerprint = format!(
-                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
-                item.scope_kind, item.scope, item.sequence, item.name, item.action
-            );
-            if seen.insert(fingerprint) {
-                chords.push(item);
-            }
-        }
-    }
-
-    chords.sort_by(|left, right| {
-        left.scope_kind
-            .cmp(&right.scope_kind)
-            .then(left.scope.cmp(&right.scope))
-            .then(left.sequence.cmp(&right.sequence))
-            .then(left.name.cmp(&right.name))
-    });
-
-    chords
-}
-
-pub fn list_matching_loaded_chords(
-    loaded_app_chords: &LoadedAppChords,
-    key_buffer: &[crate::input::Key],
-    application_id: Option<&str>,
-) -> Vec<ActiveChordInfo> {
-    let mut items = loaded_app_chords
-        .list_matching_descriptions(key_buffer, application_id)
-        .into_iter()
-        .map(|item| {
-            build_description_info(
-                &item.scope,
-                item.scope_kind,
-                &item.sequence,
-                &item.description,
-            )
-        })
-        .collect::<Vec<_>>();
-
-    items.extend(
-        loaded_app_chords
-            .list_matching_chords(key_buffer, application_id)
-            .into_iter()
-            .map(|item| {
-                build_active_chord_info(&item.scope, item.scope_kind, &item.sequence, &item.chord)
-            }),
-    );
-
-    items
-}
-
-fn application_scope(application_id: &str) -> &str {
-    if application_id == GLOBAL_CHORD_RUNTIME_ID {
-        "Global"
-    } else {
-        application_id
-    }
-}
-
-fn application_scope_kind(application_id: &str) -> &'static str {
-    if application_id == GLOBAL_CHORD_RUNTIME_ID {
-        "global"
-    } else {
-        "app"
-    }
-}
-
-fn build_active_chord_info(
-    scope: &str,
-    scope_kind: &str,
-    sequence: &[crate::input::Key],
-    chord: &Chord,
-) -> ActiveChordInfo {
-    ActiveChordInfo {
-        scope: scope.to_string(),
-        scope_kind: scope_kind.to_string(),
-        sequence: format_sequence(sequence),
-        name: chord.name.clone(),
-        action: format_action(chord),
-        description: None,
-        is_description: false,
-    }
-}
-
-fn build_description_info(
-    scope: &str,
-    scope_kind: &str,
-    sequence: &[crate::input::Key],
-    description: &str,
-) -> ActiveChordInfo {
-    ActiveChordInfo {
-        scope: scope.to_string(),
-        scope_kind: scope_kind.to_string(),
-        sequence: format_sequence(sequence),
-        name: description.to_string(),
-        action: "Description".to_string(),
-        description: Some(description.to_string()),
-        is_description: true,
     }
 }
 

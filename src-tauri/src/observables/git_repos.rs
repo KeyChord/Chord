@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use serde::Serialize;
-use typeshare::typeshare;
 use crate::define_observable;
+use serde::Serialize;
+use std::collections::HashMap;
+use typeshare::typeshare;
 
 #[derive(Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitReposState {
-    pub repos: HashMap<String, GitRepo>
+    pub repos: HashMap<String, GitRepo>,
 }
 
 #[taurpc::ipc_type]
@@ -20,7 +20,7 @@ pub struct GitRepo {
     pub slug: String,
     pub url: String,
     pub local_path: String,
-    pub head_short_sha: Option<String>
+    pub head_short_sha: Option<String>,
 }
 
 define_observable! {

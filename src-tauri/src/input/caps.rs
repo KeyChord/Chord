@@ -1,12 +1,12 @@
+use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::handle_key_event;
 use crate::input::{Key, KeyEvent};
-use crate::feature::app_handle_ext::AppHandleExt;
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use std::os::raw::c_int;
 use std::process::Command;
 use std::sync::mpsc::channel;
-use std::sync::{mpsc::Sender, OnceLock};
+use std::sync::{OnceLock, mpsc::Sender};
 use tauri::AppHandle;
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();

@@ -1,4 +1,5 @@
 use crate::IndicatorPanel;
+use crate::feature::SafeAppHandle;
 use anyhow::Result;
 use objc2::msg_send;
 use objc2_app_kit::{
@@ -8,12 +9,11 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{WebviewUrl, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
-use crate::feature::{SafeAppHandle};
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -39,10 +39,7 @@ pub struct ChorderIndicatorUi {
 impl ChorderIndicatorUi {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let window = handle
-            .new_webview_window_builder(
-                "chords",
-                WebviewUrl::App("index.html".into()),
-            )?
+            .new_webview_window_builder("chords", WebviewUrl::App("index.html".into()))?
             .title("Chords")
             .inner_size(640.0, 180.0)
             .visible(false)

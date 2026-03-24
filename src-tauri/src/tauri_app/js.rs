@@ -3,14 +3,14 @@ use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
 use rquickjs::{
+    AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value,
     loader::{Loader, Resolver},
     module::Declared,
-    AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value,
 };
 use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::{
-    async_runtime::{block_on, channel},
     AppHandle,
+    async_runtime::{block_on, channel},
 };
 
 struct JsEngine {
