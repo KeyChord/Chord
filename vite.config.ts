@@ -1,5 +1,6 @@
 import { defineConfig } from "vite-plus";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
@@ -9,6 +10,7 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [
     react(),
+    babel({ presets: [reactCompilerPreset()] }),
     tailwindcss(),
     tanstackRouter({
       target: "react",

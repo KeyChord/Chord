@@ -16,6 +16,11 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 );
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
+type RawChord = ReturnType<typeof useChordFile>[string];
+type ParsedChord = {
+  keys: string[];
+  chord: RawChord;
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -27,6 +32,111 @@ function normalizePrettyKey(token: string) {
   }
 
   return token;
+}
+
+function normalizeToken(token: string) {
+  const pretty = normalizePrettyKey(getPrettyKey(token));
+  return pretty.length === 1 ? pretty.toUpperCase() : pretty;
+}
+
+function parseSequence(sequence: string) {
+  return Array.from(sequence).map(normalizeToken);
+}
+
+function sortTokens(tokens: Iterable<string>) {
+  const tokenSet = new Set(tokens);
+  const letterTokens = LETTER_TOKENS.filter((token) => tokenSet.has(token));
+  const otherTokens = [...tokenSet]
+    .filter((token) => !/^[A-Z]$/.test(token))
+    .sort((left, right) => left.localeCompare(right));
+
+  return [...letterTokens, ...otherTokens];
+}
+
+function findMatchingBrace(sequence: string, start: number) {
+  let depth = 0;
+
+  for (let index = start; index < sequence.length; index += 1) {
+    const char = sequence[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function expandBraceVariants(inner: string) {
+  if (inner.includes(",")) {
+    return inner.split(",");
+  }
+
+  const rangeParts = inner.split("..");
+  if (rangeParts.length !== 2) {
+    throw new Error("unsupported brace expression");
+  }
+
+  const [start, end] = rangeParts;
+  const startNumber = Number.parseInt(start, 10);
+  const endNumber = Number.parseInt(end, 10);
+
+  if (Number.isFinite(startNumber) && Number.isFinite(endNumber)) {
+    const step = startNumber <= endNumber ? 1 : -1;
+    const width = Math.max(start.length, end.length);
+    const variants: string[] = [];
+
+    for (let value = startNumber; ; value += step) {
+      variants.push(value.toString().padStart(width, "0"));
+      if (value === endNumber) {
+        break;
+      }
+    }
+
+    return variants;
+  }
+
+  if (start.length !== 1 || end.length !== 1) {
+    throw new Error("unsupported brace range");
+  }
+
+  const startCode = start.charCodeAt(0);
+  const endCode = end.charCodeAt(0);
+  const step = startCode <= endCode ? 1 : -1;
+  const variants: string[] = [];
+
+  for (let value = startCode; ; value += step) {
+    variants.push(String.fromCharCode(value));
+    if (value === endCode) {
+      break;
+    }
+  }
+
+  return variants;
+}
+
+function expandDescriptionSequence(sequence: string): string[] {
+  const start = sequence.indexOf("{");
+  if (start === -1) {
+    return [sequence];
+  }
+
+  const end = findMatchingBrace(sequence, start);
+  if (end === undefined) {
+    throw new Error("unclosed brace expression");
+  }
+
+  const prefix = sequence.slice(0, start);
+  const inner = sequence.slice(start + 1, end);
+  const suffix = sequence.slice(end + 1);
+  const variants = expandBraceVariants(inner);
+  const suffixes = expandDescriptionSequence(suffix);
+
+  return variants.flatMap((variant) => suffixes.map((suffixValue) => `${prefix}${variant}${suffixValue}`));
 }
 
 function ChordKeyRow({
@@ -74,8 +184,8 @@ function ChordKeyRow({
 
 export function Chords() {
   const state = useChorderState();
-  const { frontmostAppBundleId } = useFrontmostState()
-  const chords = useChordFile(frontmostAppBundleId)
+  const { frontmostAppBundleId } = useFrontmostState();
+  const rawChords = useChordFile(frontmostAppBundleId);
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const [surfaceVersion, setSurfaceVersion] = useState(0);
   const [isPreparingSurface, setIsPreparingSurface] = useState(false);
@@ -150,10 +260,37 @@ export function Chords() {
     };
   }, [surfaceVersion]);
 
-  const normalizedBufferTokens = state.keyBuffer.map((key) => {
-    const pretty = normalizePrettyKey(getPrettyKey(key));
-    return pretty.length === 1 ? pretty.toUpperCase() : pretty;
-  });
+  const parsedChords: ParsedChord[] = [];
+  const descriptionsBySequence: Record<string, string> = {};
+
+  for (const [sequence, chord] of Object.entries(rawChords)) {
+    if (!sequence) {
+      continue;
+    }
+
+    if (sequence.startsWith("?")) {
+      if (!chord?.name) {
+        continue;
+      }
+
+      try {
+        for (const expandedSequence of expandDescriptionSequence(sequence.slice(1))) {
+          descriptionsBySequence[parseSequence(expandedSequence).join("")] = chord.name;
+        }
+      } catch {
+        // Ignore invalid description-only entries in the overlay.
+      }
+
+      continue;
+    }
+
+    parsedChords.push({
+      keys: parseSequence(sequence),
+      chord,
+    });
+  }
+
+  const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
 
   const maxVisibleRows = 20;
   const availableHeight = Math.max(viewportHeight - 96, 240);
@@ -169,19 +306,29 @@ export function Chords() {
     { length: Math.max(1, currentPrefixLength + 1) },
     (_, columnIndex) => {
       const prefixTokens = normalizedBufferTokens.slice(0, columnIndex);
+      const matchingChords = parsedChords.filter((chord) =>
+        prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
+      );
       const activeTokens = new Set(
-        chords
-          .filter((chord) =>
-            prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
-          )
+        matchingChords
           .map((chord) => chord.keys[columnIndex])
           .filter((token): token is string => Boolean(token)),
       );
+      const rows = sortTokens(activeTokens).map((token) => {
+        const sequenceKey = [...prefixTokens, token].join("");
+        const exactChord = matchingChords.find(
+          (chord) => chord.keys[columnIndex] === token && chord.keys.length === columnIndex + 1,
+        );
+
+        return {
+          token,
+          description: descriptionsBySequence[sequenceKey] ?? exactChord?.chord.name ?? "",
+        };
+      });
 
       return {
         id: `column-${columnIndex}`,
-        prefixTokens,
-        activeTokens,
+        rows,
         selectedToken: normalizedBufferTokens[columnIndex],
         hasSelection: Boolean(normalizedBufferTokens[columnIndex]),
       };
@@ -212,35 +359,17 @@ export function Chords() {
                   className="flex flex-col items-start justify-center"
                   style={{ gap: `${rowGap}px` }}
                 >
-                  {LETTER_TOKENS.filter((token) => column.activeTokens.has(token)).map((token) => (
+                  {column.rows.map((row) => (
                     <ChordKeyRow
-                      key={`${column.id}-${token}`}
-                      token={token}
-                      description='todo'
-                      isSelected={column.selectedToken === token}
-                      isDimmed={column.hasSelection && column.selectedToken !== token}
+                      key={`${column.id}-${row.token}`}
+                      token={row.token}
+                      description={row.description}
+                      isSelected={column.selectedToken === row.token}
+                      isDimmed={column.hasSelection && column.selectedToken !== row.token}
                       keySize={keySize}
                       descriptionFontSize={descriptionFontSize}
                     />
                   ))}
-
-                  {chords.some((chord) => column.activeTokens.has(chord.keys[0])) ? (
-                    <div className="flex flex-col items-start" style={{ gap: `${rowGap}px` }}>
-                      {chords
-                        .filter((chord) => column.activeTokens.has(chord.keys[0]))
-                        .map((chord) => (
-                          <ChordKeyRow
-                            key={`${column.id}-${chord.keys[0]}`}
-                            token={chord.keys[0]}
-                            description='todo'
-                            isSelected={column.selectedToken === chord.keys[0]}
-                            isDimmed={column.hasSelection && column.selectedToken !== chord.keys[0]}
-                            keySize={keySize}
-                            descriptionFontSize={descriptionFontSize}
-                          />
-                        ))}
-                    </div>
-                  ) : null}
                 </div>
               ))}
             </div>
