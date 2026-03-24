@@ -185,6 +185,10 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 - `cmd+ctrl+alt+shift+f{1..12}`
 - `cmd+ctrl+alt+f{1..12}`
 
+## Web Mode (Planned / Experimental)
+
+While _Chord Mode_ defaults to app-shortcuts, you can press `Caps` right after (`Caps+Space+Caps` to toggle "Web Mode", which activates chords that apply to the currently focused webpage. In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input. To type regular input, you can press and immediately release `Caps+Space` (similar to toggling `Insert Mode` in Vim), and press it again to re-enable key sequences. To exit _Web Mode_, you can just press `Caps+Space+Caps` again.
+
 ## Comparison to keyboard shortcuts
 
 Because keyboard shortcuts must be composed of one or more modifier keys followed by a single character, they come with inherent limitations:
