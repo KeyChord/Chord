@@ -302,13 +302,14 @@ impl ChordRegistry {
         let mut app_config_map = HashMap::new();
 
         for chord_folder in chord_packages {
-            log::debug!("Loading folder from root {:?}", chord_folder.root_dir);
+            if let Some(root_dir) = chord_folder.root_dir {
+                log::debug!("Loading folder: {:?}", root_dir);
+            } else {
+                log::debug!("Loading bundled chords");
+            }
 
             for (chord_file_path, file) in chord_folder.chords_files {
-                log::debug!(
-                    "Starting to load chords file from path {:?}",
-                    chord_file_path
-                );
+                log::debug!( "Loading {:?}", chord_file_path);
 
                 let Some(runtime_id) = runtime_id_from_chords_path(Path::new(&chord_file_path))
                 else {
@@ -319,19 +320,12 @@ impl ChordRegistry {
                 let chords = file.get_chords_shallow();
                 for sequence in chords.keys() {
                     if is_global_chord_sequence(sequence) {
-                        log::debug!("Adding global chord for sequence: {:?}", sequence);
                         global_chords_to_runtime_key.insert(sequence.clone(), runtime_id.clone());
                     }
                 }
 
                 let config = file.config.clone();
                 let app_chord_runtime = ChordRuntime::from_file_shallow(chord_file_path, file)?;
-
-                log::debug!(
-                    "Loaded {} initial chords for runtime {}",
-                    app_chord_runtime.chords.len(),
-                    runtime_id
-                );
                 app_runtime_map.insert(runtime_id.clone(), app_chord_runtime);
                 app_config_map.insert(runtime_id, config);
             }
@@ -359,7 +353,46 @@ impl ChordRegistry {
         Ok((global_chords_to_runtime_key, app_runtime_map))
     }
 
-    pub fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
+    pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
+        let Some(handle) = self.handle.try_handle() else {
+            anyhow::bail!("app not ready")
+        };
+
+        for chord_package in &chord_packages {
+            let js_files = chord_package.js_files.clone();
+            let root_dir = chord_package.root_dir.clone();
+
+            with_js(handle.clone(), move |ctx| {
+                Box::pin(async move {
+                    let load_module =
+                        |filepath: &String, js: String| -> rquickjs::Result<Promise> {
+                            let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
+                            let module = Module::declare(ctx.clone(), filepath.clone(), js)?;
+                            let meta = module.meta()?;
+                            meta.set("url", module_disk_path)?;
+                            let (_evaluated, promise) = module.eval()?;
+                            Ok(promise)
+                        };
+                    for (filepath, js) in js_files {
+                        match load_module(&filepath, js) {
+                            Ok(promise) => {
+                                if let Err(e) = promise.into_future::<()>().await {
+                                    log::error!("failed to await module {}: {:?}", filepath, e);
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to load module {}: {:?}", filepath, e);
+                            }
+                        };
+                    }
+
+                    Ok(())
+                })
+            })
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+        }
+
         let (global_chords_to_runtime_key, app_runtime_map) =
             ChordRegistry::parse_packages(chord_packages)?;
 
@@ -370,35 +403,36 @@ impl ChordRegistry {
             }
         }
 
+        // Set state before setting observable
         {
-            let mut map = self.global_chords_to_runtime_key
-                .lock().expect("poisoned");
+            let mut map = self.global_chords_to_runtime_key.lock().expect("poisoned");
             map.extend(global_chords_to_runtime_key);
         }
 
         {
-            let mut map = self.runtimes
-                .lock().expect("poisoned");
+            let mut map = self.runtimes.lock().expect("poisoned");
             map.extend(
                 app_runtime_map
                     .into_iter()
-                    .map(|(key, value)| (key, Arc::new(value)))
-            );        }
+                    .map(|(key, value)| (key, Arc::new(value))),
+            );
+        }
 
         self.observable.set_state(ChordRegistryState { chords })?;
+
+        // We should only load `macos.toml` modules AFTER the js files have been loaded
+        self.load_chord_config_modules().await;
+
         Ok(())
     }
 
-    pub fn new(handle: SafeAppHandle, observable: Arc<ChordRegistryObservable>) -> Result<Self> {
-        let mut registry = ChordRegistry {
+    pub fn new_empty(handle: SafeAppHandle, observable: Arc<ChordRegistryObservable>) -> Self {
+        ChordRegistry {
             handle,
             global_chords_to_runtime_key: Mutex::new(HashMap::new()),
             runtimes: Mutex::new(HashMap::new()),
             observable,
-        };
-        let bundled_chord_package = ChordPackage::load_bundled()?;
-        registry.load_packages(vec![bundled_chord_package])?;
-        Ok(registry)
+        }
     }
 
     // No application = global chord
@@ -408,7 +442,8 @@ impl ChordRegistry {
         application_id: Option<String>,
     ) -> Option<Arc<ChordRuntime>> {
         if is_global_chord_sequence(sequence) {
-            let global_chords_to_runtime_key = self.global_chords_to_runtime_key.lock().expect("poisoned");
+            let global_chords_to_runtime_key =
+                self.global_chords_to_runtime_key.lock().expect("poisoned");
             let Some(runtime_key) = global_chords_to_runtime_key.get(sequence) else {
                 log::warn!("Invalid global chord sequence: {:?}", sequence);
                 return None;
@@ -485,7 +520,13 @@ impl ChordRegistry {
             }
         } else if let Some(application_id) = application_id {
             if let Some(runtime) = runtimes.get(application_id) {
-                push_runtime_matches(&mut matches, application_id, "app", runtime.clone(), chord_prefix);
+                push_runtime_matches(
+                    &mut matches,
+                    application_id,
+                    "app",
+                    runtime.clone(),
+                    chord_prefix,
+                );
             }
         }
 
@@ -529,7 +570,8 @@ impl ChordRegistry {
             }
 
             let global_runtime_ids = {
-                let global_chords_to_runtime_key = self.global_chords_to_runtime_key.lock().expect("poisoned");
+                let global_chords_to_runtime_key =
+                    self.global_chords_to_runtime_key.lock().expect("poisoned");
                 global_chords_to_runtime_key
                     .values()
                     .cloned()
@@ -554,7 +596,8 @@ impl ChordRegistry {
             }
         } else if is_global_chord_sequence(chord_prefix) {
             let global_runtime_ids = {
-                let global_chords_to_runtime_key = self.global_chords_to_runtime_key.lock().expect("poisoned");
+                let global_chords_to_runtime_key =
+                    self.global_chords_to_runtime_key.lock().expect("poisoned");
                 global_chords_to_runtime_key
                     .values()
                     .cloned()
@@ -608,7 +651,7 @@ impl ChordRegistry {
     }
 
     /// Also re-evaluates JavaScript
-    pub async fn reload(&mut self) -> Result<()> {
+    pub async fn reload(&self) -> Result<()> {
         let Some(handle) = self.handle.try_handle() else {
             anyhow::bail!("app not loaded yet")
         };
@@ -619,45 +662,8 @@ impl ChordRegistry {
 
         let chord_packages = chord_package_registry.load_all_chord_packages()?;
         reset_js(handle.clone()).await?;
+        self.load_packages(chord_packages).await?;
 
-        for chord_package in &chord_packages {
-            let js_files = chord_package.js_files.clone();
-            let root_dir = chord_package.root_dir.clone();
-
-            with_js(handle.clone(), move |ctx| {
-                Box::pin(async move {
-                    let load_module =
-                        |filepath: &String, js: String| -> rquickjs::Result<Promise> {
-                            let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
-                            let module = Module::declare(ctx.clone(), filepath.clone(), js)?;
-                            let meta = module.meta()?;
-                            meta.set("url", module_disk_path)?;
-                            let (_evaluated, promise) = module.eval()?;
-                            Ok(promise)
-                        };
-                    for (filepath, js) in js_files {
-                        match load_module(&filepath, js) {
-                            Ok(promise) => {
-                                if let Err(e) = promise.into_future::<()>().await {
-                                    log::error!("failed to await module {}: {:?}", filepath, e);
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("Failed to load module {}: {:?}", filepath, e);
-                            }
-                        };
-                    }
-
-                    Ok(())
-                })
-            })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
-        }
-
-        self.load_packages(chord_packages)?;
-        // We should only load `macos.toml` modules AFTER the js files have been loaded
-        self.load_chord_config_modules().await;
         Ok(())
     }
 
@@ -898,7 +904,8 @@ async fn import_js_namespace<'js>(ctx: Ctx<'js>, module_path: &str) -> Option<Ob
         Ok(namespace) => Some(namespace),
         Err(e) => {
             log::error!(
-                "Failed to import JS module: {}",
+                "Failed to import JS module {}: {}",
+                module_path,
                 format_js_error(ctx.clone(), e)
             );
             None

@@ -6,7 +6,7 @@ use parking_lot::deadlock;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 pub use tauri_app::*;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
@@ -171,28 +171,31 @@ fn setup(app: &mut tauri::App) -> Result<()> {
         chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRegistry::new(safe_handle.clone(), chord_registry_observable.clone())?,
+        chord_registry: ChordRegistry::new_empty(safe_handle.clone(), chord_registry_observable.clone())
     });
 
-    // Load the
-    let chord_packages = git_package_registry.load_all_packages()?;
-    let chord_registry = app.handle().app_chord_registry();
-    chord_registry.load_packages(chord_packages)?;
-
     let handle = app.handle();
+    tauri::async_runtime::spawn(load_chords(handle.clone(), git_package_registry));
+    tauri::async_runtime::spawn(load_permissions(handle.clone()));
+
+    // Create tray
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
         log::error!("Failed to create tray: {error:#}");
     }
 
-    {
-        let handle = handle.clone();
-        tauri::async_runtime::spawn(async move {
-            let permissions = handle.app_permissions();
-            if let Err(e) = permissions.load().await {
-                log::error!("Failed to load permissions:\n{:#?}", e);
-            }
-        });
-    }
-
     Ok(())
+}
+
+async fn load_chords(handle: AppHandle, git_package_registry: Arc<GitPackageRegistry>) -> Result<()> {
+    let mut chord_packages = git_package_registry.load_all_packages()?;
+    chord_packages.push(ChordPackage::load_bundled()?);
+    let chord_registry = handle.app_chord_registry();
+    log::debug!("Loading packages: {:?}", chord_packages.iter().map(|p| p.root_dir.clone()).collect::<Vec<_>>());
+    chord_registry.load_packages(chord_packages).await?;
+    Ok(())
+}
+
+async fn load_permissions(handle: AppHandle) -> Result<()> {
+    let permissions = handle.app_permissions();
+    Ok(permissions.load().await?)
 }
