@@ -2,13 +2,12 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use crate::{tauri_app, AppContext};
 use crate::chords::{ChordPackage, ChordRegistry};
-use crate::app::{AppHandleExt, AppManaged};
-use crate::app::{AppChorder, AppFrontmost, AppPermissions, AppSettings, SafeAppHandle};
-use crate::app::global_hotkey::GlobalHotkeyStore;
-use crate::app::placeholder_chords::PlaceholderChordStore;
-use crate::app::repos::GitReposStore;
+use crate::app::{AppHandleExt, AppManaged, SafeAppHandle, AppFrontmost, GitReposStore, PlaceholderChordStore, GlobalHotkeyStore};
+use crate::chord_runner::ChordRunner;
+use crate::desktop_app::DesktopAppManager;
 use crate::lock_file::AppLockFile;
-use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable, FrontmostObservable, GitReposObservable};
+use crate::mode::AppMode::Chord;
+use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
 use crate::registry::{ChordPackageRegistry, GitPackageRegistry};
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
@@ -22,6 +21,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
     let chord_files_observable = Arc::new(ChordFilesObservable::new(safe_handle.clone())?);
     let git_package_registry = Arc::new(GitPackageRegistry::new(safe_handle.clone())?);
+    let desktop_app_manager_observable = Arc::new(DesktopAppManagerObservable::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
     app.handle().manage(git_repos_observable.clone());
     app.handle().manage(permissions_observable.clone());
@@ -47,6 +47,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
             safe_handle.clone(),
             chord_files_observable.clone(),
         ),
+        chord_runner: ChordRunner::new(safe_handle.clone()),
+        desktop_app_manager: DesktopAppManager::new(safe_handle.clone(), desktop_app_manager_observable)
     });
 
     let handle = app.handle();
@@ -58,11 +60,12 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
         log::error!("Failed to create tray: {error:#}");
     }
-    handle.app_settings().apply_all()?;
+    let settings = handle.app_settings();
+    settings.apply_all()?;
 
     let startup_status = tauri_app::startup::get_startup_status(&handle)?;
     if startup_status.should_show_onboarding {
-        tauri_app::settings::show_settings_window(handle.clone())?;
+        settings.ui.open()?;
     }
 
     Ok(())

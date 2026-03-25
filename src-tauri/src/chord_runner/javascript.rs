@@ -7,6 +7,7 @@ use crate::quickjs::with_js;
 use anyhow::Result;
 use crate::app::SafeAppHandle;
 
+#[derive(Clone)]
 pub struct ChordJavascriptRunner {
     handle: SafeAppHandle
 }

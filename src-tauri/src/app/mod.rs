@@ -1,29 +1,32 @@
 use crate::AppContext;
-use crate::chord_runner::ChordRunner;
+use self::global_hotkey::GlobalHotkeyStore;
+use self::placeholder_chords::PlaceholderChordStore;
+use self::repos::GitReposStore;
+pub(crate) use crate::app::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
 use crate::chords::ChordRegistry;
-use crate::app::global_hotkey::GlobalHotkeyStore;
-use crate::app::placeholder_chords::PlaceholderChordStore;
-use crate::app::repos::GitReposStore;
-use crate::app::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
 use crate::desktop_app::DesktopAppManager;
 use crate::registry::ChordPackageRegistry;
+use crate::chord_runner::ChordRunner;
 
-mod chorder;
-mod chorder_ui;
-mod frontmost;
-pub mod global_hotkey;
-mod permissions;
-pub mod placeholder_chords;
-pub mod repos;
-mod safe_app_handle;
-mod settings;
-
+pub mod chorder;
 pub use chorder::*;
+pub mod chorder_ui;
 pub use chorder_ui::*;
+mod frontmost;
 pub use frontmost::*;
+pub mod global_hotkey;
+pub use global_hotkey::*;
+pub mod permissions;
 pub use permissions::*;
+pub mod placeholder_chords;
+pub use placeholder_chords::*;
+pub mod repos;
+pub use repos::*;
+pub mod safe_app_handle;
 pub use safe_app_handle::*;
+pub mod settings;
 pub use settings::*;
+
 
 crate::define_app_managed! {
     settings: AppSettings => app_settings,

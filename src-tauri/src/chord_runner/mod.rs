@@ -1,19 +1,19 @@
-use std::sync::Arc;
+use crate::app::SafeAppHandle;
 use crate::chord_runner::javascript::ChordJavascriptRunner;
 use crate::chord_runner::shell::ChordShellRunner;
 use crate::chord_runner::shortcut::ChordShortcutRunner;
 use crate::chords::{Chord, ChordPayload, ChordRuntime};
 use anyhow::Result;
-use crate::app::SafeAppHandle;
+use std::sync::Arc;
 
-pub mod shortcut;
-pub mod shell;
 pub mod javascript;
+pub mod shell;
+pub mod shortcut;
 
 pub struct ChordRunner {
     pub shortcut: ChordShortcutRunner,
     shell: ChordShellRunner,
-    javascript: ChordJavascriptRunner
+    javascript: ChordJavascriptRunner,
 }
 
 impl ChordRunner {
@@ -25,17 +25,18 @@ impl ChordRunner {
         Self {
             shortcut,
             shell,
-            javascript
+            javascript,
         }
     }
 
-    pub async fn press_chord(
+    pub fn press_chord(
         &self,
         runtime: Arc<ChordRuntime>,
         chord_payload: &ChordPayload,
     ) -> Result<()> {
         if let Some(shortcut) = chord_payload.chord.shortcut.clone() {
-            self.shortcut.press_shortcut(shortcut, chord_payload.num_times)?;
+            self.shortcut
+                .press_shortcut(shortcut, chord_payload.num_times)?;
         }
 
         if let Some(shell) = chord_payload.chord.shell.clone() {
@@ -43,7 +44,15 @@ impl ChordRunner {
         }
 
         if let Some(js) = chord_payload.chord.js.clone() {
-            self.javascript.execute_chord_javascript(runtime.path.clone(), js, chord_payload.num_times).await?;
+            let javascript = self.javascript.clone();
+            let chord_payload = chord_payload.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = javascript
+                    .execute_chord_javascript(runtime.path.clone(), js, chord_payload.num_times)
+                    .await {
+                    log::error!("failed to execute js: {}", e);
+                };
+            });
         }
 
         Ok(())
