@@ -1,8 +1,8 @@
+use crate::app::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use crate::observables::{AppPermissionsObservable, AppPermissionsState, Observable};
 use anyhow::Result;
 use std::sync::Arc;
-use crate::app::SafeAppHandle;
 
 pub struct AppPermissions {
     _input_monitoring: AppPermissionsInputMonitoring,
@@ -111,4 +111,3 @@ pub fn open_system_settings(url: &str, permission_name: &str) {
         log::error!("Failed to open {permission_name} settings: {error}");
     }
 }
-

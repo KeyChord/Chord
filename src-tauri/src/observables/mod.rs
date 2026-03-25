@@ -2,20 +2,20 @@ use std::collections::HashMap;
 
 mod chord_files;
 mod chorder;
+mod desktop_app_manager;
 mod frontmost;
 mod git_repos;
 mod permissions;
 mod settings;
-mod desktop_app_manager;
 
 use crate::app::SafeAppHandle;
 pub use chord_files::*;
 pub use chorder::*;
+pub use desktop_app_manager::*;
 pub use frontmost::*;
 pub use git_repos::*;
 pub use permissions::*;
 pub use settings::*;
-pub use desktop_app_manager::*;
 
 pub struct ObservableRegistration {
     pub id: &'static str,

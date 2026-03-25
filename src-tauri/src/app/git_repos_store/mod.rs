@@ -1,3 +1,4 @@
+use crate::app::SafeAppHandle;
 use crate::git::{GitHubRepoRef, clone_repo};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::Result;
@@ -5,7 +6,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::app::SafeAppHandle;
 
 #[derive(Clone)]
 pub struct GitReposStore {

@@ -1,12 +1,15 @@
-use std::time::{Duration, Instant};
 use anyhow::Result;
 use base64::Engine;
 use objc2::__framework_prelude::AnyObject;
-use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
+use objc2_app_kit::{
+    NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
+    NSWorkspaceLaunchOptions,
+};
 use objc2_foundation::{NSDictionary, NSSize, NSString};
+use std::time::{Duration, Instant};
 
 pub struct DesktopApp {
-    pub bundle_id: String
+    pub bundle_id: String,
 }
 
 #[derive(Debug)]
@@ -27,10 +30,9 @@ impl DesktopApp {
         }
 
         Ok(Self {
-            bundle_id: bundle_id.to_string()
+            bundle_id: bundle_id.to_string(),
         })
     }
-
 
     pub fn get_metadata(&self) -> Result<DesktopAppMetadata> {
         Ok(DesktopAppMetadata {
@@ -42,7 +44,8 @@ impl DesktopApp {
 
     pub fn resolve_display_name(&self) -> Option<String> {
         let bundle_id = NSString::from_str(&self.bundle_id);
-        let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        let running_apps =
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
 
         if let Some(app) = running_apps.iter().next() {
             if let Some(name) = app.localizedName() {
@@ -79,7 +82,8 @@ impl DesktopApp {
 
         let tiff = icon.TIFFRepresentation()?;
         let bitmap = NSBitmapImageRep::imageRepWithData(&tiff)?;
-        let properties = NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
+        let properties =
+            NSDictionary::<objc2_app_kit::NSBitmapImageRepPropertyKey, AnyObject>::new();
         let png_data = unsafe {
             bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties)
         }?;

@@ -1,5 +1,6 @@
+use crate::app::chord_package::{AppChordsFileConfig, ChordPackage};
 use crate::app::chord_runner::runtime::{
-    ChordRuntime, MatchingChordInfo, MatchingDescriptionInfo, GLOBAL_CHORD_RUNTIME_ID,
+    ChordRuntime, GLOBAL_CHORD_RUNTIME_ID, MatchingChordInfo, MatchingDescriptionInfo,
 };
 use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::app::{AppHandleExt, SafeAppHandle};
@@ -11,7 +12,6 @@ use llrt_core::{Module, Promise};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use crate::app::chord_package::{AppChordsFileConfig, ChordPackage};
 
 pub struct ChordRunnerRegistry {
     pub global_chords_to_runtime_key: Mutex<HashMap<Vec<Key>, String>>,
@@ -156,8 +156,8 @@ impl ChordRunnerRegistry {
                     Ok(())
                 })
             })
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
+            .await
+            .map_err(|e| anyhow::anyhow!(e))?;
         }
 
         let placeholder_entries = handle.app_placeholder_chord_store().entries();
@@ -492,7 +492,7 @@ impl ChordRunnerRegistry {
                         Ok(())
                     })
                 })
-                    .await;
+                .await;
 
                 if let Err(err) = result {
                     log::error!("load_module failed for {}: {}", path2, err);

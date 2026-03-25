@@ -6,10 +6,6 @@ type TAURI_CHANNEL<T> = (response: T) => void
 
 export type AppError = { Message: string }
 
-export type AppMetadataInfo = { bundleId: string; displayName: string | null; iconDataUrl: string | null }
-
-export type AppNeedsRelaunchInfo = { bundleId: string; displayName: string | null }
-
 export type GitRepo = { owner: string; name: string; slug: string; url: string; localPath: string; headShortSha: string | null }
 
 export type GlobalShortcutMappingInfo = { shortcut: string; bundleId: string; hotkeyId: string }
@@ -18,14 +14,12 @@ export type LocalChordPackage = { path: string }
 
 export type StartupStatusInfo = { launchedViaAutostart: boolean; onboardingCompleted: boolean; shouldShowOnboarding: boolean }
 
-const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getAppMetadata":["bundle_id"],"getCurrentStates":[],"getStartupStatus":[],"listAppsNeedingRelaunch":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}' }
+const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getCurrentStates":[],"getStartupStatus":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}' }
 export type Router = { "": {addGitRepo: (repo: string) => Promise<GitRepo>, 
 addLocalChordFolder: (path: string) => Promise<LocalChordPackage>, 
 completeOnboarding: () => Promise<null>, 
-getAppMetadata: (bundleId: string) => Promise<AppMetadataInfo>, 
 getCurrentStates: () => Promise<string>, 
 getStartupStatus: () => Promise<StartupStatusInfo>, 
-listAppsNeedingRelaunch: () => Promise<AppNeedsRelaunchInfo[]>, 
 listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>, 
 listLocalChordFolders: () => Promise<LocalChordPackage[]>, 
 openAccessibilitySettings: () => Promise<void>, 

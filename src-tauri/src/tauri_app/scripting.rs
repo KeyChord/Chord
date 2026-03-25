@@ -1,7 +1,7 @@
+use crate::app::AppHandleExt;
 use anyhow::{Context, Result, bail};
 use std::sync::OnceLock;
 use tauri::AppHandle;
-use crate::app::AppHandleExt;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
@@ -29,7 +29,7 @@ pub fn handle_url(url: &str) -> Result<()> {
         ScriptCommand::OpenSettings => {
             let settings = handle.app_settings();
             settings.ui.open()?
-        },
+        }
         ScriptCommand::ReloadConfigs => reload_configs(handle),
     }
 

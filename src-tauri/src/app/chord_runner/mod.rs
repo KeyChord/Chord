@@ -4,15 +4,15 @@ use self::runtime::ChordRuntime;
 use self::shell::ChordShellRunner;
 use self::shortcut::ChordShortcutRunner;
 use crate::app::SafeAppHandle;
+use crate::app::chord_package::Chord;
 use anyhow::Result;
 use std::sync::Arc;
-use crate::app::chord_package::Chord;
 
 pub mod javascript;
+pub mod registry;
 pub mod runtime;
 pub mod shell;
 pub mod shortcut;
-pub mod registry;
 
 // TODO: registry should be part of ChordRunner
 pub struct ChordRunner {

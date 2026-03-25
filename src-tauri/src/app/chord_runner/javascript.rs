@@ -1,17 +1,16 @@
-use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
-use llrt_core::function::Args;
-use llrt_core::libs::utils::result::ResultExt;
-use serde::Serialize;
-use typeshare::typeshare;
+use crate::app::SafeAppHandle;
 use crate::quickjs::with_js;
 use anyhow::Result;
-use crate::app::SafeAppHandle;
+use llrt_core::function::Args;
+use llrt_core::libs::utils::result::ResultExt;
+use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
+use serde::Serialize;
+use typeshare::typeshare;
 
 #[derive(Clone)]
 pub struct ChordJavascriptRunner {
-    handle: SafeAppHandle
+    handle: SafeAppHandle,
 }
-
 
 #[typeshare(typescript(type = "any"))]
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -43,7 +42,8 @@ impl ChordJavascriptRunner {
         let handle = self.handle.try_handle()?;
         with_js(handle.clone(), move |ctx| {
             Box::pin(call_js_export(ctx, module_path, invocation, num_times))
-        }).await?;
+        })
+        .await?;
 
         Ok(())
     }
@@ -63,7 +63,13 @@ async fn call_js_export<'js>(
         if let Some(promise) = export.as_promise().cloned() {
             export = promise.into_future::<Value<'js>>().await?;
         }
-        let function = export.as_function().cloned().or_throw_msg(&ctx, &format!("JS export `{}` did not resolve to a function: {:?}", export_name, export))?;
+        let function = export.as_function().cloned().or_throw_msg(
+            &ctx,
+            &format!(
+                "JS export `{}` did not resolve to a function: {:?}",
+                export_name, export
+            ),
+        )?;
         let args = convert_js_args(&ctx, invocation.args.clone())?;
         let mut args_builder = Args::new(ctx.clone(), args.len());
         for value in args {
@@ -93,13 +99,10 @@ fn convert_js_args<'js>(ctx: &Ctx<'js>, args: ChordJsArgs) -> rquickjs::Result<V
 
         ChordJsArgs::Eval(source) => {
             let value: Value<'js> = ctx.eval(source.as_str())?;
-            let array = value
-                .as_array()
-                .cloned()
-                .or_throw_msg(
-                    ctx,
-                    &format!("JS args `{}` must evaluate to an array", source),
-                )?;
+            let array = value.as_array().cloned().or_throw_msg(
+                ctx,
+                &format!("JS args `{}` must evaluate to an array", source),
+            )?;
 
             (0..array.len())
                 .map(|index| {

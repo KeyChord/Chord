@@ -1,9 +1,9 @@
+use crate::app::chord_package::AppChordsFile;
 use anyhow::Result;
 use fast_radix_trie::StringRadixMap;
 use include_dir::{Dir, include_dir};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use crate::app::chord_package::AppChordsFile;
 
 #[derive(Debug)]
 pub struct ChordPackage {

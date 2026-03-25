@@ -1,3 +1,4 @@
+use crate::app::AppManaged;
 use crate::observables::Observable;
 use anyhow::Result;
 use delegate::delegate;
@@ -10,7 +11,6 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::app::AppManaged;
 
 type OnSafeCallback = Box<dyn FnOnce(AppHandle) + Send + 'static>;
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;

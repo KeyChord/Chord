@@ -1,18 +1,18 @@
+use crate::app::SafeAppHandle;
 use crate::input::Key;
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use serde::Serialize;
 use std::str::FromStr;
 use typeshare::typeshare;
-use crate::app::SafeAppHandle;
 
 pub struct ChordShortcutRunner {
-    handle: SafeAppHandle
+    handle: SafeAppHandle,
 }
 
 impl ChordShortcutRunner {
     pub fn new(handle: SafeAppHandle) -> Self {
-        Self  { handle }
+        Self { handle }
     }
 
     pub fn press_shortcut(&self, shortcut: Shortcut, num_times: usize) -> Result<()> {
@@ -55,7 +55,6 @@ impl ChordShortcutRunner {
     }
 }
 
-
 /// Represents a parsed keyboard shortcut, e.g. "cmd+shift+n".
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -97,9 +96,9 @@ impl Shortcut {
         let has_shift = self.chords.iter().any(|chord| {
             chord.keys.iter().any(|key| {
                 matches!(
-                key,
-                Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)
-            )
+                    key,
+                    Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)
+                )
             })
         });
 
@@ -133,8 +132,7 @@ impl Shortcut {
 
     pub fn to_release_actions(&self) -> Vec<ShortcutAction> {
         let suppress_shift = !self.has_shift();
-        self
-            .chords
+        self.chords
             .last()
             .into_iter()
             .flat_map(|chord| {
@@ -148,4 +146,3 @@ impl Shortcut {
             .collect()
     }
 }
-

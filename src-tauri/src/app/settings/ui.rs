@@ -1,10 +1,10 @@
+use crate::app::SafeAppHandle;
 use crate::observables::{AppSettingsObservable, AppSettingsState, ChorderObservable, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use tauri::{Manager, WebviewUrl, WebviewWindow};
-use crate::app::SafeAppHandle;
 
 pub struct SettingsUi {
     pub handle: SafeAppHandle,
@@ -44,7 +44,7 @@ impl SettingsUi {
         Ok(())
     }
 
-    pub fn open_inspector(&self) -> Result<()>{
+    pub fn open_inspector(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         window.show()?;
         window.unminimize()?;
@@ -60,4 +60,3 @@ impl SettingsUi {
         Ok(())
     }
 }
-

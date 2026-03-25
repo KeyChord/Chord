@@ -1,3 +1,5 @@
+use crate::app::desktop_app::clear_callbacks;
+use crate::quickjs::chord_module::ChordModule;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
@@ -11,8 +13,6 @@ use tauri::{
     AppHandle,
     async_runtime::{block_on, channel},
 };
-use crate::app::desktop_app::clear_callbacks;
-use crate::quickjs::chord_module::ChordModule;
 
 mod chord_module;
 
@@ -211,4 +211,3 @@ where
         .await
         .ok_or_else(|| anyhow::anyhow!("main thread task dropped"))?
 }
-

@@ -7,7 +7,6 @@ use device_query::DeviceState;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
-
 pub struct AppContext {
     pub device_state: Option<DeviceState>,
     pub key_event_state: KeyEventState,
@@ -48,4 +47,3 @@ impl AppContext {
             .take_caps_lock_passthrough_on_release(event)
     }
 }
-

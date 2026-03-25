@@ -15,4 +15,3 @@ impl From<anyhow::Error> for AppError {
 }
 
 pub type AppResult<T> = Result<T, AppError>;
-

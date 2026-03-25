@@ -1,11 +1,11 @@
+use crate::api::{AppError, AppResult};
+use crate::app::SafeAppHandle;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::api::{AppError, AppResult};
-use crate::app::SafeAppHandle;
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
 
@@ -90,4 +90,3 @@ pub fn normalize_placeholder_sequence(sequence: &str) -> Result<String> {
 
     Ok(normalized)
 }
-

@@ -1,7 +1,7 @@
-use std::sync::Arc;
-use parking_lot::Mutex;
-use tauri::AppHandle;
 use crate::api::{AppError, AppResult};
+use parking_lot::Mutex;
+use std::sync::Arc;
+use tauri::AppHandle;
 
 #[derive(Clone, Default)]
 pub struct ApiImpl {

@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::input::handle_key_event;
 use crate::input::{Key, KeyEvent};
 use anyhow::Result;
@@ -7,7 +8,6 @@ use std::process::Command;
 use std::sync::mpsc::channel;
 use std::sync::{OnceLock, mpsc::Sender};
 use tauri::AppHandle;
-use crate::app::AppHandleExt;
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 

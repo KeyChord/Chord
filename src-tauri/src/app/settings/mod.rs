@@ -1,11 +1,11 @@
+use self::ui::SettingsUi;
+use crate::app::SafeAppHandle;
 use crate::observables::{AppSettingsObservable, AppSettingsState, ChorderObservable, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use tauri::Manager;
-use crate::app::SafeAppHandle;
-use self::ui::SettingsUi;
 
 mod ui;
 
@@ -14,7 +14,6 @@ pub struct AppSettings {
     observable: Arc<AppSettingsObservable>,
     handle: SafeAppHandle,
 }
-
 
 impl AppSettings {
     pub fn new(handle: SafeAppHandle, observable: Arc<AppSettingsObservable>) -> Result<Self> {

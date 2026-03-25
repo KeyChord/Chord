@@ -1,10 +1,10 @@
+use crate::app::SafeAppHandle;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::app::SafeAppHandle;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GlobalHotkeyStoreEntry {
@@ -26,7 +26,6 @@ pub struct GlobalShortcutMappingInfo {
     pub bundle_id: String,
     pub hotkey_id: String,
 }
-
 
 impl GlobalHotkeyStore {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
@@ -85,4 +84,3 @@ impl GlobalHotkeyStore {
         Ok(())
     }
 }
-

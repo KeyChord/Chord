@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::input::Key;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
 use bitflags::bitflags;
@@ -6,7 +7,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
 use tauri::AppHandle;
-use crate::app::AppHandleExt;
 
 #[derive(Debug)]
 pub enum KeyEvent {

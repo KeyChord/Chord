@@ -1,9 +1,8 @@
+use crate::app::chord_package::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, Chord};
 use crate::input::Key;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use crate::app::chord_package::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, Chord};
-
 
 #[derive(Debug, Clone)]
 pub struct MatchingChordInfo {

@@ -26,4 +26,3 @@ pub fn build_app_menu<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R
 
     Ok(menu)
 }
-

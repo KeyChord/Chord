@@ -1,8 +1,8 @@
-use serde::Serialize;
-use typeshare::typeshare;
 use crate::app::chord_runner::javascript::ChordJsInvocation;
 use crate::app::chord_runner::shortcut::Shortcut;
 use crate::input::Key;
+use serde::Serialize;
+use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]

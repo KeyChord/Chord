@@ -1,18 +1,17 @@
-use std::sync::Arc;
 use crate::app::SafeAppHandle;
 use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
-use rquickjs::{Ctx, Function, Persistent, Promise, Value};
-use serde::Serialize;
-use std::cell::RefCell;
-use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::time::{Duration, Instant};
 use llrt_core::libs::utils::result::ResultExt;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
 use objc2_foundation::NSString;
+use rquickjs::{Ctx, Function, Persistent, Promise, Value};
+use serde::Serialize;
+use std::cell::RefCell;
+use std::sync::Arc;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::{Duration, Instant};
 use tauri::AppHandle;
-
 
 pub struct DesktopAppManager {
     observable: Arc<DesktopAppManagerObservable>,
@@ -28,7 +27,8 @@ impl DesktopAppManager {
         let app = DesktopApp::new(bundle_id)?;
 
         let bundle_id = NSString::from_str(bundle_id);
-        let running_apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        let running_apps =
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
 
         for app in running_apps.iter() {
             app.terminate();
@@ -64,11 +64,7 @@ impl DesktopAppManager {
         Ok(())
     }
 
-    pub fn set_app_needs_relaunch(
-        &self,
-        bundle_id: &str,
-        needs_relaunch: bool,
-    ) -> Result<()> {
+    pub fn set_app_needs_relaunch(&self, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
         let bundle_id = bundle_id.to_string();
         let state = self.observable.get_state()?;
         let apps_needing_relaunch = state.apps_needing_relaunch.clone();
@@ -82,7 +78,9 @@ impl DesktopAppManager {
             apps_needing_relaunch.retain(|id| id != &bundle_id);
         }
 
-        self.observable.set_state(DesktopAppManagerState { apps_needing_relaunch })?;
+        self.observable.set_state(DesktopAppManagerState {
+            apps_needing_relaunch,
+        })?;
         Ok(())
     }
 }
@@ -169,7 +167,7 @@ pub fn register_app_terminate_handler<'js>(
         unregister_app_terminate_handler(id);
         Ok(())
     })?
-        .with_name("off")
+    .with_name("off")
 }
 
 fn unregister_app_terminate_handler(id: u64) {
@@ -203,7 +201,7 @@ pub fn dispatch_app_launch(app: ObservedApp) {
         if let Err(error) = with_js(handle, move |ctx| {
             Box::pin(invoke_launch_callbacks(ctx, app))
         })
-            .await
+        .await
         {
             log::error!("Failed to run app launch callbacks: {error}");
         }
@@ -223,7 +221,7 @@ pub fn dispatch_app_terminate(app: ObservedApp) {
         if let Err(error) = with_js(handle, move |ctx| {
             Box::pin(invoke_terminate_callbacks(ctx, app))
         })
-            .await
+        .await
         {
             log::error!("Failed to run app terminate callbacks: {error}");
         }
@@ -238,10 +236,9 @@ pub async fn invoke_launch_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Re
             continue;
         }
 
-        let callback = callback
-            .callback
-            .restore(&ctx)?;
-        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone()).or_throw_msg(&ctx, "failed to serialize launch payload")?;
+        let callback = callback.callback.restore(&ctx)?;
+        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone())
+            .or_throw_msg(&ctx, "failed to serialize launch payload")?;
         let result: Value<'js> = callback.call((js_app,))?;
         if let Some(promise) = result.into_promise() {
             promise.into_future::<Value<'js>>().await.map(|_| ())?
@@ -260,8 +257,8 @@ pub async fn invoke_terminate_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) ->
         }
 
         let callback = callback.callback.restore(&ctx)?;
-        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone()).or_throw_msg(&ctx,
-            "failed to serialize app terminate payload")?;
+        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone())
+            .or_throw_msg(&ctx, "failed to serialize app terminate payload")?;
         let result: Value<'js> = callback.call((js_app,))?;
         if let Some(promise) = result.into_promise() {
             promise.into_future::<Value<'js>>().await.map(|_| ())?
@@ -365,7 +362,7 @@ mod macos {
     }
 }
 
-#[cfg(target_os = "macos")]
-use macos::init_macos_observers;
 use crate::app::desktop_app::DesktopApp;
 use crate::quickjs::with_js;
+#[cfg(target_os = "macos")]
+use macos::init_macos_observers;

@@ -1,5 +1,5 @@
-mod manager;
 mod app;
+mod manager;
 
-pub use manager::*;
 pub use app::*;
+pub use manager::*;

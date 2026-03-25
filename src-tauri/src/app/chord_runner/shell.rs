@@ -15,7 +15,6 @@ impl ChordShellRunner {
             run_shell_command(shell).await;
         });
     }
-
 }
 
 async fn run_shell_command(shell: String) {
@@ -38,16 +37,16 @@ fn log_shell_output(shell: &str, output: std::process::Output) {
 
     if output.status.success() {
         log::debug!(
-                "shell command succeeded with exit code {:?}: {}",
-                exit_code,
-                shell
-            );
+            "shell command succeeded with exit code {:?}: {}",
+            exit_code,
+            shell
+        );
     } else {
         log::error!(
-                "shell command failed with exit code {:?}: {}",
-                exit_code,
-                shell
-            );
+            "shell command failed with exit code {:?}: {}",
+            exit_code,
+            shell
+        );
     }
 
     if !stdout.is_empty() {

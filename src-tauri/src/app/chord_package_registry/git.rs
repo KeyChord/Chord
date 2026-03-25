@@ -1,9 +1,8 @@
+use crate::app::SafeAppHandle;
+use crate::app::chord_package::ChordPackage;
 use crate::observables::GitReposObservable;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
-use crate::app::chord_package::ChordPackage;
-use crate::app::SafeAppHandle;
-
 
 pub struct GitChordPackageRegistry {
     pub dir: PathBuf,
@@ -33,4 +32,3 @@ impl GitChordPackageRegistry {
         Ok(packages)
     }
 }
-

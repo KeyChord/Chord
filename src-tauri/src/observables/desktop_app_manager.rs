@@ -6,7 +6,7 @@ use typeshare::typeshare;
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopAppManagerState {
-    pub apps_needing_relaunch: Vec<String>
+    pub apps_needing_relaunch: Vec<String>,
 }
 
 define_observable! {

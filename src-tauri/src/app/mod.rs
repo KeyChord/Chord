@@ -6,6 +6,7 @@ pub mod chord_package;
 pub mod chord_package_registry;
 pub mod chord_runner;
 pub mod chorder;
+pub mod context;
 pub mod desktop_app;
 pub mod frontmost;
 pub mod git_repos_store;
@@ -13,7 +14,6 @@ pub mod global_hotkey_store;
 pub mod permissions;
 pub mod placeholder_chord_store;
 pub mod settings;
-pub mod context;
 
 macro_rules! define_app_managed {
     (

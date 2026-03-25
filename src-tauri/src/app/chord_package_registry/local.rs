@@ -1,13 +1,13 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use crate::app::SafeAppHandle;
+use crate::app::chord_package::ChordPackage;
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
-use crate::app::chord_package::ChordPackage;
-use crate::app::SafeAppHandle;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -143,4 +143,3 @@ impl LocalPackageRegistry {
         Ok(canonical_path)
     }
 }
-

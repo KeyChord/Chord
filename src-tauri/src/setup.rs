@@ -1,5 +1,7 @@
+use crate::app::chord_package::ChordPackage;
 use crate::app::chord_package_registry::{ChordPackageRegistry, GitChordPackageRegistry};
 use crate::app::chord_runner::ChordRunner;
+use crate::app::chord_runner::registry::ChordRunnerRegistry;
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
 use crate::app::desktop_app::DesktopAppManager;
@@ -18,8 +20,6 @@ use crate::observables::{
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-use crate::app::chord_package::ChordPackage;
-use crate::app::chord_runner::registry::ChordRunnerRegistry;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {

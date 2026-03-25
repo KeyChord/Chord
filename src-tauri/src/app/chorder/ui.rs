@@ -1,4 +1,5 @@
 use crate::IndicatorPanel;
+use crate::app::SafeAppHandle;
 use anyhow::Result;
 use objc2::msg_send;
 use objc2_app_kit::{
@@ -13,7 +14,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{WebviewUrl, WebviewWindow};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
-use crate::app::SafeAppHandle;
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -125,7 +125,7 @@ impl ChorderIndicatorUi {
             _ => anyhow::bail!("unsupported platform for native surface vibrancy"),
         }
     }
-    
+
     pub fn open_inspector(&self) -> Result<()> {
         let window = self.window.clone();
         window.show()?;
