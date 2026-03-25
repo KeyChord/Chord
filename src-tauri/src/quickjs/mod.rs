@@ -11,7 +11,7 @@ use tauri::{
     AppHandle,
     async_runtime::{block_on, channel},
 };
-use crate::desktop_app::clear_callbacks;
+use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
 
 mod chord_module;

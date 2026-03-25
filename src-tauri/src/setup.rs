@@ -1,14 +1,26 @@
-use std::sync::Arc;
-use tauri::{AppHandle, Manager};
-use crate::{tauri_app, AppContext};
-use crate::chords::{ChordPackage, ChordRegistry};
-use crate::app::{AppHandleExt, AppManaged, SafeAppHandle, AppFrontmost, GitReposStore, PlaceholderChordStore, GlobalHotkeyStore};
-use crate::chord_runner::ChordRunner;
-use crate::desktop_app::DesktopAppManager;
+use crate::app::chord_package_registry::{ChordPackageRegistry, GitPackageRegistry};
+use crate::app::chord_registry::ChordRegistry;
+use crate::app::chord_runner::ChordRunner;
+use crate::app::chorder::AppChorder;
+use crate::app::context::AppContext;
+use crate::app::desktop_app::DesktopAppManager;
+use crate::app::frontmost::AppFrontmost;
+use crate::app::git_repos_store::GitReposStore;
+use crate::app::global_hotkey_store::GlobalHotkeyStore;
+use crate::app::permissions::AppPermissions;
+use crate::app::placeholder_chord_store::PlaceholderChordStore;
+use crate::app::settings::AppSettings;
+use crate::app::{AppHandleExt, AppManaged, SafeAppHandle};
 use crate::lock_file::AppLockFile;
 use crate::mode::AppMode::Chord;
-use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
-use crate::registry::{ChordPackageRegistry, GitPackageRegistry};
+use crate::observables::{
+    AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable,
+    DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable,
+};
+use crate::tauri_app;
+use std::sync::Arc;
+use tauri::{AppHandle, Manager};
+use crate::app::chord_registry::chord_package::ChordPackage;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -21,7 +33,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
     let chord_files_observable = Arc::new(ChordFilesObservable::new(safe_handle.clone())?);
     let git_package_registry = Arc::new(GitPackageRegistry::new(safe_handle.clone())?);
-    let desktop_app_manager_observable = Arc::new(DesktopAppManagerObservable::new(safe_handle.clone())?);
+    let desktop_app_manager_observable =
+        Arc::new(DesktopAppManagerObservable::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
     app.handle().manage(git_repos_observable.clone());
     app.handle().manage(permissions_observable.clone());
@@ -48,7 +61,10 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
             chord_files_observable.clone(),
         ),
         chord_runner: ChordRunner::new(safe_handle.clone()),
-        desktop_app_manager: DesktopAppManager::new(safe_handle.clone(), desktop_app_manager_observable)
+        desktop_app_manager: DesktopAppManager::new(
+            safe_handle.clone(),
+            desktop_app_manager_observable,
+        ),
     });
 
     let handle = app.handle();

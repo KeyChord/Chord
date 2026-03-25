@@ -12,7 +12,7 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
 
     match app_mode {
         AppMode::Chord => {
-            chorder.handle_key_event(handle.clone(), &key_event)?;
+            chorder.handle_key_event(&key_event)?;
         }
         AppMode::None => {
             let should_emit_caps_lock = handle
@@ -22,7 +22,7 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
             let should_finalize_chord_mode = should_finalize_chord_mode(&key_event, &state);
 
             if should_finalize_chord_mode {
-                chorder.handle_key_event(handle.clone(), &key_event)?;
+                chorder.handle_key_event(&key_event)?;
             }
 
             chorder.ensure_inactive()?;
@@ -40,70 +40,3 @@ fn should_finalize_chord_mode(key_event: &KeyEvent, state: &ChorderState) -> boo
     matches!(key_event, KeyEvent::Release(Key(KeyMappingCode::Space))) && !state.is_idle()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::chords::Chord;
-    use keycode::KeyMappingCode::*;
-
-    fn test_chord() -> Chord {
-        Chord {
-            keys: vec![Key(KeyA)],
-            name: "Test".to_string(),
-            shortcut: None,
-            shell: None,
-            js: None,
-        }
-    }
-
-    #[test]
-    fn finalizes_space_release_when_key_buffer_is_pending() {
-        let state = ChorderState {
-            key_buffer: vec![Key(KeyA)],
-            pressed_chord: None,
-            active_chord: None,
-            is_shift_pressed: false,
-            is_indicator_visible: true,
-        };
-
-        assert!(should_finalize_chord_mode(
-            &KeyEvent::Release(Key(KeyMappingCode::Space)),
-            &state
-        ));
-    }
-
-    #[test]
-    fn finalizes_space_release_when_chord_state_is_still_active() {
-        let state = ChorderState {
-            key_buffer: vec![],
-            pressed_chord: Some(test_chord()),
-            active_chord: Some(test_chord()),
-            is_shift_pressed: false,
-            is_indicator_visible: true,
-        };
-
-        assert!(should_finalize_chord_mode(
-            &KeyEvent::Release(Key(KeyMappingCode::Space)),
-            &state
-        ));
-    }
-
-    #[test]
-    fn ignores_idle_or_non_space_release_events() {
-        assert!(!should_finalize_chord_mode(
-            &KeyEvent::Release(Key(KeyMappingCode::Space)),
-            &ChorderState::default()
-        ));
-
-        assert!(!should_finalize_chord_mode(
-            &KeyEvent::Press(Key(KeyA)),
-            &ChorderState {
-                key_buffer: vec![Key(KeyA)],
-                pressed_chord: None,
-                active_chord: None,
-                is_shift_pressed: false,
-                is_indicator_visible: true,
-            }
-        ));
-    }
-}

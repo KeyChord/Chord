@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use crate::desktop_app::DesktopApp;
 use crate::app::SafeAppHandle;
 use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
@@ -368,4 +367,5 @@ mod macos {
 
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;
+use crate::app::desktop_app::DesktopApp;
 use crate::quickjs::with_js;

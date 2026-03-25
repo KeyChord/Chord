@@ -1,12 +1,15 @@
+use self::javascript::ChordJavascriptRunner;
+use self::runtime::Chord;
+use self::runtime::ChordPayload;
+use self::runtime::ChordRuntime;
+use self::shell::ChordShellRunner;
+use self::shortcut::ChordShortcutRunner;
 use crate::app::SafeAppHandle;
-use crate::chord_runner::javascript::ChordJavascriptRunner;
-use crate::chord_runner::shell::ChordShellRunner;
-use crate::chord_runner::shortcut::ChordShortcutRunner;
-use crate::chords::{Chord, ChordPayload, ChordRuntime};
 use anyhow::Result;
 use std::sync::Arc;
 
 pub mod javascript;
+pub mod runtime;
 pub mod shell;
 pub mod shortcut;
 
@@ -49,7 +52,8 @@ impl ChordRunner {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = javascript
                     .execute_chord_javascript(runtime.path.clone(), js, chord_payload.num_times)
-                    .await {
+                    .await
+                {
                     log::error!("failed to execute js: {}", e);
                 };
             });

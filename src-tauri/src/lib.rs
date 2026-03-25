@@ -13,16 +13,12 @@ use tauri_plugin_log::{Target, TargetKind};
 
 mod api;
 mod app;
-mod chord_runner;
-mod chords;
 mod constants;
-mod desktop_app;
 pub mod git;
 mod input;
 mod mode;
 mod observables;
 mod quickjs;
-mod registry;
 mod setup;
 mod tauri_app;
 

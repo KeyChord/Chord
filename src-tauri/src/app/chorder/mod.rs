@@ -1,6 +1,5 @@
-use super::{ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle};
-use crate::app::AppHandleExt;
-use crate::chords::{Chord, ChordPayload};
+use self::ui::{ChorderIndicatorUi, NativeSurfaceRect};
+use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::input::KeyEvent;
 use crate::observables::{ChorderObservable, ChorderState, FrontmostObservable, Observable};
@@ -13,6 +12,9 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener};
+use crate::app::chord_runner::runtime::{Chord, ChordPayload};
+
+mod ui;
 
 pub struct AppChorder {
     pub ui: ChorderIndicatorUi,

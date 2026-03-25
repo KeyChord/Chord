@@ -5,7 +5,6 @@ use crate::app::AppHandleExt;
 #[cfg(debug_assertions)]
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 #[cfg(debug_assertions)]
-use crate::settings::open_chords_inspector;
 
 pub const TRAY_ID: &str = "chord-tray";
 const TRAY_ICON_BYTES: &[u8] =
@@ -46,7 +45,8 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
             }
             #[cfg(debug_assertions)]
             OPEN_INSPECTOR_MENU_ID => {
-                if let Err(error) = open_chords_inspector(handle.clone()) {
+                let chorder = handle.app_chorder();
+                if let Err(error) = chorder.ui.open_inspector() {
                     log::error!("Failed to open inspector: {error}");
                 }
             }

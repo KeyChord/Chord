@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use llrt_core::libs::utils::result::ResultExt;
 use rquickjs::prelude::Func;
 use crate::app::AppHandleExt;
-use crate::app::global_hotkey::GlobalHotkeyStoreEntry;
-use crate::chord_runner::shortcut::Shortcut;
-use crate::desktop_app::{init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler};
+use crate::app::chord_runner::shortcut::Shortcut;
+use crate::app::desktop_app::{init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler};
+use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
 use crate::quickjs::AppUserData;
 
 pub struct ChordModule;

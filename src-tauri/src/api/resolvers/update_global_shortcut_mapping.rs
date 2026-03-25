@@ -1,6 +1,6 @@
 use crate::api::{ApiImpl, AppError, AppResult};
 use crate::app::AppHandleExt;
-use crate::chord_runner::shortcut::Shortcut;
+use crate::app::chord_runner::shortcut::Shortcut;
 
 pub async fn update_global_shortcut_mapping(
     api: ApiImpl,

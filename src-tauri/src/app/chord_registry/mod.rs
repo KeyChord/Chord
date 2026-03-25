@@ -1,30 +1,19 @@
-use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
-use crate::input::Key;
-use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
-use anyhow::Result;
-use llrt_core::libs::utils::result::ResultExt;
-use rquickjs::{Ctx, Function, Module, Object, Promise, Value};
-use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use typeshare::typeshare;
-use crate::app::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
+use llrt_core::{Module, Promise};
+use llrt_core::libs::utils::result::ResultExt;
+use crate::app::chord_registry::chord_file::AppChordsFileConfig;
+use crate::app::chord_registry::chord_package::ChordPackage;
+use crate::app::chord_runner::runtime::{ChordRuntime, MatchingChordInfo, MatchingDescriptionInfo, GLOBAL_CHORD_RUNTIME_ID};
+use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::app::{AppHandleExt, SafeAppHandle};
-use crate::chord_runner::javascript::ChordJsInvocation;
-use crate::chord_runner::shortcut::Shortcut;
+use crate::input::Key;
+use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
 use crate::quickjs::{reset_js, with_js};
 
-
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-pub struct Chord {
-    pub keys: Vec<Key>,
-    pub name: String,
-    pub shortcut: Option<Shortcut>,
-    pub shell: Option<String>,
-    pub js: Option<ChordJsInvocation>,
-}
+pub mod chord_file;
+pub mod chord_package;
 
 pub struct ChordRegistry {
     pub global_chords_to_runtime_key: Mutex<HashMap<Vec<Key>, String>>,
@@ -34,277 +23,12 @@ pub struct ChordRegistry {
     observable: Arc<ChordFilesObservable>,
 }
 
-#[derive(Debug, Clone)]
-pub struct MatchingChordInfo {
-    pub scope: String,
-    pub scope_kind: &'static str,
-    pub sequence: Vec<Key>,
-    pub chord: Chord,
-}
-
-#[derive(Debug, Clone)]
-pub struct MatchingDescriptionInfo {
-    pub scope: String,
-    pub scope_kind: &'static str,
-    pub sequence: Vec<Key>,
-    pub description: String,
-}
-
-// Each chord runtime is associated with a JS module which lives in-memory
-// (similar to require.cache)
-pub struct ChordRuntime {
-    // Used as a unique module key
-    pub path: String,
-
-    pub chords: HashMap<Vec<Key>, Chord>,
-    pub descriptions: HashMap<Vec<Key>, String>,
-    // Needs to be an Arc so the JS runtime can access its latest value
-    pub raw_chords: Arc<Mutex<HashMap<String, AppChordMapValue>>>,
-    pub config: Option<AppChordsFileConfig>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ChordPayload {
-    pub chord: Chord,
-    pub num_times: usize,
-}
-
-pub(crate) const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
-
-impl ChordRuntime {
-    pub fn from_chords(path: String, chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
-        let raw_chords = Arc::new(Mutex::new(HashMap::new()));
-        Ok(Self {
-            path,
-            chords,
-            descriptions: HashMap::new(),
-            raw_chords,
-            config: None,
-        })
-    }
-
-    // Doesn't resolve _config.extends
-    pub fn from_file_shallow(
-        path: String,
-        chord_file: AppChordsFile,
-        placeholder_bindings: &HashMap<String, String>,
-    ) -> Result<Self> {
-        let raw_chords = Arc::new(Mutex::new(chord_file.get_raw_chords()));
-        let config = chord_file.config.clone();
-
-        // We intentionally keep global chords because they execute in this runtime
-        let chords = chord_file.get_chords_shallow(placeholder_bindings);
-        let descriptions = chord_file.get_descriptions_shallow();
-
-        Ok(Self {
-            path,
-            raw_chords,
-            config,
-            chords,
-            descriptions,
-        })
-    }
-
-    pub fn extend_runtime(&mut self, base: &Self) -> Result<()> {
-        for (sequence, chord) in &base.chords {
-            self.chords
-                .entry(sequence.clone())
-                .or_insert_with(|| chord.clone());
-        }
-
-        for (sequence, description) in &base.descriptions {
-            self.descriptions
-                .entry(sequence.clone())
-                .or_insert_with(|| description.clone());
-        }
-
-        let mut raw_chords = self.raw_chords.lock().expect("poisoned lock");
-        let base_raw_chords = base.raw_chords.lock().expect("poisoned lock");
-        for (sequence, chord) in base_raw_chords.iter() {
-            raw_chords
-                .entry(sequence.clone())
-                .or_insert_with(|| chord.clone());
-        }
-
-        Ok(())
-    }
-
-    pub fn get_chord(&self, sequence: &[Key]) -> Option<ChordPayload> {
-        let split_idx = sequence
-            .iter()
-            .position(|k| !k.is_digit())
-            .unwrap_or(sequence.len());
-        let (digit_keys, chord_keys) = sequence.split_at(split_idx);
-        let num_times = if digit_keys.is_empty() {
-            1
-        } else {
-            let digits: String = digit_keys.iter().filter_map(|k| k.to_char(false)).collect();
-            let num_times = digits.parse::<usize>().unwrap_or(1);
-            num_times
-        };
-        self.chords.get(chord_keys).map(|chord| ChordPayload {
-            chord: chord.clone(),
-            num_times,
-        })
-    }
-}
-
-fn runtime_id_from_chords_path(file_path: &Path) -> Option<String> {
-    if file_path.file_name()? != "macos.toml" {
-        return None;
-    }
-
-    let application_path = file_path.parent()?.strip_prefix("chords").ok()?;
-    if application_path.as_os_str().is_empty() {
-        return Some(GLOBAL_CHORD_RUNTIME_ID.to_string());
-    }
-
-    Some(
-        application_path
-            .iter()
-            .map(|component| component.to_string_lossy().into_owned())
-            .collect::<Vec<_>>()
-            .join("."),
-    )
-}
-
-fn is_global_chord_sequence(sequence: &[Key]) -> bool {
-    sequence
-        .first()
-        .is_some_and(|key| !key.is_digit() && !key.is_letter())
-}
-
-fn split_repeat_prefix(sequence: &[Key]) -> (&[Key], &[Key]) {
-    let split_idx = sequence
-        .iter()
-        .position(|key| !key.is_digit())
-        .unwrap_or(sequence.len());
-
-    sequence.split_at(split_idx)
-}
-
-fn push_runtime_matches(
-    matches: &mut Vec<MatchingChordInfo>,
-    scope: &str,
-    scope_kind: &'static str,
-    runtime: Arc<ChordRuntime>,
-    chord_prefix: &[Key],
-) {
-    for (sequence, chord) in &runtime.chords {
-        if !sequence.starts_with(chord_prefix) {
-            continue;
-        }
-
-        matches.push(MatchingChordInfo {
-            scope: scope.to_string(),
-            scope_kind,
-            sequence: sequence.clone(),
-            chord: chord.clone(),
-        });
-    }
-}
-
-fn push_runtime_description_matches(
-    matches: &mut Vec<MatchingDescriptionInfo>,
-    scope: &str,
-    scope_kind: &'static str,
-    runtime: Arc<ChordRuntime>,
-    chord_prefix: &[Key],
-) {
-    for (sequence, description) in &runtime.descriptions {
-        if !sequence.starts_with(chord_prefix) {
-            continue;
-        }
-
-        matches.push(MatchingDescriptionInfo {
-            scope: scope.to_string(),
-            scope_kind,
-            sequence: sequence.clone(),
-            description: description.clone(),
-        });
-    }
-}
-
-fn resolve_runtime_extends(
-    application_id: &str,
-    app_runtime_map: &mut HashMap<String, ChordRuntime>,
-    app_config_map: &HashMap<String, Option<AppChordsFileConfig>>,
-    resolved: &mut HashSet<String>,
-    resolving: &mut HashSet<String>,
-) -> Result<()> {
-    if resolved.contains(application_id) {
-        return Ok(());
-    }
-
-    if !resolving.insert(application_id.to_string()) {
-        log::warn!("Circular extends detected for application ID: {application_id}");
-        return Ok(());
-    }
-
-    let extends = app_config_map
-        .get(application_id)
-        .and_then(|config| config.as_ref())
-        .and_then(|config| config.extends.clone());
-
-    if let Some(base_application_id) = extends {
-        if app_runtime_map.contains_key(&base_application_id) {
-            resolve_runtime_extends(
-                &base_application_id,
-                app_runtime_map,
-                app_config_map,
-                resolved,
-                resolving,
-            )?;
-
-            let Some(mut app_runtime) = app_runtime_map.remove(application_id) else {
-                resolving.remove(application_id);
-                return Ok(());
-            };
-
-            if let Some(base_runtime) = app_runtime_map.get(&base_application_id) {
-                app_runtime.extend_runtime(base_runtime)?;
-            }
-
-            app_runtime_map.insert(application_id.to_string(), app_runtime);
-        } else {
-            log::warn!(
-                "Invalid extends for application ID {application_id}: {base_application_id}"
-            );
-        }
-    }
-
-    resolving.remove(application_id);
-    resolved.insert(application_id.to_string());
-
-    Ok(())
-}
-
-fn placeholder_bindings_for_file(
-    entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
-    file_path: &str,
-) -> HashMap<String, String> {
-    entries
-        .iter()
-        .filter_map(|(key, entry)| {
-            (key.file_path == file_path)
-                .then_some((key.sequence_template.clone(), entry.sequence.clone()))
-        })
-        .collect()
-}
-
-fn scope_info_from_runtime_id(runtime_id: &str) -> (String, String) {
-    if runtime_id == GLOBAL_CHORD_RUNTIME_ID {
-        ("Global".to_string(), "global".to_string())
-    } else {
-        (runtime_id.to_string(), "app".to_string())
-    }
-}
 
 impl ChordRegistry {
     fn parse_packages(
         chord_packages: Vec<ChordPackage>,
         placeholder_entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
-    ) -> Result<(
+    ) -> anyhow::Result<(
         HashMap<Vec<Key>, String>,
         HashMap<String, ChordRuntime>,
         HashMap<String, serde_json::Value>,
@@ -402,7 +126,7 @@ impl ChordRegistry {
         ))
     }
 
-    pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
+    pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> anyhow::Result<()> {
         let handle = self.handle.try_handle()?;
         for chord_package in &chord_packages {
             let js_files = chord_package.js_files.clone();
@@ -435,8 +159,8 @@ impl ChordRegistry {
                     Ok(())
                 })
             })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
         }
 
         let placeholder_entries = handle.app_placeholder_chord_store().entries();
@@ -467,7 +191,7 @@ impl ChordRegistry {
         let raw_files_as_json_strings = raw_files_map
             .iter()
             .map(|(k, v)| Ok((k.clone(), serde_json::to_string(v)?)))
-            .collect::<Result<HashMap<_, _>>>()?;
+            .collect::<anyhow::Result<HashMap<_, _>>>()?;
         log::debug!("Setting {} raw files", raw_files_as_json_strings.len());
         self.observable.set_state(ChordFilesState {
             raw_files_as_json_strings,
@@ -705,7 +429,7 @@ impl ChordRegistry {
     }
 
     /// Also re-evaluates JavaScript
-    pub async fn reload(&self) -> Result<()> {
+    pub async fn reload(&self) -> anyhow::Result<()> {
         let handle = self.handle.try_handle()?;
         let chorder = handle.app_chorder();
         let chord_package_registry = handle.app_chord_package_registry();
@@ -771,7 +495,7 @@ impl ChordRegistry {
                         Ok(())
                     })
                 })
-                .await;
+                    .await;
 
                 if let Err(err) = result {
                     log::error!("load_module failed for {}: {}", path2, err);
@@ -790,4 +514,153 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
 }
 
 
+fn runtime_id_from_chords_path(file_path: &Path) -> Option<String> {
+    if file_path.file_name()? != "macos.toml" {
+        return None;
+    }
 
+    let application_path = file_path.parent()?.strip_prefix("chords").ok()?;
+    if application_path.as_os_str().is_empty() {
+        return Some(GLOBAL_CHORD_RUNTIME_ID.to_string());
+    }
+
+    Some(
+        application_path
+            .iter()
+            .map(|component| component.to_string_lossy().into_owned())
+            .collect::<Vec<_>>()
+            .join("."),
+    )
+}
+
+fn is_global_chord_sequence(sequence: &[Key]) -> bool {
+    sequence
+        .first()
+        .is_some_and(|key| !key.is_digit() && !key.is_letter())
+}
+
+fn split_repeat_prefix(sequence: &[Key]) -> (&[Key], &[Key]) {
+    let split_idx = sequence
+        .iter()
+        .position(|key| !key.is_digit())
+        .unwrap_or(sequence.len());
+
+    sequence.split_at(split_idx)
+}
+
+fn push_runtime_matches(
+    matches: &mut Vec<MatchingChordInfo>,
+    scope: &str,
+    scope_kind: &'static str,
+    runtime: Arc<ChordRuntime>,
+    chord_prefix: &[Key],
+) {
+    for (sequence, chord) in &runtime.chords {
+        if !sequence.starts_with(chord_prefix) {
+            continue;
+        }
+
+        matches.push(MatchingChordInfo {
+            scope: scope.to_string(),
+            scope_kind,
+            sequence: sequence.clone(),
+            chord: chord.clone(),
+        });
+    }
+}
+
+fn push_runtime_description_matches(
+    matches: &mut Vec<MatchingDescriptionInfo>,
+    scope: &str,
+    scope_kind: &'static str,
+    runtime: Arc<ChordRuntime>,
+    chord_prefix: &[Key],
+) {
+    for (sequence, description) in &runtime.descriptions {
+        if !sequence.starts_with(chord_prefix) {
+            continue;
+        }
+
+        matches.push(MatchingDescriptionInfo {
+            scope: scope.to_string(),
+            scope_kind,
+            sequence: sequence.clone(),
+            description: description.clone(),
+        });
+    }
+}
+
+fn resolve_runtime_extends(
+    application_id: &str,
+    app_runtime_map: &mut HashMap<String, ChordRuntime>,
+    app_config_map: &HashMap<String, Option<AppChordsFileConfig>>,
+    resolved: &mut HashSet<String>,
+    resolving: &mut HashSet<String>,
+) -> anyhow::Result<()> {
+    if resolved.contains(application_id) {
+        return Ok(());
+    }
+
+    if !resolving.insert(application_id.to_string()) {
+        log::warn!("Circular extends detected for application ID: {application_id}");
+        return Ok(());
+    }
+
+    let extends = app_config_map
+        .get(application_id)
+        .and_then(|config| config.as_ref())
+        .and_then(|config| config.extends.clone());
+
+    if let Some(base_application_id) = extends {
+        if app_runtime_map.contains_key(&base_application_id) {
+            resolve_runtime_extends(
+                &base_application_id,
+                app_runtime_map,
+                app_config_map,
+                resolved,
+                resolving,
+            )?;
+
+            let Some(mut app_runtime) = app_runtime_map.remove(application_id) else {
+                resolving.remove(application_id);
+                return Ok(());
+            };
+
+            if let Some(base_runtime) = app_runtime_map.get(&base_application_id) {
+                app_runtime.extend_runtime(base_runtime)?;
+            }
+
+            app_runtime_map.insert(application_id.to_string(), app_runtime);
+        } else {
+            log::warn!(
+                "Invalid extends for application ID {application_id}: {base_application_id}"
+            );
+        }
+    }
+
+    resolving.remove(application_id);
+    resolved.insert(application_id.to_string());
+
+    Ok(())
+}
+
+fn placeholder_bindings_for_file(
+    entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
+    file_path: &str,
+) -> HashMap<String, String> {
+    entries
+        .iter()
+        .filter_map(|(key, entry)| {
+            (key.file_path == file_path)
+                .then_some((key.sequence_template.clone(), entry.sequence.clone()))
+        })
+        .collect()
+}
+
+fn scope_info_from_runtime_id(runtime_id: &str) -> (String, String) {
+    if runtime_id == GLOBAL_CHORD_RUNTIME_ID {
+        ("Global".to_string(), "global".to_string())
+    } else {
+        (runtime_id.to_string(), "app".to_string())
+    }
+}

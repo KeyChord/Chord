@@ -1,6 +1,6 @@
 use crate::api::{ApiImpl, AppResult};
 use crate::app::AppHandleExt;
-use crate::app::placeholder_chords::PlaceholderChordStoreKey;
+use crate::app::r#mod::PlaceholderChordStoreKey;
 
 pub async fn remove_placeholder_chord_binding(
     api: ApiImpl,

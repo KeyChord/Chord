@@ -1,46 +1,33 @@
-use crate::AppContext;
-use self::global_hotkey::GlobalHotkeyStore;
-use self::placeholder_chords::PlaceholderChordStore;
-use self::repos::GitReposStore;
-pub(crate) use crate::app::{AppChorder, AppFrontmost, AppPermissions, AppSettings};
-use crate::chords::ChordRegistry;
-use crate::desktop_app::DesktopAppManager;
-use crate::registry::ChordPackageRegistry;
-use crate::chord_runner::ChordRunner;
+mod safe_app_handle;
+pub use safe_app_handle::SafeAppHandle;
 
+// App globals
+pub mod chord_package_registry;
+pub mod chord_registry;
+pub mod chord_runner;
 pub mod chorder;
-pub use chorder::*;
-pub mod chorder_ui;
-pub use chorder_ui::*;
-mod frontmost;
-pub use frontmost::*;
-pub mod global_hotkey;
-pub use global_hotkey::*;
+pub mod desktop_app;
+pub mod frontmost;
+pub mod git_repos_store;
+pub mod global_hotkey_store;
 pub mod permissions;
-pub use permissions::*;
-pub mod placeholder_chords;
-pub use placeholder_chords::*;
-pub mod repos;
-pub use repos::*;
-pub mod safe_app_handle;
-pub use safe_app_handle::*;
+pub mod placeholder_chord_store;
 pub mod settings;
-pub use settings::*;
-
+pub mod context;
 
 crate::define_app_managed! {
-    settings: AppSettings => app_settings,
-    chorder: AppChorder => app_chorder,
-    context: AppContext => app_context,
-    chord_package_registry: ChordPackageRegistry => app_chord_package_registry,
-    frontmost: AppFrontmost => app_frontmost,
-    permissions: AppPermissions => app_permissions,
-    global_hotkey_store: GlobalHotkeyStore => app_global_hotkey_store,
-    placeholder_chord_store: PlaceholderChordStore => app_placeholder_chord_store,
-    git_repos_store: GitReposStore => app_git_repos_store,
-    chord_registry: ChordRegistry => app_chord_registry,
-    desktop_app_manager: DesktopAppManager => desktop_app_manager,
-    chord_runner: ChordRunner => chord_runner
+    chord_runner: self::chord_runner::ChordRunner => chord_runner,
+    chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
+    chord_registry: self::chord_registry::ChordRegistry => app_chord_registry,
+    desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,
+    settings: self::settings::AppSettings => app_settings,
+    chorder: self::chorder::AppChorder => app_chorder,
+    context: self::context::AppContext => app_context,
+    frontmost: self::frontmost::AppFrontmost => app_frontmost,
+    permissions: self::permissions::AppPermissions => app_permissions,
+    global_hotkey_store: self::global_hotkey_store::GlobalHotkeyStore => app_global_hotkey_store,
+    placeholder_chord_store: self::placeholder_chord_store::PlaceholderChordStore => app_placeholder_chord_store,
+    git_repos_store: self::git_repos_store::GitReposStore => app_git_repos_store,
 }
 
 #[macro_export]

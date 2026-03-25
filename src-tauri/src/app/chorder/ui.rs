@@ -125,6 +125,16 @@ impl ChorderIndicatorUi {
             _ => anyhow::bail!("unsupported platform for native surface vibrancy"),
         }
     }
+    
+    pub fn open_inspector(&self) -> Result<()> {
+        let window = self.window.clone();
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+        #[cfg(debug_assertions)]
+        window.open_devtools();
+        Ok(())
+    }
 
     pub fn configure_window_surface(
         window: &WebviewWindow,

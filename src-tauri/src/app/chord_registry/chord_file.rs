@@ -1,11 +1,11 @@
-use crate::chord_runner::javascript::{ChordJsArgs, ChordJsInvocation};
-use crate::chords::Chord;
+use crate::app::chord_runner::javascript::{ChordJsArgs, ChordJsInvocation};
+use crate::app::chord_runner::runtime::Chord;
+use crate::app::chord_runner::shortcut::Shortcut;
 use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use typeshare::typeshare;
-use crate::chord_runner::shortcut::Shortcut;
 
 #[derive(Debug, Serialize)]
 pub struct AppChordsFile {
@@ -177,13 +177,10 @@ pub struct AppChord {
 
 impl AppChord {
     fn js_invocation(&self) -> Result<Option<ChordJsInvocation>> {
-        let mut invocation = self
-            .args
-            .clone()
-            .map(|args| ChordJsInvocation {
-                export_name: "default".into(),
-                args: parse_js_args(args),
-            });
+        let mut invocation = self.args.clone().map(|args| ChordJsInvocation {
+            export_name: "default".into(),
+            args: parse_js_args(args),
+        });
 
         for (key, value) in &self.extra {
             let Some(export_name) = key.strip_prefix("args:") else {

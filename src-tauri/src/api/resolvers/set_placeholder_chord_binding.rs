@@ -1,6 +1,6 @@
 use crate::api::{ApiImpl, AppResult, normalize_placeholder_sequence};
 use crate::app::AppHandleExt;
-use crate::app::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
+use crate::app::r#mod::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 
 pub async fn set_placeholder_chord_binding(
     api: ApiImpl,
