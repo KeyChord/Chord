@@ -172,6 +172,7 @@ impl ChordRunnerRegistry {
         });
 
         // Load the metadata
+        // TODO: this hangs for some reason
         // let desktop_app_manager = handle.desktop_app_manager();
         // let bundle_ids: Vec<&str> = app_runtime_map.keys().map(|k| k.as_str()).collect();
         // desktop_app_manager.load_apps_metadata(&bundle_ids)?;
