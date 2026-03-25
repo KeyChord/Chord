@@ -8,6 +8,7 @@ pub mod chord_runner;
 pub mod chorder;
 pub mod context;
 pub mod desktop_app;
+pub mod dev_lockfile_detector;
 pub mod frontmost;
 pub mod git_repos_store;
 pub mod global_hotkey_store;
@@ -65,6 +66,7 @@ define_app_managed! {
     chord_runner: self::chord_runner::ChordRunner => chord_runner,
     chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
     chord_registry: self::chord_runner::registry::ChordRunnerRegistry => app_chord_registry,
+    dev_lockfile_detector: self::dev_lockfile_detector::DevLockfileDetector => app_dev_lockfile_detector,
     desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,
     settings: self::settings::AppSettings => app_settings,
     chorder: self::chorder::AppChorder => app_chorder,

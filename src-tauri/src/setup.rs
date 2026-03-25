@@ -5,6 +5,7 @@ use crate::app::chord_runner::registry::ChordRunnerRegistry;
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
 use crate::app::desktop_app::DesktopAppManager;
+use crate::app::dev_lockfile_detector::DevLockfileDetector;
 use crate::app::frontmost::AppFrontmost;
 use crate::app::git_repos_store::GitReposStore;
 use crate::app::global_hotkey_store::GlobalHotkeyStore;
@@ -46,6 +47,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
         chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
         context: AppContext::new()?,
+        dev_lockfile_detector: DevLockfileDetector::new(),
         permissions: AppPermissions::new_unloaded(
             safe_handle.clone(),
             permissions_observable.clone(),

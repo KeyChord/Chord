@@ -18,6 +18,7 @@ const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
 const INDICATOR_TRANSITION_MS = 240;
 const HIDDEN_X_OFFSET_PX = 40;
+const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 type RawChord = ReturnType<typeof useChordFile>[string];
 type ParsedChord = {
   keys: string[];
@@ -437,6 +438,11 @@ export function Chords() {
                   className="flex flex-col items-start justify-center"
                   style={{ gap: `${rowGap}px` }}
                 >
+                  {SHOW_DEVELOPMENT_LABEL && column.id === "column-0" ? (
+                    <div className="-mb-1 text-[10px] font-semibold tracking-[0.28em] text-foreground/55">
+                      DEVELOPMENT
+                    </div>
+                  ) : null}
                   {column.rows.map((row) => (
                     <ChordKeyRow
                       key={`${column.id}-${row.token}`}
