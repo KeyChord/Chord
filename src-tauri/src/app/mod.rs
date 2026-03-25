@@ -1,0 +1,77 @@
+mod safe_app_handle;
+pub use safe_app_handle::SafeAppHandle;
+
+// App globals
+pub mod chord_package;
+pub mod chord_package_registry;
+pub mod chord_runner;
+pub mod chorder;
+pub mod desktop_app;
+pub mod frontmost;
+pub mod git_repos_store;
+pub mod global_hotkey_store;
+pub mod permissions;
+pub mod placeholder_chord_store;
+pub mod settings;
+pub mod context;
+
+macro_rules! define_app_managed {
+    (
+        $(
+            $field:ident : $ty:ty => $getter:ident
+        ),+ $(,)?
+    ) => {
+        pub struct AppManaged {
+            $(
+                pub $field: $ty,
+            )+
+        }
+
+        impl AppManaged {
+            pub fn register<R: ::tauri::Runtime>(self, handle: &::tauri::AppHandle<R>) {
+                $(
+                    let _ = ::tauri::Manager::manage(handle, self.$field);
+                )+
+            }
+        }
+
+        pub trait AppHandleExt {
+            $(
+                fn $getter(&self) -> &$ty;
+            )+
+
+            fn observable_state<T: $crate::observables::Observable>(
+                &self,
+            ) -> ::anyhow::Result<::std::sync::Arc<T::State>>;
+        }
+
+        impl<R: ::tauri::Runtime> AppHandleExt for ::tauri::AppHandle<R> {
+            $(
+                fn $getter(&self) -> &$ty {
+                    ::tauri::Manager::state::<$ty>(self).inner()
+                }
+            )+
+
+            fn observable_state<T: $crate::observables::Observable>(
+                &self,
+            ) -> ::anyhow::Result<::std::sync::Arc<T::State>> {
+                Ok(::tauri::Manager::state::<::std::sync::Arc<T>>(self).inner().get_state()?)
+            }
+        }
+    };
+}
+
+define_app_managed! {
+    chord_runner: self::chord_runner::ChordRunner => chord_runner,
+    chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
+    chord_registry: self::chord_runner::registry::ChordRunnerRegistry => app_chord_registry,
+    desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,
+    settings: self::settings::AppSettings => app_settings,
+    chorder: self::chorder::AppChorder => app_chorder,
+    context: self::context::AppContext => app_context,
+    frontmost: self::frontmost::AppFrontmost => app_frontmost,
+    permissions: self::permissions::AppPermissions => app_permissions,
+    global_hotkey_store: self::global_hotkey_store::GlobalHotkeyStore => app_global_hotkey_store,
+    placeholder_chord_store: self::placeholder_chord_store::PlaceholderChordStore => app_placeholder_chord_store,
+    git_repos_store: self::git_repos_store::GitReposStore => app_git_repos_store,
+}

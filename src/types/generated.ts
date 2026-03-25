@@ -22,6 +22,9 @@ export interface AppPermissionsState {
 
 export interface AppSettingsState {
 	bundleIdsNeedingRelaunch: string[];
+	showMenuBarIcon: boolean;
+	showDockIcon: boolean;
+	hideGuideByDefault: boolean;
 }
 
 export interface ShortcutChord {

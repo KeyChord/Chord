@@ -1,8 +1,7 @@
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::tauri_app::settings::show_settings_window;
 use anyhow::{Context, Result, bail};
 use std::sync::OnceLock;
 use tauri::AppHandle;
+use crate::app::AppHandleExt;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
@@ -27,7 +26,10 @@ pub fn handle_url(url: &str) -> Result<()> {
         .context("app handle is not initialized")?;
 
     match command {
-        ScriptCommand::OpenSettings => show_settings_window(handle)?,
+        ScriptCommand::OpenSettings => {
+            let settings = handle.app_settings();
+            settings.ui.open()?
+        },
         ScriptCommand::ReloadConfigs => reload_configs(handle),
     }
 

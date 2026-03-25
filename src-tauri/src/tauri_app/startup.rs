@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_store::StoreExt;
 
-const APP_STATE_STORE_PATH: &str = "app-state.json";
+pub(crate) const APP_STATE_STORE_PATH: &str = "app-state.json";
 const ONBOARDING_COMPLETED_KEY: &str = "onboardingCompleted";
 
 #[derive(Debug)]

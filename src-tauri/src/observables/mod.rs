@@ -6,14 +6,16 @@ mod frontmost;
 mod git_repos;
 mod permissions;
 mod settings;
+mod desktop_app_manager;
 
-use crate::feature::SafeAppHandle;
+use crate::app::SafeAppHandle;
 pub use chord_files::*;
 pub use chorder::*;
 pub use frontmost::*;
 pub use git_repos::*;
 pub use permissions::*;
 pub use settings::*;
+pub use desktop_app_manager::*;
 
 pub struct ObservableRegistration {
     pub id: &'static str,
@@ -35,7 +37,7 @@ pub trait Observable: Sized + Send + Sync + 'static {
         observer: observable_property::Observer<std::sync::Arc<Self::State>>,
     ) -> Result<observable_property::ObserverId, observable_property::PropertyError>;
 
-    fn new(handle: crate::feature::SafeAppHandle) -> anyhow::Result<Self>;
+    fn new(handle: crate::app::SafeAppHandle) -> anyhow::Result<Self>;
 }
 
 pub fn get_all_observable_states(
@@ -73,7 +75,7 @@ macro_rules! define_observable {
                 Ok(self.state.set(::std::sync::Arc::new(state))?)
             }
 
-            fn new(handle: $crate::feature::SafeAppHandle) -> ::anyhow::Result<Self> {
+            fn new(handle: $crate::app::SafeAppHandle) -> ::anyhow::Result<Self> {
                 let state = <Self::State as ::std::default::Default>::default();
                 let state =
                     ::observable_property::ObservableProperty::new(::std::sync::Arc::new(state));
@@ -111,7 +113,7 @@ macro_rules! define_observable {
                 <$name as $crate::observables::Observable>::EVENT;
 
             pub fn get_json(
-                handle: &$crate::feature::SafeAppHandle,
+                handle: &$crate::app::SafeAppHandle,
             ) -> ::anyhow::Result<::serde_json::Value> {
                 let state = handle.observable_state::<$name>()?;
                 Ok(::serde_json::to_value(state.as_ref())?)
