@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+use log::kv::ToValue;
 use tauri::AppHandle;
 
 pub struct DesktopAppManager {
@@ -21,6 +22,23 @@ pub struct DesktopAppManager {
 impl DesktopAppManager {
     pub fn new(handle: SafeAppHandle, observable: Arc<DesktopAppManagerObservable>) -> Self {
         DesktopAppManager { observable, handle }
+    }
+
+    pub fn load_apps_metadata(&self, bundle_ids: &[&str]) -> Result<()> {
+        let state = self.observable.get_state()?;
+        let mut apps_metadata = state.apps_metadata.clone();
+        let apps_needing_relaunch = state.apps_needing_relaunch.clone();
+        for bundle_id in bundle_ids {
+            let app = DesktopApp::new(&bundle_id)?;
+            if let Ok(metadata) = app.get_metadata() {
+                apps_metadata.insert(bundle_id.to_string(), metadata);
+            }
+        }
+        self.observable.set_state(DesktopAppManagerState {
+            apps_metadata,
+            apps_needing_relaunch
+        })?;
+        Ok(())
     }
 
     pub fn relaunch_app(&self, bundle_id: &str) -> Result<()> {
@@ -68,6 +86,7 @@ impl DesktopAppManager {
         let bundle_id = bundle_id.to_string();
         let state = self.observable.get_state()?;
         let apps_needing_relaunch = state.apps_needing_relaunch.clone();
+        let apps_metadata = state.apps_metadata.clone();
         let mut apps_needing_relaunch = apps_needing_relaunch.clone();
 
         if needs_relaunch {
@@ -80,6 +99,7 @@ impl DesktopAppManager {
 
         self.observable.set_state(DesktopAppManagerState {
             apps_needing_relaunch,
+            apps_metadata
         })?;
         Ok(())
     }

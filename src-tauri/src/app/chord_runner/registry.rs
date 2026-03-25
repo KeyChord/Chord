@@ -171,6 +171,11 @@ impl ChordRunnerRegistry {
                 .then(left.placeholder.cmp(&right.placeholder))
         });
 
+        // Load the metadata
+        let desktop_app_manager = handle.desktop_app_manager();
+        let bundle_ids: Vec<&str> = app_runtime_map.keys().map(|k| k.as_str()).collect();
+        desktop_app_manager.load_apps_metadata(&bundle_ids)?;
+
         // Set state before setting observable
         {
             let mut map = self.global_chords_to_runtime_key.lock().expect("poisoned");
@@ -230,93 +235,6 @@ impl ChordRunnerRegistry {
             let runtimes = self.runtimes.lock().expect("poisoned");
             application_id.and_then(|app_id| runtimes.get(&app_id).map(|r| r.clone()))
         }
-    }
-
-    pub fn list_matching_chords(
-        &self,
-        key_buffer: &[Key],
-        application_id: Option<&str>,
-    ) -> Vec<MatchingChordInfo> {
-        let (_, chord_prefix) = split_repeat_prefix(key_buffer);
-        let mut matches = Vec::new();
-        let chords = {
-            let lock = self.global_chords_to_runtime_key.lock().expect("poisoned");
-            lock.clone()
-        };
-        let runtimes = self.runtimes.lock().expect("poisoned");
-
-        if chord_prefix.is_empty() {
-            if let Some(application_id) = application_id {
-                if let Some(runtime) = runtimes.get(application_id) {
-                    push_runtime_matches(
-                        &mut matches,
-                        application_id,
-                        "app",
-                        runtime.clone(),
-                        chord_prefix,
-                    );
-                }
-            }
-
-            for (sequence, runtime_id) in &chords {
-                let Some(runtime) = runtimes.get(runtime_id) else {
-                    continue;
-                };
-                let Some(chord) = runtime.chords.get(sequence) else {
-                    continue;
-                };
-
-                matches.push(MatchingChordInfo {
-                    scope: "Global".to_string(),
-                    scope_kind: "global",
-                    sequence: sequence.clone(),
-                    chord: chord.clone(),
-                });
-            }
-        } else if is_global_chord_sequence(chord_prefix) {
-            for (sequence, runtime_id) in chords {
-                if !sequence.starts_with(chord_prefix) {
-                    continue;
-                }
-
-                let Some(runtime) = runtimes.get(&runtime_id) else {
-                    continue;
-                };
-                let Some(chord) = runtime.chords.get(&sequence) else {
-                    continue;
-                };
-
-                matches.push(MatchingChordInfo {
-                    scope: "Global".to_string(),
-                    scope_kind: "global",
-                    sequence: sequence.clone(),
-                    chord: chord.clone(),
-                });
-            }
-        } else if let Some(application_id) = application_id {
-            if let Some(runtime) = runtimes.get(application_id) {
-                push_runtime_matches(
-                    &mut matches,
-                    application_id,
-                    "app",
-                    runtime.clone(),
-                    chord_prefix,
-                );
-            }
-        }
-
-        matches.sort_by(|left, right| {
-            let left_scope_rank = if left.scope_kind == "app" { 0 } else { 1 };
-            let right_scope_rank = if right.scope_kind == "app" { 0 } else { 1 };
-
-            left_scope_rank
-                .cmp(&right_scope_rank)
-                .then(left.sequence.len().cmp(&right.sequence.len()))
-                .then(left.scope.cmp(&right.scope))
-                .then(left.chord.name.cmp(&right.chord.name))
-        });
-
-        matches
     }
 
     pub fn list_matching_descriptions(

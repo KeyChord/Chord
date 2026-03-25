@@ -13,7 +13,8 @@ import {
 } from "#/components/ui/card.tsx";
 import { Input } from "#/components/ui/input.tsx";
 import { taurpc } from "#/api/taurpc.ts";
-import { useChordFilesState } from "#/utils/state.ts";
+import { useChordFilesState, useDesktopAppManagerState } from "#/utils/state.ts";
+import type { DesktopAppMetadata } from "../../types/generated.ts";
 
 export function PlaceholderChordsCard() {
   const [input, setInput] = useState("");
@@ -23,16 +24,7 @@ export function PlaceholderChordsCard() {
       [...new Set(placeholderChords.filter((entry) => entry.scopeKind === "app").map((entry) => entry.scope))].sort(),
     [placeholderChords],
   );
-  const appMetadataQueries = useQueries({
-    queries: appBundleIds.map((bundleId) => ({
-      queryKey: ["app-metadata", bundleId],
-      queryFn: () => taurpc.getAppMetadata(bundleId),
-      staleTime: 60_000,
-    })),
-  });
-  const appMetadataByBundleId = Object.fromEntries(
-    appBundleIds.map((bundleId, index) => [bundleId, appMetadataQueries[index]?.data]),
-  );
+  const { appsMetadata } = useDesktopAppManagerState();
   const normalizedFilter = input.trim().toLowerCase();
   const filteredPlaceholders = placeholderChords.filter((placeholder) => {
     if (!normalizedFilter) {
@@ -41,7 +33,7 @@ export function PlaceholderChordsCard() {
 
     const appLabel =
       placeholder.scopeKind === "app"
-        ? appMetadataByBundleId[placeholder.scope]?.displayName?.trim() || placeholder.scope
+        ? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
         : "Global";
 
     return [
@@ -86,7 +78,7 @@ export function PlaceholderChordsCard() {
             {filteredPlaceholders.map((placeholder) => {
               const appMetadata =
                 placeholder.scopeKind === "app"
-                  ? appMetadataByBundleId[placeholder.scope]
+                  ? appsMetadata[placeholder.scope]
                   : undefined;
               const appLabel =
                 placeholder.scopeKind === "app"
@@ -115,7 +107,7 @@ function PlaceholderChordRow({
   placeholder,
 }: {
   appLabel: string;
-  appMetadata?: Awaited<ReturnType<typeof taurpc.getAppMetadata>>;
+  appMetadata?: DesktopAppMetadata,
   placeholder: ReturnType<typeof useChordFilesState>["placeholderChords"][number];
 }) {
   const [draftSequence, setDraftSequence] = useState(placeholder.assignedSequence ?? "");

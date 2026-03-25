@@ -40,7 +40,7 @@ export type ChordJsArgs =
 	| { type: "Eval", value: string };
 
 export interface ChordJsInvocation {
-	export_name?: string;
+	export_name: string;
 	args: ChordJsArgs;
 }
 
@@ -77,6 +77,17 @@ export interface ChorderState {
 	isIndicatorVisible: boolean;
 }
 
+export interface DesktopAppMetadata {
+	bundleId: string;
+	displayName?: string;
+	iconDataUrl?: string;
+}
+
+export interface DesktopAppManagerState {
+	appsNeedingRelaunch: string[];
+	appsMetadata: Record<string, DesktopAppMetadata>;
+}
+
 export interface FrontmostState {
 	frontmostAppBundleId?: string;
 }
@@ -93,3 +104,4 @@ export interface GitRepo {
 export interface GitReposState {
 	repos: Record<string, GitRepo>;
 }
+

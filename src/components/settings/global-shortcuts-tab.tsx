@@ -15,6 +15,8 @@ import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/rea
 import { X } from "lucide-react";
 import { taurpc } from "../../api/taurpc.ts";
 import { useState } from "react";
+import type { DesktopAppMetadata } from "../../types/generated.ts";
+import { useDesktopAppManagerState } from "../../utils/state.ts";
 
 export function GlobalShortcutsTab() {
   const [input, setInput] = useState("");
@@ -32,17 +34,7 @@ export function GlobalShortcutsTab() {
     queryFn: taurpc.listGlobalShortcutMappings,
   });
   const mappings = data ?? [];
-  const appMetadataQueries = useQueries({
-    queries: mappings.map((mapping) => ({
-      queryKey: ["app-metadata", mapping.bundleId],
-      queryFn: () => taurpc.getAppMetadata(mapping.bundleId),
-      staleTime: 60_000,
-    })),
-  });
-  const appMetadataByBundleId = Object.fromEntries(
-    mappings.map((mapping, index) => [mapping.bundleId, appMetadataQueries[index]?.data]),
-  );
-
+  const { appsMetadata } = useDesktopAppManagerState()
   const normalizedFilter = input.trim().toLowerCase();
   const filteredMappings = mappings.filter((mapping) => {
     if (!normalizedFilter) {
@@ -53,7 +45,7 @@ export function GlobalShortcutsTab() {
       mapping.shortcut,
       mapping.bundleId,
       mapping.hotkeyId,
-      appMetadataByBundleId[mapping.bundleId]?.displayName ?? "",
+      appsMetadata[mapping.bundleId]?.displayName ?? "",
     ].some((value) => value.toLowerCase().includes(normalizedFilter));
   });
 
@@ -92,7 +84,7 @@ export function GlobalShortcutsTab() {
         ) : (
           <div className="space-y-2">
             {filteredMappings.map((mapping) => {
-              const appMetadata = appMetadataByBundleId[mapping.bundleId];
+              const appMetadata = appsMetadata[mapping.bundleId];
               const appLabel = appMetadata?.displayName?.trim() || mapping.bundleId;
 
               return (
@@ -123,7 +115,7 @@ function GlobalShortcutRow({
   onRemove,
 }: {
   appLabel: string;
-  appMetadata?: Awaited<ReturnType<typeof taurpc.getAppMetadata>>;
+  appMetadata?: DesktopAppMetadata
   mapping: Awaited<ReturnType<typeof taurpc.listGlobalShortcutMappings>>[number];
   isRemoving: boolean;
   onRemove: (shortcut: string) => void;

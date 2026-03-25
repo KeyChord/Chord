@@ -6,6 +6,7 @@ import type {
   ChordFilesState,
   FrontmostState,
   GitReposState,
+  DesktopAppManagerState,
 } from "../types/generated.ts";
 import { listen } from "@tauri-apps/api/event";
 import renameFunction from "rename-fn";
@@ -38,3 +39,4 @@ export const usePermissionsState = await createUseTauriState<AppPermissionsState
 export const useGitRepoStoreState = await createUseTauriState<GitReposState>("git-repos");
 export const useChordFilesState = await createUseTauriState<ChordFilesState>("chord-files");
 export const useFrontmostState = await createUseTauriState<FrontmostState>("frontmost");
+export const useDesktopAppManagerState = await createUseTauriState<DesktopAppManagerState>("desktop-app-manager");

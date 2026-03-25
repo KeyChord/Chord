@@ -7,12 +7,14 @@ use objc2_app_kit::{
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
 use std::time::{Duration, Instant};
+use typeshare::typeshare;
 
 pub struct DesktopApp {
     pub bundle_id: String,
 }
 
 #[derive(Debug)]
+#[typeshare]
 #[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
 #[specta(rename_all = "camelCase")]

@@ -1,17 +1,17 @@
-import type { AppMetadataInfo } from "#/api/taurpc.ts";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "#/components/ui/tooltip.tsx";
+import type { DesktopAppMetadata } from "../../types/generated.ts";
 
 export function AppIcon({
   appMetadata,
   label,
   tooltip,
 }: {
-  appMetadata?: AppMetadataInfo;
+  appMetadata?: DesktopAppMetadata;
   label: string;
   tooltip?: string;
 }) {
