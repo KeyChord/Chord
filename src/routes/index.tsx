@@ -1,15 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
-export const Route = createFileRoute("/")({
-  loader: () => {
-    const label = getCurrentWindow().label;
+export const Route = createFileRoute('/')({
+	loader: () => {
+		const label = getCurrentWindow().label;
 
-    if (label === "settings") {
-      throw redirect({ to: "/settings" });
-    }
+		if (label === 'settings') {
+			throw redirect({ to: '/settings' });
+		}
 
-    throw redirect({ to: "/chords" });
-  },
+		throw redirect({ to: '/chords' });
+	},
 });

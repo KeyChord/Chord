@@ -2,7 +2,7 @@
 name = "chords"
 version = "0.1.0"
 description = "shortcuts reimagined"
-authors = ["you"]
+authors = [ "you" ]
 edition = "2024"
 autobins = false
 
@@ -13,7 +13,11 @@ autobins = false
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "chords_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = [
+	"staticlib",
+	"cdylib",
+	"rlib"
+]
 
 [[bin]]
 name = "chord"
@@ -24,40 +28,47 @@ tauri-build = { version = "2", features = [] }
 cc = "1.0"
 
 [dependencies]
-tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri = { version = "2", features = [
+	"macos-private-api",
+	"tray-icon",
+	"image-png"
+] }
 taurpc-macros = { path = "./crates/taurpc_macros" }
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.6"
 tauri-plugin-fs = "2.4.5"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 base64 = "0.22"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = [ "full" ] }
 tauri-plugin-user-input = "0.1.1"
 tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-single-instance = "2.4.0"
 tauri-plugin-log = "2"
 log = "*"
-rdev = { version = "*", features = ["unstable_grab", "x11"] }
+rdev = { version = "*", features = [
+	"unstable_grab",
+	"x11"
+] }
 observable-property = "0.4.2"
 toml = "1.0.6"
 anyhow = "1.0"
 libc = "0.2"
 bitflags = "2.11"
-parking_lot = { version = "0.12", features = ["deadlock_detection"] }
+parking_lot = { version = "0.12", features = [ "deadlock_detection" ] }
 keycode = "1"
-include_dir = { version = "0.7", features = ["glob"] }
+include_dir = { version = "0.7", features = [ "glob" ] }
 device_query = "4"
 walkdir = "2.5.0"
-gix = { version = "0.80.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
+gix = { version = "0.80.0", features = [ "blocking-http-transport-reqwest-rust-tls" ] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-rquickjs = { version = "0.11.0", features = ["full-async"] }
+rquickjs = { version = "0.11.0", features = [ "full-async" ] }
 mac-keycode = "0.0.2"
 fast_radix_trie = "1.1.0"
 llrt_modules = { git = "https://github.com/awslabs/llrt", package = "llrt_modules" }
 llrt_core = { git = "https://github.com/awslabs/llrt", package = "llrt_core", features = [
-  'no-sdk',
-  'uncompressed',
+	'no-sdk',
+	'uncompressed',
 ] }
 # We need to manually enable all features
 llrt_os = { git = "https://github.com/awslabs/llrt", package = "llrt_os", default-features = true }
@@ -66,7 +77,7 @@ rquickjs-serde = "0.5.0"
 tauri-plugin-store = "2"
 jsonc-parser = "0.32.1"
 typeshare = "1"
-specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+specta = { version = "=2.0.0-rc.22", features = [ "derive" ] }
 taurpc = "0.7.1"
 delegate = "0.13.5"
 thiserror = "2.0.18"
@@ -75,8 +86,8 @@ inventory = "0.3.22"
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
 objc2 = "0.6.2"
-objc2-app-kit = { version = "0.3.1", features = ["block2"] }
-objc2-foundation = { version = "0.3.1", features = ["block2"] }
+objc2-app-kit = { version = "0.3.1", features = [ "block2" ] }
+objc2-foundation = { version = "0.3.1", features = [ "block2" ] }
 macos-accessibility-client = "0.0.2"
 frontmost = "1.1.0"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1", version = "2.1.0" }

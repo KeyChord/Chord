@@ -1,54 +1,54 @@
-export type SocketReqMsg =
-  | ReadyReqMsg
-  | ModuleReqMsg
-  | EndReqMsg
-  | StartReqMsg
-  | CompletedReqMsg
-  | ErrorReqMsg;
+export type SocketReqMsg
+	= | ReadyReqMsg
+		| ModuleReqMsg
+		| EndReqMsg
+		| StartReqMsg
+		| CompletedReqMsg
+		| ErrorReqMsg;
 
-export type ReadyReqMsg = {
-  type: "ready";
-  workerId: number;
-};
+export interface ReadyReqMsg {
+	type: 'ready'
+	workerId: number
+}
 
-export type ErrorReqMsg = {
-  type: "error";
-  error: any;
-  ended: number;
-  started: number;
-  workerId: number;
-};
+export interface ErrorReqMsg {
+	type: 'error'
+	error: any
+	ended: number
+	started: number
+	workerId: number
+}
 
-export type ModuleReqMsg = {
-  type: "module";
-  testCount: number;
-  skipCount: number;
-  onlyCount: number;
-};
+export interface ModuleReqMsg {
+	type: 'module'
+	testCount: number
+	skipCount: number
+	onlyCount: number
+}
 
-export type CompletedReqMsg = {
-  type: "completed";
-};
+export interface CompletedReqMsg {
+	type: 'completed'
+}
 
-export type EndReqMsg = {
-  type: "end";
-  ended: number;
-  started: number;
-  isSuite: boolean;
-};
+export interface EndReqMsg {
+	type: 'end'
+	ended: number
+	started: number
+	isSuite: boolean
+}
 
-export type StartReqMsg = {
-  type: "start";
-  desc: string;
-  isSuite: boolean;
-  started: number;
-  timeout?: number;
-};
+export interface StartReqMsg {
+	type: 'start'
+	desc: string
+	isSuite: boolean
+	started: number
+	timeout?: number
+}
 
-export type SocketResponseMap = {};
+export interface SocketResponseMap {}
 
 export type SocketRes<T extends SocketReqMsg> = T extends {
-  type: keyof SocketResponseMap;
+	type: keyof SocketResponseMap
 }
-  ? SocketResponseMap[T["type"]]
-  : null;
+	? SocketResponseMap[T['type']]
+	: null;

@@ -1,22 +1,22 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { EventEmitter as EE } from "node:events";
+import { EventEmitter as EE } from 'node:events';
+import { inherits } from 'node:util';
 // @ts-ignore
-import { Readable } from "readable-stream/lib/_stream_readable.js";
+import { Duplex } from 'readable-stream/lib/_stream_duplex.js';
 // @ts-ignore
-import { Writable } from "readable-stream/lib/_stream_writable.js";
+import { PassThrough } from 'readable-stream/lib/_stream_passthrough.js';
 // @ts-ignore
-import { Duplex } from "readable-stream/lib/_stream_duplex.js";
+import { Readable } from 'readable-stream/lib/_stream_readable.js';
 // @ts-ignore
-import { Transform } from "readable-stream/lib/_stream_transform.js";
+import { Transform } from 'readable-stream/lib/_stream_transform.js';
 // @ts-ignore
-import { PassThrough } from "readable-stream/lib/_stream_passthrough.js";
+import { Writable } from 'readable-stream/lib/_stream_writable.js';
 // @ts-ignore
-import { finished } from "readable-stream/lib/internal/streams/end-of-stream.js";
-// @ts-ignore
-import { pipeline } from "readable-stream/lib/internal/streams/pipeline.js";
+import { finished } from 'readable-stream/lib/internal/streams/end-of-stream.js';
 
-import { inherits } from "node:util";
+// @ts-ignore
+import { pipeline } from 'readable-stream/lib/internal/streams/pipeline.js';
 
 inherits(Stream, EE);
 Stream.Readable = Readable;
@@ -32,90 +32,93 @@ Stream.Stream = Stream;
 // part of this class) is overridden in the Readable class.
 
 function Stream(this: any) {
-  EE.call(this);
+	EE.call(this);
 }
 
 Stream.prototype.pipe = function (dest: any, options: any) {
-  var source = this;
+	const source = this;
 
-  function ondata(chunk: any) {
-    if (dest.writable) {
-      if (false === dest.write(chunk) && source.pause) {
-        source.pause();
-      }
-    }
-  }
+	function ondata(chunk: any) {
+		if (dest.writable) {
+			if (dest.write(chunk) === false && source.pause) {
+				source.pause();
+			}
+		}
+	}
 
-  source.on("data", ondata);
+	source.on('data', ondata);
 
-  function ondrain() {
-    if (source.readable && source.resume) {
-      source.resume();
-    }
-  }
+	function ondrain() {
+		if (source.readable && source.resume) {
+			source.resume();
+		}
+	}
 
-  dest.on("drain", ondrain);
+	dest.on('drain', ondrain);
 
-  // If the 'end' option is not supplied, dest.end() will be called when
-  // source gets the 'end' or 'close' events.  Only dest.end() once.
-  if (!dest._isStdio && (!options || options.end !== false)) {
-    source.on("end", onend);
-    source.on("close", onclose);
-  }
+	// If the 'end' option is not supplied, dest.end() will be called when
+	// source gets the 'end' or 'close' events.  Only dest.end() once.
+	if (!dest._isStdio && (!options || options.end !== false)) {
+		source.on('end', onend);
+		source.on('close', onclose);
+	}
 
-  var didOnEnd = false;
-  function onend() {
-    if (didOnEnd) return;
-    didOnEnd = true;
+	let didOnEnd = false;
+	function onend() {
+		if (didOnEnd)
+			return;
+		didOnEnd = true;
 
-    dest.end();
-  }
+		dest.end();
+	}
 
-  function onclose() {
-    if (didOnEnd) return;
-    didOnEnd = true;
+	function onclose() {
+		if (didOnEnd)
+			return;
+		didOnEnd = true;
 
-    if (typeof dest.destroy === "function") dest.destroy();
-  }
+		if (typeof dest.destroy === 'function')
+			dest.destroy();
+	}
 
-  // don't leave dangling pipes when there are errors.
-  function onerror(er: any) {
-    cleanup();
-    if (source.listenerCount("error") === 0) {
-      throw er; // Unhandled stream error in pipe.
-    }
-  }
+	// don't leave dangling pipes when there are errors.
+	function onerror(er: any) {
+		cleanup();
+		if (source.listenerCount('error') === 0) {
+			throw er; // Unhandled stream error in pipe.
+		}
+	}
 
-  source.on("error", onerror);
-  dest.on("error", onerror);
+	source.on('error', onerror);
+	dest.on('error', onerror);
 
-  // remove all the event listeners that were added.
-  function cleanup() {
-    source.removeListener("data", ondata);
-    dest.removeListener("drain", ondrain);
+	// remove all the event listeners that were added.
+	function cleanup() {
+		source.removeListener('data', ondata);
+		dest.removeListener('drain', ondrain);
 
-    source.removeListener("end", onend);
-    source.removeListener("close", onclose);
+		source.removeListener('end', onend);
+		source.removeListener('close', onclose);
 
-    source.removeListener("error", onerror);
-    dest.removeListener("error", onerror);
+		source.removeListener('error', onerror);
+		dest.removeListener('error', onerror);
 
-    source.removeListener("end", cleanup);
-    source.removeListener("close", cleanup);
+		source.removeListener('end', cleanup);
+		source.removeListener('close', cleanup);
 
-    dest.removeListener("close", cleanup);
-  }
+		dest.removeListener('close', cleanup);
+	}
 
-  source.on("end", cleanup);
-  source.on("close", cleanup);
+	source.on('end', cleanup);
+	source.on('close', cleanup);
 
-  dest.on("close", cleanup);
+	dest.on('close', cleanup);
 
-  dest.emit("pipe", source);
+	dest.emit('pipe', source);
 
-  // Allow for unix-like usage: A.pipe(B).pipe(C)
-  return dest;
+	// Allow for unix-like usage: A.pipe(B).pipe(C)
+	return dest;
 };
 
 export default Stream;
-export { Readable, Writable, Duplex, Transform, PassThrough, finished, pipeline, Stream };
+export { Duplex, finished, PassThrough, pipeline, Readable, Stream, Transform, Writable };

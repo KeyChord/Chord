@@ -19,9 +19,9 @@ llrt_events = { git = "https://github.com/awslabs/llrt", package = "llrt_events"
 llrt_stream = { git = "https://github.com/awslabs/llrt", package = "llrt_stream" }
 llrt_utils = { git = "https://github.com/awslabs/llrt", package = "llrt_utils", default-features = false }
 rquickjs = { version = "0.11", default-features = false }
-tokio = { version = "1", features = ["net"], default-features = false }
+tokio = { version = "1", features = [ "net" ], default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 llrt_test = { path = "../../libs/llrt_test" }
-rand = { version = "0.10.0", features = ["alloc"], default-features = false }
+rand = { version = "0.10.0", features = [ "alloc" ], default-features = false }

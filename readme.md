@@ -164,9 +164,12 @@ export const menu = (...segments: string[]) => {
 
 [chords]
 # `explorer.newFile` doesn't have a default shortcut in VSCode
-fh = { name = "File: Here", args = ["explorer.newFile"] }
+fh = { name = "File: Here", args = [ "explorer.newFile" ] }
 # `args:menu` calls the named `menu` export instead of `default`
-mc = { name = "Menu: Columns", 'args:menu' = ["View", "Columns"] }
+mc = { name = "Menu: Columns", 'args:menu' = [
+	"View",
+	"Columns"
+] }
 # String args are evaluated as JavaScript and must return an array
 df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()]' }
 # ...
@@ -200,16 +203,15 @@ Because there are only a limited amount of modifier+key combinations available, 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
 gf = {
-  name = "Go to File",
-  # cmd+p doesn't make you think of "File" (my best guess is that cmd+f is already taken by Find, and so it's adapted from the shortcut for the similar feature Command Palette which is cmd+shift+p (p for palette)
-  # Either way, "gf" for "goto file" is a lot easier to remember
-  shortcut = "cmd+p"
+	name = "Go to File",
+	# cmd+p doesn't make you think of "File" (my best guess is that cmd+f is already taken by Find, and so it's adapted from the shortcut for the similar feature Command Palette which is cmd+shift+p (p for palette)
+	# Either way, "gf" for "goto file" is a lot easier to remember
+	shortcut = "cmd+p"
 }
-
 gd = {
-  name = "Go to Definition",
-  # Some shortcuts don't even use letters at all...
-  shortcut = "F12"
+	name = "Go to Definition",
+	# Some shortcuts don't even use letters at all...
+	shortcut = "F12"
 }
 ```
 

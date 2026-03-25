@@ -1,40 +1,40 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Chord",
-  "version": "0.1.0",
-  "identifier": "com.leonsilicon.chord",
-  "build": {
-    "beforeDevCommand": "bun run vite-dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
-    "frontendDist": "../dist"
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyMTA1MTg3MjAzMTkxMzAKUldRd2tURWdoMUVRTXRiM3hzRlkvRVhjdkE0Y3lLNXJvaTEzRGRlYjRXdjVCdzVYc0lLM3lILysK",
-      "endpoints": ["https://github.com/KeyChord/Chord/releases/latest/download/latest.json"]
-    }
-  },
-  "app": {
-    "macOSPrivateApi": true,
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "createUpdaterArtifacts": true,
-    "macOS": {
-      "signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
-      "infoPlist": "Info.plist"
-    },
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png",
-      "icons/icon.icns",
-      "icons/icon.ico"
-    ]
-  }
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "Chord",
+	"version": "0.1.0",
+	"identifier": "com.leonsilicon.chord",
+	"build": {
+		"beforeDevCommand": "bun run vite-dev",
+		"devUrl": "http://localhost:1420",
+		"beforeBuildCommand": "bun run build",
+		"frontendDist": "../dist"
+	},
+	"plugins": {
+		"updater": {
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDMyMTA1MTg3MjAzMTkxMzAKUldRd2tURWdoMUVRTXRiM3hzRlkvRVhjdkE0Y3lLNXJvaTEzRGRlYjRXdjVCdzVYc0lLM3lILysK",
+			"endpoints": ["https://github.com/KeyChord/Chord/releases/latest/download/latest.json"]
+		}
+	},
+	"app": {
+		"macOSPrivateApi": true,
+		"security": {
+			"csp": null
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"createUpdaterArtifacts": true,
+		"macOS": {
+			"signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
+			"infoPlist": "Info.plist"
+		},
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
+	}
 }

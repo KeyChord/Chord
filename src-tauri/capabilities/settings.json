@@ -1,21 +1,21 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "settings",
-  "description": "Capability for the settings window",
-  "windows": ["settings"],
-  "permissions": [
-    "core:default",
-    "autostart:default",
-    "log:default",
-    "macos-permissions:default",
-    "opener:allow-default-urls",
-    "opener:allow-open-path",
-    "core:window:default",
-    "core:window:allow-hide",
-    "core:window:allow-set-focus",
-    "core:window:allow-show",
-    "core:window:allow-unminimize",
-    "fs:read-dirs",
-    "store:default"
-  ]
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "settings",
+	"description": "Capability for the settings window",
+	"windows": ["settings"],
+	"permissions": [
+		"core:default",
+		"autostart:default",
+		"log:default",
+		"macos-permissions:default",
+		"opener:allow-default-urls",
+		"opener:allow-open-path",
+		"core:window:default",
+		"core:window:allow-hide",
+		"core:window:allow-set-focus",
+		"core:window:allow-show",
+		"core:window:allow-unminimize",
+		"fs:read-dirs",
+		"store:default"
+	]
 }

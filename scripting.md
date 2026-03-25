@@ -7,10 +7,10 @@ Use [pnpm] because it supports specifying a dependency which is subdirectory of 
 ```jsonc
 // package.json
 {
-  "devDependencies": {
-    "llrt-types": "github:awslabs/llrt#path:/types",
-    // ...
-  },
+	"devDependencies": {
+		"llrt-types": "github:awslabs/llrt#path:/types"
+		// ...
+	}
 }
 ```
 
@@ -19,10 +19,10 @@ Make sure your `tsconfig.json` has the `types` property set to `llrt-types`:
 ```jsonc
 // tsconfig.json
 {
-  "compilerOptions": {
-    "types": ["llrt-types"],
-    // ...
-  },
+	"compilerOptions": {
+		"types": ["llrt-types"]
+		// ...
+	}
 }
 ```
 
