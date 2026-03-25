@@ -36,12 +36,12 @@ pub fn register_key_event_input_grabber(handle: AppHandle) {
                 return Some(event);
             }
 
-            if !handle
-                .app_dev_lockfile_detector()
-                .should_intercept_input_events()
-            {
-                return Some(event);
-            }
+            // if !handle
+            //     .app_dev_lockfile_detector()
+            //     .should_intercept_input_events()
+            // {
+            //     return Some(event);
+            // }
 
             let context = handle.app_context();
             let key_event = match event.event_type {
