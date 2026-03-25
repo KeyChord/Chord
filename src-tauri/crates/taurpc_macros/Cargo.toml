@@ -1,6 +1,13 @@
 [package]
-name = "taurpc_macros"
+name = "taurpc-macros"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+proc-macro = true
+
 [dependencies]
+convert_case = "0.11"
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full"] }

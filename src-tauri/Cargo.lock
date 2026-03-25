@@ -857,6 +857,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-user-input",
  "taurpc",
+ "taurpc-macros 0.1.0",
  "thiserror 2.0.18",
  "tokio",
  "toml 1.0.6+spec-1.1.0",
@@ -950,6 +951,15 @@ name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "convert_case"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "affbf0190ed2caf063e3def54ff444b449371d55c58e513a95ab98eca50adb49"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -8105,8 +8115,18 @@ dependencies = [
  "specta-serde",
  "specta-typescript",
  "tauri",
- "taurpc-macros",
+ "taurpc-macros 0.7.1",
  "tokio",
+]
+
+[[package]]
+name = "taurpc-macros"
+version = "0.1.0"
+dependencies = [
+ "convert_case 0.11.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
