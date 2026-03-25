@@ -44,12 +44,10 @@ toml = "1.0.6"
 anyhow = "1.0"
 libc = "0.2"
 bitflags = "2.11"
-arc-swap = "1.8"
 parking_lot = { version = "0.12", features = ["deadlock_detection"] }
 keycode = "1"
 include_dir = { version = "0.7", features = ["glob"] }
 device_query = "4"
-bijective-enum-map = "0.1.0"
 walkdir = "2.5.0"
 gix = { version = "0.80.0", features = ["blocking-http-transport-reqwest-rust-tls"] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
@@ -66,22 +64,13 @@ llrt_os = { git = "https://github.com/awslabs/llrt", package = "llrt_os", defaul
 llrt_readline = { path = "./crates/llrt_readline" }
 rquickjs-serde = "0.5.0"
 tauri-plugin-store = "2"
-jsonc-parser = "0.31.0"
-include_json = "*"
+jsonc-parser = "0.32.1"
 typeshare = "1"
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 taurpc = "0.7.1"
 delegate = "0.13.5"
 thiserror = "2.0.18"
 inventory = "0.3.22"
-automoduse = "1"
-
-
-# Deno makes input methods super laggy for some reason, might debug in future, but not worth right now
-#deno_runtime = {  version = "0.248.0", features = ["transpile"] }
-#deno_resolver = "0.71.0"
-#sys_traits = "*"
-#deno_ast = "0.53.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

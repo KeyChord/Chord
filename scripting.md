@@ -90,3 +90,11 @@ This repo also includes a small `chord` CLI wrapper that forwards commands to th
 If you want to run it as `chord` from anywhere, add the repo copy to your `PATH` or symlink it into a directory that is already on your `PATH`.
 
 The CLI depends on macOS recognizing the bundled Chord app as the handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once first.
+
+## FAQ
+
+### Why not bundle a full-fledged runtime like Deno or Bun?
+
+Deno has too much overhead, an experiment was previously tried but it makes the keypress handler lag significantly (maybe I embedded it wrong, but not worth the trouble of debugging).
+
+Bun on the other hand is great, but doesn't have an official integration API, which makes it impossible to expose custom Rust functions (needed in order to synchronize state). It can still be used for one-off CLI tasks such as browser automation, though.

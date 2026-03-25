@@ -1,8 +1,10 @@
 use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_quote, Attribute, FnArg, ItemTrait, Pat, TraitItem, TraitItemFn,
+    parse_macro_input, parse_quote, Attribute, FnArg, ItemTrait, LitStr, Pat, TraitItem,
+    TraitItemFn,
 };
 
 fn has_taurpc_attr(attrs: &[Attribute]) -> bool {
@@ -51,11 +53,54 @@ fn extract_arg_idents(method: &TraitItemFn) -> syn::Result<Vec<syn::Ident>> {
     Ok(idents)
 }
 
+fn parse_module_ident(lit: &LitStr) -> syn::Result<syn::Ident> {
+    syn::parse_str::<syn::Ident>(&lit.value()).map_err(|_| {
+        syn::Error::new_spanned(
+            lit,
+            "`mod` must be a valid Rust identifier string, for example \"resolvers\"",
+        )
+    })
+}
+
 #[proc_macro_attribute]
 pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let mut export_to: Option<LitStr> = None;
+    let mut resolver_mod_name: Option<LitStr> = None;
+
+    let parser = syn::meta::parser(|meta| {
+        if meta.path.is_ident("export_to") {
+            let value: LitStr = meta.value()?.parse()?;
+            if export_to.replace(value).is_some() {
+                return Err(meta.error("duplicate `export_to` argument"));
+            }
+            return Ok(());
+        }
+
+        if meta.path.is_ident("mod") {
+            let value: LitStr = meta.value()?.parse()?;
+            if resolver_mod_name.replace(value).is_some() {
+                return Err(meta.error("duplicate `mod` argument"));
+            }
+            return Ok(());
+        }
+
+        Err(meta.error(
+            "unsupported argument; expected `export_to = \"...\"` or `mod = \"...\"`",
+        ))
+    });
+
+    parse_macro_input!(attr with parser);
+
+    let resolver_mod_ident = match resolver_mod_name {
+        Some(lit) => match parse_module_ident(&lit) {
+            Ok(ident) => ident,
+            Err(error) => return error.to_compile_error().into(),
+        },
+        None => syn::Ident::new("resolvers", Span::call_site()),
+    };
+
     let mut item_trait = parse_macro_input!(item as ItemTrait);
     let trait_ident = item_trait.ident.clone();
-    let procedures_args = proc_macro2::TokenStream::from(attr);
 
     let mut resolver_mod_items = Vec::new();
     let mut impl_methods = Vec::new();
@@ -95,18 +140,21 @@ pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         impl_methods.push(quote! {
             #impl_sig {
-                self::resolvers::#name::#name(self, #(#arg_idents),*).await
+                self::#resolver_mod_ident::#name::#name(self, #(#arg_idents),*).await
             }
         });
     }
 
-    let procedures_attr = if procedures_args.is_empty() {
-        quote! {
-            #[taurpc::procedures]
+    let procedures_attr = match export_to {
+        Some(path) => {
+            quote! {
+                #[taurpc::procedures(export_to = #path)]
+            }
         }
-    } else {
-        quote! {
-            #[taurpc::procedures(#procedures_args)]
+        None => {
+            quote! {
+                #[taurpc::procedures]
+            }
         }
     };
 
@@ -114,7 +162,7 @@ pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
         #procedures_attr
         #item_trait
 
-        pub mod resolvers {
+        pub mod #resolver_mod_ident {
             #(#resolver_mod_items)*
         }
 

@@ -339,17 +339,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
-name = "automoduse"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0e47ca9aa586264a8e82938f9fdcedb35b95ffb7b14bdd5f871501377d0920d"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "aws-lc-rs"
 version = "1.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -419,12 +408,6 @@ name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
-
-[[package]]
-name = "bijective-enum-map"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f579474876cbbd08d252854266ed2e43038f0374225c253fbb45f1c383181c6"
 
 [[package]]
 name = "bit-set"
@@ -806,10 +789,7 @@ name = "chords"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "arc-swap",
- "automoduse",
  "base64 0.22.1",
- "bijective-enum-map",
  "bitflags 2.11.0",
  "block2",
  "cc",
@@ -820,7 +800,6 @@ dependencies = [
  "frontmost",
  "gix",
  "include_dir",
- "include_json",
  "inventory",
  "jsonc-parser",
  "keycode",
@@ -3780,19 +3759,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "include_json"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "307f5191369b34bcf894d6fe3ff85e3ccddcbed1f3b7bc66fe2cdf2a3b8ec05a"
-dependencies = [
- "macro-string",
- "proc-macro2",
- "quote",
- "serde_json",
- "syn 2.0.117",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4043,9 +4009,9 @@ dependencies = [
 
 [[package]]
 name = "jsonc-parser"
-version = "0.31.0"
+version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45157f76d8fbe134e0c97403d69ac48989a1e0249a058b20f9f5eeff11bb09f0"
+checksum = "8de0ffda8def4eb16ed430641db8056c2509b20e38f2dd327bdb4c83239f88c4"
 
 [[package]]
 name = "jsonptr"
@@ -4902,17 +4868,6 @@ checksum = "c33254f6f9b60b98eff934c3664530e5058ff7173e0c6b12419a17d5461e7145"
 dependencies = [
  "core-foundation 0.10.1",
  "core-foundation-sys",
-]
-
-[[package]]
-name = "macro-string"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59a9dbbfc75d2688ed057456ce8a3ee3f48d12eec09229f560f3643b9f275653"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
 ]
 
 [[package]]
