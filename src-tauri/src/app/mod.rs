@@ -36,6 +36,7 @@ macro_rules! define_app_managed {
             }
         }
 
+        #[allow(dead_code)]
         pub trait AppHandleExt {
             $(
                 fn $getter(&self) -> &$ty;

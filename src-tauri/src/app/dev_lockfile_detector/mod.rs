@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+#[allow(dead_code)]
 pub struct DevLockfileDetector {
     enforce_lockfile_check: bool,
     lockfile_path: PathBuf,
@@ -13,6 +14,7 @@ impl DevLockfileDetector {
         }
     }
 
+    #[allow(dead_code)]
     pub fn should_intercept_input_events(&self) -> bool {
         if !self.enforce_lockfile_check {
             return true;
@@ -22,6 +24,7 @@ impl DevLockfileDetector {
     }
 }
 
+#[allow(dead_code)]
 fn is_dev_lockfile_present(lockfile_path: &Path) -> bool {
     lockfile_path.exists()
 }

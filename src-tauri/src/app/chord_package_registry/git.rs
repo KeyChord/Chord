@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 
 pub struct GitChordPackageRegistry {
+    #[allow(dead_code)]
     pub dir: PathBuf,
 
     handle: SafeAppHandle,

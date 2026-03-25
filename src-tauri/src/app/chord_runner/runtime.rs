@@ -4,6 +4,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MatchingChordInfo {
     pub scope: String,
@@ -12,6 +13,7 @@ pub struct MatchingChordInfo {
     pub chord: Chord,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct MatchingDescriptionInfo {
     pub scope: String,
@@ -42,6 +44,7 @@ pub struct ChordPayload {
 pub(crate) const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
 
 impl ChordRuntime {
+    #[allow(dead_code)]
     pub fn from_chords(path: String, chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
         let raw_chords = Arc::new(Mutex::new(HashMap::new()));
         Ok(Self {

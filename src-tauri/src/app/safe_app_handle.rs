@@ -13,6 +13,7 @@ use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
 
 type OnSafeCallback = Box<dyn FnOnce(AppHandle) + Send + 'static>;
+#[allow(dead_code)]
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
 pub trait OnSafeReturn: Send + 'static {
@@ -38,10 +39,12 @@ where
     }
 }
 
+#[allow(dead_code)]
 pub struct AsyncOnSafe<R> {
     future: BoxFuture<R>,
 }
 
+#[allow(dead_code)]
 impl<R> AsyncOnSafe<R>
 where
     R: OnSafeReturn,
@@ -141,6 +144,7 @@ impl SafeAppHandle {
         }
     }
 
+    #[allow(dead_code)]
     pub fn on_safe_async<F, Fut, R>(&self, callback: F)
     where
         F: FnOnce(AppHandle) -> Fut + Send + 'static,

@@ -238,112 +238,6 @@ impl ChordRunnerRegistry {
         }
     }
 
-    pub fn list_matching_descriptions(
-        &self,
-        key_buffer: &[Key],
-        application_id: Option<&str>,
-    ) -> Vec<MatchingDescriptionInfo> {
-        let (_, chord_prefix) = split_repeat_prefix(key_buffer);
-        let mut matches = Vec::new();
-
-        if chord_prefix.is_empty() {
-            if let Some(application_id) = application_id {
-                let runtime = {
-                    let runtimes = self.runtimes.lock().expect("poisoned");
-                    runtimes.get(application_id).map(|r| r.clone())
-                };
-                if let Some(runtime) = runtime {
-                    push_runtime_description_matches(
-                        &mut matches,
-                        application_id,
-                        "app",
-                        runtime.clone(),
-                        chord_prefix,
-                    );
-                }
-            }
-
-            let global_runtime_ids = {
-                let global_chords_to_runtime_key =
-                    self.global_chords_to_runtime_key.lock().expect("poisoned");
-                global_chords_to_runtime_key
-                    .values()
-                    .cloned()
-                    .collect::<HashSet<_>>()
-            };
-            for runtime_id in global_runtime_ids {
-                let runtime = {
-                    let runtimes = self.runtimes.lock().expect("poisoned");
-                    runtimes.get(&runtime_id).map(|r| r.clone())
-                };
-                let Some(runtime) = runtime else {
-                    continue;
-                };
-
-                push_runtime_description_matches(
-                    &mut matches,
-                    "Global",
-                    "global",
-                    runtime.clone(),
-                    chord_prefix,
-                );
-            }
-        } else if is_global_chord_sequence(chord_prefix) {
-            let global_runtime_ids = {
-                let global_chords_to_runtime_key =
-                    self.global_chords_to_runtime_key.lock().expect("poisoned");
-                global_chords_to_runtime_key
-                    .values()
-                    .cloned()
-                    .collect::<HashSet<_>>()
-            };
-            for runtime_id in global_runtime_ids {
-                let runtime = {
-                    let runtimes = self.runtimes.lock().expect("poisoned");
-                    runtimes.get(&runtime_id).map(|r| r.clone())
-                };
-                let Some(runtime) = runtime else {
-                    continue;
-                };
-
-                push_runtime_description_matches(
-                    &mut matches,
-                    "Global",
-                    "global",
-                    runtime.clone(),
-                    chord_prefix,
-                );
-            }
-        } else if let Some(application_id) = application_id {
-            let runtime = {
-                let runtimes = self.runtimes.lock().expect("poisoned");
-                runtimes.get(application_id).map(|r| r.clone())
-            };
-            if let Some(runtime) = runtime {
-                push_runtime_description_matches(
-                    &mut matches,
-                    application_id,
-                    "app",
-                    runtime.clone(),
-                    chord_prefix,
-                );
-            }
-        }
-
-        matches.sort_by(|left, right| {
-            let left_scope_rank = if left.scope_kind == "app" { 0 } else { 1 };
-            let right_scope_rank = if right.scope_kind == "app" { 0 } else { 1 };
-
-            left_scope_rank
-                .cmp(&right_scope_rank)
-                .then(left.sequence.len().cmp(&right.sequence.len()))
-                .then(left.scope.cmp(&right.scope))
-                .then(left.description.cmp(&right.description))
-        });
-
-        matches
-    }
-
     /// Also re-evaluates JavaScript
     pub async fn reload(&self) -> anyhow::Result<()> {
         let handle = self.handle.try_handle()?;
@@ -454,6 +348,7 @@ fn is_global_chord_sequence(sequence: &[Key]) -> bool {
         .is_some_and(|key| !key.is_digit() && !key.is_letter())
 }
 
+#[allow(dead_code)]
 fn split_repeat_prefix(sequence: &[Key]) -> (&[Key], &[Key]) {
     let split_idx = sequence
         .iter()
@@ -463,6 +358,7 @@ fn split_repeat_prefix(sequence: &[Key]) -> (&[Key], &[Key]) {
     sequence.split_at(split_idx)
 }
 
+#[allow(dead_code)]
 fn push_runtime_matches(
     matches: &mut Vec<MatchingChordInfo>,
     scope: &str,
@@ -484,6 +380,7 @@ fn push_runtime_matches(
     }
 }
 
+#[allow(dead_code)]
 fn push_runtime_description_matches(
     matches: &mut Vec<MatchingDescriptionInfo>,
     scope: &str,

@@ -1,4 +1,5 @@
 use crate::constants::SHOW_SETTINGS_WINDOW_MENU_ID;
+#[allow(unused_imports)]
 use tauri::{
     AppHandle, Runtime,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, WINDOW_SUBMENU_ID},

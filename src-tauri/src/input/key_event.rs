@@ -127,6 +127,7 @@ impl KeyEventState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_modifier_flags(&self) -> Modifiers {
         Modifiers::from_bits_truncate(self.modifier_flags.load(Ordering::Relaxed))
     }

@@ -99,6 +99,7 @@ impl ChordPackage {
         })
     }
 
+    #[allow(dead_code)]
     pub fn merge(&mut self, other: Self) {
         self.chords_files.extend(other.chords_files);
         self.js_files.extend(other.js_files);

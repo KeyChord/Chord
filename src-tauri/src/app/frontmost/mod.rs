@@ -27,6 +27,7 @@ impl frontmost::app::FrontmostApp for FrontmostTracker {
 }
 
 pub struct AppFrontmost {
+    #[allow(dead_code)]
     observable: Arc<FrontmostObservable>,
 }
 

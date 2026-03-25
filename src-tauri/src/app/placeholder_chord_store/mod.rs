@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use crate::api::{AppError, AppResult};
 use crate::app::SafeAppHandle;
 use anyhow::Result;
@@ -44,6 +45,7 @@ impl PlaceholderChordStore {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub fn entry(&self, key: &PlaceholderChordStoreKey) -> Option<PlaceholderChordStoreEntry> {
         self.entries().get(key).cloned()
     }

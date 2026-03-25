@@ -105,7 +105,7 @@ impl Shortcut {
         has_shift
     }
 
-    pub fn to_press_actions(&self, num_times: usize) -> Vec<ShortcutAction> {
+    fn to_press_actions(&self, num_times: usize) -> Vec<ShortcutAction> {
         let mut actions = Vec::new();
         let suppress_shift = !self.has_shift();
 
@@ -130,7 +130,7 @@ impl Shortcut {
         actions
     }
 
-    pub fn to_release_actions(&self) -> Vec<ShortcutAction> {
+    fn to_release_actions(&self) -> Vec<ShortcutAction> {
         let suppress_shift = !self.has_shift();
         self.chords
             .last()

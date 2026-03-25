@@ -2,12 +2,12 @@ use crate::app::SafeAppHandle;
 use tokio::process::Command;
 
 pub struct ChordShellRunner {
-    handle: SafeAppHandle,
+    _handle: SafeAppHandle,
 }
 
 impl ChordShellRunner {
     pub fn new(handle: SafeAppHandle) -> Self {
-        Self { handle }
+        Self { _handle: handle }
     }
 
     pub fn run_shell_command(&self, shell: String) {

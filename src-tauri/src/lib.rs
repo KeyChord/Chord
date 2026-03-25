@@ -1,5 +1,7 @@
 use crate::api::{Api, ApiImpl};
+#[allow(unused_imports)]
 use crate::app::{AppHandleExt, SafeAppHandle};
+#[allow(unused_imports)]
 use crate::observables::{ChorderObservable, GitReposObservable};
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
@@ -88,7 +90,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api.clone().into_handler()))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
-        .on_menu_event(|handle, event| {
+        .on_menu_event(|_handle, _event| {
             // tauri_app::menu::handle_menu_event(handle, &event);
         })
         .plugin(log_plugin)

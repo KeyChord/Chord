@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use crate::app::SafeAppHandle;
 use crate::observables::{AppSettingsObservable, AppSettingsState, ChorderObservable, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
@@ -44,6 +46,7 @@ impl SettingsUi {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn open_inspector(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         window.show()?;
@@ -54,6 +57,7 @@ impl SettingsUi {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn hide(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         window.hide()?;

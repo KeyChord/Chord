@@ -4,6 +4,7 @@ use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
 use objc2_foundation::NSString;
+#[allow(unused_imports)]
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
@@ -11,19 +12,24 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+#[allow(unused_imports)]
 use log::kv::ToValue;
 use tauri::AppHandle;
 
 pub struct DesktopAppManager {
     observable: Arc<DesktopAppManagerObservable>,
-    handle: SafeAppHandle,
+    _handle: SafeAppHandle,
 }
 
 impl DesktopAppManager {
     pub fn new(handle: SafeAppHandle, observable: Arc<DesktopAppManagerObservable>) -> Self {
-        DesktopAppManager { observable, handle }
+        DesktopAppManager {
+            observable,
+            _handle: handle,
+        }
     }
 
+    #[allow(dead_code)]
     pub fn load_apps_metadata(&self, bundle_ids: &[&str]) -> Result<()> {
         let state = self.observable.get_state()?;
         let mut apps_metadata = state.apps_metadata.clone();
@@ -42,7 +48,7 @@ impl DesktopAppManager {
     }
 
     pub fn relaunch_app(&self, bundle_id: &str) -> Result<()> {
-        let app = DesktopApp::new(bundle_id)?;
+        let _app = DesktopApp::new(bundle_id)?;
 
         let bundle_id = NSString::from_str(bundle_id);
         let running_apps =

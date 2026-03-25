@@ -106,6 +106,7 @@ macro_rules! define_observable {
         }
 
         impl $name {
+            #[allow(dead_code)]
             pub const ID: &'static str =
                 <$name as $crate::observables::Observable>::ID;
 

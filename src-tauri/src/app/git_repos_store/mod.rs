@@ -51,6 +51,7 @@ impl GitReposStore {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn remove(&self, owner: &str, slug: &str) -> Result<()> {
         // Filesystem first
         let id = format!("{}/{}", owner, slug);

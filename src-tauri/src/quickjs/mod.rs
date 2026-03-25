@@ -3,6 +3,7 @@ use crate::quickjs::chord_module::ChordModule;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
+#[allow(unused_imports)]
 use rquickjs::{
     AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value,
     loader::{Loader, Resolver},

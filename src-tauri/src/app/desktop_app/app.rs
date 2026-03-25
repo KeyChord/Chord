@@ -1,18 +1,22 @@
 use anyhow::Result;
 use base64::Engine;
 use objc2::__framework_prelude::AnyObject;
+#[allow(unused_imports)]
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
     NSWorkspaceLaunchOptions,
 };
 use objc2_foundation::{NSDictionary, NSSize, NSString};
+#[allow(unused_imports)]
 use std::time::{Duration, Instant};
 use typeshare::typeshare;
 
+#[allow(dead_code)]
 pub struct DesktopApp {
     pub bundle_id: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 #[typeshare]
 #[taurpc::ipc_type]
@@ -36,6 +40,7 @@ impl DesktopApp {
         })
     }
 
+    #[allow(dead_code)]
     pub fn get_metadata(&self) -> Result<DesktopAppMetadata> {
         Ok(DesktopAppMetadata {
             bundle_id: self.bundle_id.clone(),
@@ -44,6 +49,7 @@ impl DesktopApp {
         })
     }
 
+    #[allow(dead_code)]
     pub fn resolve_display_name(&self) -> Option<String> {
         let bundle_id = NSString::from_str(&self.bundle_id);
         let running_apps =
@@ -67,6 +73,7 @@ impl DesktopApp {
         )
     }
 
+    #[allow(dead_code)]
     pub fn resolve_path(&self) -> Option<String> {
         let bundle_id = NSString::from_str(&self.bundle_id);
         let workspace = NSWorkspace::sharedWorkspace();
@@ -75,6 +82,7 @@ impl DesktopApp {
         Some(app_path.to_string())
     }
 
+    #[allow(dead_code)]
     pub fn resolve_icon_data_url(&self) -> Option<String> {
         let app_path = self.resolve_path()?;
         let workspace = NSWorkspace::sharedWorkspace();
