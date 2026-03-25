@@ -1,4 +1,5 @@
-use crate::api::{ApiImpl, open_system_settings};
+use crate::api::ApiImpl;
+use crate::app::permissions::open_system_settings;
 
 pub async fn open_accessibility_settings(api: ApiImpl) {
     let _ = api;

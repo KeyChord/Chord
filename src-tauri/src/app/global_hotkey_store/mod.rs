@@ -17,6 +17,17 @@ pub struct GlobalHotkeyStore {
     pub store: Arc<Store<Wry>>,
 }
 
+#[derive(Debug)]
+#[taurpc::ipc_type]
+#[serde(rename_all = "camelCase")]
+#[specta(rename_all = "camelCase")]
+pub struct GlobalShortcutMappingInfo {
+    pub shortcut: String,
+    pub bundle_id: String,
+    pub hotkey_id: String,
+}
+
+
 impl GlobalHotkeyStore {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let store = handle.store("global-hotkeys.json")?;
@@ -74,3 +85,4 @@ impl GlobalHotkeyStore {
         Ok(())
     }
 }
+

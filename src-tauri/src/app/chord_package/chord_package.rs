@@ -3,7 +3,7 @@ use fast_radix_trie::StringRadixMap;
 use include_dir::{Dir, include_dir};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use crate::app::chord_registry::chord_file::AppChordsFile;
+use crate::app::chord_package::AppChordsFile;
 
 #[derive(Debug)]
 pub struct ChordPackage {

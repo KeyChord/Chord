@@ -1,21 +1,19 @@
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use llrt_core::{Module, Promise};
-use llrt_core::libs::utils::result::ResultExt;
-use crate::app::chord_registry::chord_file::AppChordsFileConfig;
-use crate::app::chord_registry::chord_package::ChordPackage;
-use crate::app::chord_runner::runtime::{ChordRuntime, MatchingChordInfo, MatchingDescriptionInfo, GLOBAL_CHORD_RUNTIME_ID};
+use crate::app::chord_runner::runtime::{
+    ChordRuntime, MatchingChordInfo, MatchingDescriptionInfo, GLOBAL_CHORD_RUNTIME_ID,
+};
 use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
 use crate::quickjs::{reset_js, with_js};
+use llrt_core::libs::utils::result::ResultExt;
+use llrt_core::{Module, Promise};
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use crate::app::chord_package::{AppChordsFileConfig, ChordPackage};
 
-pub mod chord_file;
-pub mod chord_package;
-
-pub struct ChordRegistry {
+pub struct ChordRunnerRegistry {
     pub global_chords_to_runtime_key: Mutex<HashMap<Vec<Key>, String>>,
     pub runtimes: Mutex<HashMap<String, Arc<ChordRuntime>>>,
 
@@ -23,8 +21,7 @@ pub struct ChordRegistry {
     observable: Arc<ChordFilesObservable>,
 }
 
-
-impl ChordRegistry {
+impl ChordRunnerRegistry {
     fn parse_packages(
         chord_packages: Vec<ChordPackage>,
         placeholder_entries: &HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>,
@@ -165,7 +162,7 @@ impl ChordRegistry {
 
         let placeholder_entries = handle.app_placeholder_chord_store().entries();
         let (global_chords_to_runtime_key, app_runtime_map, raw_files_map, mut placeholder_chords) =
-            ChordRegistry::parse_packages(chord_packages, &placeholder_entries)?;
+            ChordRunnerRegistry::parse_packages(chord_packages, &placeholder_entries)?;
         placeholder_chords.sort_by(|left, right| {
             left.scope_kind
                 .cmp(&right.scope_kind)
@@ -205,7 +202,7 @@ impl ChordRegistry {
     }
 
     pub fn new_empty(handle: SafeAppHandle, observable: Arc<ChordFilesObservable>) -> Self {
-        ChordRegistry {
+        ChordRunnerRegistry {
             handle,
             global_chords_to_runtime_key: Mutex::new(HashMap::new()),
             runtimes: Mutex::new(HashMap::new()),
@@ -512,7 +509,6 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
         .display()
         .to_string()
 }
-
 
 fn runtime_id_from_chords_path(file_path: &Path) -> Option<String> {
     if file_path.file_name()? != "macos.toml" {

@@ -1,19 +1,17 @@
-use crate::chords::ChordPackage;
 use crate::observables::GitReposObservable;
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+use crate::app::chord_package::ChordPackage;
 use crate::app::SafeAppHandle;
 
-pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
-pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
 
-pub struct GitPackageRegistry {
+pub struct GitChordPackageRegistry {
     pub dir: PathBuf,
 
     handle: SafeAppHandle,
 }
 
-impl GitPackageRegistry {
+impl GitChordPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Result<Self> {
         let dir = handle.path().app_cache_dir()?;
         Ok(Self { dir, handle })

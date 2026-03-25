@@ -1,11 +1,11 @@
 use crate::app::chord_runner::javascript::{ChordJsArgs, ChordJsInvocation};
-use crate::app::chord_runner::runtime::Chord;
 use crate::app::chord_runner::shortcut::Shortcut;
 use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use typeshare::typeshare;
+use crate::app::chord_package::Chord;
 
 #[derive(Debug, Serialize)]
 pub struct AppChordsFile {

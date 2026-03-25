@@ -1,5 +1,4 @@
 use self::javascript::ChordJavascriptRunner;
-use self::runtime::Chord;
 use self::runtime::ChordPayload;
 use self::runtime::ChordRuntime;
 use self::shell::ChordShellRunner;
@@ -7,12 +6,15 @@ use self::shortcut::ChordShortcutRunner;
 use crate::app::SafeAppHandle;
 use anyhow::Result;
 use std::sync::Arc;
+use crate::app::chord_package::Chord;
 
 pub mod javascript;
 pub mod runtime;
 pub mod shell;
 pub mod shortcut;
+pub mod registry;
 
+// TODO: registry should be part of ChordRunner
 pub struct ChordRunner {
     pub shortcut: ChordShortcutRunner,
     shell: ChordShellRunner,

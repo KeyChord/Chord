@@ -1,5 +1,4 @@
-use crate::app::chord_package_registry::{ChordPackageRegistry, GitPackageRegistry};
-use crate::app::chord_registry::ChordRegistry;
+use crate::app::chord_package_registry::{ChordPackageRegistry, GitChordPackageRegistry};
 use crate::app::chord_runner::ChordRunner;
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
@@ -12,7 +11,6 @@ use crate::app::placeholder_chord_store::PlaceholderChordStore;
 use crate::app::settings::AppSettings;
 use crate::app::{AppHandleExt, AppManaged, SafeAppHandle};
 use crate::lock_file::AppLockFile;
-use crate::mode::AppMode::Chord;
 use crate::observables::{
     AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable,
     DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable,
@@ -20,7 +18,8 @@ use crate::observables::{
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-use crate::app::chord_registry::chord_package::ChordPackage;
+use crate::app::chord_package::ChordPackage;
+use crate::app::chord_runner::registry::ChordRunnerRegistry;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -32,7 +31,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
     let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
     let chord_files_observable = Arc::new(ChordFilesObservable::new(safe_handle.clone())?);
-    let git_package_registry = Arc::new(GitPackageRegistry::new(safe_handle.clone())?);
+    let git_package_registry = Arc::new(GitChordPackageRegistry::new(safe_handle.clone())?);
     let desktop_app_manager_observable =
         Arc::new(DesktopAppManagerObservable::new(safe_handle.clone())?);
     app.handle().manage(chorder_observable.clone());
@@ -56,7 +55,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRegistry::new_empty(
+        chord_registry: ChordRunnerRegistry::new_empty(
             safe_handle.clone(),
             chord_files_observable.clone(),
         ),
@@ -89,7 +88,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
 async fn load_chords(
     handle: AppHandle,
-    git_package_registry: Arc<GitPackageRegistry>,
+    git_package_registry: Arc<GitChordPackageRegistry>,
 ) -> anyhow::Result<()> {
     let mut chord_packages = git_package_registry.load_all_packages()?;
     chord_packages.push(ChordPackage::load_bundled()?);

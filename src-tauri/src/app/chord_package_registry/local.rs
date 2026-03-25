@@ -6,9 +6,11 @@ use serde::Serialize;
 use specta::Type;
 use tauri::Wry;
 use tauri_plugin_store::Store;
+use crate::app::chord_package::ChordPackage;
 use crate::app::SafeAppHandle;
-use crate::chords::ChordPackage;
-use crate::registry::{CHORD_SOURCES_STORE_PATH, LOCAL_FOLDERS_KEY};
+
+pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
+pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
 
 #[derive(Serialize, Type)]
 pub struct LocalChordPackage {

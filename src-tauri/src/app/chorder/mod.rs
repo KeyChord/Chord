@@ -1,4 +1,6 @@
 use self::ui::{ChorderIndicatorUi, NativeSurfaceRect};
+use crate::app::chord_package::Chord;
+use crate::app::chord_runner::runtime::ChordPayload;
 use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::input::KeyEvent;
@@ -11,8 +13,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Listener};
-use crate::app::chord_runner::runtime::{Chord, ChordPayload};
+use tauri::{Emitter, Listener};
 
 mod ui;
 
@@ -234,14 +235,13 @@ impl AppChorder {
                     let chord_runtime =
                         chord_registry.get_chord_runtime(&last_chord.keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
-                        chord_runner
-                            .press_chord(
-                                chord_runtime,
-                                &ChordPayload {
-                                    chord: last_chord.clone(),
-                                    num_times: 1,
-                                },
-                            )?;
+                        chord_runner.press_chord(
+                            chord_runtime,
+                            &ChordPayload {
+                                chord: last_chord.clone(),
+                                num_times: 1,
+                            },
+                        )?;
                         self.observable.set_state(state.with_session(
                             vec![],
                             state.active_chord.clone(),

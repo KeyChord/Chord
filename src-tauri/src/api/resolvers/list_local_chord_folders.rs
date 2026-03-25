@@ -1,6 +1,6 @@
 use crate::api::{ApiImpl, AppResult};
 use crate::app::AppHandleExt;
-use crate::registry::LocalChordPackage;
+use crate::app::chord_package_registry::LocalChordPackage;
 
 pub async fn list_local_chord_folders(api: ApiImpl) -> AppResult<Vec<LocalChordPackage>> {
     let handle = api.handle()?;

@@ -1,27 +1,9 @@
-use crate::app::chord_registry::chord_file::{
-    AppChordMapValue, AppChordsFile, AppChordsFileConfig,
-};
-use crate::app::chord_runner::javascript::ChordJsInvocation;
-use crate::app::chord_runner::shortcut::Shortcut;
-use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::input::Key;
 use anyhow::Result;
-use rquickjs::{Object, Promise, Value};
-use serde::Serialize;
-use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use typeshare::typeshare;
+use crate::app::chord_package::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, Chord};
 
-#[typeshare]
-#[derive(Debug, Clone, Serialize)]
-pub struct Chord {
-    pub keys: Vec<Key>,
-    pub name: String,
-    pub shortcut: Option<Shortcut>,
-    pub shell: Option<String>,
-    pub js: Option<ChordJsInvocation>,
-}
 
 #[derive(Debug, Clone)]
 pub struct MatchingChordInfo {
@@ -137,4 +119,3 @@ impl ChordRuntime {
         })
     }
 }
-

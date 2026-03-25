@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::Wry;
 use tauri_plugin_store::Store;
+use crate::api::{AppError, AppResult};
 use crate::app::SafeAppHandle;
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
@@ -76,3 +77,17 @@ impl PlaceholderChordStore {
         Ok(())
     }
 }
+
+pub fn normalize_placeholder_sequence(sequence: &str) -> Result<String> {
+    let normalized = sequence.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        anyhow::bail!("placeholder sequence cannot be empty");
+    }
+
+    if !normalized.chars().all(|ch| ch.is_ascii_lowercase()) {
+        anyhow::bail!("placeholder sequence must only contain letters a-z");
+    }
+
+    Ok(normalized)
+}
+

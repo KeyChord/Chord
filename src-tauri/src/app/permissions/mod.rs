@@ -105,3 +105,10 @@ impl AppPermissionsAccessibility {
         Ok(Self {})
     }
 }
+
+pub fn open_system_settings(url: &str, permission_name: &str) {
+    if let Err(error) = std::process::Command::new("open").arg(url).spawn() {
+        log::error!("Failed to open {permission_name} settings: {error}");
+    }
+}
+

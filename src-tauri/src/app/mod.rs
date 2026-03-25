@@ -2,8 +2,8 @@ mod safe_app_handle;
 pub use safe_app_handle::SafeAppHandle;
 
 // App globals
+pub mod chord_package;
 pub mod chord_package_registry;
-pub mod chord_registry;
 pub mod chord_runner;
 pub mod chorder;
 pub mod desktop_app;
@@ -15,22 +15,6 @@ pub mod placeholder_chord_store;
 pub mod settings;
 pub mod context;
 
-crate::define_app_managed! {
-    chord_runner: self::chord_runner::ChordRunner => chord_runner,
-    chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
-    chord_registry: self::chord_registry::ChordRegistry => app_chord_registry,
-    desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,
-    settings: self::settings::AppSettings => app_settings,
-    chorder: self::chorder::AppChorder => app_chorder,
-    context: self::context::AppContext => app_context,
-    frontmost: self::frontmost::AppFrontmost => app_frontmost,
-    permissions: self::permissions::AppPermissions => app_permissions,
-    global_hotkey_store: self::global_hotkey_store::GlobalHotkeyStore => app_global_hotkey_store,
-    placeholder_chord_store: self::placeholder_chord_store::PlaceholderChordStore => app_placeholder_chord_store,
-    git_repos_store: self::git_repos_store::GitReposStore => app_git_repos_store,
-}
-
-#[macro_export]
 macro_rules! define_app_managed {
     (
         $(
@@ -75,4 +59,19 @@ macro_rules! define_app_managed {
             }
         }
     };
+}
+
+define_app_managed! {
+    chord_runner: self::chord_runner::ChordRunner => chord_runner,
+    chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
+    chord_registry: self::chord_runner::registry::ChordRunnerRegistry => app_chord_registry,
+    desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,
+    settings: self::settings::AppSettings => app_settings,
+    chorder: self::chorder::AppChorder => app_chorder,
+    context: self::context::AppContext => app_context,
+    frontmost: self::frontmost::AppFrontmost => app_frontmost,
+    permissions: self::permissions::AppPermissions => app_permissions,
+    global_hotkey_store: self::global_hotkey_store::GlobalHotkeyStore => app_global_hotkey_store,
+    placeholder_chord_store: self::placeholder_chord_store::PlaceholderChordStore => app_placeholder_chord_store,
+    git_repos_store: self::git_repos_store::GitReposStore => app_git_repos_store,
 }
