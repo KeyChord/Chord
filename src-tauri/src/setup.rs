@@ -25,24 +25,19 @@ use tauri::{AppHandle, Manager};
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     let safe_handle = SafeAppHandle::new(app.handle().clone())?;
+
     let app_lock_file = AppLockFile::acquire(app.handle())?;
-    let chorder_observable = Arc::new(ChorderObservable::new(safe_handle.clone())?);
-    let git_repos_observable = Arc::new(GitReposObservable::new(safe_handle.clone())?);
-    let permissions_observable = Arc::new(AppPermissionsObservable::new(safe_handle.clone())?);
-    let settings_observable = Arc::new(AppSettingsObservable::new(safe_handle.clone())?);
-    let frontmost_observable = Arc::new(FrontmostObservable::new(safe_handle.clone())?);
-    let chord_files_observable = Arc::new(ChordFilesObservable::new(safe_handle.clone())?);
-    let git_package_registry = Arc::new(GitChordPackageRegistry::new(safe_handle.clone())?);
-    let desktop_app_manager_observable =
-        Arc::new(DesktopAppManagerObservable::new(safe_handle.clone())?);
-    app.handle().manage(chorder_observable.clone());
-    app.handle().manage(git_repos_observable.clone());
-    app.handle().manage(permissions_observable.clone());
-    app.handle().manage(settings_observable.clone());
-    app.handle().manage(frontmost_observable.clone());
-    app.handle().manage(chord_files_observable.clone());
-    app.handle().manage(git_package_registry.clone());
     app.handle().manage(app_lock_file);
+
+    let chorder_observable = manage(app.handle(), ChorderObservable::new(safe_handle.clone())?);
+    let git_repos_observable = manage(app.handle(), GitReposObservable::new(safe_handle.clone())?);
+    let permissions_observable = manage(app.handle(), AppPermissionsObservable::new(safe_handle.clone())?);
+    let settings_observable = manage(app.handle(), AppSettingsObservable::new(safe_handle.clone())?);
+    let frontmost_observable = manage(app.handle(), FrontmostObservable::new(safe_handle.clone())?);
+    let chord_files_observable = manage(app.handle(), ChordFilesObservable::new(safe_handle.clone())?);
+    let git_package_registry = manage(app.handle(), GitChordPackageRegistry::new(safe_handle.clone())?);
+    let desktop_app_manager_observable = manage(app.handle(), DesktopAppManagerObservable::new(safe_handle.clone())?);
+
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
         chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
@@ -109,4 +104,13 @@ async fn load_chords(
 async fn load_permissions(handle: AppHandle) -> anyhow::Result<()> {
     let permissions = handle.app_permissions();
     Ok(permissions.load().await?)
+}
+
+fn manage<T>(handle: &tauri::AppHandle, value: T) -> Arc<T>
+where
+    T: Send + Sync + 'static,
+{
+    let value = Arc::new(value);
+    handle.manage(value.clone());
+    value
 }
