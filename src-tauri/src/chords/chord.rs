@@ -1,38 +1,20 @@
-use crate::chords::shortcut::{Shortcut, press_shortcut, release_shortcut};
 use crate::chords::{AppChordMapValue, AppChordsFile, AppChordsFileConfig, ChordPackage};
-use crate::feature::SafeAppHandle;
-use crate::feature::app_handle_ext::AppHandleExt;
-use crate::feature::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
 use crate::input::Key;
-use crate::js::{format_js_error, reset_js, with_js};
 use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
-use rquickjs::function::Args;
-use rquickjs::{Array, Ctx, Function, Module, Object, Promise, Value};
+use rquickjs::{Ctx, Function, Module, Object, Promise, Value};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{Arc, Mutex};
-use tauri::AppHandle;
 use typeshare::typeshare;
+use crate::app::placeholder_chords::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
+use crate::app::{AppHandleExt, SafeAppHandle};
+use crate::chord_runner::javascript::ChordJsInvocation;
+use crate::chord_runner::shortcut::Shortcut;
+use crate::quickjs::{reset_js, with_js};
 
-#[typeshare(typescript(type = "any"))]
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "type", content = "value")]
-pub enum ChordJsArgs {
-    #[typeshare(skip)]
-    Values(Vec<toml::Value>),
-    Eval(String),
-}
-
-#[typeshare(typescript(type = "any"))]
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChordJsInvocation {
-    pub export_name: Option<String>,
-    pub args: ChordJsArgs,
-}
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -356,25 +338,27 @@ impl ChordRegistry {
                     placeholder_bindings_for_file(placeholder_entries, &chord_file_path);
                 let (scope, scope_kind) = scope_info_from_runtime_id(&runtime_id);
 
-                placeholder_chords.extend(file.placeholder_chords.iter().filter_map(|placeholder| {
-                    let Some(name) = placeholder.name() else {
-                        return None;
-                    };
+                placeholder_chords.extend(file.placeholder_chords.iter().filter_map(
+                    |placeholder| {
+                        let Some(name) = placeholder.name() else {
+                            return None;
+                        };
 
-                    Some(PlaceholderChordInfo {
-                        file_path: chord_file_path.clone(),
-                        scope: scope.clone(),
-                        scope_kind: scope_kind.clone(),
-                        name,
-                        placeholder: placeholder.placeholder.clone(),
-                        sequence_template: placeholder.sequence_template.clone(),
-                        sequence_prefix: placeholder.sequence_prefix.clone(),
-                        sequence_suffix: placeholder.sequence_suffix.clone(),
-                        assigned_sequence: placeholder_bindings
-                            .get(&placeholder.sequence_template)
-                            .cloned(),
-                    })
-                }));
+                        Some(PlaceholderChordInfo {
+                            file_path: chord_file_path.clone(),
+                            scope: scope.clone(),
+                            scope_kind: scope_kind.clone(),
+                            name,
+                            placeholder: placeholder.placeholder.clone(),
+                            sequence_template: placeholder.sequence_template.clone(),
+                            sequence_prefix: placeholder.sequence_prefix.clone(),
+                            sequence_suffix: placeholder.sequence_suffix.clone(),
+                            assigned_sequence: placeholder_bindings
+                                .get(&placeholder.sequence_template)
+                                .cloned(),
+                        })
+                    },
+                ));
 
                 let chords = file.get_chords_shallow(&placeholder_bindings);
                 for sequence in chords.keys() {
@@ -419,10 +403,7 @@ impl ChordRegistry {
     }
 
     pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> Result<()> {
-        let Some(handle) = self.handle.try_handle() else {
-            anyhow::bail!("app not ready")
-        };
-
+        let handle = self.handle.try_handle()?;
         for chord_package in &chord_packages {
             let js_files = chord_package.js_files.clone();
             let root_dir = chord_package.root_dir.clone();
@@ -477,11 +458,10 @@ impl ChordRegistry {
 
         {
             let mut map = self.runtimes.lock().expect("poisoned");
-            *map =
-                app_runtime_map
-                    .into_iter()
-                    .map(|(key, value)| (key, Arc::new(value)))
-                    .collect();
+            *map = app_runtime_map
+                .into_iter()
+                .map(|(key, value)| (key, Arc::new(value)))
+                .collect();
         }
 
         let raw_files_as_json_strings = raw_files_map
@@ -726,10 +706,7 @@ impl ChordRegistry {
 
     /// Also re-evaluates JavaScript
     pub async fn reload(&self) -> Result<()> {
-        let Some(handle) = self.handle.try_handle() else {
-            anyhow::bail!("app not loaded yet")
-        };
-
+        let handle = self.handle.try_handle()?;
         let chorder = handle.app_chorder();
         let chord_package_registry = handle.app_chord_package_registry();
         chorder.ensure_inactive()?;
@@ -762,38 +739,33 @@ impl ChordRegistry {
             let bundle_id = bundle_id.clone();
 
             tauri::async_runtime::spawn(async move {
-                let path_ = path.clone();
+                let path = path.clone();
+                let path2 = path.clone();
                 let result = with_js(handle.handle().clone(), move |ctx| {
                     Box::pin(async move {
-                        let load_module = || -> rquickjs::Result<rquickjs::Promise> {
+                        let load_module = async || {
                             let module = Module::declare(ctx.clone(), path.clone(), content)?;
+
                             let chords =
                                 rquickjs_serde::to_value(ctx.clone(), raw_chords).or_throw(&ctx)?;
-                            let chords_obj = chords.into_object().or_throw(&ctx);
+                            let chords_obj = chords.into_object().or_throw(&ctx)?;
+
                             let meta = module.meta()?;
                             meta.set("chords", chords_obj)?;
-                            meta.set("bundleId", bundle_id)?;
+                            meta.set("bundleId", bundle_id.clone())?;
+
                             let (_evaluated, promise) = module.eval()?;
-                            Ok(promise)
+
+                            promise
+                                .into_future::<()>()
+                                .await
+                                .or_throw_msg(&ctx, "failed to await module")?;
+
+                            Ok::<(), rquickjs::Error>(())
                         };
 
-                        match load_module() {
-                            Ok(promise) => {
-                                if let Err(e) = promise.into_future::<()>().await {
-                                    log::error!(
-                                        "failed to await module {}: {}",
-                                        path,
-                                        format_js_error(ctx.clone(), e)
-                                    )
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "Failed to load module {}: {}",
-                                    path,
-                                    format_js_error(ctx.clone(), e)
-                                );
-                            }
+                        if let Err(e) = load_module().await {
+                            log::error!("Failed to load module {}: {}", path, e);
                         }
 
                         Ok(())
@@ -802,7 +774,7 @@ impl ChordRegistry {
                 .await;
 
                 if let Err(err) = result {
-                    log::error!("load_module failed for {}: {}", path_, err);
+                    log::error!("load_module failed for {}: {}", path2, err);
                 }
             });
         }
@@ -817,365 +789,5 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
         .to_string()
 }
 
-fn press_shortcut_on_main_thread(
-    handle: AppHandle,
-    shortcut: Shortcut,
-    num_times: usize,
-) -> Result<()> {
-    handle.run_on_main_thread(move || {
-        if let Err(e) = press_shortcut(shortcut.clone(), num_times) {
-            log::error!("failed to press shortcut: {e}");
-        }
-    })?;
 
-    Ok(())
-}
 
-fn release_shortcut_on_main_thread(handle: AppHandle, shortcut: Shortcut) -> Result<()> {
-    handle.run_on_main_thread(move || {
-        if let Err(e) = release_shortcut(shortcut.clone()) {
-            log::error!("failed to release shortcut: {e}");
-        }
-    })?;
-
-    Ok(())
-}
-
-fn run_shell_command_in_background(shell: String) {
-    std::thread::spawn(move || run_shell_command(shell));
-}
-
-fn run_shell_command(shell: String) {
-    let mut command = Command::new("sh");
-    command.arg("-c").arg(&shell);
-    log::debug!("Running shell command: {:?}", command);
-
-    match command.output() {
-        Ok(output) => log_shell_output(&shell, output),
-        Err(e) => {
-            log::error!("failed to run shell command `{shell}`: {e}");
-        }
-    }
-}
-
-fn log_shell_output(shell: &str, output: std::process::Output) {
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let exit_code = output.status.code();
-
-    if output.status.success() {
-        log::debug!(
-            "shell command succeeded with exit code {:?}: {}",
-            exit_code,
-            shell
-        );
-    } else {
-        log::error!(
-            "shell command failed with exit code {:?}: {}",
-            exit_code,
-            shell
-        );
-    }
-
-    if !stdout.is_empty() {
-        log::debug!("shell stdout: {stdout}");
-    }
-
-    if !stderr.is_empty() {
-        log::debug!("shell stderr: {stderr}");
-    }
-}
-
-fn invoke_js_chord_in_background(
-    handle: AppHandle,
-    module_path: String,
-    invocation: ChordJsInvocation,
-    num_times: usize,
-) {
-    tauri::async_runtime::spawn(async move {
-        if let Err(e) = with_js(handle.clone(), move |ctx| {
-            Box::pin(call_js_export(ctx, module_path, invocation, num_times))
-        })
-        .await
-        {
-            log::error!("press_chord failed: {}", e);
-        }
-    });
-}
-
-async fn call_js_export<'js>(
-    ctx: Ctx<'js>,
-    module_path: String,
-    invocation: ChordJsInvocation,
-    num_times: usize,
-) -> anyhow::Result<()> {
-    for _ in 0..num_times {
-        let Some(namespace) = import_js_namespace(ctx.clone(), &module_path).await else {
-            return Ok(());
-        };
-
-        let Some(function) =
-            get_export_function(ctx.clone(), &namespace, invocation.export_name.as_deref()).await
-        else {
-            return Ok(());
-        };
-
-        let Some(js_args) = convert_js_args(&ctx, invocation.args.clone()) else {
-            return Ok(());
-        };
-
-        let export_name = invocation.export_name.as_deref().unwrap_or("default");
-        log::debug!(
-            "Calling JS export `{}` with arguments: {:?}",
-            export_name,
-            js_args
-        );
-
-        let result = match call_function_with_values(ctx.clone(), function, js_args) {
-            Ok(value) => value,
-            Err(e) => {
-                log::error!(
-                    "Failed to call JS export `{}`: {}",
-                    export_name,
-                    format_js_error(ctx.clone(), e)
-                );
-                return Ok(());
-            }
-        };
-
-        log::debug!("Return value: {:?}", result);
-
-        match await_promise_if_needed(ctx.clone(), result).await {
-            Ok(awaited) => {
-                log::debug!("Promise awaited: {:?}", awaited);
-            }
-            Err(e) => {
-                log::error!(
-                    "JS export `{}` promise rejected: {}",
-                    export_name,
-                    format_js_error(ctx.clone(), e)
-                );
-            }
-        }
-    }
-
-    Ok(())
-}
-
-async fn import_js_namespace<'js>(ctx: Ctx<'js>, module_path: &str) -> Option<Object<'js>> {
-    let import_promise = match Module::import(&ctx, module_path.to_string()) {
-        Ok(import_promise) => import_promise,
-        Err(e) => {
-            log::error!(
-                "Failed to start importing JS module: {}",
-                format_js_error(ctx.clone(), e)
-            );
-            return None;
-        }
-    };
-
-    match import_promise.into_future::<Object>().await {
-        Ok(namespace) => Some(namespace),
-        Err(e) => {
-            log::error!(
-                "Failed to import JS module {}: {}",
-                module_path,
-                format_js_error(ctx.clone(), e)
-            );
-            None
-        }
-    }
-}
-
-async fn get_export_function<'js>(
-    ctx: Ctx<'js>,
-    namespace: &Object<'js>,
-    export_name: Option<&str>,
-) -> Option<Function<'js>> {
-    let export_name = export_name.unwrap_or("default");
-    let export: Value<'js> = match namespace.get(export_name) {
-        Ok(export) => export,
-        Err(e) => {
-            log::error!(
-                "Failed to get JS export `{}`: {}",
-                export_name,
-                format_js_error(ctx.clone(), e)
-            );
-            return None;
-        }
-    };
-
-    log::debug!("JS export `{}`: {:?}", export_name, export);
-    let resolved: Value<'js> = if let Some(promise) = export.as_promise().cloned() {
-        match promise.into_future::<Value<'js>>().await {
-            Ok(value) => value,
-            Err(e) => {
-                log::error!(
-                    "Failed to resolve JS export `{}` promise: {}",
-                    export_name,
-                    format_js_error(ctx.clone(), e)
-                );
-                return None;
-            }
-        }
-    } else {
-        export
-    };
-
-    let Some(function) = resolved.as_function().cloned() else {
-        log::error!(
-            "JS export `{}` did not resolve to a function: {:?}",
-            export_name,
-            resolved
-        );
-        return None;
-    };
-
-    Some(function)
-}
-
-fn convert_js_args<'js>(ctx: &Ctx<'js>, args: ChordJsArgs) -> Option<Vec<Value<'js>>> {
-    match args {
-        ChordJsArgs::Values(values) => toml_values_to_js_args(ctx, values),
-        ChordJsArgs::Eval(source) => evaluate_js_args(ctx, &source),
-    }
-}
-
-fn toml_values_to_js_args<'js>(
-    ctx: &Ctx<'js>,
-    values: Vec<toml::Value>,
-) -> Option<Vec<Value<'js>>> {
-    let mut js_args = Vec::with_capacity(values.len());
-
-    for value in values {
-        match rquickjs_serde::to_value(ctx.clone(), value) {
-            Ok(value) => js_args.push(value),
-            Err(e) => {
-                log::error!("Failed to convert TOML arguments: {}", e);
-                return None;
-            }
-        }
-    }
-
-    Some(js_args)
-}
-
-fn evaluate_js_args<'js>(ctx: &Ctx<'js>, source: &str) -> Option<Vec<Value<'js>>> {
-    let evaluated: Value<'js> = match ctx.eval(source) {
-        Ok(value) => value,
-        Err(e) => {
-            log::error!(
-                "Failed to evaluate JS args `{}`: {}",
-                source,
-                format_js_error(ctx.clone(), e)
-            );
-            None
-        }
-    }?;
-
-    let Some(array) = value_to_array(ctx, evaluated, source) else {
-        return None;
-    };
-
-    array_to_values(ctx, array, source)
-}
-
-fn value_to_array<'js>(_ctx: &Ctx<'js>, value: Value<'js>, source: &str) -> Option<Array<'js>> {
-    let Some(array) = value.as_array().cloned() else {
-        log::error!("JS args `{}` must evaluate to an array", source);
-        return None;
-    };
-
-    Some(array)
-}
-
-fn array_to_values<'js>(
-    ctx: &Ctx<'js>,
-    array: Array<'js>,
-    source: &str,
-) -> Option<Vec<Value<'js>>> {
-    let mut values = Vec::with_capacity(array.len());
-
-    for index in 0..array.len() {
-        match array.get(index) {
-            Ok(value) => values.push(value),
-            Err(e) => {
-                log::error!(
-                    "Failed to read JS args `{}` at index {}: {}",
-                    source,
-                    index,
-                    format_js_error(ctx.clone(), e)
-                );
-                return None;
-            }
-        }
-    }
-
-    Some(values)
-}
-
-fn call_function_with_values<'js>(
-    ctx: Ctx<'js>,
-    function: Function<'js>,
-    values: Vec<Value<'js>>,
-) -> rquickjs::Result<Value<'js>> {
-    let mut args_builder = Args::new(ctx, values.len());
-
-    for value in values {
-        args_builder.push_arg(value)?;
-    }
-
-    function.call_arg(args_builder)
-}
-
-async fn await_promise_if_needed<'js>(ctx: Ctx<'js>, result: Value<'js>) -> rquickjs::Result<()> {
-    if !result.is_promise() {
-        return Ok(());
-    }
-
-    let promise = match Promise::from_value(result) {
-        Ok(promise) => promise,
-        Err(e) => {
-            log::error!(
-                "Function returned something marked as promise, but it could not be converted: {}",
-                format_js_error(ctx.clone(), e)
-            );
-            return Ok(());
-        }
-    };
-
-    let result = promise.into_future::<Value>().await.map(|_| ());
-    log::debug!("Promise result: {:?}", result);
-    result
-}
-
-pub fn press_chord(
-    handle: AppHandle,
-    runtime: Arc<ChordRuntime>,
-    chord_payload: &ChordPayload,
-) -> Result<()> {
-    log::debug!("Pressing chord: {:?}", chord_payload);
-
-    if let Some(shortcut) = chord_payload.chord.shortcut.clone() {
-        return press_shortcut_on_main_thread(handle, shortcut, chord_payload.num_times);
-    }
-
-    if let Some(shell) = chord_payload.chord.shell.clone() {
-        run_shell_command_in_background(shell);
-        return Ok(());
-    }
-
-    if let Some(js) = chord_payload.chord.js.clone() {
-        invoke_js_chord_in_background(handle, runtime.path.clone(), js, chord_payload.num_times);
-    }
-
-    Ok(())
-}
-
-pub fn release_chord(handle: AppHandle, chord: &Chord) -> Result<()> {
-    if let Some(shortcut) = chord.shortcut.clone() {
-        release_shortcut_on_main_thread(handle, shortcut)?;
-    }
-
-    Ok(())
-}

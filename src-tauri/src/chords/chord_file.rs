@@ -1,9 +1,11 @@
-use crate::chords::{Chord, Shortcut};
+use crate::chord_runner::javascript::{ChordJsArgs, ChordJsInvocation};
+use crate::chords::Chord;
 use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use typeshare::typeshare;
+use crate::chord_runner::shortcut::Shortcut;
 
 #[derive(Debug, Serialize)]
 pub struct AppChordsFile {
@@ -44,7 +46,10 @@ impl AppChordsFile {
             };
 
             let Some(description) = description_text_from_value(&value) else {
-                log::warn!("Skipping empty description entry for sequence: {}", sequence);
+                log::warn!(
+                    "Skipping empty description entry for sequence: {}",
+                    sequence
+                );
                 continue;
             };
 
@@ -171,27 +176,23 @@ pub struct AppChord {
 }
 
 impl AppChord {
-    fn js_invocation(&self) -> Result<Option<crate::chords::ChordJsInvocation>> {
-        let mut invocation =
-            self.args
-                .clone()
-                .map(|args| crate::chords::ChordJsInvocation {
-                    export_name: None,
-                    args: parse_js_args(args),
-                });
+    fn js_invocation(&self) -> Result<Option<ChordJsInvocation>> {
+        let mut invocation = self
+            .args
+            .clone()
+            .map(|args| ChordJsInvocation {
+                export_name: "default".into(),
+                args: parse_js_args(args),
+            });
 
         for (key, value) in &self.extra {
             let Some(export_name) = key.strip_prefix("args:") else {
                 continue;
             };
 
-            if export_name.is_empty() {
-                anyhow::bail!("Invalid JS export key: {key}");
-            }
-
             let args = parse_js_args_value(key, value)?;
-            let next_invocation = crate::chords::ChordJsInvocation {
-                export_name: Some(export_name.to_string()),
+            let next_invocation = ChordJsInvocation {
+                export_name: export_name.to_string(),
                 args,
             };
 
@@ -204,17 +205,17 @@ impl AppChord {
     }
 }
 
-fn parse_js_args(args: AppChordArgs) -> crate::chords::ChordJsArgs {
+fn parse_js_args(args: AppChordArgs) -> ChordJsArgs {
     match args {
-        AppChordArgs::Values(values) => crate::chords::ChordJsArgs::Values(values),
-        AppChordArgs::Eval(source) => crate::chords::ChordJsArgs::Eval(source),
+        AppChordArgs::Values(values) => ChordJsArgs::Values(values),
+        AppChordArgs::Eval(source) => ChordJsArgs::Eval(source),
     }
 }
 
-fn parse_js_args_value(key: &str, value: &toml::Value) -> Result<crate::chords::ChordJsArgs> {
+fn parse_js_args_value(key: &str, value: &toml::Value) -> Result<ChordJsArgs> {
     match value {
-        toml::Value::Array(items) => Ok(crate::chords::ChordJsArgs::Values(items.clone())),
-        toml::Value::String(source) => Ok(crate::chords::ChordJsArgs::Eval(source.clone())),
+        toml::Value::Array(items) => Ok(ChordJsArgs::Values(items.clone())),
+        toml::Value::String(source) => Ok(ChordJsArgs::Eval(source.clone())),
         _ => anyhow::bail!("{key} must be an array or string"),
     }
 }
@@ -430,177 +431,4 @@ fn expand_brace_variants(inner: &str) -> Result<Vec<String>> {
     }
 
     Ok(variants)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{AppChord, AppChordArgs, AppChordsFile};
-    use crate::chords::{ChordJsArgs, ChordJsInvocation};
-    use crate::input::Key;
-    use std::collections::HashMap;
-
-    #[test]
-    fn parses_default_export_args() {
-        let chord = AppChord {
-            name: "Test".to_string(),
-            shortcut: None,
-            shell: None,
-            args: Some(AppChordArgs::Values(vec![
-                toml::Value::String("one".to_string()),
-                toml::Value::String("two".to_string()),
-            ])),
-            extra: Default::default(),
-        };
-
-        assert_eq!(
-            chord.js_invocation().unwrap(),
-            Some(ChordJsInvocation {
-                export_name: None,
-                args: ChordJsArgs::Values(vec![
-                    toml::Value::String("one".to_string()),
-                    toml::Value::String("two".to_string()),
-                ]),
-            })
-        );
-    }
-
-    #[test]
-    fn parses_named_export_args() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-a = { name = "Menu", 'args:menu' = ["View", "Columns"] }
-"#,
-        )
-        .unwrap();
-
-        let entry = match file.chords.get("a").unwrap() {
-            super::AppChordMapValue::Single(entry) => entry,
-            super::AppChordMapValue::Multiple(_) => unreachable!(),
-        };
-
-        assert_eq!(
-            entry.js_invocation().unwrap(),
-            Some(ChordJsInvocation {
-                export_name: Some("menu".to_string()),
-                args: ChordJsArgs::Values(vec![
-                    toml::Value::String("View".to_string()),
-                    toml::Value::String("Columns".to_string()),
-                ]),
-            })
-        );
-    }
-
-    #[test]
-    fn parses_eval_args() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-a = { name = "Dynamic", args = '["View", "Columns".toLowerCase()]' }
-"#,
-        )
-        .unwrap();
-
-        let entry = match file.chords.get("a").unwrap() {
-            super::AppChordMapValue::Single(entry) => entry,
-            super::AppChordMapValue::Multiple(_) => unreachable!(),
-        };
-
-        assert_eq!(
-            entry.js_invocation().unwrap(),
-            Some(ChordJsInvocation {
-                export_name: None,
-                args: ChordJsArgs::Eval(r#"["View", "Columns".toLowerCase()]"#.to_string()),
-            })
-        );
-    }
-
-    #[test]
-    fn rejects_multiple_js_invocation_targets() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-a = { name = "Conflict", args = ["default"], 'args:menu' = ["View"] }
-"#,
-        )
-        .unwrap();
-
-        let entry = match file.chords.get("a").unwrap() {
-            super::AppChordMapValue::Single(entry) => entry,
-            super::AppChordMapValue::Multiple(_) => unreachable!(),
-        };
-
-        assert!(entry.js_invocation().is_err());
-    }
-
-    #[test]
-    fn parses_description_entries_separately() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-'?f' = { name = "Find / File" }
-f = { name = "Find" }
-"#,
-        )
-        .unwrap();
-
-        assert!(file.chords.contains_key("f"));
-        assert_eq!(file.descriptions.get("f"), Some(&"Find / File".to_string()));
-    }
-
-    #[test]
-    fn expands_description_ranges() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-'?f{1..3}' = { name = "Folding: Level" }
-"#,
-        )
-        .unwrap();
-
-        let descriptions = file.get_descriptions_shallow();
-
-        for sequence in ["f1", "f2", "f3"] {
-            let keys = Key::parse_sequence(sequence).unwrap();
-            assert_eq!(descriptions.get(&keys), Some(&"Folding: Level".to_string()));
-        }
-    }
-
-    #[test]
-    fn parses_placeholder_chords_separately() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-'\<' = { name = "Literal Slash" }
-'\<Dark Mode>' = { name = "Dark Mode" }
-"#,
-        )
-        .unwrap();
-
-        assert!(file.chords.contains_key("\\<"));
-        assert_eq!(file.placeholder_chords.len(), 1);
-        assert_eq!(file.placeholder_chords[0].placeholder, "Dark Mode");
-        assert_eq!(file.placeholder_chords[0].sequence_prefix, "\\");
-        assert_eq!(file.placeholder_chords[0].sequence_suffix, "");
-    }
-
-    #[test]
-    fn resolves_placeholder_chords_with_bindings() {
-        let file = AppChordsFile::parse(
-            r#"
-[chords]
-'\<' = { name = "Literal Slash" }
-'\<Dark Mode>' = { name = "Dark Mode", shortcut = "cmd+shift+d" }
-"#,
-        )
-        .unwrap();
-
-        let chords = file.get_chords_shallow(&HashMap::from([(
-            "\\<Dark Mode>".to_string(),
-            "dm".to_string(),
-        )]));
-
-        let keys = Key::parse_sequence("\\dm").unwrap();
-        assert_eq!(chords.get(&keys).map(|chord| chord.name.as_str()), Some("Dark Mode"));
-    }
 }

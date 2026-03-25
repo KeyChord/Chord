@@ -16,7 +16,8 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 );
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
-const INDICATOR_TRANSITION_MS = 220;
+const INDICATOR_TRANSITION_MS = 240;
+const HIDDEN_X_OFFSET_PX = 40;
 type RawChord = ReturnType<typeof useChordFile>[string];
 type ParsedChord = {
   keys: string[];
@@ -25,6 +26,10 @@ type ParsedChord = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function easeOutCubic(value: number) {
+  return 1 - (1 - value) ** 3;
 }
 
 function normalizePrettyKey(token: string) {
@@ -192,7 +197,12 @@ export function Chords() {
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
   const [surfaceVersion, setSurfaceVersion] = useState(0);
   const [isPreparingSurface, setIsPreparingSurface] = useState(false);
+  const [indicatorProgress, setIndicatorProgress] = useState(() =>
+    state.isIndicatorVisible ? 1 : 0,
+  );
   const surfaceRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const indicatorProgressRef = useRef(indicatorProgress);
 
   const emitSurfaceRect = () => {
     const surface = surfaceRef.current;
@@ -210,22 +220,9 @@ export function Chords() {
     });
   };
 
-  const emitSurfaceRectDuringTransition = () => {
-    const endTime = performance.now() + INDICATOR_TRANSITION_MS;
-    let frameId = 0;
-
-    const tick = () => {
-      emitSurfaceRect();
-      if (performance.now() < endTime) {
-        frameId = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frameId = window.requestAnimationFrame(tick);
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  };
+  useEffect(() => {
+    indicatorProgressRef.current = indicatorProgress;
+  }, [indicatorProgress]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -252,6 +249,48 @@ export function Chords() {
   useEffect(() => {
     void emit("chorder-window-ready");
   }, []);
+
+  useEffect(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    const startProgress = indicatorProgressRef.current;
+    const targetProgress = state.isIndicatorVisible ? 1 : 0;
+    if (Math.abs(targetProgress - startProgress) < 0.001) {
+      setIndicatorProgress(targetProgress);
+      indicatorProgressRef.current = targetProgress;
+      return;
+    }
+
+    const startedAt = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = now - startedAt;
+      const t = clamp(elapsed / INDICATOR_TRANSITION_MS, 0, 1);
+      const nextProgress =
+        startProgress + (targetProgress - startProgress) * easeOutCubic(t);
+
+      indicatorProgressRef.current = nextProgress;
+      setIndicatorProgress(nextProgress);
+
+      if (t < 1) {
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      } else {
+        animationFrameRef.current = null;
+      }
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [state.isIndicatorVisible]);
 
   useLayoutEffect(() => {
     if (!isPreparingSurface) {
@@ -369,9 +408,10 @@ export function Chords() {
 
   useLayoutEffect(() => {
     emitSurfaceRect();
-  }, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize]);
+  }, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize, indicatorProgress]);
 
-  useLayoutEffect(() => emitSurfaceRectDuringTransition(), [state.isIndicatorVisible]);
+  const hiddenFraction = 1 - indicatorProgress;
+  const indicatorTransform = `translateX(calc(-${hiddenFraction * 100}% - ${hiddenFraction * HIDDEN_X_OFFSET_PX}px))`;
 
   return (
     <div className="relative size-full bg-transparent">
@@ -383,11 +423,11 @@ export function Chords() {
             "relative isolate overflow-hidden rounded-r-[2rem] rounded-l-none border border-l-0 px-5 py-5 pl-7",
             "border-white/30 bg-white/22 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)]",
             "dark:border-white/10 dark:bg-zinc-950/24 dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]",
-            "transition-[transform,opacity] duration-200 ease-out",
-            state.isIndicatorVisible
-              ? "translate-x-0 opacity-100"
-              : "-translate-x-[calc(100%+2.5rem)] opacity-0",
           )}
+          style={{
+            transform: indicatorTransform,
+            opacity: indicatorProgress,
+          }}
         >
           <div className="relative flex items-start">
             <div className="flex items-start gap-6">

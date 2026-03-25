@@ -1,8 +1,7 @@
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::tauri_app::scripting::reload_configs;
-use crate::tauri_app::settings::show_settings_window;
 use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
-
+use crate::app::AppHandleExt;
 #[cfg(debug_assertions)]
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 #[cfg(debug_assertions)]
@@ -28,7 +27,7 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
         .text(SETTINGS_MENU_ID, "Show Settings")
         .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs");
 
-    let menu = menu.separator().text(QUIT_MENU_ID, "Quit").build()?;
+    let menu = menu.separator().text(QUIT_MENU_ID, "Quit Chord").build()?;
 
     let mut tray = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
@@ -37,7 +36,8 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
         .icon(load_tray_icon()?)
         .on_menu_event(|handle, event| match event.id().as_ref() {
             SETTINGS_MENU_ID => {
-                if let Err(e) = show_settings_window(handle.clone()) {
+                let settings = handle.app_settings();
+                if let Err(e) = settings.ui.open() {
                     log::error!("Failed to show settings window: {e}");
                 }
             }

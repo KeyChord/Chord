@@ -1,4 +1,3 @@
-use crate::feature::app_handle_ext::AppManaged;
 use crate::observables::Observable;
 use anyhow::Result;
 use delegate::delegate;
@@ -11,6 +10,7 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_dialog::{Dialog, DialogExt};
 use tauri_plugin_store::{Store, StoreExt};
+use crate::app::AppManaged;
 
 type OnSafeCallback = Box<dyn FnOnce(AppHandle) + Send + 'static>;
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
@@ -175,12 +175,12 @@ impl SafeAppHandle {
         observable.get_state()
     }
 
-    pub fn try_handle(&self) -> Option<&AppHandle> {
+    pub fn try_handle(&self) -> Result<&AppHandle> {
         let state = self.inner.state.lock().expect("state mutex poisoned");
         if state.is_safe {
-            Some(&self.inner.handle)
+            Ok(&self.inner.handle)
         } else {
-            None
+            anyhow::bail!("app not ready")
         }
     }
 

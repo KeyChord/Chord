@@ -1,4 +1,4 @@
-use crate::feature::app_handle_ext::AppHandleExt;
+use crate::app_handle_ext::AppHandleExt;
 use crate::input::Key;
 use crate::{input::handler::handle_key_event, mode::AppModeStateMachine};
 use bitflags::bitflags;

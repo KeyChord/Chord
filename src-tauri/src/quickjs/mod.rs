@@ -1,4 +1,3 @@
-use crate::tauri_app::js_chord::ChordModule;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
@@ -12,6 +11,10 @@ use tauri::{
     AppHandle,
     async_runtime::{block_on, channel},
 };
+use crate::desktop_app::clear_callbacks;
+use crate::quickjs::chord_module::ChordModule;
+
+mod chord_module;
 
 struct JsEngine {
     // Keep the runtime alive for as long as the context exists.
@@ -159,7 +162,7 @@ pub async fn reset_js(handle: AppHandle) -> anyhow::Result<()> {
     let (tx, mut rx) = channel(1);
 
     handle.run_on_main_thread(move || {
-        crate::tauri_app::app_lifecycle::clear_callbacks();
+        clear_callbacks();
         JS_ENGINE.with(|cell| {
             *cell.borrow_mut() = None;
         });

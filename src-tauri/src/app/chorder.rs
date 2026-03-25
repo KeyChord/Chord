@@ -1,6 +1,6 @@
 use super::{ChorderIndicatorUi, NativeSurfaceRect, SafeAppHandle};
-use crate::chords::{Chord, ChordPayload, press_chord, release_chord};
-use crate::feature::app_handle_ext::AppHandleExt;
+use crate::chords::{Chord, ChordPayload};
+use crate::app::AppHandleExt;
 use crate::input::Key;
 use crate::input::KeyEvent;
 use crate::observables::{ChorderObservable, ChorderState, FrontmostObservable, Observable};
@@ -295,12 +295,12 @@ impl AppChorder {
         should_handle_held_key_event(&mut held_keys, key_event)
     }
 
-    fn execute_key_buffer(
+    async fn execute_key_buffer(
         &self,
-        handle: AppHandle,
         key_buffer: Vec<Key>,
         release_immediately: bool,
     ) -> Result<Option<Chord>> {
+        let handle = self.handle.try_handle()?;
         let chord_registry = handle.app_chord_registry();
         let frontmost = handle.observable_state::<FrontmostObservable>()?;
         let frontmost_application_id = frontmost.frontmost_app_bundle_id.clone();
@@ -324,10 +324,11 @@ impl AppChorder {
             return Ok(None);
         };
 
-        press_chord(handle.clone(), chord_runtime, &chord_payload)?;
+        let chord_runner = handle.chord_runner();
+        chord_runner.press_chord(chord_runtime, &chord_payload).await?;
 
         if release_immediately {
-            release_chord(handle.clone(), &chord_payload.chord)?;
+            chord_runner.release_chord(&chord_payload.chord)?;
         }
 
         Ok(Some(chord_payload.chord.clone()))

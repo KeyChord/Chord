@@ -1,10 +1,10 @@
-use crate::feature::SafeAppHandle;
 use crate::observables::{AppSettingsObservable, AppSettingsState, ChorderObservable, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use tauri::{Manager, WebviewUrl, WebviewWindow};
+use crate::app::SafeAppHandle;
 
 pub struct AppSettings {
     pub ui: SettingsUi,
@@ -40,6 +40,30 @@ impl SettingsUi {
             .build()?;
 
         Ok(window)
+    }
+
+    pub fn open(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+        Ok(())
+    }
+
+    pub fn open_inspector(&self) -> Result<()>{
+        let window = self.get_or_create_window()?;
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+        #[cfg(debug_assertions)]
+        window.open_devtools();
+        Ok(())
+    }
+
+    pub fn hide(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        window.hide()?;
+        Ok(())
     }
 }
 
@@ -111,15 +135,15 @@ impl AppSettings {
         Ok(())
     }
 
+    // UNSAFE
     fn apply_guide_visibility(&self, visible: bool) -> Result<()> {
-        if let Some(app_handle) = self.handle.try_handle() {
-            let chorder = app_handle.state::<Arc<ChorderObservable>>();
-            let current_state = chorder.get_state()?;
-            chorder.set_state(crate::observables::ChorderState {
-                is_indicator_visible: visible,
-                ..current_state.as_ref().clone()
-            })?;
-        }
+        let handle = self.handle.try_handle()?;
+        let chorder = handle.state::<Arc<ChorderObservable>>();
+        let current_state = chorder.get_state()?;
+        chorder.set_state(crate::observables::ChorderState {
+            is_indicator_visible: visible,
+            ..current_state.as_ref().clone()
+        })?;
 
         Ok(())
     }

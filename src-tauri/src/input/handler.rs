@@ -1,10 +1,10 @@
-use crate::feature::app_handle_ext::AppHandleExt;
 use crate::input::{Key, KeyEvent, emit_caps_lock};
 use crate::mode::AppMode;
 use crate::observables::{ChorderObservable, ChorderState};
 use anyhow::Result;
 use keycode::KeyMappingCode;
 use tauri::AppHandle;
+use crate::app::AppHandleExt;
 
 pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
     let app_mode = handle.app_context().get_app_mode();

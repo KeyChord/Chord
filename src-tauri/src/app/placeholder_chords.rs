@@ -56,9 +56,14 @@ impl PlaceholderChordStore {
         Ok(())
     }
 
-    pub fn set(&self, key: PlaceholderChordStoreKey, entry: PlaceholderChordStoreEntry) -> Result<()> {
+    pub fn set(
+        &self,
+        key: PlaceholderChordStoreKey,
+        entry: PlaceholderChordStoreEntry,
+    ) -> Result<()> {
         let serialized_key = Self::serialize_key(&key);
-        let value = serde_json::to_value(entry).expect("placeholder chord store entry should serialize");
+        let value =
+            serde_json::to_value(entry).expect("placeholder chord store entry should serialize");
         self.store.set(serialized_key, value);
         self.save()?;
         Ok(())

@@ -1,33 +1,6 @@
-use crate::feature::app_handle_ext::AppHandleExt;
 use anyhow::Result;
 use tauri::{AppHandle, Runtime};
-
-pub fn show_settings_window<R: Runtime>(handle: AppHandle<R>) -> Result<()> {
-    let settings = handle.app_settings();
-    let window = settings.ui.get_or_create_window()?;
-    window.show()?;
-    window.unminimize()?;
-    window.set_focus()?;
-    Ok(())
-}
-
-pub fn hide_settings_window<R: Runtime>(handle: AppHandle<R>) -> Result<()> {
-    let settings = handle.app_settings();
-    let window = settings.ui.get_or_create_window()?;
-    window.hide()?;
-    Ok(())
-}
-
-pub fn open_settings_inspector<R: Runtime>(handle: AppHandle<R>) -> Result<()> {
-    let settings = handle.app_settings();
-    let window = settings.ui.get_or_create_window()?;
-    window.show()?;
-    window.unminimize()?;
-    window.set_focus()?;
-    #[cfg(debug_assertions)]
-    window.open_devtools();
-    Ok(())
-}
+use crate::app::AppHandleExt;
 
 pub fn open_chords_inspector<R: Runtime>(handle: AppHandle<R>) -> Result<()> {
     let chorder = handle.app_chorder();
