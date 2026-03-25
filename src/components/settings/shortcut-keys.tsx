@@ -12,17 +12,24 @@ import { SFIcon } from '@bradleyhodges/sfsymbols-react';
 import getPrettyKey from 'pretty-key';
 
 export function ShortcutKeys({ shortcut }: { shortcut: string }) {
-	const chords = shortcut.split(' ').map(chord => chord.split('+'));
+	const chords = shortcut.split(' ').reduce<Array<{ id: string, keys: string[] }>>((items, chord) => {
+		const prefix = items.length > 0 ? `${items.at(-1)?.id ?? ''} ${chord}` : chord;
+		items.push({
+			id: prefix,
+			keys: chord.split('+'),
+		});
+		return items;
+	}, []);
 
 	return (
 		<div className="flex flex-wrap items-center gap-1.5">
-			{chords.map((keys, chordIndex) => (
+			{chords.map(chord => (
 				<div
-					key={`${shortcut}:${keys.join('+')}:${chordIndex}`}
+					key={`${shortcut}:${chord.id}`}
 					className="flex items-center gap-1.5"
 				>
 					<KbdGroup>
-						{keys.map((key) => {
+						{chord.keys.map((key) => {
 							const modifierIcon = getModifierIcon(key);
 							const label = getPrettyKey(key);
 
@@ -42,7 +49,7 @@ export function ShortcutKeys({ shortcut }: { shortcut: string }) {
 							);
 						})}
 					</KbdGroup>
-					{chordIndex + 1 < chords.length
+					{chord.id !== chords.at(-1)?.id
 						? (
 								<span className="text-xs text-muted-foreground">then</span>
 							)

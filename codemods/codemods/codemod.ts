@@ -2,6 +2,8 @@ import type { Transform } from 'codemod:ast-grep';
 import type Rust from 'codemod:ast-grep/langs/rust';
 
 // TODO: use this codemod to dynamically apply patch files
+const LEADING_WHITESPACE_REGEX = /^(\s*)/;
+
 const transform: Transform<Rust> = async (root) => {
 	const rootNode = root.root();
 
@@ -15,7 +17,7 @@ const transform: Transform<Rust> = async (root) => {
 		return rootNode.text();
 	}
 
-	const edits = nodes.map(node => node.replace(node.text().replace(/^(\s*)/, '$1// ')));
+	const edits = nodes.map(node => node.replace(node.text().replace(LEADING_WHITESPACE_REGEX, '$1// ')));
 
 	return rootNode.commitEdits(edits);
 };

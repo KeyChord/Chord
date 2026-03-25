@@ -18,7 +18,6 @@ async function createUseTauriState<T>(stateId: string) {
 		const [state, setState] = useState<T>(initialStates[stateId]);
 		useEffect(() => {
 			const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
-				console.log(event.payload);
 				setState(event.payload);
 			});
 

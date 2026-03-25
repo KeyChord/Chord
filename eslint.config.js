@@ -8,14 +8,15 @@ export default antfu(
 		ignores: [
 			'**/target',
 			'**/src-tauri',
+			'**/src/routeTree.gen.ts',
 		],
 		stylistic: {
 			indent: 'tab',
 		},
-	},
-	{
 		rules: {
 			'style/semi': ['error', 'always'],
+			'antfu/no-top-level-await': 'off',
+			'react-refresh/only-export-components': 'off',
 		},
 	},
 );

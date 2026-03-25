@@ -13,17 +13,14 @@ import {
 import { Input } from '#/components/ui/input.tsx';
 import { useChordFilesState, useDesktopAppManagerState } from '#/utils/state.ts';
 import { useMutation } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+
+const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
 	const [input, setInput] = useState('');
 	const { placeholderChords } = useChordFilesState();
-	const appBundleIds = useMemo(
-		() =>
-			[...new Set(placeholderChords.filter(entry => entry.scopeKind === 'app').map(entry => entry.scope))].sort(),
-		[placeholderChords],
-	);
 	const { appsMetadata } = useDesktopAppManagerState();
 	const normalizedFilter = input.trim().toLowerCase();
 	const filteredPlaceholders = placeholderChords.filter((placeholder) => {
@@ -96,7 +93,7 @@ export function PlaceholderChordsCard() {
 
 										return (
 											<PlaceholderChordRow
-												key={`${placeholder.filePath}:${placeholder.sequenceTemplate}`}
+												key={`${placeholder.filePath}:${placeholder.sequenceTemplate}:${placeholder.assignedSequence ?? ''}`}
 												appLabel={appLabel}
 												appMetadata={appMetadata}
 												placeholder={placeholder}
@@ -146,10 +143,6 @@ function PlaceholderChordRow({
 	const hasDraftSequence = normalizedDraftSequence.length > 0;
 	const hasAssignedSequence = assignedSequence.length > 0;
 
-	useEffect(() => {
-		setDraftSequence(placeholder.assignedSequence ?? '');
-	}, [placeholder.assignedSequence]);
-
 	return (
 		<div className="rounded-lg border bg-background/80 px-3 py-3">
 			<div className="flex flex-col gap-3 lg:flex-row lg:items-center">
@@ -184,7 +177,7 @@ function PlaceholderChordRow({
 							type="text"
 							value={draftSequence}
 							onChange={(event) => {
-								setDraftSequence(event.target.value.replace(/[^a-z]/gi, '').toLowerCase());
+								setDraftSequence(event.target.value.replace(LETTERS_ONLY_REGEX, '').toLowerCase());
 							}}
 							placeholder="letters"
 							className="min-w-0 flex-1 bg-transparent px-2 font-mono text-sm outline-none placeholder:text-muted-foreground"

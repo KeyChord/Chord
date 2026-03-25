@@ -7,6 +7,7 @@ import * as RechartsPrimitive from 'recharts';
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const;
+const CHART_ID_COLON_REGEX = /:/g;
 
 export type ChartConfig = {
 	[k in string]: {
@@ -45,7 +46,7 @@ function ChartContainer({
 	children: React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>['children']
 }) {
 	const uniqueId = React.useId();
-	const chartId = `chart-${id || uniqueId.replace(/:/g, '')}`;
+	const chartId = `chart-${id || uniqueId.replace(CHART_ID_COLON_REGEX, '')}`;
 
 	return (
 		<ChartContext value={{ config }}>
@@ -67,30 +68,27 @@ function ChartContainer({
 
 function ChartStyle({ id, config }: { id: string, config: ChartConfig }) {
 	const colorConfig = Object.entries(config).filter(([, config]) => config.theme || config.color);
+	const css = Object.entries(THEMES)
+		.map(
+			([theme, prefix]) => `
+${prefix} [data-chart=${id}] {
+${colorConfig
+	.map(([key, itemConfig]) => {
+		const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+		return color ? `  --color-${key}: ${color};` : null;
+	})
+	.join('\n')}
+}
+`,
+		)
+		.join('\n');
 
 	if (!colorConfig.length) {
 		return null;
 	}
 
 	return (
-		<style
-			dangerouslySetInnerHTML={{
-				__html: Object.entries(THEMES)
-					.map(
-						([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-			.map(([key, itemConfig]) => {
-				const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-				return color ? `  --color-${key}: ${color};` : null;
-			})
-			.join('\n')}
-}
-`,
-					)
-					.join('\n'),
-			}}
-		/>
+		<style>{css}</style>
 	);
 }
 

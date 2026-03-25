@@ -3,8 +3,6 @@
 import type { InferCommandOutput } from 'taurpc';
 import { createTauRPCProxy as createProxy } from 'taurpc';
 
-type TAURI_CHANNEL<T> = (response: T) => void;
-
 export interface AppError { Message: string }
 
 export interface GitRepo { owner: string, name: string, slug: string, url: string, localPath: string, headShortSha: string | null }

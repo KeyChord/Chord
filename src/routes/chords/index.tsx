@@ -18,6 +18,7 @@ const NATIVE_SURFACE_RADIUS = 32;
 const INDICATOR_TRANSITION_MS = 240;
 const HIDDEN_X_OFFSET_PX = 40;
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
+const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 type RawChord = ReturnType<typeof useChordFile>[string];
 interface ParsedChord {
 	keys: string[]
@@ -53,7 +54,7 @@ function sortTokens(tokens: Iterable<string>) {
 	const tokenSet = new Set(tokens);
 	const letterTokens = LETTER_TOKENS.filter(token => tokenSet.has(token));
 	const otherTokens = [...tokenSet]
-		.filter(token => !/^[A-Z]$/.test(token))
+		.filter(token => !SINGLE_LETTER_TOKEN_REGEX.test(token))
 		.sort((left, right) => left.localeCompare(right));
 
 	return [...letterTokens, ...otherTokens];
@@ -197,7 +198,6 @@ export function Chords() {
 	const rawChords = useChordFile(frontmostAppBundleId);
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
-	const [isPreparingSurface, setIsPreparingSurface] = useState(false);
 	const [indicatorProgress, setIndicatorProgress] = useState(() =>
 		state.isIndicatorVisible ? 1 : 0,
 	);
@@ -238,7 +238,6 @@ export function Chords() {
 
 	useEffect(() => {
 		const unlistenPromise = listen('chorder-will-show', () => {
-			setIsPreparingSurface(true);
 			setSurfaceVersion(version => version + 1);
 		});
 
@@ -260,8 +259,11 @@ export function Chords() {
 		const startProgress = indicatorProgressRef.current;
 		const targetProgress = state.isIndicatorVisible ? 1 : 0;
 		if (Math.abs(targetProgress - startProgress) < 0.001) {
-			setIndicatorProgress(targetProgress);
-			indicatorProgressRef.current = targetProgress;
+			animationFrameRef.current = window.requestAnimationFrame(() => {
+				indicatorProgressRef.current = targetProgress;
+				setIndicatorProgress(targetProgress);
+				animationFrameRef.current = null;
+			});
 			return;
 		}
 
@@ -295,14 +297,13 @@ export function Chords() {
 	}, [state.isIndicatorVisible]);
 
 	useLayoutEffect(() => {
-		if (!isPreparingSurface) {
+		if (surfaceVersion === 0) {
 			return;
 		}
 
 		emitSurfaceRect();
 		void emit('chorder-surface-ready');
-		setIsPreparingSurface(false);
-	}, [isPreparingSurface, surfaceVersion]);
+	}, [surfaceVersion]);
 
 	useEffect(() => {
 		const surface = surfaceRef.current;
