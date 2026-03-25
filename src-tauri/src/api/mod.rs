@@ -1,6 +1,3 @@
-use std::sync::Arc;
-use parking_lot::Mutex;
-use tauri::AppHandle;
 use crate::app::chord_package_registry::LocalChordPackage;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::observables::GitRepo;
@@ -9,6 +6,8 @@ use crate::startup::StartupStatusInfo;
 mod error;
 pub use error::*;
 mod resolvers;
+mod api;
+pub use api::*;
 
 #[taurpc::procedures(export_to = "../src/api/bindings.gen.ts")]
 pub trait Api {
@@ -66,20 +65,3 @@ pub trait Api {
     async fn get_current_states() -> AppResult<String>;
 }
 
-#[derive(Clone, Default)]
-pub struct ApiImpl {
-    handle: Arc<Mutex<Option<AppHandle>>>,
-}
-
-impl ApiImpl {
-    pub fn set_handle(&self, handle: AppHandle) {
-        *self.handle.lock() = Some(handle);
-    }
-
-    pub fn handle(&self) -> AppResult<AppHandle> {
-        self.handle
-            .lock()
-            .clone()
-            .ok_or_else(|| AppError::Message("app handle is not initialized".to_string()))
-    }
-}
