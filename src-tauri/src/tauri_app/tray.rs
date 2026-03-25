@@ -4,7 +4,6 @@ use crate::constants::OPEN_INSPECTOR_MENU_ID;
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::tauri_app::scripting::reload_configs;
 use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
-#[cfg(debug_assertions)]
 
 pub const TRAY_ID: &str = "chord-tray";
 const TRAY_ICON_BYTES: &[u8] =
