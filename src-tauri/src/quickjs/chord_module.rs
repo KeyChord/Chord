@@ -9,16 +9,28 @@ use crate::quickjs::AppUserData;
 use llrt_core::libs::utils::result::ResultExt;
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::Func;
-use rquickjs::{Ctx, Function};
+use rquickjs::{Ctx, Exception, Function};
 use std::collections::HashSet;
 
 pub struct ChordModule;
+
+fn app_handle(ctx: &Ctx<'_>) -> rquickjs::Result<tauri::AppHandle> {
+    let userdata = ctx
+        .userdata::<AppUserData>()
+        .ok_or_else(|| Exception::throw_message(ctx, "missing app context"))?;
+
+    userdata
+        .handle
+        .clone()
+        .ok_or_else(|| Exception::throw_message(ctx, "`chord` module is unavailable in CLI mode"))
+}
 
 fn on_app_launch<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
     callback: Function<'js>,
 ) -> rquickjs::Result<()> {
+    let _ = app_handle(&ctx)?;
     register_app_launch_handler(ctx, bundle_id, callback)
 }
 
@@ -27,12 +39,12 @@ fn on_app_terminate<'js>(
     bundle_id: String,
     callback: Function<'js>,
 ) -> rquickjs::Result<Function<'js>> {
+    let _ = app_handle(&ctx)?;
     register_app_terminate_handler(ctx, bundle_id, callback)
 }
 
 fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let chord_runner = handle.chord_runner();
     let shortcut =
         Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
@@ -44,8 +56,7 @@ fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
 }
 
 fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let chord_runner = handle.chord_runner();
     let shortcut =
         Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
@@ -57,8 +68,7 @@ fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
 }
 
 fn tap(ctx: Ctx, key: String) -> rquickjs::Result<()> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let chord_runner = handle.chord_runner();
     let shortcut =
         Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
@@ -78,8 +88,7 @@ fn get_global_hotkey(
     bundle_id: String,
     hotkey_id: String,
 ) -> rquickjs::Result<Option<String>> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
     let shortcut = global_hotkey_store
         .entries()
@@ -96,8 +105,7 @@ fn register_global_hotkey(
     bundle_id: String,
     hotkey_id: String,
 ) -> rquickjs::Result<Option<String>> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
     let all = global_hotkey_store.entries();
 
@@ -138,8 +146,7 @@ fn set_app_needs_relaunch(
     bundle_id: String,
     needs_relaunch: bool,
 ) -> rquickjs::Result<()> {
-    let userdata = ctx.userdata::<AppUserData>().unwrap();
-    let handle = &userdata.handle;
+    let handle = app_handle(&ctx)?;
     let desktop_app_manager = handle.desktop_app_manager();
     desktop_app_manager
         .set_app_needs_relaunch(&bundle_id, needs_relaunch)
@@ -161,9 +168,9 @@ impl ModuleDef for ChordModule {
     }
 
     fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> rquickjs::Result<()> {
-        let userdata = ctx.userdata::<AppUserData>().unwrap();
-        let handle = &userdata.handle;
-        init_app_lifecycle(handle.clone());
+        if let Ok(handle) = app_handle(ctx) {
+            init_app_lifecycle(handle);
+        }
 
         exports.export("press", Func::from(press))?;
         exports.export("release", Func::from(release))?;

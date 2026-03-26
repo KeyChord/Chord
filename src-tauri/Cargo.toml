@@ -57,6 +57,7 @@ anyhow = "1.0"
 libc = "0.2"
 bitflags = "2.11"
 parking_lot = { version = "0.12", features = [ "deadlock_detection" ] }
+clap = { version = "4.5.60", features = [ "derive" ] }
 keycode = "1"
 include_dir = { version = "0.7", features = [ "glob" ] }
 device_query = "4"

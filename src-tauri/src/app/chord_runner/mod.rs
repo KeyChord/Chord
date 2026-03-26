@@ -19,6 +19,8 @@ pub struct ChordRunner {
     pub shortcut: ChordShortcutRunner,
     shell: ChordShellRunner,
     javascript: ChordJavascriptRunner,
+
+    handle: SafeAppHandle
 }
 
 impl ChordRunner {
@@ -31,6 +33,7 @@ impl ChordRunner {
             shortcut,
             shell,
             javascript,
+            handle,
         }
     }
 
@@ -49,6 +52,7 @@ impl ChordRunner {
         }
 
         if let Some(js) = chord_payload.chord.js.clone() {
+            log::debug!("Running JavaScript: {:?}", js);
             let javascript = self.javascript.clone();
             let chord_payload = chord_payload.clone();
             tauri::async_runtime::spawn(async move {

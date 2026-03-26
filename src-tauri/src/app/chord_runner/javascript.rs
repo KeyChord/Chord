@@ -1,5 +1,5 @@
 use crate::app::SafeAppHandle;
-use crate::quickjs::with_js;
+use crate::quickjs::{format_js_error, with_js};
 use anyhow::Result;
 use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
@@ -41,8 +41,22 @@ impl ChordJavascriptRunner {
         num_times: usize,
     ) -> Result<()> {
         let handle = self.handle.try_handle()?;
+        let export_name = invocation.export_name.clone();
+        let module_path_for_error = module_path.clone();
+
         with_js(handle.clone(), move |ctx| {
-            Box::pin(call_js_export(ctx, module_path, invocation, num_times))
+            Box::pin(async move {
+                call_js_export(ctx.clone(), module_path, invocation, num_times)
+                    .await
+                    .map_err(|error| {
+                        anyhow::anyhow!(
+                            "failed to execute JS export `{}` from `{}`:\n{}",
+                            export_name,
+                            module_path_for_error,
+                            format_js_error(&ctx, error)
+                        )
+                    })
+            })
         })
         .await?;
 
@@ -55,7 +69,7 @@ async fn call_js_export<'js>(
     module_path: String,
     invocation: ChordJsInvocation,
     num_times: usize,
-) -> anyhow::Result<()> {
+) -> rquickjs::Result<()> {
     for _ in 0..num_times {
         let export_name = invocation.export_name.clone();
         let module_promise = Module::import(&ctx, module_path.to_string())?;

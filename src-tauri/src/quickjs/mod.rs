@@ -10,7 +10,7 @@ use rquickjs::{
     loader::{Loader, Resolver},
     module::Declared,
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::{
     AppHandle,
@@ -31,7 +31,7 @@ thread_local! {
 }
 
 pub struct AppUserData {
-    pub handle: AppHandle,
+    pub handle: Option<AppHandle>,
 }
 
 // This tells rquickjs "this type does not contain JS references"
@@ -138,7 +138,7 @@ impl Loader for ModuleLoader {
     }
 }
 
-async fn build_engine(handle: AppHandle) -> anyhow::Result<JsEngine> {
+async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
     let rt = AsyncRuntime::new()?;
     let module_builder = llrt_modules::module_builder::ModuleBuilder::default()
         .with_global(llrt_core::modules::embedded::init)
@@ -185,7 +185,7 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
         return Ok(ctx);
     }
 
-    let engine = build_engine(handle).await?;
+    let engine = build_engine(Some(handle)).await?;
     let out = engine.ctx.clone();
     JS_ENGINE.with(|cell| {
         *cell.borrow_mut() = Some(engine);
@@ -201,7 +201,7 @@ pub async fn reset_js(handle: AppHandle) -> anyhow::Result<()> {
     handle.run_on_main_thread(move || {
         let result = block_on(async move {
             clear_callbacks();
-            let engine = build_engine(rebuild_handle).await?;
+            let engine = build_engine(Some(rebuild_handle)).await?;
             JS_ENGINE.with(|cell| {
                 *cell.borrow_mut() = Some(engine);
             });
@@ -252,6 +252,39 @@ where
     rx.recv()
         .await
         .ok_or_else(|| anyhow::anyhow!("main thread task dropped"))?
+}
+
+async fn import_module<'js>(ctx: Ctx<'js>, module_path: String) -> rquickjs::Result<()> {
+    let module_promise = Module::import(&ctx, module_path)?;
+    let _module = module_promise.into_future::<Object>().await?;
+    Ok(())
+}
+
+fn canonicalize_module_path(path: &Path) -> anyhow::Result<PathBuf> {
+    let path = std::fs::canonicalize(path)?;
+    if !path.is_file() {
+        anyhow::bail!("expected a JavaScript file path, got {}", path.display());
+    }
+
+    Ok(path)
+}
+
+pub async fn run_standalone_module(path: &Path) -> anyhow::Result<()> {
+    let module_path = canonicalize_module_path(path)?.display().to_string();
+    let engine = build_engine(None).await?;
+
+    engine
+        .ctx
+        .async_with(|ctx| {
+            let module_path = module_path.clone();
+            let fut = Box::pin(async move {
+                import_module(ctx.clone(), module_path)
+                    .await
+                    .map_err(|error| anyhow::anyhow!(format_js_error(&ctx, error)))
+            });
+            unsafe { uplift(fut) }
+        })
+        .await
 }
 
 pub fn format_js_error<'js>(ctx: &Ctx<'js>, error: Error) -> String {

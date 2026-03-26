@@ -41,6 +41,10 @@ tauri_panel! {
 
 #[cfg_attr(mobile, tauri_app::mobile_entry_point)]
 pub fn run() {
+    run_app();
+}
+
+pub fn run_app() {
     std::panic::set_hook(Box::new(|info| {
         let bt = std::backtrace::Backtrace::force_capture();
 
@@ -154,4 +158,8 @@ pub fn run() {
             }
         }
     });
+}
+
+pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
+    quickjs::run_standalone_module(path.as_ref()).await
 }

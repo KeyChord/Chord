@@ -18,6 +18,15 @@ static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../
 
 impl ChordPackage {
     pub fn load_bundled() -> Result<Self> {
+        if let Some(root) = bundled_chords_dev_root() {
+            log::debug!("Loading bundled chords from disk: {:?}", root);
+            return Self::load_from_local_folder(&root);
+        }
+
+        Self::load_bundled_embedded()
+    }
+
+    fn load_bundled_embedded() -> Result<Self> {
         let mut js_files = StringRadixMap::new();
         let mut chords_files = StringRadixMap::new();
         let mut chord_file_paths = Vec::new();
@@ -153,4 +162,13 @@ fn is_supported_macos_chord_filename(path: &Path) -> bool {
     };
 
     file_name == "macos.toml" || file_name.ends_with(".macos.toml")
+}
+
+fn bundled_chords_dev_root() -> Option<PathBuf> {
+    if !cfg!(debug_assertions) {
+        return None;
+    }
+
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/chords");
+    root.exists().then_some(root)
 }
