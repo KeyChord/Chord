@@ -87,9 +87,6 @@ function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
 		onSuccess: () => {
 			toast.success(`Removed ${repo.slug}.`);
 		},
-		onError: (error) => {
-			toast.error(`Failed to remove ${repo.slug}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		},
 	});
 
 	return (
