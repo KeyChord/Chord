@@ -143,8 +143,6 @@ Actions can also take the form of shell commands, which is useful when certain f
 
 To exit _Chord Mode_, all you need to do is simply release your `Space` key. It's that simple!
 
-<!-- TODO: This section should be introduced alongside `shell` -->
-
 ## JavaScript Scripting
 
 In addition to running shortcuts and shell commands, chords can also run arbitrary JavaScript scripts, which provides more power for certain use-cases, especially for apps that don't necessarily have shortcuts bound to every action.
@@ -188,9 +186,13 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 - `cmd+ctrl+alt+shift+f{1..12}`
 - `cmd+ctrl+alt+f{1..12}`
 
-## Web Mode (Planned / Experimental)
+## Web Mode (planned)
 
 While _Chord Mode_ defaults to app-shortcuts, you can press `Caps` right after (`Caps+Space+Caps` to toggle "Web Mode", which activates chords that apply to the currently focused webpage. In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input. To type regular input, you can press and immediately release `Caps+Space` (similar to toggling `Insert Mode` in Vim), and press it again to re-enable key sequences. To exit _Web Mode_, you can just press `Caps+Space+Caps` again.
+
+## Buffering (planned)
+
+One of _Chord_'s most powerful features is the ability to "buffer" chords: if you press another chord before the current one is finished executing, _Chord_ will queue it instead of triggering it immediately.
 
 ## Comparison to keyboard shortcuts
 

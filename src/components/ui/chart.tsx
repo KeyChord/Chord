@@ -26,7 +26,7 @@ interface ChartContextProps {
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
 function useChart() {
-	const context = React.use(ChartContext);
+	const context = React.useContext(ChartContext);
 
 	if (!context) {
 		throw new Error('useChart must be used within a <ChartContainer />');
@@ -49,7 +49,7 @@ function ChartContainer({
 	const chartId = `chart-${id || uniqueId.replace(CHART_ID_COLON_REGEX, '')}`;
 
 	return (
-		<ChartContext value={{ config }}>
+		<ChartContext.Provider value={{ config }}>
 			<div
 				data-slot="chart"
 				data-chart={chartId}
@@ -62,7 +62,7 @@ function ChartContainer({
 				<ChartStyle id={chartId} config={config} />
 				<RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer>
 			</div>
-		</ChartContext>
+		</ChartContext.Provider>
 	);
 }
 
