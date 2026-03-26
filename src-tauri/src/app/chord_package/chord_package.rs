@@ -40,15 +40,20 @@ impl ChordPackage {
                     anyhow::anyhow!("Could not read file as utf8: {:?}", entry.path())
                 })?;
 
-                js_files.insert(relative_path.to_string_lossy().to_string(), content.to_string());
+                js_files.insert(
+                    relative_path.to_string_lossy().to_string(),
+                    content.to_string(),
+                );
             }
         }
 
         chord_file_paths.sort();
         for relative_path in chord_file_paths {
-            let file = BUNDLED_MACOS_CHORDS_DIR.get_file(&relative_path).ok_or_else(|| {
-                anyhow::anyhow!("Could not find bundled file: {:?}", relative_path)
-            })?;
+            let file = BUNDLED_MACOS_CHORDS_DIR
+                .get_file(&relative_path)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Could not find bundled file: {:?}", relative_path)
+                })?;
             let content = file.contents_utf8().ok_or_else(|| {
                 anyhow::anyhow!("Could not read file as utf8: {:?}", relative_path)
             })?;

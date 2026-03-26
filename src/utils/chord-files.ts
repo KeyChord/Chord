@@ -3,6 +3,7 @@ import mapObject from 'map-obj';
 import { useChordFilesState } from './state.ts';
 
 interface RawChord {
+	index: number
 	name: string
 	shell?: string
 	js?: any

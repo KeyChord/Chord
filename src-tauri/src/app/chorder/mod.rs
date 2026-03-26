@@ -432,6 +432,7 @@ mod tests {
     fn test_chord() -> Chord {
         Chord {
             keys: vec![Key(KeyA)],
+            index: 0,
             name: "Test".to_string(),
             shortcut: None,
             shell: None,

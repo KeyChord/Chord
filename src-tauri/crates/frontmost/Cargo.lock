@@ -31,6 +31,7 @@ dependencies = [
 name = "frontmost"
 version = "1.1.0"
 dependencies = [
+ "log",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -41,6 +42,12 @@ name = "libc"
 version = "0.2.175"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
+
+[[package]]
+name = "log"
+version = "0.4.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
 name = "objc2"

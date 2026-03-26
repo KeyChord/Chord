@@ -115,7 +115,11 @@ fn with_module_load_context(name: &str, error: Error) -> Error {
     match error {
         Error::Io(io_error) => Error::new_loading_message(
             name,
-            format!("tried to read {}: {}", attempted_module_path(name), io_error),
+            format!(
+                "tried to read {}: {}",
+                attempted_module_path(name),
+                io_error
+            ),
         ),
         other => other,
     }
@@ -134,12 +138,7 @@ impl Loader for ModuleLoader {
     }
 }
 
-async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
-    let existing = JS_ENGINE.with(|cell| cell.borrow().as_ref().map(|engine| engine.ctx.clone()));
-    if let Some(ctx) = existing {
-        return Ok(ctx);
-    }
-
+async fn build_engine(handle: AppHandle) -> anyhow::Result<JsEngine> {
     let rt = AsyncRuntime::new()?;
     let module_builder = llrt_modules::module_builder::ModuleBuilder::default()
         .with_global(llrt_core::modules::embedded::init)
@@ -174,12 +173,22 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
     //     *cell.borrow_mut() = Some(main_worker);
     // });
 
-    let out = context.clone();
+    Ok(JsEngine {
+        _rt: rt,
+        ctx: context,
+    })
+}
+
+async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
+    let existing = JS_ENGINE.with(|cell| cell.borrow().as_ref().map(|engine| engine.ctx.clone()));
+    if let Some(ctx) = existing {
+        return Ok(ctx);
+    }
+
+    let engine = build_engine(handle).await?;
+    let out = engine.ctx.clone();
     JS_ENGINE.with(|cell| {
-        *cell.borrow_mut() = Some(JsEngine {
-            _rt: rt,
-            ctx: context,
-        });
+        *cell.borrow_mut() = Some(engine);
     });
 
     Ok(out)
@@ -187,14 +196,20 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
 
 pub async fn reset_js(handle: AppHandle) -> anyhow::Result<()> {
     let (tx, mut rx) = channel(1);
+    let rebuild_handle = handle.clone();
 
     handle.run_on_main_thread(move || {
-        clear_callbacks();
-        JS_ENGINE.with(|cell| {
-            *cell.borrow_mut() = None;
+        let result = block_on(async move {
+            clear_callbacks();
+            let engine = build_engine(rebuild_handle).await?;
+            JS_ENGINE.with(|cell| {
+                *cell.borrow_mut() = Some(engine);
+            });
+
+            Ok::<(), anyhow::Error>(())
         });
 
-        let _ = tx.try_send(Ok::<(), anyhow::Error>(()));
+        let _ = tx.try_send(result);
     })?;
 
     rx.recv()

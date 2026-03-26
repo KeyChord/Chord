@@ -5,6 +5,7 @@ use crate::input::Key;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use toml_edit::{DocumentMut, Item};
 use typeshare::typeshare;
 
 #[derive(Debug, Serialize)]
@@ -24,10 +25,15 @@ pub struct RawAppChordsFile {
 
 impl AppChordsFile {
     pub fn parse(content: &str) -> Result<Self> {
+        let chord_indexes = chord_entry_indexes(content)?;
         let toml_value: toml::Value = toml::from_str(content)?;
-        let json_value: serde_json::Value = serde_json::to_value(toml_value)?;
+        let mut json_value: serde_json::Value = serde_json::to_value(toml_value)?;
+        apply_raw_chord_indexes(&mut json_value, &chord_indexes);
 
-        let file = toml::from_str::<RawAppChordsFile>(content)?;
+        let mut file = toml::from_str::<RawAppChordsFile>(content)?;
+        if let Some(chords) = file.chords.as_mut() {
+            apply_chord_indexes(chords, &chord_indexes);
+        }
         let mut chords = HashMap::new();
         let mut placeholder_chords = Vec::new();
         let mut descriptions = HashMap::new();
@@ -167,6 +173,8 @@ pub enum AppChordArgs {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppChord {
+    #[serde(default)]
+    pub index: u32,
     pub name: String,
     pub shortcut: Option<String>,
     pub shell: Option<String>,
@@ -217,11 +225,90 @@ fn parse_js_args_value(key: &str, value: &toml::Value) -> Result<ChordJsArgs> {
     }
 }
 
+fn chord_entry_indexes(content: &str) -> Result<HashMap<String, u32>> {
+    let document = content.parse::<DocumentMut>()?;
+    let Some(chords_table) = document.get("chords").and_then(Item::as_table_like) else {
+        return Ok(HashMap::new());
+    };
+
+    Ok(chords_table
+        .iter()
+        .enumerate()
+        .map(|(index, (sequence, _))| (sequence.to_string(), index as u32))
+        .collect())
+}
+
+fn apply_chord_indexes(
+    chords: &mut HashMap<String, AppChordMapValue>,
+    chord_indexes: &HashMap<String, u32>,
+) {
+    for (sequence, value) in chords {
+        let Some(index) = chord_indexes.get(sequence) else {
+            continue;
+        };
+
+        value.set_index(*index);
+    }
+}
+
+fn apply_raw_chord_indexes(
+    raw_file_json: &mut serde_json::Value,
+    chord_indexes: &HashMap<String, u32>,
+) {
+    let Some(chords) = raw_file_json
+        .get_mut("chords")
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return;
+    };
+
+    for (sequence, index) in chord_indexes {
+        let Some(raw_value) = chords.get_mut(sequence) else {
+            continue;
+        };
+
+        apply_raw_chord_index(raw_value, *index);
+    }
+}
+
+fn apply_raw_chord_index(raw_value: &mut serde_json::Value, index: u32) {
+    match raw_value {
+        serde_json::Value::Object(object) => {
+            object.insert("index".into(), serde_json::Value::from(index));
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                let Some(object) = item.as_object_mut() else {
+                    continue;
+                };
+
+                object.insert("index".into(), serde_json::Value::from(index));
+            }
+        }
+        _ => {}
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum AppChordMapValue {
     Single(AppChord),
     Multiple(Vec<AppChord>),
+}
+
+impl AppChordMapValue {
+    fn set_index(&mut self, index: u32) {
+        match self {
+            Self::Single(entry) => {
+                entry.index = index;
+            }
+            Self::Multiple(entries) => {
+                for entry in entries {
+                    entry.index = index;
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -317,6 +404,7 @@ fn build_chord(sequence: &str, value: &AppChordMapValue) -> Option<(Vec<Key>, Ch
 
     let chord = Chord {
         keys: keys.clone(),
+        index: entry.index,
         name: entry.name.clone(),
         shortcut,
         shell: entry.shell.clone(),
@@ -428,4 +516,65 @@ fn expand_brace_variants(inner: &str) -> Result<Vec<String>> {
     }
 
     Ok(variants)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn index_of(value: &AppChordMapValue) -> u32 {
+        match value {
+            AppChordMapValue::Single(entry) => entry.index,
+            AppChordMapValue::Multiple(entries) => {
+                entries.first().map(|entry| entry.index).unwrap_or(0)
+            }
+        }
+    }
+
+    #[test]
+    fn parse_assigns_indexes_in_toml_order() {
+        let file = AppChordsFile::parse(
+            r#"
+[chords]
+b = { name = "Bravo" }
+'?a' = { name = "Alpha Section" }
+a = [{ name = "Alpha One" }, { name = "Alpha Two" }]
+'<digit>' = { name = "Digit Placeholder" }
+"#,
+        )
+        .expect("parse should succeed");
+
+        let AppChordMapValue::Single(bravo) =
+            file.chords.get("b").expect("b chord should be present")
+        else {
+            panic!("b should parse as a single chord");
+        };
+        assert_eq!(bravo.index, 0);
+
+        assert_eq!(file.raw_file_json["chords"]["?a"]["index"], 1);
+
+        let AppChordMapValue::Multiple(alpha_variants) =
+            file.chords.get("a").expect("a chord should be present")
+        else {
+            panic!("a should parse as multiple chords");
+        };
+        assert_eq!(alpha_variants[0].index, 2);
+        assert_eq!(alpha_variants[1].index, 2);
+
+        let placeholder = file
+            .placeholder_chords
+            .first()
+            .expect("placeholder should be present");
+        assert_eq!(index_of(&placeholder.value), 3);
+
+        let resolved = file.get_chords_shallow(&HashMap::new());
+        let keys = Key::parse_sequence("a").expect("a should be a valid sequence");
+        assert_eq!(
+            resolved
+                .get(&keys)
+                .expect("resolved chord should exist")
+                .index,
+            2
+        );
+    }
 }

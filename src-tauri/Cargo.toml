@@ -52,6 +52,7 @@ rdev = { version = "*", features = [
 ] }
 observable-property = "0.4.2"
 toml = "1.0.6"
+toml_edit = "0.25.4"
 anyhow = "1.0"
 libc = "0.2"
 bitflags = "2.11"
