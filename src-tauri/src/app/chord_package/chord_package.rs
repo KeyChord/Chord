@@ -19,7 +19,14 @@ static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../
 impl ChordPackage {
     pub fn load_bundled() -> Result<Self> {
         let mut chords_files = StringRadixMap::new();
-        for file in BUNDLED_MACOS_CHORDS_DIR.find("**/macos.toml")? {
+        let mut chord_file_paths = BUNDLED_MACOS_CHORDS_DIR
+            .find("**/*.toml")?
+            .into_iter()
+            .filter(|file| is_supported_macos_chord_filename(file.path()))
+            .collect::<Vec<_>>();
+        chord_file_paths.sort_by(|left, right| left.path().cmp(right.path()));
+
+        for file in chord_file_paths {
             let path = format!("chords/{}", file.path().to_string_lossy());
             let content = file
                 .as_file()
@@ -47,6 +54,7 @@ impl ChordPackage {
     pub fn load_from_local_folder(root: &Path) -> Result<Self> {
         let mut js_files = StringRadixMap::new();
         let mut chords_files = StringRadixMap::new();
+        let mut chord_file_paths = Vec::new();
 
         if root.exists() {
             for entry in WalkDir::new(root) {
@@ -59,24 +67,10 @@ impl ChordPackage {
 
                 let relative_path = path.strip_prefix(root)?.to_path_buf();
 
-                // ------------------------
-                // Handle chords/**/macos.toml
-                // ------------------------
-                if relative_path.starts_with("chords") {
-                    if entry.file_name() == "macos.toml" {
-                        let content = std::fs::read_to_string(path)?;
-
-                        match AppChordsFile::parse(&content) {
-                            Ok(parsed) => {
-                                chords_files
-                                    .insert(relative_path.to_string_lossy().to_string(), parsed);
-                            }
-                            Err(error) => {
-                                log::warn!("Skipping invalid {:?}: {}", path, error);
-                                continue;
-                            }
-                        }
-                    }
+                if relative_path.starts_with("chords")
+                    && is_supported_macos_chord_filename(&relative_path)
+                {
+                    chord_file_paths.push(relative_path.clone());
                 }
 
                 // ------------------------
@@ -86,6 +80,21 @@ impl ChordPackage {
                     let content = std::fs::read_to_string(path)?;
 
                     js_files.insert(relative_path.to_string_lossy().to_string(), content);
+                }
+            }
+
+            chord_file_paths.sort();
+            for relative_path in chord_file_paths {
+                let path = root.join(&relative_path);
+                let content = std::fs::read_to_string(&path)?;
+
+                match AppChordsFile::parse(&content) {
+                    Ok(parsed) => {
+                        chords_files.insert(relative_path.to_string_lossy().to_string(), parsed);
+                    }
+                    Err(error) => {
+                        log::warn!("Skipping invalid {:?}: {}", path, error);
+                    }
                 }
             }
         } else {
@@ -104,4 +113,12 @@ impl ChordPackage {
         self.chords_files.extend(other.chords_files);
         self.js_files.extend(other.js_files);
     }
+}
+
+fn is_supported_macos_chord_filename(path: &Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+
+    file_name == "macos.toml" || file_name.ends_with(".macos.toml")
 }

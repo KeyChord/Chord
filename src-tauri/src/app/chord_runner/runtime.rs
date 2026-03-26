@@ -27,6 +27,7 @@ pub struct MatchingDescriptionInfo {
 pub struct ChordRuntime {
     // Used as a unique module key
     pub path: String,
+    pub bundle_id: String,
 
     pub chords: HashMap<Vec<Key>, Chord>,
     pub descriptions: HashMap<Vec<Key>, String>,
@@ -49,6 +50,7 @@ impl ChordRuntime {
         let raw_chords = Arc::new(Mutex::new(HashMap::new()));
         Ok(Self {
             path,
+            bundle_id: GLOBAL_CHORD_RUNTIME_ID.to_string(),
             chords,
             descriptions: HashMap::new(),
             raw_chords,
@@ -59,6 +61,7 @@ impl ChordRuntime {
     // Doesn't resolve _config.extends
     pub fn from_file_shallow(
         path: String,
+        bundle_id: String,
         chord_file: AppChordsFile,
         placeholder_bindings: &HashMap<String, String>,
     ) -> Result<Self> {
@@ -71,6 +74,7 @@ impl ChordRuntime {
 
         Ok(Self {
             path,
+            bundle_id,
             raw_chords,
             config,
             chords,

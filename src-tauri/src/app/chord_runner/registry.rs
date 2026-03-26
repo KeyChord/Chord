@@ -15,10 +15,16 @@ use std::sync::{Arc, Mutex};
 
 pub struct ChordRunnerRegistry {
     pub global_chords_to_runtime_key: Mutex<HashMap<Vec<Key>, String>>,
-    pub runtimes: Mutex<HashMap<String, Arc<ChordRuntime>>>,
+    pub runtime_index: Mutex<HashMap<String, Arc<ChordRuntime>>>,
+    pub runtimes: Mutex<HashMap<String, Vec<Arc<ChordRuntime>>>>,
 
     handle: SafeAppHandle,
     observable: Arc<ChordFilesObservable>,
+}
+
+struct RuntimePathInfo {
+    runtime_id: String,
+    bundle_id: String,
 }
 
 impl ChordRunnerRegistry {
@@ -28,12 +34,16 @@ impl ChordRunnerRegistry {
     ) -> anyhow::Result<(
         HashMap<Vec<Key>, String>,
         HashMap<String, ChordRuntime>,
+        HashMap<String, String>,
+        Vec<String>,
         HashMap<String, serde_json::Value>,
         Vec<PlaceholderChordInfo>,
     )> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
         let mut app_config_map = HashMap::new();
+        let mut runtime_bundle_ids = HashMap::new();
+        let mut runtime_order = Vec::new();
         let mut raw_files_json_map = HashMap::new();
         let mut placeholder_chords = Vec::new();
 
@@ -49,15 +59,17 @@ impl ChordRunnerRegistry {
 
                 raw_files_json_map.insert(chord_file_path.clone(), file.raw_file_json.clone());
 
-                let Some(runtime_id) = runtime_id_from_chords_path(Path::new(&chord_file_path))
+                let Some(runtime_info) = runtime_info_from_chords_path(Path::new(&chord_file_path))
                 else {
                     log::warn!("Invalid chords path: {:?}", chord_file_path);
                     continue;
                 };
+                let runtime_id = runtime_info.runtime_id;
+                let bundle_id = runtime_info.bundle_id;
 
                 let placeholder_bindings =
                     placeholder_bindings_for_file(placeholder_entries, &chord_file_path);
-                let (scope, scope_kind) = scope_info_from_runtime_id(&runtime_id);
+                let (scope, scope_kind) = scope_info_from_bundle_id(&bundle_id);
 
                 placeholder_chords.extend(file.placeholder_chords.iter().filter_map(
                     |placeholder| {
@@ -89,13 +101,19 @@ impl ChordRunnerRegistry {
                 }
 
                 let config = file.config.clone();
-                let app_chord_runtime =
-                    ChordRuntime::from_file_shallow(chord_file_path, file, &placeholder_bindings)?;
+                let app_chord_runtime = ChordRuntime::from_file_shallow(
+                    chord_file_path,
+                    bundle_id.clone(),
+                    file,
+                    &placeholder_bindings,
+                )?;
                 app_runtime_map.insert(runtime_id.clone(), app_chord_runtime);
-                app_config_map.insert(runtime_id, config);
+                app_config_map.insert(runtime_id.clone(), config);
+                runtime_bundle_ids.insert(runtime_id.clone(), bundle_id);
+                runtime_order.push(runtime_id);
             }
 
-            let application_ids = app_runtime_map.keys().cloned().collect::<Vec<_>>();
+            let application_ids = runtime_order.clone();
             let mut resolved = HashSet::new();
             let mut resolving = HashSet::new();
 
@@ -118,6 +136,8 @@ impl ChordRunnerRegistry {
         Ok((
             global_chords_to_runtime_key,
             app_runtime_map,
+            runtime_bundle_ids,
+            runtime_order,
             raw_files_json_map,
             placeholder_chords,
         ))
@@ -161,8 +181,14 @@ impl ChordRunnerRegistry {
         }
 
         let placeholder_entries = handle.app_placeholder_chord_store().entries();
-        let (global_chords_to_runtime_key, app_runtime_map, raw_files_map, mut placeholder_chords) =
-            ChordRunnerRegistry::parse_packages(chord_packages, &placeholder_entries)?;
+        let (
+            global_chords_to_runtime_key,
+            app_runtime_map,
+            runtime_bundle_ids,
+            runtime_order,
+            raw_files_map,
+            mut placeholder_chords,
+        ) = ChordRunnerRegistry::parse_packages(chord_packages, &placeholder_entries)?;
         placeholder_chords.sort_by(|left, right| {
             left.scope_kind
                 .cmp(&right.scope_kind)
@@ -183,12 +209,39 @@ impl ChordRunnerRegistry {
             *map = global_chords_to_runtime_key;
         }
 
+        let runtime_index = app_runtime_map
+            .into_iter()
+            .map(|(runtime_id, runtime)| (runtime_id, Arc::new(runtime)))
+            .collect::<HashMap<_, _>>();
+        let mut runtimes = HashMap::<String, Vec<Arc<ChordRuntime>>>::new();
+        let mut seen_runtime_ids = HashSet::new();
+        let mut deduped_runtime_order = runtime_order
+            .into_iter()
+            .rev()
+            .filter(|runtime_id| seen_runtime_ids.insert(runtime_id.clone()))
+            .collect::<Vec<_>>();
+        deduped_runtime_order.reverse();
+        for runtime_id in deduped_runtime_order {
+            let Some(bundle_id) = runtime_bundle_ids.get(&runtime_id) else {
+                continue;
+            };
+            let Some(runtime) = runtime_index.get(&runtime_id) else {
+                continue;
+            };
+            runtimes
+                .entry(bundle_id.clone())
+                .or_default()
+                .push(runtime.clone());
+        }
+
+        {
+            let mut map = self.runtime_index.lock().expect("poisoned");
+            *map = runtime_index;
+        }
+
         {
             let mut map = self.runtimes.lock().expect("poisoned");
-            *map = app_runtime_map
-                .into_iter()
-                .map(|(key, value)| (key, Arc::new(value)))
-                .collect();
+            *map = runtimes;
         }
 
         let raw_files_as_json_strings = raw_files_map
@@ -211,6 +264,7 @@ impl ChordRunnerRegistry {
         ChordRunnerRegistry {
             handle,
             global_chords_to_runtime_key: Mutex::new(HashMap::new()),
+            runtime_index: Mutex::new(HashMap::new()),
             runtimes: Mutex::new(HashMap::new()),
             observable,
         }
@@ -230,11 +284,19 @@ impl ChordRunnerRegistry {
                 return None;
             };
 
-            let runtimes = self.runtimes.lock().expect("poisoned");
-            runtimes.get(runtime_key).map(|r| r.clone())
+            let runtime_index = self.runtime_index.lock().expect("poisoned");
+            runtime_index.get(runtime_key).map(|r| r.clone())
         } else {
             let runtimes = self.runtimes.lock().expect("poisoned");
-            application_id.and_then(|app_id| runtimes.get(&app_id).map(|r| r.clone()))
+            application_id.and_then(|app_id| {
+                runtimes.get(&app_id).and_then(|app_runtimes| {
+                    app_runtimes
+                        .iter()
+                        .rev()
+                        .find(|runtime| runtime.get_chord(sequence).is_some())
+                        .cloned()
+                })
+            })
         }
     }
 
@@ -253,11 +315,11 @@ impl ChordRunnerRegistry {
     }
 
     async fn load_chord_config_modules(&self) {
-        let runtimes = {
-            let runtimes = self.runtimes.lock().expect("poisoned");
-            runtimes.clone()
+        let runtime_index = {
+            let runtime_index = self.runtime_index.lock().expect("poisoned");
+            runtime_index.clone()
         };
-        for (bundle_id, runtime) in runtimes.iter() {
+        for runtime in runtime_index.values() {
             let handle = self.handle.clone();
 
             let Some(js) = runtime.config.as_ref().and_then(|c| c.js.as_ref()) else {
@@ -270,7 +332,7 @@ impl ChordRunnerRegistry {
 
             let path = runtime.path.clone();
             let raw_chords = runtime.raw_chords.lock().unwrap().clone();
-            let bundle_id = bundle_id.clone();
+            let bundle_id = runtime.bundle_id.clone();
 
             tauri::async_runtime::spawn(async move {
                 let path = path.clone();
@@ -323,23 +385,33 @@ fn module_disk_path(root_dir: Option<&Path>, module_path: &str) -> String {
         .to_string()
 }
 
-fn runtime_id_from_chords_path(file_path: &Path) -> Option<String> {
-    if file_path.file_name()? != "macos.toml" {
+fn runtime_info_from_chords_path(file_path: &Path) -> Option<RuntimePathInfo> {
+    let file_name = file_path.file_name()?.to_str()?;
+    if !is_supported_macos_chord_filename(file_name) {
         return None;
     }
 
     let application_path = file_path.parent()?.strip_prefix("chords").ok()?;
-    if application_path.as_os_str().is_empty() {
-        return Some(GLOBAL_CHORD_RUNTIME_ID.to_string());
-    }
-
-    Some(
+    let bundle_id = if application_path.as_os_str().is_empty() {
+        GLOBAL_CHORD_RUNTIME_ID.to_string()
+    } else {
         application_path
             .iter()
             .map(|component| component.to_string_lossy().into_owned())
             .collect::<Vec<_>>()
-            .join("."),
-    )
+            .join(".")
+    };
+    let runtime_id = if file_name == "macos.toml" {
+        bundle_id.clone()
+    } else {
+        let runtime_name = file_name.strip_suffix(".macos.toml")?;
+        format!("{bundle_id}#{runtime_name}")
+    };
+
+    Some(RuntimePathInfo {
+        runtime_id,
+        bundle_id,
+    })
 }
 
 fn is_global_chord_sequence(sequence: &[Key]) -> bool {
@@ -469,10 +541,47 @@ fn placeholder_bindings_for_file(
         .collect()
 }
 
-fn scope_info_from_runtime_id(runtime_id: &str) -> (String, String) {
-    if runtime_id == GLOBAL_CHORD_RUNTIME_ID {
+fn is_supported_macos_chord_filename(file_name: &str) -> bool {
+    file_name == "macos.toml" || file_name.ends_with(".macos.toml")
+}
+
+fn scope_info_from_bundle_id(bundle_id: &str) -> (String, String) {
+    if bundle_id == GLOBAL_CHORD_RUNTIME_ID {
         ("Global".to_string(), "global".to_string())
     } else {
-        (runtime_id.to_string(), "app".to_string())
+        (bundle_id.to_string(), "app".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_base_runtime_info_from_chords_path() {
+        let info = runtime_info_from_chords_path(Path::new("chords/com/apple/finder/macos.toml"))
+            .expect("runtime info");
+
+        assert_eq!(info.bundle_id, "com.apple.finder");
+        assert_eq!(info.runtime_id, "com.apple.finder");
+    }
+
+    #[test]
+    fn parses_named_runtime_info_from_chords_path() {
+        let info =
+            runtime_info_from_chords_path(Path::new("chords/com/apple/finder/work.macos.toml"))
+                .expect("runtime info");
+
+        assert_eq!(info.bundle_id, "com.apple.finder");
+        assert_eq!(info.runtime_id, "com.apple.finder#work");
+    }
+
+    #[test]
+    fn parses_global_named_runtime_info_from_chords_path() {
+        let info = runtime_info_from_chords_path(Path::new("chords/work.macos.toml"))
+            .expect("runtime info");
+
+        assert_eq!(info.bundle_id, GLOBAL_CHORD_RUNTIME_ID);
+        assert_eq!(info.runtime_id, "__global__#work");
     }
 }

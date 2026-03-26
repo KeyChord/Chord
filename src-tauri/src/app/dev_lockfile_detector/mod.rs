@@ -33,7 +33,10 @@ fn is_dev_lockfile_present(lockfile_path: &Path) -> bool {
 mod tests {
     use super::*;
 
-    fn detector_for_test(lockfile_path: PathBuf, enforce_lockfile_check: bool) -> DevLockfileDetector {
+    fn detector_for_test(
+        lockfile_path: PathBuf,
+        enforce_lockfile_check: bool,
+    ) -> DevLockfileDetector {
         DevLockfileDetector {
             enforce_lockfile_check,
             lockfile_path,

@@ -14,6 +14,8 @@ interface RawChordFile {
 	chords?: Record<string, RawChord | Array<RawChord>>
 }
 
+const GLOBAL_RUNTIME_ID = '__global__';
+
 function materializePlaceholderChords(
 	file: RawChordFile,
 	placeholders: PlaceholderChordInfo[],
@@ -75,7 +77,11 @@ export function useChordFile(bundleId: string | undefined): Record<string, RawCh
 function getGlobalChords(rawFilesAsJson: Record<string, RawChordFile>) {
 	const chords: Record<string, RawChord> = {};
 
-	for (const file of Object.values(rawFilesAsJson)) {
+	for (const [filePath, file] of sortedChordFileEntries(rawFilesAsJson)) {
+		if (bundleIdFromFilePath(filePath) !== GLOBAL_RUNTIME_ID) {
+			continue;
+		}
+
 		for (const [sequence, chord] of Object.entries(file.chords ?? {})) {
 			if (sequence[0]?.toUpperCase() === sequence[0]) {
 				chords[sequence] = Array.isArray(chord) ? chord[0] : chord;
@@ -86,16 +92,67 @@ function getGlobalChords(rawFilesAsJson: Record<string, RawChordFile>) {
 	return chords;
 }
 
-function bundleIdToFilepath(bundleId: string) {
-	return `chords/${bundleId.replaceAll('.', '/')}/macos.toml`;
+function supportedChordFileName(fileName: string) {
+	return fileName === 'macos.toml' || fileName.endsWith('.macos.toml');
 }
 
-function resolveChords(
+function runtimeInfoFromFilePath(filePath: string) {
+	if (!filePath.startsWith('chords/')) {
+		return undefined;
+	}
+
+	const parts = filePath.split('/');
+	const fileName = parts.at(-1);
+	if (!fileName || !supportedChordFileName(fileName)) {
+		return undefined;
+	}
+
+	const bundlePath = parts.slice(1, -1).join('/');
+	const bundleId = bundlePath === '' ? GLOBAL_RUNTIME_ID : bundlePath.replaceAll('/', '.');
+	const runtimeId = fileName === 'macos.toml'
+		? bundleId
+		: `${bundleId}#${fileName.slice(0, -'.macos.toml'.length)}`;
+
+	return { bundleId, runtimeId };
+}
+
+function sortedChordFileEntries(rawFilesAsJson: Record<string, RawChordFile>) {
+	return Object.entries(rawFilesAsJson).sort(([leftPath], [rightPath]) => {
+		const leftIsBase = leftPath.endsWith('/macos.toml') || leftPath === 'chords/macos.toml';
+		const rightIsBase = rightPath.endsWith('/macos.toml') || rightPath === 'chords/macos.toml';
+		return Number(rightIsBase) - Number(leftIsBase) || leftPath.localeCompare(rightPath);
+	});
+}
+
+function bundleIdFromFilePath(filePath: string) {
+	return runtimeInfoFromFilePath(filePath)?.bundleId;
+}
+
+function findFilePathForRuntimeId(
 	rawFilesAsJson: Record<string, RawChordFile>,
-	bundleId: string,
+	runtimeId: string,
+) {
+	for (const [filePath] of Object.entries(rawFilesAsJson)) {
+		if (runtimeInfoFromFilePath(filePath)?.runtimeId === runtimeId) {
+			return filePath;
+		}
+	}
+
+	return undefined;
+}
+
+function resolveChordsForFile(
+	rawFilesAsJson: Record<string, RawChordFile>,
+	filePath: string,
+	visited = new Set<string>(),
 ): Record<string, RawChord> {
-	const filepath = bundleIdToFilepath(bundleId);
-	const file = rawFilesAsJson[filepath] ?? {};
+	if (visited.has(filePath)) {
+		return {};
+	}
+
+	visited.add(filePath);
+
+	const file = rawFilesAsJson[filePath] ?? {};
 	const chords: Record<string, RawChord> = mapObject(file.chords ?? {}, (key, value) => {
 		if (Array.isArray(value)) {
 			return [key, value[0]];
@@ -105,9 +162,31 @@ function resolveChords(
 	});
 
 	if (file.config?.extends) {
-		const extendedChords = resolveChords(rawFilesAsJson, file.config.extends);
+		const extendedFilePath = findFilePathForRuntimeId(rawFilesAsJson, file.config.extends);
+		const extendedChords = extendedFilePath
+			? resolveChordsForFile(rawFilesAsJson, extendedFilePath, visited)
+			: {};
 		for (const [sequence, value] of Object.entries(extendedChords)) {
 			chords[sequence] = value;
+		}
+	}
+
+	visited.delete(filePath);
+	return chords;
+}
+
+function resolveChords(
+	rawFilesAsJson: Record<string, RawChordFile>,
+	bundleId: string,
+): Record<string, RawChord> {
+	const chords: Record<string, RawChord> = {};
+	const filePaths = sortedChordFileEntries(rawFilesAsJson)
+		.map(([filePath]) => filePath)
+		.filter(filePath => bundleIdFromFilePath(filePath) === bundleId);
+
+	for (const filePath of filePaths) {
+		for (const [sequence, chord] of Object.entries(resolveChordsForFile(rawFilesAsJson, filePath))) {
+			chords[sequence] = chord;
 		}
 	}
 

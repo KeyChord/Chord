@@ -31,12 +31,27 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
     let chorder_observable = manage(app.handle(), ChorderObservable::new(safe_handle.clone())?);
     let git_repos_observable = manage(app.handle(), GitReposObservable::new(safe_handle.clone())?);
-    let permissions_observable = manage(app.handle(), AppPermissionsObservable::new(safe_handle.clone())?);
-    let settings_observable = manage(app.handle(), AppSettingsObservable::new(safe_handle.clone())?);
+    let permissions_observable = manage(
+        app.handle(),
+        AppPermissionsObservable::new(safe_handle.clone())?,
+    );
+    let settings_observable = manage(
+        app.handle(),
+        AppSettingsObservable::new(safe_handle.clone())?,
+    );
     let frontmost_observable = manage(app.handle(), FrontmostObservable::new(safe_handle.clone())?);
-    let chord_files_observable = manage(app.handle(), ChordFilesObservable::new(safe_handle.clone())?);
-    let git_package_registry = manage(app.handle(), GitChordPackageRegistry::new(safe_handle.clone())?);
-    let desktop_app_manager_observable = manage(app.handle(), DesktopAppManagerObservable::new(safe_handle.clone())?);
+    let chord_files_observable = manage(
+        app.handle(),
+        ChordFilesObservable::new(safe_handle.clone())?,
+    );
+    let git_package_registry = manage(
+        app.handle(),
+        GitChordPackageRegistry::new(safe_handle.clone())?,
+    );
+    let desktop_app_manager_observable = manage(
+        app.handle(),
+        DesktopAppManagerObservable::new(safe_handle.clone())?,
+    );
 
     safe_handle.manage(AppManaged {
         frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,

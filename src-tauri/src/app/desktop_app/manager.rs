@@ -2,6 +2,8 @@ use crate::app::SafeAppHandle;
 use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
+#[allow(unused_imports)]
+use log::kv::ToValue;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
 use objc2_foundation::NSString;
 #[allow(unused_imports)]
@@ -12,8 +14,6 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
-#[allow(unused_imports)]
-use log::kv::ToValue;
 use tauri::AppHandle;
 
 pub struct DesktopAppManager {
@@ -42,7 +42,7 @@ impl DesktopAppManager {
         }
         self.observable.set_state(DesktopAppManagerState {
             apps_metadata,
-            apps_needing_relaunch
+            apps_needing_relaunch,
         })?;
         Ok(())
     }
@@ -105,7 +105,7 @@ impl DesktopAppManager {
 
         self.observable.set_state(DesktopAppManagerState {
             apps_needing_relaunch,
-            apps_metadata
+            apps_metadata,
         })?;
         Ok(())
     }
