@@ -15,6 +15,7 @@ import {
 } from '#/components/ui/dropdown-menu.tsx';
 import { useMutation } from '@tanstack/react-query';
 import { Ellipsis, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { taurpc } from '../../api/taurpc.ts';
 import { useGitRepoStoreState } from '../../utils/state.ts';
 import { AddRepoButton } from './add-repo-button.tsx';
@@ -83,6 +84,12 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
 	const removeGitRepoMutation = useMutation({
 		mutationFn: taurpc.removeGitRepo,
+		onSuccess: () => {
+			toast.success(`Removed ${repo.slug}.`);
+		},
+		onError: (error) => {
+			toast.error(`Failed to remove ${repo.slug}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		},
 	});
 
 	return (

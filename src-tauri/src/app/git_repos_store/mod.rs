@@ -1,7 +1,7 @@
 use crate::app::SafeAppHandle;
 use crate::git::{GitHubRepoRef, clone_repo};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,21 +58,32 @@ impl GitReposStore {
         Ok(())
     }
 
-    pub fn remove_repo(&self, repo_ref: &GitHubRepoRef) -> Result<()> {
-        // Filesystem first
-        let id = repo_ref.slug();
+    pub fn remove_repo(&self, slug: &str) -> Result<()> {
+        let id = slug.trim().to_string();
+        anyhow::ensure!(!id.is_empty(), "Repository cannot be empty");
+
+        let state = self.observable.get_state()?;
+        let mut repos = state.repos.clone();
+        let removed_repo = repos
+            .remove(&id)
+            .with_context(|| format!("Repository {id} has not been added yet"))?;
+
         self.store.delete(id.clone());
         self.save()?;
 
-        let repo_path = repo_ref.local_path(&self.github_repos_dir()?);
-        if repo_path.exists() {
-            fs::remove_dir_all(&repo_path)?;
-        }
-
-        let state = self.handle.observable_state::<GitReposObservable>()?;
-        let mut repos = state.repos.clone();
-        repos.remove(&id);
         self.observable.set_state(GitReposState { repos })?;
+
+        let repo_path = PathBuf::from(&removed_repo.local_path);
+        if repo_path.exists() {
+            fs::remove_dir_all(&repo_path)
+                .with_context(|| format!("Failed to remove local repo cache at {}", repo_path.display()))?;
+
+            if let Some(parent) = repo_path.parent() {
+                if parent.read_dir()?.next().is_none() {
+                    let _ = fs::remove_dir(parent);
+                }
+            }
+        }
 
         Ok(())
     }

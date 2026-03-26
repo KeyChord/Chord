@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::constants::SHOW_SETTINGS_WINDOW_MENU_ID;
 #[allow(unused_imports)]
 use tauri::{
@@ -26,4 +27,16 @@ pub fn build_app_menu<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R
     }
 
     Ok(menu)
+}
+
+pub fn handle_menu_event<R: Runtime>(handle: &AppHandle<R>, event: &MenuEvent) {
+    match event.id().as_ref() {
+        SHOW_SETTINGS_WINDOW_MENU_ID => {
+            let settings = handle.app_settings();
+            if let Err(error) = settings.ui.open() {
+                log::error!("Failed to show settings window from app menu: {error}");
+            }
+        }
+        _ => {}
+    }
 }

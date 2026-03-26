@@ -94,8 +94,8 @@ pub fn run_app() {
     let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api.clone().into_handler()))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
-        .on_menu_event(|_handle, _event| {
-            // tauri_app::menu::handle_menu_event(handle, &event);
+        .on_menu_event(|handle, event| {
+            tauri_app::menu::handle_menu_event(handle, &event);
         })
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
