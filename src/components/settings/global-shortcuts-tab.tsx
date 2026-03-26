@@ -14,7 +14,6 @@ import { Input } from '#/components/ui/input.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { taurpc } from '../../api/taurpc.ts';
 import { useDesktopAppManagerState } from '../../utils/state.ts';
 
@@ -139,9 +138,6 @@ function GlobalShortcutRow({
 			await queryClient.invalidateQueries({
 				queryKey: ['global-shortcuts'],
 			});
-		},
-		onError: (error) => {
-			toast.error(error.message);
 		},
 	});
 

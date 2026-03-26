@@ -18,6 +18,7 @@ pub trait Api {
     async fn get_startup_status() -> AppResult<StartupStatusInfo>;
     async fn complete_onboarding() -> AppResult<()>;
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
+    async fn remove_git_repo(repo: String) -> AppResult<()>;
     async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
     async fn list_local_chord_folders() -> AppResult<Vec<LocalChordPackage>>;
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;

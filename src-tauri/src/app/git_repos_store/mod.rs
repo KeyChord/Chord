@@ -2,6 +2,7 @@ use crate::app::SafeAppHandle;
 use crate::git::{GitHubRepoRef, clone_repo};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::Result;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Wry;
@@ -39,9 +40,10 @@ impl GitReposStore {
 
     fn add(&self, repo: GitRepo) -> Result<()> {
         // Filesystem first
-        let id = format!("{}/{}", repo.owner, repo.slug);
+        let id = repo.slug.clone();
         let value = serde_json::to_value(repo.clone())?;
         self.store.set(id.clone(), value);
+        self.save()?;
 
         let state = self.observable.get_state()?;
         let mut repos = state.repos.clone();
@@ -51,11 +53,21 @@ impl GitReposStore {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn remove(&self, owner: &str, slug: &str) -> Result<()> {
+    fn save(&self) -> Result<()> {
+        self.store.save()?;
+        Ok(())
+    }
+
+    pub fn remove_repo(&self, repo_ref: &GitHubRepoRef) -> Result<()> {
         // Filesystem first
-        let id = format!("{}/{}", owner, slug);
+        let id = repo_ref.slug();
         self.store.delete(id.clone());
+        self.save()?;
+
+        let repo_path = repo_ref.local_path(&self.github_repos_dir()?);
+        if repo_path.exists() {
+            fs::remove_dir_all(&repo_path)?;
+        }
 
         let state = self.handle.observable_state::<GitReposObservable>()?;
         let mut repos = state.repos.clone();
@@ -94,7 +106,10 @@ impl GitReposStore {
         crate::git::refresh_repo(&repo_ref, &repo_path)?;
 
         let repo = repo_ref.into_repo(&repos_root);
-        let key = format!("{}/{}", repo.owner, repo.slug);
+        let key = repo.slug.clone();
+        let value = serde_json::to_value(repo.clone())?;
+        self.store.set(key.clone(), value);
+        self.save()?;
 
         let state = self.observable.get_state()?;
         let mut repos = state.repos.clone();

@@ -14,7 +14,6 @@ import { Input } from '#/components/ui/input.tsx';
 import { useChordFilesState, useDesktopAppManagerState } from '#/utils/state.ts';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { toast } from 'sonner';
 
 const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
@@ -124,16 +123,10 @@ function PlaceholderChordRow({
 				placeholder.sequenceTemplate,
 				sequence,
 			),
-		onError: (error) => {
-			toast.error(error.message);
-		},
 	});
 	const removePlaceholderChordBindingMutation = useMutation({
 		mutationFn: () =>
 			taurpc.removePlaceholderChordBinding(placeholder.filePath, placeholder.sequenceTemplate),
-		onError: (error) => {
-			toast.error(error.message);
-		},
 	});
 	const isPending
 		= setPlaceholderChordBindingMutation.isPending || removePlaceholderChordBindingMutation.isPending;

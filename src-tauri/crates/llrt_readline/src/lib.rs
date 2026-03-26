@@ -41,7 +41,8 @@ impl<'js> InputIterator<'js> {
             .as_object()
             .ok_or_else(|| Exception::throw_type(ctx, "readline input must be an object"))?;
 
-        if let Some(method) = get_function_property(&input_obj, Symbol::async_iterator(ctx.clone()))?
+        if let Some(method) =
+            get_function_property(&input_obj, Symbol::async_iterator(ctx.clone()))?
         {
             return Self::from_method(&input, method);
         }
@@ -58,15 +59,13 @@ impl<'js> InputIterator<'js> {
 
     fn from_method(input: &Value<'js>, method: Function<'js>) -> Result<Self> {
         let iterator: Value<'js> = method.call((This(input.clone()),))?;
-        let iterator = iterator
-            .into_object()
-            .ok_or_else(|| {
-                Error::new_from_js_message(
-                    "iterator result",
-                    "object",
-                    "iterator method must return an object",
-                )
-            })?;
+        let iterator = iterator.into_object().ok_or_else(|| {
+            Error::new_from_js_message(
+                "iterator result",
+                "object",
+                "iterator method must return an object",
+            )
+        })?;
         let next_method = iterator.get(PredefinedAtom::Next)?;
 
         Ok(Self {
@@ -444,7 +443,11 @@ impl<'js> Readline<'js> {
         })
     }
 
-    fn clear_line(this: This<Class<'js, Self>>, ctx: Ctx<'js>, dir: i32) -> Result<Class<'js, Self>> {
+    fn clear_line(
+        this: This<Class<'js, Self>>,
+        ctx: Ctx<'js>,
+        dir: i32,
+    ) -> Result<Class<'js, Self>> {
         queue_or_commit(this.0, ctx, clear_line_sequence(dir))
     }
 
@@ -513,7 +516,10 @@ fn parse_interface_args<'js>(
         if options.contains_key("input")? {
             let input = options.get("input")?;
             let output = options.get_optional("output")?.or(output);
-            let terminal = options.get_optional("terminal")?.or(terminal).unwrap_or(false);
+            let terminal = options
+                .get_optional("terminal")?
+                .or(terminal)
+                .unwrap_or(false);
             let prompt = options.get_optional("prompt")?.unwrap_or_default();
             let history = options.get_optional("history")?.unwrap_or_default();
             return Ok((input, output, terminal, prompt, history));
@@ -551,7 +557,7 @@ fn parse_callback_args<'js>(
                 .ok_or_else(|| Exception::throw_type(ctx, "options must be an object"))?;
             let signal = options.get_optional("signal")?;
             Ok((signal, cb))
-        },
+        }
         None => Ok((None, cb)),
     }
 }
@@ -767,18 +773,18 @@ fn question_promise_impl<'js, T: ReadlineClass<'js> + 'js>(
         match next_line::<T>(ctx2.clone(), interface.clone()).await {
             Ok(Some(answer)) => {
                 let _: () = resolve.call((answer,))?;
-            },
+            }
             Ok(None) => {
                 let _: () = resolve.call((String::new(),))?;
-            },
+            }
             Err(Error::Exception) => {
                 let reason = ctx2.catch();
                 let _: () = reject.call((reason,))?;
-            },
+            }
             Err(err) => {
                 let value = Exception::throw_message(&ctx2, &err.to_string()).into_value(&ctx2)?;
                 let _: () = reject.call((value,))?;
-            },
+            }
         }
 
         Ok(())
@@ -787,7 +793,10 @@ fn question_promise_impl<'js, T: ReadlineClass<'js> + 'js>(
     Ok(promise)
 }
 
-async fn next_line<'js, T: ReadlineClass<'js>>(ctx: Ctx<'js>, interface: Class<'js, T>) -> Result<Option<String>> {
+async fn next_line<'js, T: ReadlineClass<'js>>(
+    ctx: Ctx<'js>,
+    interface: Class<'js, T>,
+) -> Result<Option<String>> {
     loop {
         if interface.borrow().state().closed {
             return Ok(None);
@@ -855,7 +864,13 @@ fn finish_line<'js, T: ReadlineClass<'js>>(
         state.history.push(line.clone());
     }
 
-    T::emit_str(This(interface), ctx, "line", vec![line.into_js(ctx)?], false)?;
+    T::emit_str(
+        This(interface),
+        ctx,
+        "line",
+        vec![line.into_js(ctx)?],
+        false,
+    )?;
     Ok(())
 }
 
@@ -915,12 +930,7 @@ fn cursor_to<'js>(
     write_sequence(&stream, cursor_to_sequence(x, y), cb)
 }
 
-fn move_cursor<'js>(
-    stream: Object<'js>,
-    dx: i32,
-    dy: i32,
-    cb: Opt<Function<'js>>,
-) -> Result<bool> {
+fn move_cursor<'js>(stream: Object<'js>, dx: i32, dy: i32, cb: Opt<Function<'js>>) -> Result<bool> {
     write_sequence(&stream, move_cursor_sequence(dx, dy), cb.0)
 }
 
@@ -1009,7 +1019,9 @@ impl ModuleDef for ReadlinePromisesModule {
     fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> Result<()> {
         init(ctx)?;
 
-        export_default(ctx, exports, |default| export_promises_namespace(ctx, default))
+        export_default(ctx, exports, |default| {
+            export_promises_namespace(ctx, default)
+        })
     }
 }
 

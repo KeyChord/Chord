@@ -14,7 +14,7 @@ export type LocalChordPackage = { path: string }
 
 export type StartupStatusInfo = { launchedViaAutostart: boolean; onboardingCompleted: boolean; shouldShowOnboarding: boolean }
 
-const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getCurrentStates":[],"getStartupStatus":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"relaunchApp":["bundle_id"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}' }
+const ARGS_MAP = { '':'{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getCurrentStates":[],"getStartupStatus":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}' }
 export type Router = { "": {addGitRepo: (repo: string) => Promise<GitRepo>, 
 addLocalChordFolder: (path: string) => Promise<LocalChordPackage>, 
 completeOnboarding: () => Promise<null>, 
@@ -27,6 +27,7 @@ openInputMonitoringSettings: () => Promise<void>,
 pickLocalChordFolder: () => Promise<string | null>, 
 quitApp: () => Promise<null>, 
 relaunchApp: (bundleId: string) => Promise<null>, 
+removeGitRepo: (repo: string) => Promise<null>, 
 removeGlobalShortcutMapping: (shortcut: string) => Promise<null>, 
 removePlaceholderChordBinding: (filePath: string, sequenceTemplate: string) => Promise<null>, 
 setPlaceholderChordBinding: (filePath: string, sequenceTemplate: string, sequence: string) => Promise<null>, 

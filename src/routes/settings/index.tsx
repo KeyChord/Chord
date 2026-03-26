@@ -1,9 +1,9 @@
 import { taurpc } from '#/api/taurpc.ts';
 import { ChordsTab } from '#/components/settings/chords-tab.tsx';
+import { ConfigureTab } from '#/components/settings/configure-tab.tsx';
 import { FirstRunOnboarding } from '#/components/settings/first-run-onboarding.tsx';
 import { GlobalShortcutsTab } from '#/components/settings/global-shortcuts-tab.tsx';
 import { SettingsTab } from '#/components/settings/settings-tab.tsx';
-import { Toaster } from '#/components/ui/sonner.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs.tsx';
 import { TanStackDevtools } from '@tanstack/react-devtools';
 import { useQuery } from '@tanstack/react-query';
@@ -51,7 +51,7 @@ function Settings() {
 										<div>
 											<h1 className="text-[20px] font-semibold">Settings</h1>
 											<p className="mt-1 text-muted-foreground">
-												Configure permissions, manage chord sources, and review the app's shortcuts.
+												Configure permissions, manage chord sources, assign placeholder chords, and review the app's shortcuts.
 											</p>
 										</div>
 									</div>
@@ -71,6 +71,12 @@ function Settings() {
 												Chords
 											</TabsTrigger>
 											<TabsTrigger
+												value="configure"
+												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
+											>
+												Configure
+											</TabsTrigger>
+											<TabsTrigger
 												value="shortcuts"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
@@ -86,6 +92,10 @@ function Settings() {
 											<ChordsTab />
 										</TabsContent>
 
+										<TabsContent value="configure">
+											<ConfigureTab />
+										</TabsContent>
+
 										<TabsContent value="shortcuts">
 											<GlobalShortcutsTab />
 										</TabsContent>
@@ -93,7 +103,6 @@ function Settings() {
 								</div>
 							</div>
 						)}
-			<Toaster position="top-right" />
 			{import.meta.env.DEV
 				? (
 						<TanStackDevtools

@@ -3,8 +3,8 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse_macro_input, parse_quote, Attribute, FnArg, ItemTrait, LitStr, Pat, TraitItem,
-    TraitItemFn,
+    Attribute, FnArg, ItemTrait, LitStr, Pat, TraitItem, TraitItemFn, parse_macro_input,
+    parse_quote,
 };
 
 fn has_taurpc_attr(attrs: &[Attribute]) -> bool {
@@ -84,9 +84,7 @@ pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
             return Ok(());
         }
 
-        Err(meta.error(
-            "unsupported argument; expected `export_to = \"...\"` or `mod = \"...\"`",
-        ))
+        Err(meta.error("unsupported argument; expected `export_to = \"...\"` or `mod = \"...\"`"))
     });
 
     parse_macro_input!(attr with parser);

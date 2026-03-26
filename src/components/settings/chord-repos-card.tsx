@@ -1,4 +1,5 @@
 import { Badge } from '#/components/ui/badge.tsx';
+import { Button } from '#/components/ui/button.tsx';
 import {
 	Card,
 	CardContent,
@@ -6,6 +7,15 @@ import {
 	CardHeader,
 	CardTitle,
 } from '#/components/ui/card.tsx';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu.tsx';
+import { useMutation } from '@tanstack/react-query';
+import { Ellipsis, Trash2 } from 'lucide-react';
+import { taurpc } from '../../api/taurpc.ts';
 import { useGitRepoStoreState } from '../../utils/state.ts';
 import { AddRepoButton } from './add-repo-button.tsx';
 import { OpenRepoButton } from './open-repo-button.tsx';
@@ -63,8 +73,44 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 				<div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
 					<OpenRepoButton repo={repo} />
 					<SyncRepoButton repo={repo} />
+					<RepoActionsMenuButton repo={repo} />
 				</div>
 			</div>
 		</div>
+	);
+}
+
+function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
+	const removeGitRepoMutation = useMutation({
+		mutationFn: taurpc.removeGitRepo,
+	});
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					aria-label={`More actions for ${repo.slug}`}
+					title="More actions"
+					disabled={removeGitRepoMutation.isPending}
+				>
+					<Ellipsis />
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-40">
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={removeGitRepoMutation.isPending}
+					onSelect={() => {
+						removeGitRepoMutation.mutate(repo.slug);
+					}}
+				>
+					<Trash2 />
+					{removeGitRepoMutation.isPending ? 'Removing...' : 'Remove Repo'}
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

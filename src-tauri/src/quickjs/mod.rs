@@ -5,10 +5,12 @@ use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
 #[allow(unused_imports)]
 use rquickjs::{
-    AsyncContext, AsyncRuntime, Ctx, Error, Function, JsLifetime, Module, Object, Value,
+    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, Function, JsLifetime, Module, Object,
+    Value,
     loader::{Loader, Resolver},
     module::Declared,
 };
+use std::path::Path;
 use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::{
     AppHandle,
@@ -98,12 +100,36 @@ fn get_module<'js>(ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module
     Some(module).transpose()
 }
 
+fn attempted_module_path(name: &str) -> String {
+    let path = Path::new(name);
+    if path.is_absolute() {
+        return path.display().to_string();
+    }
+
+    std::env::current_dir()
+        .map(|cwd| cwd.join(path).display().to_string())
+        .unwrap_or_else(|_| path.display().to_string())
+}
+
+fn with_module_load_context(name: &str, error: Error) -> Error {
+    match error {
+        Error::Io(io_error) => Error::new_loading_message(
+            name,
+            format!("tried to read {}: {}", attempted_module_path(name), io_error),
+        ),
+        other => other,
+    }
+}
+
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
         let module = get_module(ctx, name)?;
         Ok(match module {
             Some(module) => module,
-            None => self.llrt_loader.load(ctx, name)?,
+            None => self
+                .llrt_loader
+                .load(ctx, name)
+                .map_err(|error| with_module_load_context(name, error))?,
         })
     }
 }
@@ -211,4 +237,31 @@ where
     rx.recv()
         .await
         .ok_or_else(|| anyhow::anyhow!("main thread task dropped"))?
+}
+
+pub fn format_js_error<'js>(ctx: &Ctx<'js>, error: Error) -> String {
+    match CaughtError::from_error(ctx, error) {
+        CaughtError::Error(error) => error.to_string(),
+        CaughtError::Exception(exception) => format_js_exception(&exception),
+        CaughtError::Value(value) => format!("JavaScript threw a non-Error value: {:?}", value),
+    }
+}
+
+fn format_js_exception<'js>(exception: &rquickjs::Exception<'js>) -> String {
+    let message = exception
+        .message()
+        .map(|message| message.trim().to_string())
+        .filter(|message| !message.is_empty());
+    let stack = exception
+        .stack()
+        .map(|stack| stack.trim().to_string())
+        .filter(|stack| !stack.is_empty());
+
+    match (message, stack) {
+        (Some(message), Some(stack)) if stack.contains(&message) => stack,
+        (Some(message), Some(stack)) => format!("{message}\n{stack}"),
+        (Some(message), None) => message,
+        (None, Some(stack)) => stack,
+        (None, None) => "JavaScript exception with no message or stack".to_string(),
+    }
 }

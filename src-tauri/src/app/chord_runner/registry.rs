@@ -6,7 +6,7 @@ use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, Placeholde
 use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
-use crate::quickjs::{reset_js, with_js};
+use crate::quickjs::{format_js_error, reset_js, with_js};
 use llrt_core::libs::utils::result::ResultExt;
 use llrt_core::{Module, Promise};
 use std::collections::{HashMap, HashSet};
@@ -164,11 +164,19 @@ impl ChordRunnerRegistry {
                         match load_module(&filepath, js) {
                             Ok(promise) => {
                                 if let Err(e) = promise.into_future::<()>().await {
-                                    log::error!("failed to await module {}: {:?}", filepath, e);
+                                    log::error!(
+                                        "Failed to await module {}: {}",
+                                        filepath,
+                                        format_js_error(&ctx, e)
+                                    );
                                 }
                             }
                             Err(e) => {
-                                log::error!("Failed to load module {}: {:?}", filepath, e);
+                                log::error!(
+                                    "Failed to declare/evaluate module {}: {}",
+                                    filepath,
+                                    format_js_error(&ctx, e)
+                                );
                             }
                         };
                     }
@@ -361,7 +369,11 @@ impl ChordRunnerRegistry {
                         };
 
                         if let Err(e) = load_module().await {
-                            log::error!("Failed to load module {}: {}", path, e);
+                            log::error!(
+                                "Failed to load module {}: {}",
+                                path,
+                                format_js_error(&ctx, e)
+                            );
                         }
 
                         Ok(())
