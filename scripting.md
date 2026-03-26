@@ -38,10 +38,20 @@ Make sure your `tsconfig.json` has the `types` property set to `llrt-types`:
 The built-in `chord` module also exposes:
 
 ```ts
+export class Applescript {
+	constructor(source: string);
+	constructor(fn: (...args: unknown[]) => unknown, ...args: unknown[]);
+	compile(): void;
+	execute(): unknown;
+}
+
 export function setAppNeedsRelaunch(bundleId: string, needsRelaunch: boolean): void;
 ```
 
 This marks or clears an app in the settings UI and gives the user a one-click relaunch button.
+
+`Applescript` uses the macOS `OSAKit` framework via the Rust `osakit` crate. Call `compile()` before `execute()`.
+When constructed with a string it runs AppleScript source directly. When constructed with a function, Chord serializes the trailing args, uses `fn.toString()`, wraps it as JXA, and executes it as `JavaScript` in OSAKit.
 
 ## URL Scheme
 
