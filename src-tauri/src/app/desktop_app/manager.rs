@@ -142,10 +142,12 @@ pub struct ObservedApp {
 }
 
 pub fn init_app_lifecycle(handle: AppHandle) {
-    let _ = APP_HANDLE.set(handle);
+    let _ = APP_HANDLE.set(handle.clone());
 
     #[cfg(target_os = "macos")]
-    init_macos_observers();
+    if let Err(error) = handle.run_on_main_thread(init_macos_observers) {
+        log::error!("Failed to initialize app lifecycle observers: {error}");
+    }
 }
 
 pub fn register_app_launch_handler<'js>(

@@ -13,11 +13,12 @@ use rquickjs::{
     module::Declared,
 };
 use std::path::{Path, PathBuf};
+use std::sync::{OnceLock, mpsc};
+use std::thread;
 use std::{cell::RefCell, future::Future, pin::Pin};
-use tauri::{
-    AppHandle,
-    async_runtime::{block_on, channel},
-};
+use tauri::AppHandle;
+use tokio::runtime::Runtime;
+use tokio::sync::oneshot;
 
 mod chord_module;
 
@@ -30,6 +31,55 @@ struct JsEngine {
 thread_local! {
     static JS_ENGINE: RefCell<Option<JsEngine>> = RefCell::new(None);
     // static JS_WORKER: RefCell<Option<MainWorker>> = RefCell::new(None);
+}
+
+type JsTask = Box<dyn FnOnce(&Runtime) + Send + 'static>;
+
+struct JsWorker {
+    tx: mpsc::Sender<JsTask>,
+}
+
+impl JsWorker {
+    fn global() -> &'static Self {
+        static WORKER: OnceLock<JsWorker> = OnceLock::new();
+
+        WORKER.get_or_init(|| {
+            let (tx, rx) = mpsc::channel::<JsTask>();
+
+            thread::Builder::new()
+                .name("quickjs-worker".into())
+                .spawn(move || {
+                    let runtime = tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .expect("failed to build quickjs worker runtime");
+
+                    while let Ok(task) = rx.recv() {
+                        task(&runtime);
+                    }
+                })
+                .expect("failed to spawn quickjs worker thread");
+
+            Self { tx }
+        })
+    }
+
+    async fn run<R, F>(&self, task: F) -> anyhow::Result<R>
+    where
+        R: Send + 'static,
+        F: FnOnce(&Runtime) -> anyhow::Result<R> + Send + 'static,
+    {
+        let (tx, rx) = oneshot::channel();
+
+        self.tx
+            .send(Box::new(move |runtime| {
+                let _ = tx.send(task(runtime));
+            }))
+            .map_err(|_| anyhow::anyhow!("quickjs worker is unavailable"))?;
+
+        rx.await
+            .map_err(|_| anyhow::anyhow!("quickjs worker task dropped"))?
+    }
 }
 
 pub struct AppUserData {
@@ -197,26 +247,19 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
 }
 
 pub async fn reset_js(handle: AppHandle) -> anyhow::Result<()> {
-    let (tx, mut rx) = channel(1);
-    let rebuild_handle = handle.clone();
+    JsWorker::global()
+        .run(move |runtime| {
+            runtime.block_on(async move {
+                clear_callbacks();
+                let engine = build_engine(Some(handle)).await?;
+                JS_ENGINE.with(|cell| {
+                    *cell.borrow_mut() = Some(engine);
+                });
 
-    handle.run_on_main_thread(move || {
-        let result = block_on(async move {
-            clear_callbacks();
-            let engine = build_engine(Some(rebuild_handle)).await?;
-            JS_ENGINE.with(|cell| {
-                *cell.borrow_mut() = Some(engine);
-            });
-
-            Ok::<(), anyhow::Error>(())
-        });
-
-        let _ = tx.try_send(result);
-    })?;
-
-    rx.recv()
-        .await
-        .ok_or_else(|| anyhow::anyhow!("main thread task dropped"))??;
+                Ok::<(), anyhow::Error>(())
+            })
+        })
+        .await?;
 
     Ok(())
 }
@@ -233,27 +276,21 @@ where
     F: Send + 'static + for<'js> FnOnce(Ctx<'js>) -> LocalBoxFuture<'js, anyhow::Result<R>>,
     R: Send + 'static,
 {
-    let (tx, mut rx) = channel(1);
+    JsWorker::global()
+        .run(move |runtime| {
+            runtime.block_on(async move {
+                let async_ctx: AsyncContext = ensure_engine(handle).await?;
 
-    handle.clone().run_on_main_thread(move || {
-        let result = block_on(async move {
-            let async_ctx: AsyncContext = ensure_engine(handle).await?;
-
-            async_ctx
-                .async_with(|ctx| {
-                    let fut = f(ctx.clone());
-                    let fut = Box::pin(async move { fut.await });
-                    unsafe { uplift(fut) }
-                })
-                .await
-        });
-
-        let _ = tx.try_send(result);
-    })?;
-
-    rx.recv()
+                async_ctx
+                    .async_with(|ctx| {
+                        let fut = f(ctx.clone());
+                        let fut = Box::pin(async move { fut.await });
+                        unsafe { uplift(fut) }
+                    })
+                    .await
+            })
+        })
         .await
-        .ok_or_else(|| anyhow::anyhow!("main thread task dropped"))?
 }
 
 async fn import_module<'js>(ctx: Ctx<'js>, module_path: String) -> rquickjs::Result<()> {
