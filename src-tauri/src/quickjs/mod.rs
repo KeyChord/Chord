@@ -1,5 +1,7 @@
 use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
+use llrt_core::function::Args;
+use llrt_core::libs::utils::result::ResultExt;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
@@ -260,6 +262,44 @@ async fn import_module<'js>(ctx: Ctx<'js>, module_path: String) -> rquickjs::Res
     Ok(())
 }
 
+async fn call_module_export<'js>(
+    ctx: Ctx<'js>,
+    module_path: String,
+    export_name: String,
+    args: Vec<serde_json::Value>,
+) -> rquickjs::Result<()> {
+    let module_promise = Module::import(&ctx, module_path)?;
+    let module = module_promise.into_future::<Object>().await?;
+
+    let mut export: Value<'js> = module.get(export_name.clone())?;
+    if let Some(promise) = export.as_promise().cloned() {
+        export = promise.into_future::<Value<'js>>().await?;
+    }
+
+    let function = export.as_function().cloned().or_throw_msg(
+        &ctx,
+        &format!(
+            "JS export `{}` did not resolve to a function: {:?}",
+            export_name, export
+        ),
+    )?;
+
+    let mut args_builder = Args::new(ctx.clone(), args.len());
+    for arg in args {
+        let value = rquickjs_serde::to_value(ctx.clone(), arg)
+            .or_throw_msg(&ctx, "Failed to convert CLI arguments")?;
+        args_builder.push_arg(value)?;
+    }
+
+    let mut result: Value<'js> = function.call_arg(args_builder)?;
+    if let Some(promise) = result.as_promise().cloned() {
+        result = promise.into_future::<Value<'js>>().await?;
+    }
+
+    let _ = result;
+    Ok(())
+}
+
 fn canonicalize_module_path(path: &Path) -> anyhow::Result<PathBuf> {
     let path = std::fs::canonicalize(path)?;
     if !path.is_file() {
@@ -279,6 +319,35 @@ pub async fn run_standalone_module(path: &Path) -> anyhow::Result<()> {
             let module_path = module_path.clone();
             let fut = Box::pin(async move {
                 import_module(ctx.clone(), module_path)
+                    .await
+                    .map_err(|error| anyhow::anyhow!(format_js_error(&ctx, error)))
+            });
+            unsafe { uplift(fut) }
+        })
+        .await
+}
+
+fn parse_cli_arg(arg: String) -> serde_json::Value {
+    serde_json::from_str(&arg).unwrap_or(serde_json::Value::String(arg))
+}
+
+pub async fn run_standalone_export(
+    path: &Path,
+    export_name: String,
+    args: Vec<String>,
+) -> anyhow::Result<()> {
+    let module_path = canonicalize_module_path(path)?.display().to_string();
+    let args: Vec<serde_json::Value> = args.into_iter().map(parse_cli_arg).collect();
+    let engine = build_engine(None).await?;
+
+    engine
+        .ctx
+        .async_with(|ctx| {
+            let module_path = module_path.clone();
+            let export_name = export_name.clone();
+            let args = args.clone();
+            let fut = Box::pin(async move {
+                call_module_export(ctx.clone(), module_path, export_name, args)
                     .await
                     .map_err(|error| anyhow::anyhow!(format_js_error(&ctx, error)))
             });

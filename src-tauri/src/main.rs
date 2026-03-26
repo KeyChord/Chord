@@ -17,6 +17,15 @@ enum Commands {
         #[arg(value_name = "FILE", value_hint = ValueHint::FilePath)]
         file: PathBuf,
     },
+    #[command(trailing_var_arg = true)]
+    RunExport {
+        #[arg(value_name = "FILE", value_hint = ValueHint::FilePath)]
+        file: PathBuf,
+        #[arg(value_name = "EXPORT")]
+        export: String,
+        #[arg(value_name = "ARG", allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 fn main() {
@@ -26,6 +35,12 @@ fn main() {
     match cli.command {
         Some(Commands::Run { file }) => {
             if let Err(error) = run_cli(file) {
+                eprintln!("{error:#}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::RunExport { file, export, args }) => {
+            if let Err(error) = run_export_cli(file, export, args) {
                 eprintln!("{error:#}");
                 std::process::exit(1);
             }
@@ -43,6 +58,19 @@ fn run_cli(file: PathBuf) -> anyhow::Result<()> {
 
         rt.block_on(chords_lib::run_script(file))
     })
-        .join()
-        .unwrap()
+    .join()
+    .unwrap()
+}
+
+fn run_export_cli(file: PathBuf, export: String, args: Vec<String>) -> anyhow::Result<()> {
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        rt.block_on(chords_lib::run_script_export(file, export, args))
+    })
+    .join()
+    .unwrap()
 }

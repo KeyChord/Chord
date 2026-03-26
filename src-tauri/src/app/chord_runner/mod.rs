@@ -20,7 +20,7 @@ pub struct ChordRunner {
     shell: ChordShellRunner,
     javascript: ChordJavascriptRunner,
 
-    handle: SafeAppHandle
+    handle: SafeAppHandle,
 }
 
 impl ChordRunner {

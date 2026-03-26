@@ -163,3 +163,11 @@ pub fn run_app() {
 pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
     quickjs::run_standalone_module(path.as_ref()).await
 }
+
+pub async fn run_script_export(
+    path: impl AsRef<std::path::Path>,
+    export_name: impl Into<String>,
+    args: Vec<String>,
+) -> anyhow::Result<()> {
+    quickjs::run_standalone_export(path.as_ref(), export_name.into(), args).await
+}
