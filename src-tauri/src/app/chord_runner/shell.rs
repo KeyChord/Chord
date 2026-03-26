@@ -1,6 +1,7 @@
 use crate::app::SafeAppHandle;
 use tokio::process::Command;
 
+#[derive(Clone)]
 pub struct ChordShellRunner {
     _handle: SafeAppHandle,
 }
@@ -10,10 +11,8 @@ impl ChordShellRunner {
         Self { _handle: handle }
     }
 
-    pub fn run_shell_command(&self, shell: String) {
-        tauri::async_runtime::spawn(async move {
-            run_shell_command(shell).await;
-        });
+    pub async fn run_shell_command(&self, shell: String) {
+        run_shell_command(shell).await;
     }
 }
 

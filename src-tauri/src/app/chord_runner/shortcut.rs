@@ -6,6 +6,7 @@ use serde::Serialize;
 use std::str::FromStr;
 use typeshare::typeshare;
 
+#[derive(Clone)]
 pub struct ChordShortcutRunner {
     handle: SafeAppHandle,
 }
