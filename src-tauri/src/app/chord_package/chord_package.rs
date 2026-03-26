@@ -18,28 +18,55 @@ static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../
 
 impl ChordPackage {
     pub fn load_bundled() -> Result<Self> {
+        let mut js_files = StringRadixMap::new();
         let mut chords_files = StringRadixMap::new();
-        let mut chord_file_paths = BUNDLED_MACOS_CHORDS_DIR
-            .find("**/*.toml")?
-            .into_iter()
-            .filter(|file| is_supported_macos_chord_filename(file.path()))
-            .collect::<Vec<_>>();
-        chord_file_paths.sort_by(|left, right| left.path().cmp(right.path()));
+        let mut chord_file_paths = Vec::new();
 
-        for file in chord_file_paths {
-            let path = format!("chords/{}", file.path().to_string_lossy());
-            let content = file
-                .as_file()
-                .and_then(|f| f.contents_utf8())
-                .ok_or_else(|| anyhow::anyhow!("Could not read file as utf8: {:?}", file.path()))?;
-            let app_chords_file = AppChordsFile::parse(content)?;
-            chords_files.insert(path, app_chords_file);
+        for entry in BUNDLED_MACOS_CHORDS_DIR.find("**/*")? {
+            let Some(file) = entry.as_file() else {
+                continue;
+            };
+
+            let relative_path = entry.path().to_path_buf();
+
+            if relative_path.starts_with("chords")
+                && is_supported_macos_chord_filename(&relative_path)
+            {
+                chord_file_paths.push(relative_path.clone());
+            }
+
+            if relative_path.extension().and_then(|value| value.to_str()) == Some("js") {
+                let content = file.contents_utf8().ok_or_else(|| {
+                    anyhow::anyhow!("Could not read file as utf8: {:?}", entry.path())
+                })?;
+
+                js_files.insert(relative_path.to_string_lossy().to_string(), content.to_string());
+            }
+        }
+
+        chord_file_paths.sort();
+        for relative_path in chord_file_paths {
+            let file = BUNDLED_MACOS_CHORDS_DIR.get_file(&relative_path).ok_or_else(|| {
+                anyhow::anyhow!("Could not find bundled file: {:?}", relative_path)
+            })?;
+            let content = file.contents_utf8().ok_or_else(|| {
+                anyhow::anyhow!("Could not read file as utf8: {:?}", relative_path)
+            })?;
+
+            match AppChordsFile::parse(content) {
+                Ok(parsed) => {
+                    chords_files.insert(relative_path.to_string_lossy().to_string(), parsed);
+                }
+                Err(error) => {
+                    log::warn!("Skipping invalid {:?}: {}", relative_path, error);
+                }
+            }
         }
 
         Ok(Self {
             root_dir: None,
             chords_files,
-            js_files: StringRadixMap::new(),
+            js_files,
         })
     }
 
