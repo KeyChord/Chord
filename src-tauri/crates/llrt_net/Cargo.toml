@@ -23,5 +23,5 @@ tokio = { version = "1", features = [ "net" ], default-features = false }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-llrt_test = { path = "https://github.com/awslabs/llrt", package = "llrt_test" }
+llrt_test = { git = "https://github.com/awslabs/llrt", package = "llrt_test" }
 rand = { version = "0.10.0", features = [ "alloc" ], default-features = false }

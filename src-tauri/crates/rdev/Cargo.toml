@@ -88,19 +88,3 @@ tokio = { version = "1.5", features = [
 	"rt-multi-thread"
 ] }
 
-[[example]]
-name = "serialize"
-required-features = [ "serialize" ]
-
-[[example]]
-name = "grab"
-required-features = [ "unstable_grab" ]
-
-[[example]]
-name = "tokio_channel"
-required-features = []
-
-[[test]]
-name = "grab"
-path = "tests/grab.rs"
-required-features = [ "unstable_grab" ]
