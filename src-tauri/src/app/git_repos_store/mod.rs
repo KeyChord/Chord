@@ -2,6 +2,7 @@ use crate::app::SafeAppHandle;
 use crate::git::{GitHubRepoRef, clone_repo};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,16 +20,7 @@ pub struct GitReposStore {
 impl GitReposStore {
     pub fn new(handle: SafeAppHandle, observable: Arc<GitReposObservable>) -> Result<Self> {
         let store = handle.store("repos.json")?;
-        // We only read from tauri::Store once at the start
-        let repos = store
-            .entries()
-            .into_iter()
-            .filter_map(|(k, v)| {
-                serde_json::from_value::<GitRepo>(v.clone())
-                    .ok()
-                    .map(|entry| (k.to_string(), entry))
-            })
-            .collect();
+        let repos = load_repos(store.as_ref())?;
         log::debug!("repos: {:?}", repos);
         observable.set_state(GitReposState { repos })?;
         Ok(Self {
@@ -129,4 +121,48 @@ impl GitReposStore {
 
         Ok(())
     }
+}
+
+fn load_repos(store: &Store<Wry>) -> Result<HashMap<String, GitRepo>> {
+    let entries = store.entries();
+    let mut repos = HashMap::new();
+    let mut should_rewrite = false;
+
+    for (key, value) in entries {
+        match serde_json::from_value::<GitRepo>(value) {
+            Ok(repo) => {
+                if key != repo.slug {
+                    log::warn!(
+                        "Normalizing git repo store key from {} to {}",
+                        key,
+                        repo.slug
+                    );
+                    should_rewrite = true;
+                }
+
+                repos.insert(repo.slug.clone(), repo);
+            }
+            Err(error) => {
+                log::warn!("Skipping invalid git repo store entry {key}: {error}");
+                should_rewrite = true;
+            }
+        }
+    }
+
+    if should_rewrite {
+        rewrite_repos(store, &repos)?;
+    }
+
+    Ok(repos)
+}
+
+fn rewrite_repos(store: &Store<Wry>, repos: &HashMap<String, GitRepo>) -> Result<()> {
+    store.clear();
+    for (slug, repo) in repos {
+        let value = serde_json::to_value(repo)
+            .with_context(|| format!("Failed to serialize repo {slug}"))?;
+        store.set(slug.clone(), value);
+    }
+    store.save()?;
+    Ok(())
 }
