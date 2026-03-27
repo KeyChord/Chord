@@ -114,19 +114,18 @@ fn convert_js_args<'js>(ctx: &Ctx<'js>, args: ChordJsArgs) -> rquickjs::Result<V
 
         ChordJsArgs::Eval(source) => {
             let value: Value<'js> = ctx.eval(source.as_str())?;
-            let array = value.as_array().cloned().or_throw_msg(
-                ctx,
-                &format!("JS args `{}` must evaluate to an array", source),
-            )?;
+            if let Some(array) = value.as_array().cloned() {
+                return (0..array.len())
+                    .map(|index| {
+                        array.get(index).or_throw_msg(
+                            ctx,
+                            &format!("Failed to read JS args `{}` at index {}", source, index),
+                        )
+                    })
+                    .collect::<rquickjs::Result<Vec<_>>>();
+            }
 
-            (0..array.len())
-                .map(|index| {
-                    array.get(index).or_throw_msg(
-                        ctx,
-                        &format!("Failed to read JS args `{}` at index {}", source, index),
-                    )
-                })
-                .collect::<rquickjs::Result<Vec<_>>>()
+            Ok(vec![value])
         }
     }
 }

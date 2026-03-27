@@ -465,6 +465,65 @@ impl Key {
         Some(char)
     }
 
+    pub fn to_sequence_char(&self) -> Option<char> {
+        let char = match self.0 {
+            KeyA => 'a',
+            KeyB => 'b',
+            KeyC => 'c',
+            KeyD => 'd',
+            KeyE => 'e',
+            KeyF => 'f',
+            KeyG => 'g',
+            KeyH => 'h',
+            KeyI => 'i',
+            KeyJ => 'j',
+            KeyK => 'k',
+            KeyL => 'l',
+            KeyM => 'm',
+            KeyN => 'n',
+            KeyO => 'o',
+            KeyP => 'p',
+            KeyQ => 'q',
+            KeyR => 'r',
+            KeyS => 's',
+            KeyT => 't',
+            KeyU => 'u',
+            KeyV => 'v',
+            KeyW => 'w',
+            KeyX => 'x',
+            KeyY => 'y',
+            KeyZ => 'z',
+            Digit1 => '1',
+            Digit2 => '2',
+            Digit3 => '3',
+            Digit4 => '4',
+            Digit5 => '5',
+            Digit6 => '6',
+            Digit7 => '7',
+            Digit8 => '8',
+            Digit9 => '9',
+            Digit0 => '0',
+            Minus => '-',
+            Equal => '=',
+            BracketLeft => '[',
+            BracketRight => ']',
+            Backslash => '\\',
+            Semicolon => ';',
+            Quote => '\'',
+            Comma => ',',
+            Period => '.',
+            Slash => '/',
+            Backquote => '`',
+            _ => return None,
+        };
+
+        Some(char)
+    }
+
+    pub fn serialize_sequence(sequence: &[Key]) -> Option<String> {
+        sequence.iter().map(Key::to_sequence_char).collect()
+    }
+
     pub fn parse_sequence(sequence: &str) -> Result<Vec<Key>> {
         let mut keys = Vec::new();
         for key in sequence.chars().map(|c| Key::from_str(&c.to_string())) {

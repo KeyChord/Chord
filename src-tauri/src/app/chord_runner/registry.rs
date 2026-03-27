@@ -287,13 +287,21 @@ impl ChordRunnerRegistry {
         if is_global_chord_sequence(sequence) {
             let global_chords_to_runtime_key =
                 self.global_chords_to_runtime_key.lock().expect("poisoned");
-            let Some(runtime_key) = global_chords_to_runtime_key.get(sequence) else {
-                log::warn!("Invalid global chord sequence: {:?}", sequence);
-                return None;
-            };
+            if let Some(runtime_key) = global_chords_to_runtime_key.get(sequence) {
+                let runtime_index = self.runtime_index.lock().expect("poisoned");
+                return runtime_index.get(runtime_key).map(|r| r.clone());
+            }
 
-            let runtime_index = self.runtime_index.lock().expect("poisoned");
-            runtime_index.get(runtime_key).map(|r| r.clone())
+            let runtimes = self.runtimes.lock().expect("poisoned");
+            runtimes
+                .get(GLOBAL_CHORD_RUNTIME_ID)
+                .and_then(|global_runtimes| {
+                    global_runtimes
+                        .iter()
+                        .rev()
+                        .find(|runtime| runtime.get_chord(sequence).is_some())
+                        .cloned()
+                })
         } else {
             let runtimes = self.runtimes.lock().expect("poisoned");
             application_id.and_then(|app_id| {

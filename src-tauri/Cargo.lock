@@ -870,6 +870,7 @@ dependencies = [
  "parking_lot",
  "raw-window-handle",
  "rdev",
+ "regex",
  "rquickjs",
  "rquickjs-serde",
  "serde",
