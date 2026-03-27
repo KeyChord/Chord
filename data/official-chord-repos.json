@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Chromium Chords",
+    "url": "https://github.com/KeyChord/chords-chromium"
+  },
+  {
+    "name": "VSCode Chords",
+    "url": "https://github.com/KeyChord/chords-vscode"
+  },
+  {
+    "name": "JetBrains Chords",
+    "url": "https://github.com/KeyChord/chords-jetbrains"
+  }
+]

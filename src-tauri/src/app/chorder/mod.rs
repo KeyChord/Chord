@@ -153,7 +153,8 @@ impl AppChorder {
             return Ok(());
         }
 
-        if key == &Key(KeyMappingCode::Tab) {
+        let state = self.observable.get_state()?;
+        if Self::should_toggle_indicator_for_tab_event(key_event, state.is_shift_pressed) {
             if matches!(key_event, KeyEvent::Press(_)) {
                 self.toggle_indicator_visibility()?;
             }
@@ -280,7 +281,11 @@ impl AppChorder {
                 self.ensure_active()?;
                 let is_shift_pressed = context.is_shift_pressed();
                 if is_shift_pressed {
-                    self.handle_shifted_key_press(key)
+                    if Self::should_clear_key_buffer_on_shifted_press(key) {
+                        self.handle_shift_backspace_press()
+                    } else {
+                        self.handle_shifted_key_press(key)
+                    }
                 } else {
                     self.handle_unshifted_key_press(key)
                 }
@@ -336,6 +341,11 @@ impl AppChorder {
         !state.key_buffer.is_empty() && state.active_chord.is_none()
     }
 
+    fn should_toggle_indicator_for_tab_event(key_event: &KeyEvent, is_shift_pressed: bool) -> bool {
+        matches!(key_event, KeyEvent::Press(Key(KeyMappingCode::Tab)) | KeyEvent::Release(Key(KeyMappingCode::Tab)))
+            && is_shift_pressed
+    }
+
     fn next_key_buffer_for_unshifted_press(key_buffer: &[Key], key: &Key) -> Vec<Key> {
         let mut next_key_buffer = key_buffer.to_vec();
         if key == &Key(KeyMappingCode::Backspace) {
@@ -354,6 +364,17 @@ impl AppChorder {
         log::debug!("New key buffer: {:?}", next_key_buffer);
         self.observable
             .set_state(state.with_session(next_key_buffer, None, None))?;
+        Ok(())
+    }
+
+    fn should_clear_key_buffer_on_shifted_press(key: &Key) -> bool {
+        key == &Key(KeyMappingCode::Backspace)
+    }
+
+    fn handle_shift_backspace_press(&self) -> Result<()> {
+        let state = self.observable.get_state()?;
+        self.observable
+            .set_state(state.with_session(vec![], None, None))?;
         Ok(())
     }
 
@@ -515,5 +536,33 @@ mod tests {
         let next = AppChorder::next_key_buffer_for_unshifted_press(&[], &Key(Backspace));
 
         assert!(next.is_empty());
+    }
+
+    #[test]
+    fn shifted_backspace_clears_the_key_buffer() {
+        assert!(AppChorder::should_clear_key_buffer_on_shifted_press(&Key(
+            Backspace
+        )));
+        assert!(!AppChorder::should_clear_key_buffer_on_shifted_press(&Key(KeyA)));
+    }
+
+    #[test]
+    fn tab_only_toggles_the_indicator_when_shift_is_pressed() {
+        assert!(AppChorder::should_toggle_indicator_for_tab_event(
+            &KeyEvent::Press(Key(Tab)),
+            true,
+        ));
+        assert!(AppChorder::should_toggle_indicator_for_tab_event(
+            &KeyEvent::Release(Key(Tab)),
+            true,
+        ));
+        assert!(!AppChorder::should_toggle_indicator_for_tab_event(
+            &KeyEvent::Press(Key(Tab)),
+            false,
+        ));
+        assert!(!AppChorder::should_toggle_indicator_for_tab_event(
+            &KeyEvent::Press(Key(KeyA)),
+            true,
+        ));
     }
 }

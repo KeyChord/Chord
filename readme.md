@@ -131,6 +131,8 @@ In addition, because chords don't use modifier keys, you're able to use any exis
 15. Tap(CapsLock)
 </details>
 
+Pressing `Backspace` will delete the last key in your current sequence. Pressing `Shift+Backspace` will clear the entire sequence.
+
 ## Actions
 
 Actions can also take the form of shell commands, which is useful when certain functionality isn't available via a keyboard shortcut:
@@ -188,9 +190,15 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 - `cmd+ctrl+alt+shift+f{1..12}`
 - `cmd+ctrl+alt+f{1..12}`
 
-## Web Mode (Planned / Experimental)
+## Web Mode
 
-While _Chord Mode_ defaults to app-shortcuts, you can press `Caps` right after (`Caps+Space+Caps` to toggle "Web Mode", which activates chords that apply to the currently focused webpage. In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input. To type regular input, you can press and immediately release `Caps+Space` (similar to toggling `Insert Mode` in Vim), and press it again to re-enable key sequences. To exit _Web Mode_, you can just press `Caps+Space+Caps` again.
+While _Chord Mode_ defaults to app-shortcuts, you can press `Tab` right after (`Caps+Space+Tab`) to toggle "Web Mode", which activates chords that apply to the currently focused webpage.
+
+In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input.
+
+To type regular input in _Web Mode_ (e.g. opening a new tab), you should hold `Shift` while typing it out and press `Caps` to run it (obviously, the `Shift` shortcut isn't available in _Web Mode_).
+
+To exit _Web Mode_ and re-enter _Chord Mode_, press `Esc`.
 
 ## Comparison to keyboard shortcuts
 

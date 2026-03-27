@@ -71,7 +71,7 @@ export function LaunchOnLoginCard() {
 					<SettingCheckboxRow
 						id="hide-guide-by-default"
 						label="Hide Guide by default"
-						description="Start chord mode with the guide hidden. Press Tab to reveal it when needed."
+						description="Start chord mode with the guide hidden. Press Shift+Tab to reveal it when needed."
 						checked={settings.hideGuideByDefault}
 						disabled={toggleHideGuideByDefaultMutation.isPending}
 						onCheckedChange={() => {

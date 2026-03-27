@@ -1,4 +1,5 @@
 import { taurpc } from '#/api/taurpc.ts';
+import { BrowseTab } from '#/components/settings/browse-tab.tsx';
 import { ChordsTab } from '#/components/settings/chords-tab.tsx';
 import { ConfigureTab } from '#/components/settings/configure-tab.tsx';
 import { FirstRunOnboarding } from '#/components/settings/first-run-onboarding.tsx';
@@ -57,7 +58,7 @@ function Settings() {
 									</div>
 
 									<Tabs defaultValue="general" className="gap-4">
-										<TabsList className="h-auto w-full justify-start gap-2 rounded-2xl bg-transparent p-0">
+										<TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
 											<TabsTrigger
 												value="general"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
@@ -69,6 +70,12 @@ function Settings() {
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Chords
+											</TabsTrigger>
+											<TabsTrigger
+												value="browse"
+												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
+											>
+												Browse
 											</TabsTrigger>
 											<TabsTrigger
 												value="configure"
@@ -90,6 +97,10 @@ function Settings() {
 
 										<TabsContent value="chords">
 											<ChordsTab />
+										</TabsContent>
+
+										<TabsContent value="browse">
+											<BrowseTab />
 										</TabsContent>
 
 										<TabsContent value="configure">
