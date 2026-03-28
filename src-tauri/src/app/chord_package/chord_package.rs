@@ -1,7 +1,6 @@
 use crate::app::chord_package::AppChordsFile;
 use anyhow::Result;
 use fast_radix_trie::StringRadixMap;
-use include_dir::{Dir, include_dir};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
@@ -14,76 +13,7 @@ pub struct ChordPackage {
     pub js_files: StringRadixMap<String>,
 }
 
-static BUNDLED_MACOS_CHORDS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/../data/chords");
-
 impl ChordPackage {
-    pub fn load_bundled() -> Result<Self> {
-        if let Some(root) = bundled_chords_dev_root() {
-            log::debug!("Loading bundled chords from disk: {:?}", root);
-            return Self::load_from_local_folder(&root);
-        }
-
-        Self::load_bundled_embedded()
-    }
-
-    fn load_bundled_embedded() -> Result<Self> {
-        let mut js_files = StringRadixMap::new();
-        let mut chords_files = StringRadixMap::new();
-        let mut chord_file_paths = Vec::new();
-
-        for entry in BUNDLED_MACOS_CHORDS_DIR.find("**/*")? {
-            let Some(file) = entry.as_file() else {
-                continue;
-            };
-
-            let relative_path = entry.path().to_path_buf();
-
-            if relative_path.starts_with("chords")
-                && is_supported_macos_chord_filename(&relative_path)
-            {
-                chord_file_paths.push(relative_path.clone());
-            }
-
-            if relative_path.extension().and_then(|value| value.to_str()) == Some("js") {
-                let content = file.contents_utf8().ok_or_else(|| {
-                    anyhow::anyhow!("Could not read file as utf8: {:?}", entry.path())
-                })?;
-
-                js_files.insert(
-                    relative_path.to_string_lossy().to_string(),
-                    content.to_string(),
-                );
-            }
-        }
-
-        chord_file_paths.sort();
-        for relative_path in chord_file_paths {
-            let file = BUNDLED_MACOS_CHORDS_DIR
-                .get_file(&relative_path)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("Could not find bundled file: {:?}", relative_path)
-                })?;
-            let content = file.contents_utf8().ok_or_else(|| {
-                anyhow::anyhow!("Could not read file as utf8: {:?}", relative_path)
-            })?;
-
-            match AppChordsFile::parse(content) {
-                Ok(parsed) => {
-                    chords_files.insert(relative_path.to_string_lossy().to_string(), parsed);
-                }
-                Err(error) => {
-                    log::warn!("Skipping invalid {:?}: {}", relative_path, error);
-                }
-            }
-        }
-
-        Ok(Self {
-            root_dir: None,
-            chords_files,
-            js_files,
-        })
-    }
-
     pub fn load_from_git_repo(repo: &gix::Repository) -> Result<Self> {
         let root = repo
             .workdir()
@@ -162,13 +92,4 @@ fn is_supported_macos_chord_filename(path: &Path) -> bool {
     };
 
     file_name == "macos.toml" || file_name.ends_with(".macos.toml")
-}
-
-fn bundled_chords_dev_root() -> Option<PathBuf> {
-    if !cfg!(debug_assertions) {
-        return None;
-    }
-
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../data/chords");
-    root.exists().then_some(root)
 }

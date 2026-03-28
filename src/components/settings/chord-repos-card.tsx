@@ -31,7 +31,7 @@ export function ChordReposCard() {
 					<div>
 						<CardTitle>Chord Repos</CardTitle>
 						<CardDescription>
-							Added GitHub repos are cloned into the app cache and merged with bundled chords.
+							Added GitHub repos are cloned into the app cache and loaded alongside local chord folders.
 						</CardDescription>
 					</div>
 				</div>
@@ -42,7 +42,7 @@ export function ChordReposCard() {
 					{Object.values(repos).length === 0
 						? (
 								<p className="text-sm text-muted-foreground">
-									No external repos added yet. Bundled chords still load by default.
+									No external repos added yet.
 								</p>
 							)
 						: (

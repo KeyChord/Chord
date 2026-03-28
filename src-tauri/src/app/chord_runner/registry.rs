@@ -48,8 +48,6 @@ impl ChordRunnerRegistry {
         for chord_folder in chord_packages {
             if let Some(root_dir) = chord_folder.root_dir {
                 log::debug!("Loading folder: {:?}", root_dir);
-            } else {
-                log::debug!("Loading bundled chords");
             }
 
             for (chord_file_path, file) in chord_folder.chords_files {

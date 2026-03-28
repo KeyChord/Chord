@@ -20,7 +20,7 @@ impl ChordPackageRegistry {
     }
 
     pub fn load_all_chord_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {
-        let mut packages = vec![ChordPackage::load_bundled()?];
+        let mut packages = Vec::new();
         packages.extend(self.git.load_all_packages()?);
         packages.extend(self.local.load_all_packages()?);
         Ok(packages)

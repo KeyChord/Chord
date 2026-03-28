@@ -1,5 +1,4 @@
-use crate::app::chord_package::ChordPackage;
-use crate::app::chord_package_registry::{ChordPackageRegistry, GitChordPackageRegistry};
+use crate::app::chord_package_registry::ChordPackageRegistry;
 use crate::app::chord_runner::ChordRunner;
 use crate::app::chord_runner::registry::ChordRunnerRegistry;
 use crate::app::chorder::AppChorder;
@@ -44,10 +43,6 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         app.handle(),
         ChordFilesObservable::new(safe_handle.clone())?,
     );
-    let git_package_registry = manage(
-        app.handle(),
-        GitChordPackageRegistry::new(safe_handle.clone())?,
-    );
     let desktop_app_manager_observable = manage(
         app.handle(),
         DesktopAppManagerObservable::new(safe_handle.clone())?,
@@ -80,7 +75,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
-    tauri::async_runtime::spawn(load_chords(handle.clone(), git_package_registry));
+    tauri::async_runtime::spawn(load_chords(handle.clone()));
     tauri::async_runtime::spawn(load_permissions(handle.clone()));
 
     // Create tray
@@ -98,12 +93,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn load_chords(
-    handle: AppHandle,
-    git_package_registry: Arc<GitChordPackageRegistry>,
-) -> anyhow::Result<()> {
-    let mut chord_packages = git_package_registry.load_all_packages()?;
-    chord_packages.push(ChordPackage::load_bundled()?);
+async fn load_chords(handle: AppHandle) -> anyhow::Result<()> {
+    let chord_packages = handle.app_chord_package_registry().load_all_chord_packages()?;
     let chord_registry = handle.app_chord_registry();
     log::debug!(
         "Loading packages: {:?}",
