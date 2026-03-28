@@ -153,31 +153,26 @@ In addition to running shortcuts and shell commands, chords can also run arbitra
 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
-[config.js]
-module = '''
-export default (commandId: string) => {
-  // ...
-}
-
-export const menu = (...segments: string[]) => {
-  // ...
-}
-'''
+[js]
+default = "dist/vscode.runtime.js"
+menu = "dist/menu.runtime.js"
 
 [chords]
 # `explorer.newFile` doesn't have a default shortcut in VSCode
-fh = { name = "File: Here", args = [ "explorer.newFile" ] }
-# `args:menu` calls the named `menu` export instead of `default`
-mc = { name = "Menu: Columns", 'args:menu' = [
+fh = { name = "File: Here", 'js:default' = [ "explorer.newFile" ] }
+# `js:menu` calls the named `menu` target instead of `default`
+mc = { name = "Menu: Columns", 'js:menu' = [
 	"View",
 	"Columns"
 ] }
-# String args are evaluated as JavaScript and must return an array
-df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()]' }
+# String JS invocations are evaluated as JavaScript and must return an array
+df = { name = "Dynamic File", 'js:default' = '["explorer.newFile", Date.now().toString()]' }
 # ...
 ```
 
-`args` and `args:*` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
+The top-level `js` table maps invocation targets to JavaScript filenames. Chords must reference those targets with `js:<name>`, most commonly `js:default`.
+
+`js:<name>` accepts either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
 
 Chord embeds the [LLRT runtime](https://github.com/awslabs/llrt), a QuickJS-based JavaScript environment which provides partial compatibility with the Node.js APIs. For more information, see [scripting.md](./scripting.md).
 

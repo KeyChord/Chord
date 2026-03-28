@@ -1,4 +1,4 @@
-use crate::app::chord_package::{AppChordsFileConfig, ChordPackage};
+use crate::app::chord_package::ChordPackage;
 use crate::app::chord_runner::runtime::{
     ChordRuntime, GLOBAL_CHORD_RUNTIME_ID, MatchingChordInfo, MatchingDescriptionInfo,
 };
@@ -7,8 +7,7 @@ use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::observables::{ChordFilesObservable, ChordFilesState, Observable, PlaceholderChordInfo};
 use crate::quickjs::{format_js_error, reset_js, with_js};
-use llrt_core::libs::utils::result::ResultExt;
-use llrt_core::{Module, Promise};
+use llrt_core::Module;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -41,7 +40,6 @@ impl ChordRunnerRegistry {
     )> {
         let mut global_chords_to_runtime_key = HashMap::new();
         let mut app_runtime_map = HashMap::new();
-        let mut app_config_map = HashMap::new();
         let mut runtime_bundle_ids = HashMap::new();
         let mut runtime_order = Vec::new();
         let mut raw_files_json_map = HashMap::new();
@@ -100,31 +98,14 @@ impl ChordRunnerRegistry {
                     }
                 }
 
-                let config = file.config.clone();
                 let app_chord_runtime = ChordRuntime::from_file_shallow(
                     chord_file_path,
-                    bundle_id.clone(),
                     file,
                     &placeholder_bindings,
                 )?;
                 app_runtime_map.insert(runtime_id.clone(), app_chord_runtime);
-                app_config_map.insert(runtime_id.clone(), config);
                 runtime_bundle_ids.insert(runtime_id.clone(), bundle_id);
                 runtime_order.push(runtime_id);
-            }
-
-            let application_ids = runtime_order.clone();
-            let mut resolved = HashSet::new();
-            let mut resolving = HashSet::new();
-
-            for application_id in application_ids {
-                resolve_runtime_extends(
-                    &application_id,
-                    &mut app_runtime_map,
-                    &app_config_map,
-                    &mut resolved,
-                    &mut resolving,
-                )?;
             }
         }
 
@@ -151,34 +132,47 @@ impl ChordRunnerRegistry {
 
             with_js(handle.clone(), move |ctx| {
                 Box::pin(async move {
-                    let load_module =
-                        |filepath: &String, js: String| -> rquickjs::Result<Promise> {
+                    let declare_module =
+                        |filepath: &String, js: String| -> rquickjs::Result<Module> {
                             let module_disk_path = module_disk_path(root_dir.as_deref(), &filepath);
                             let module = Module::declare(ctx.clone(), filepath.clone(), js)?;
                             let meta = module.meta()?;
                             meta.set("url", module_disk_path)?;
-                            let (_evaluated, promise) = module.eval()?;
-                            Ok(promise)
+                            Ok(module)
                         };
+                    let mut modules = Vec::new();
+
                     for (filepath, js) in js_files {
-                        match load_module(&filepath, js) {
-                            Ok(promise) => {
-                                if let Err(e) = promise.into_future::<()>().await {
-                                    log::error!(
-                                        "Failed to await module {}: {}",
-                                        filepath,
-                                        format_js_error(&ctx, e)
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "Failed to declare/evaluate module {}: {}",
-                                    filepath,
-                                    format_js_error(&ctx, e)
-                                );
-                            }
-                        };
+                        match declare_module(&filepath, js) {
+                            Ok(module) => modules.push((filepath, module)),
+                            Err(e) => log::error!(
+                                "Failed to declare module {}: {}",
+                                filepath,
+                                format_js_error(&ctx, e)
+                            ),
+                        }
+                    }
+
+                    let mut module_promises = Vec::new();
+                    for (filepath, module) in modules {
+                        match module.eval() {
+                            Ok((_evaluated, promise)) => module_promises.push((filepath, promise)),
+                            Err(e) => log::error!(
+                                "Failed to evaluate module {}: {}",
+                                filepath,
+                                format_js_error(&ctx, e)
+                            ),
+                        }
+                    }
+
+                    for (filepath, promise) in module_promises {
+                        if let Err(e) = promise.into_future::<()>().await {
+                            log::error!(
+                                "Failed to await module {}: {}",
+                                filepath,
+                                format_js_error(&ctx, e)
+                            );
+                        }
                     }
 
                     Ok(())
@@ -262,9 +256,6 @@ impl ChordRunnerRegistry {
             placeholder_chords,
         })?;
 
-        // We should only load `macos.toml` modules AFTER the js files have been loaded
-        self.load_chord_config_modules().await;
-
         Ok(())
     }
 
@@ -328,72 +319,6 @@ impl ChordRunnerRegistry {
         self.load_packages(chord_packages).await?;
 
         Ok(())
-    }
-
-    async fn load_chord_config_modules(&self) {
-        let runtime_index = {
-            let runtime_index = self.runtime_index.lock().expect("poisoned");
-            runtime_index.clone()
-        };
-        for runtime in runtime_index.values() {
-            let handle = self.handle.clone();
-
-            let Some(js) = runtime.config.as_ref().and_then(|c| c.js.as_ref()) else {
-                continue;
-            };
-
-            let Some(content) = js.module.clone() else {
-                continue;
-            };
-
-            let path = runtime.path.clone();
-            let raw_chords = runtime.raw_chords.lock().unwrap().clone();
-            let bundle_id = runtime.bundle_id.clone();
-
-            tauri::async_runtime::spawn(async move {
-                let path = path.clone();
-                let path2 = path.clone();
-                let result = with_js(handle.handle().clone(), move |ctx| {
-                    Box::pin(async move {
-                        let load_module = async || {
-                            let module = Module::declare(ctx.clone(), path.clone(), content)?;
-
-                            let chords =
-                                rquickjs_serde::to_value(ctx.clone(), raw_chords).or_throw(&ctx)?;
-                            let chords_obj = chords.into_object().or_throw(&ctx)?;
-
-                            let meta = module.meta()?;
-                            meta.set("chords", chords_obj)?;
-                            meta.set("bundleId", bundle_id.clone())?;
-
-                            let (_evaluated, promise) = module.eval()?;
-
-                            promise
-                                .into_future::<()>()
-                                .await
-                                .or_throw_msg(&ctx, "failed to await module")?;
-
-                            Ok::<(), rquickjs::Error>(())
-                        };
-
-                        if let Err(e) = load_module().await {
-                            log::error!(
-                                "Failed to load module {}: {}",
-                                path,
-                                format_js_error(&ctx, e)
-                            );
-                        }
-
-                        Ok(())
-                    })
-                })
-                .await;
-
-                if let Err(err) = result {
-                    log::error!("load_module failed for {}: {}", path2, err);
-                }
-            });
-        }
     }
 }
 
@@ -492,60 +417,6 @@ fn push_runtime_description_matches(
             description: description.clone(),
         });
     }
-}
-
-fn resolve_runtime_extends(
-    application_id: &str,
-    app_runtime_map: &mut HashMap<String, ChordRuntime>,
-    app_config_map: &HashMap<String, Option<AppChordsFileConfig>>,
-    resolved: &mut HashSet<String>,
-    resolving: &mut HashSet<String>,
-) -> anyhow::Result<()> {
-    if resolved.contains(application_id) {
-        return Ok(());
-    }
-
-    if !resolving.insert(application_id.to_string()) {
-        log::warn!("Circular extends detected for application ID: {application_id}");
-        return Ok(());
-    }
-
-    let extends = app_config_map
-        .get(application_id)
-        .and_then(|config| config.as_ref())
-        .and_then(|config| config.extends.clone());
-
-    if let Some(base_application_id) = extends {
-        if app_runtime_map.contains_key(&base_application_id) {
-            resolve_runtime_extends(
-                &base_application_id,
-                app_runtime_map,
-                app_config_map,
-                resolved,
-                resolving,
-            )?;
-
-            let Some(mut app_runtime) = app_runtime_map.remove(application_id) else {
-                resolving.remove(application_id);
-                return Ok(());
-            };
-
-            if let Some(base_runtime) = app_runtime_map.get(&base_application_id) {
-                app_runtime.extend_runtime(base_runtime)?;
-            }
-
-            app_runtime_map.insert(application_id.to_string(), app_runtime);
-        } else {
-            log::warn!(
-                "Invalid extends for application ID {application_id}: {base_application_id}"
-            );
-        }
-    }
-
-    resolving.remove(application_id);
-    resolved.insert(application_id.to_string());
-
-    Ok(())
 }
 
 fn placeholder_bindings_for_file(

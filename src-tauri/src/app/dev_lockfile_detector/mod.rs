@@ -10,7 +10,7 @@ impl DevLockfileDetector {
     pub fn new() -> Self {
         Self {
             enforce_lockfile_check: !cfg!(debug_assertions),
-            lockfile_path: PathBuf::from("/tmp/com.leonsilicon.chords-dev.lock"),
+            lockfile_path: PathBuf::from("/tmp/com.leonsilicon.chord-dev.lock"),
         }
     }
 

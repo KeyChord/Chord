@@ -6,11 +6,12 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use toml_edit::{DocumentMut, Item};
-use typeshare::typeshare;
 
 #[derive(Debug, Serialize)]
 pub struct AppChordsFile {
-    pub config: Option<AppChordsFileConfig>,
+    pub name: Option<String>,
+    pub meta: Option<HashMap<String, toml::Value>>,
+    pub js: Option<HashMap<String, String>>,
     pub chords: HashMap<String, AppChordMapValue>,
     #[serde(skip_serializing)]
     pub regex_chords: Vec<AppChordRegex>,
@@ -20,8 +21,11 @@ pub struct AppChordsFile {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RawAppChordsFile {
-    pub config: Option<AppChordsFileConfig>,
+    pub name: Option<String>,
+    pub meta: Option<HashMap<String, toml::Value>>,
+    pub js: Option<HashMap<String, String>>,
     pub chords: Option<HashMap<String, AppChordMapValue>>,
 }
 
@@ -42,6 +46,8 @@ impl AppChordsFile {
         let mut descriptions = HashMap::new();
 
         for (sequence, value) in file.chords.unwrap_or_default() {
+            value.validate(&sequence)?;
+
             let Some(description_sequence) = sequence.strip_prefix('?') else {
                 if let Some(placeholder) =
                     AppChordPlaceholder::parse(sequence.clone(), value.clone())
@@ -87,33 +93,15 @@ impl AppChordsFile {
         }
 
         Ok(Self {
-            config: file.config,
+            name: file.name,
+            meta: file.meta,
+            js: file.js,
             chords,
             regex_chords,
             placeholder_chords,
             descriptions,
             raw_file_json: json_value,
         })
-    }
-
-    pub fn get_raw_chords(&self) -> HashMap<String, AppChordMapValue> {
-        let mut raw_chords = self.chords.clone();
-
-        for placeholder in &self.placeholder_chords {
-            raw_chords.insert(
-                placeholder.sequence_template.clone(),
-                placeholder.value.clone(),
-            );
-        }
-
-        for regex_chord in &self.regex_chords {
-            raw_chords.insert(
-                regex_chord.sequence_template.clone(),
-                regex_chord.value.clone(),
-            );
-        }
-
-        raw_chords
     }
 
     pub fn get_chords_shallow(
@@ -173,27 +161,6 @@ impl AppChordsFile {
     }
 }
 
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AppChordsFileConfig {
-    pub name: Option<String>,
-    pub extends: Option<String>,
-    pub js: Option<AppChordsFileConfigJs>,
-}
-
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AppChordsFileConfigJs {
-    pub module: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum AppChordArgs {
-    Values(Vec<toml::Value>),
-    Eval(String),
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppChord {
     #[serde(default)]
@@ -201,20 +168,48 @@ pub struct AppChord {
     pub name: String,
     pub shortcut: Option<String>,
     pub shell: Option<String>,
-    pub args: Option<AppChordArgs>,
     #[serde(default, flatten)]
     pub extra: HashMap<String, toml::Value>,
 }
 
 impl AppChord {
-    fn js_invocation(&self) -> Result<Option<ChordJsInvocation>> {
-        let mut invocation = self.args.clone().map(|args| ChordJsInvocation {
-            export_name: "default".into(),
-            args: parse_js_args(args),
-        });
+    fn validate(&self) -> Result<()> {
+        let mut invocation_key = None::<&str>;
 
         for (key, value) in &self.extra {
-            let Some(export_name) = key.strip_prefix("args:") else {
+            if key == "args" || key.starts_with("args:") {
+                anyhow::bail!("`{key}` is no longer supported; use `js:<name>`");
+            }
+
+            if key == "js" {
+                anyhow::bail!("`js` is not supported; use `js:<name>`");
+            }
+
+            let Some(export_name) = key.strip_prefix("js:") else {
+                continue;
+            };
+
+            if export_name.is_empty() {
+                anyhow::bail!("`js:<name>` must include a target name");
+            }
+
+            parse_js_args_value(key, value)?;
+
+            if let Some(previous_key) = invocation_key.replace(key.as_str()) {
+                anyhow::bail!(
+                    "Multiple JS invocation targets configured: `{previous_key}` and `{key}`"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn js_invocation(&self) -> Result<Option<ChordJsInvocation>> {
+        let mut invocation = None;
+
+        for (key, value) in &self.extra {
+            let Some(export_name) = key.strip_prefix("js:") else {
                 continue;
             };
 
@@ -235,25 +230,14 @@ impl AppChord {
     fn with_capture_values(&self, capture_values: &[String]) -> Self {
         let mut next = self.clone();
         next.name = substitute_capture_values_in_string(&next.name, capture_values);
-        next.args = next
-            .args
-            .take()
-            .map(|args| substitute_capture_values_in_args(args, capture_values));
 
         for (key, value) in &mut next.extra {
-            if key.starts_with("args:") {
+            if key.starts_with("js:") {
                 substitute_capture_values_in_toml_value(value, capture_values);
             }
         }
 
         next
-    }
-}
-
-fn parse_js_args(args: AppChordArgs) -> ChordJsArgs {
-    match args {
-        AppChordArgs::Values(values) => ChordJsArgs::Values(values),
-        AppChordArgs::Eval(source) => ChordJsArgs::Eval(source),
     }
 }
 
@@ -337,6 +321,23 @@ pub enum AppChordMapValue {
 }
 
 impl AppChordMapValue {
+    fn validate(&self, sequence: &str) -> Result<()> {
+        match self {
+            Self::Single(entry) => entry
+                .validate()
+                .map_err(|error| anyhow::anyhow!("invalid chord `{sequence}`: {error}")),
+            Self::Multiple(entries) => {
+                for entry in entries {
+                    entry
+                        .validate()
+                        .map_err(|error| anyhow::anyhow!("invalid chord `{sequence}`: {error}"))?;
+                }
+
+                Ok(())
+            }
+        }
+    }
+
     fn set_index(&mut self, index: u32) {
         match self {
             Self::Single(entry) => {
@@ -478,23 +479,6 @@ fn build_chord(sequence: &str, value: &AppChordMapValue) -> Option<(Vec<Key>, Ch
 
 fn is_regex_sequence_template(sequence: &str) -> bool {
     sequence.contains('(') && sequence.contains(')')
-}
-
-fn substitute_capture_values_in_args(
-    args: AppChordArgs,
-    capture_values: &[String],
-) -> AppChordArgs {
-    match args {
-        AppChordArgs::Values(mut values) => {
-            for value in &mut values {
-                substitute_capture_values_in_toml_value(value, capture_values);
-            }
-            AppChordArgs::Values(values)
-        }
-        AppChordArgs::Eval(source) => {
-            AppChordArgs::Eval(substitute_capture_values_in_string(&source, capture_values))
-        }
-    }
 }
 
 fn substitute_capture_values_in_toml_value(value: &mut toml::Value, capture_values: &[String]) {
@@ -715,12 +699,111 @@ a = [{ name = "Alpha One" }, { name = "Alpha Two" }]
     }
 
     #[test]
+    fn parse_allows_files_without_top_level_config() {
+        let file = AppChordsFile::parse(
+            r#"
+[chords]
+a = { name = "Alpha" }
+"#,
+        )
+        .expect("parse should succeed without config");
+
+        assert!(file.name.is_none());
+        assert!(file.meta.is_none());
+        assert!(file.js.is_none());
+        assert!(file.chords.contains_key("a"));
+    }
+
+    #[test]
+    fn parse_reads_top_level_name_meta_and_js_fields() {
+        let file = AppChordsFile::parse(
+            r#"
+name = "Alpha"
+
+[meta]
+category = "system"
+rank = 1
+
+[js]
+default = "dist/default.runtime.js"
+menu = "dist/menu.runtime.js"
+
+[chords]
+a = { name = "Alpha Action" }
+"#,
+        )
+        .expect("parse should succeed");
+
+        assert_eq!(file.name.as_deref(), Some("Alpha"));
+        assert_eq!(
+            file.meta
+                .as_ref()
+                .and_then(|meta| meta.get("category"))
+                .and_then(toml::Value::as_str),
+            Some("system")
+        );
+        assert_eq!(
+            file.js
+                .as_ref()
+                .and_then(|js| js.get("default"))
+                .map(String::as_str),
+            Some("dist/default.runtime.js")
+        );
+        assert_eq!(
+            file.raw_file_json["js"]["menu"],
+            serde_json::Value::String("dist/menu.runtime.js".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_rejects_legacy_config_table() {
+        let error = AppChordsFile::parse(
+            r#"
+[config]
+name = "Legacy"
+
+[chords]
+a = { name = "Alpha" }
+"#,
+        )
+        .expect_err("legacy config table should be rejected");
+
+        assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn parse_rejects_legacy_args_properties() {
+        let error = AppChordsFile::parse(
+            r#"
+[chords]
+a = { name = "Alpha", args = ["legacy"] }
+"#,
+        )
+        .expect_err("legacy args property should be rejected");
+
+        assert!(error.to_string().contains("use `js:<name>`"));
+    }
+
+    #[test]
+    fn parse_rejects_raw_js_property() {
+        let error = AppChordsFile::parse(
+            r#"
+[chords]
+a = { name = "Alpha", js = ["legacy"] }
+"#,
+        )
+        .expect_err("raw js property should be rejected");
+
+        assert!(error.to_string().contains("`js` is not supported"));
+    }
+
+    #[test]
     fn parse_separates_regex_chords_from_exact_chords() {
         let file = AppChordsFile::parse(
             r#"
 [chords]
 a = { name = "Exact" }
-'-(\d+)' = { name = "Regex $1", args = "Number($1)" }
+'-(\d+)' = { name = "Regex $1", 'js:default' = "Number($1)" }
 "#,
         )
         .expect("parse should succeed");
@@ -732,13 +815,14 @@ a = { name = "Exact" }
 
     #[test]
     fn build_chord_substitutes_capture_values() {
+        let mut extra = HashMap::new();
+        extra.insert("js:default".to_string(), toml::Value::String("Number($1)".to_string()));
         let value = AppChordMapValue::Single(AppChord {
             index: 7,
             name: "Menu Bar: Item $1".to_string(),
             shortcut: None,
             shell: None,
-            args: Some(AppChordArgs::Eval("Number($1)".to_string())),
-            extra: HashMap::new(),
+            extra,
         });
         let keys = Key::parse_sequence("-42").expect("valid sequence");
         let chord = value

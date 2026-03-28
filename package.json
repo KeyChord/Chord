@@ -7,7 +7,7 @@
 		"#/*": "./src/*"
 	},
 	"scripts": {
-		"dev": "RUST_BACKTRACE=full tauri dev --no-watch",
+		"dev": "RUST_BACKTRACE=full tauri dev --no-watch --config src-tauri/tauri.dev.conf.json",
 		"vite-dev": "vite",
 		"build": "tsc && vite build",
 		"build-dmg": "bun tauri build --bundles dmg",

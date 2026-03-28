@@ -4,16 +4,6 @@
 
 export type Key = string;
 
-export interface AppChordsFileConfigJs {
-	module?: string;
-}
-
-export interface AppChordsFileConfig {
-	name?: string;
-	extends?: string;
-	js?: AppChordsFileConfigJs;
-}
-
 export interface AppPermissionsState {
 	isAutostartEnabled?: boolean;
 	isInputMonitoringEnabled?: boolean;
@@ -105,4 +95,3 @@ export interface GitRepo {
 export interface GitReposState {
 	repos: Record<string, GitRepo>;
 }
-

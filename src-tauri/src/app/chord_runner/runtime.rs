@@ -1,11 +1,8 @@
-use crate::app::chord_package::{
-    AppChordMapValue, AppChordRegex, AppChordsFile, AppChordsFileConfig, Chord,
-};
+use crate::app::chord_package::{AppChordMapValue, AppChordRegex, AppChordsFile, Chord};
 use crate::input::Key;
 use anyhow::Result;
 use regex::Regex;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -25,19 +22,13 @@ pub struct MatchingDescriptionInfo {
     pub description: String,
 }
 
-// Each chord runtime is associated with a JS module which lives in-memory
-// (similar to require.cache)
 pub struct ChordRuntime {
-    // Used as a unique module key
     pub path: String,
-    pub bundle_id: String,
 
     pub chords: HashMap<Vec<Key>, Chord>,
     pub regex_chords: Vec<RegexChord>,
     pub descriptions: HashMap<Vec<Key>, String>,
-    // Needs to be an Arc so the JS runtime can access its latest value
-    pub raw_chords: Arc<Mutex<HashMap<String, AppChordMapValue>>>,
-    pub config: Option<AppChordsFileConfig>,
+    pub js: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,27 +49,21 @@ pub(crate) const GLOBAL_CHORD_RUNTIME_ID: &str = "__global__";
 impl ChordRuntime {
     #[allow(dead_code)]
     pub fn from_chords(path: String, chords: HashMap<Vec<Key>, Chord>) -> Result<Self> {
-        let raw_chords = Arc::new(Mutex::new(HashMap::new()));
         Ok(Self {
             path,
-            bundle_id: GLOBAL_CHORD_RUNTIME_ID.to_string(),
             chords,
             regex_chords: Vec::new(),
             descriptions: HashMap::new(),
-            raw_chords,
-            config: None,
+            js: HashMap::new(),
         })
     }
 
-    // Doesn't resolve _config.extends
     pub fn from_file_shallow(
         path: String,
-        bundle_id: String,
         chord_file: AppChordsFile,
         placeholder_bindings: &HashMap<String, String>,
     ) -> Result<Self> {
-        let raw_chords = Arc::new(Mutex::new(chord_file.get_raw_chords()));
-        let config = chord_file.config.clone();
+        let js = chord_file.js.clone().unwrap_or_default();
 
         // We intentionally keep global chords because they execute in this runtime
         let chords = chord_file.get_chords_shallow(placeholder_bindings);
@@ -97,39 +82,15 @@ impl ChordRuntime {
 
         Ok(Self {
             path,
-            bundle_id,
-            raw_chords,
-            config,
+            js,
             chords,
             regex_chords,
             descriptions,
         })
     }
 
-    pub fn extend_runtime(&mut self, base: &Self) -> Result<()> {
-        for (sequence, chord) in &base.chords {
-            self.chords
-                .entry(sequence.clone())
-                .or_insert_with(|| chord.clone());
-        }
-
-        self.regex_chords.extend(base.regex_chords.iter().cloned());
-
-        for (sequence, description) in &base.descriptions {
-            self.descriptions
-                .entry(sequence.clone())
-                .or_insert_with(|| description.clone());
-        }
-
-        let mut raw_chords = self.raw_chords.lock().expect("poisoned lock");
-        let base_raw_chords = base.raw_chords.lock().expect("poisoned lock");
-        for (sequence, chord) in base_raw_chords.iter() {
-            raw_chords
-                .entry(sequence.clone())
-                .or_insert_with(|| chord.clone());
-        }
-
-        Ok(())
+    pub fn javascript_module_path(&self, export_name: &str) -> Option<&String> {
+        self.js.get(export_name)
     }
 
     pub fn get_chord(&self, sequence: &[Key]) -> Option<ChordPayload> {
@@ -202,13 +163,12 @@ mod tests {
         let chord_file = AppChordsFile::parse(
             r#"
 [chords]
-'-(\d+)' = { name = "Menu Bar: Item $1", args = "Number($1)" }
+'-(\d+)' = { name = "Menu Bar: Item $1", 'js:default' = "Number($1)" }
 "#,
         )
         .expect("file should parse");
         let runtime = ChordRuntime::from_file_shallow(
             "chords/macos.toml".to_string(),
-            GLOBAL_CHORD_RUNTIME_ID.to_string(),
             chord_file,
             &HashMap::new(),
         )

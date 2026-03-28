@@ -53,11 +53,19 @@ impl ChordRunner {
 
         if let Some(js) = chord_payload.chord.js.clone() {
             log::debug!("Running JavaScript: {:?}", js);
+            let Some(module_path) = runtime.javascript_module_path(&js.export_name).cloned() else {
+                log::error!(
+                    "No JavaScript file configured for export `{}` in `{}`",
+                    js.export_name,
+                    runtime.path
+                );
+                return Ok(());
+            };
             let javascript = self.javascript.clone();
             let chord_payload = chord_payload.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = javascript
-                    .execute_chord_javascript(runtime.path.clone(), js, chord_payload.num_times)
+                    .execute_chord_javascript(module_path, js, chord_payload.num_times)
                     .await
                 {
                     log::error!("failed to execute js: {}", e);

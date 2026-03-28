@@ -6,12 +6,12 @@ interface RawChord {
 	index: number
 	name: string
 	shell?: string
-	js?: any
-	args?: any
 }
 
 interface RawChordFile {
-	config?: { name?: string, extends?: string }
+	name?: string
+	meta?: Record<string, unknown>
+	js?: Record<string, string>
 	chords?: Record<string, RawChord | Array<RawChord>>
 }
 
@@ -129,51 +129,18 @@ function bundleIdFromFilePath(filePath: string) {
 	return runtimeInfoFromFilePath(filePath)?.bundleId;
 }
 
-function findFilePathForRuntimeId(
-	rawFilesAsJson: Record<string, RawChordFile>,
-	runtimeId: string,
-) {
-	for (const [filePath] of Object.entries(rawFilesAsJson)) {
-		if (runtimeInfoFromFilePath(filePath)?.runtimeId === runtimeId) {
-			return filePath;
-		}
-	}
-
-	return undefined;
-}
-
 function resolveChordsForFile(
 	rawFilesAsJson: Record<string, RawChordFile>,
 	filePath: string,
-	visited = new Set<string>(),
 ): Record<string, RawChord> {
-	if (visited.has(filePath)) {
-		return {};
-	}
-
-	visited.add(filePath);
-
 	const file = rawFilesAsJson[filePath] ?? {};
-	const chords: Record<string, RawChord> = mapObject(file.chords ?? {}, (key, value) => {
+	return mapObject(file.chords ?? {}, (key, value) => {
 		if (Array.isArray(value)) {
 			return [key, value[0]];
 		}
 
 		return [key, value];
 	});
-
-	if (file.config?.extends) {
-		const extendedFilePath = findFilePathForRuntimeId(rawFilesAsJson, file.config.extends);
-		const extendedChords = extendedFilePath
-			? resolveChordsForFile(rawFilesAsJson, extendedFilePath, visited)
-			: {};
-		for (const [sequence, value] of Object.entries(extendedChords)) {
-			chords[sequence] = value;
-		}
-	}
-
-	visited.delete(filePath);
-	return chords;
 }
 
 function resolveChords(
