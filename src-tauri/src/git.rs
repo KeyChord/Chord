@@ -1,7 +1,8 @@
 use crate::observables::GitRepo;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[derive(Debug, Clone)]
 pub struct GitHubRepoRef {
@@ -74,7 +75,14 @@ impl GitHubRepoRef {
             url,
             local_path: local_path.display().to_string(),
             head_short_sha,
+            pinned_rev: None,
         }
+    }
+
+    pub fn into_pinned_repo(self, repos_root: &Path, rev: impl Into<String>) -> GitRepo {
+        let mut repo = self.into_repo(repos_root);
+        repo.pinned_rev = Some(rev.into());
+        repo
     }
 }
 
@@ -122,6 +130,85 @@ pub fn refresh_repo(repo_ref: &GitHubRepoRef, destination: &Path) -> anyhow::Res
     clone_repo(repo_ref, &temp_destination)?;
     fs::remove_dir_all(destination)?;
     fs::rename(temp_destination, destination)?;
+
+    Ok(())
+}
+
+pub fn clone_repo_at_revision(
+    repo_ref: &GitHubRepoRef,
+    destination: &Path,
+    rev: &str,
+) -> anyhow::Result<()> {
+    clone_repo(repo_ref, destination)?;
+    checkout_repo_revision(destination, rev)?;
+    Ok(())
+}
+
+fn checkout_repo_revision(repo_path: &Path, rev: &str) -> anyhow::Result<()> {
+    let trimmed_rev = rev.trim();
+    anyhow::ensure!(!trimmed_rev.is_empty(), "Revision cannot be empty");
+
+    let checkout_output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .arg("checkout")
+        .arg("--detach")
+        .arg(trimmed_rev)
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to run git checkout for revision {trimmed_rev} in {}",
+                repo_path.display()
+            )
+        })?;
+
+    if checkout_output.status.success() {
+        return Ok(());
+    }
+
+    let fetch_output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .arg("fetch")
+        .arg("--depth")
+        .arg("1")
+        .arg("origin")
+        .arg(trimmed_rev)
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to fetch revision {trimmed_rev} for {}",
+                repo_path.display()
+            )
+        })?;
+
+    anyhow::ensure!(
+        fetch_output.status.success(),
+        "Failed to fetch revision {trimmed_rev} for {}: {}",
+        repo_path.display(),
+        String::from_utf8_lossy(&fetch_output.stderr).trim()
+    );
+
+    let final_checkout_output = Command::new("git")
+        .arg("-C")
+        .arg(repo_path)
+        .arg("checkout")
+        .arg("--detach")
+        .arg("FETCH_HEAD")
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to check out fetched revision {trimmed_rev} in {}",
+                repo_path.display()
+            )
+        })?;
+
+    anyhow::ensure!(
+        final_checkout_output.status.success(),
+        "Failed to check out revision {trimmed_rev} in {}: {}",
+        repo_path.display(),
+        String::from_utf8_lossy(&final_checkout_output.stderr).trim()
+    );
 
     Ok(())
 }

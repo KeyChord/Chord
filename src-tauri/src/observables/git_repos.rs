@@ -22,6 +22,8 @@ pub struct GitRepo {
     pub url: String,
     pub local_path: String,
     pub head_short_sha: Option<String>,
+    #[serde(default)]
+    pub pinned_rev: Option<String>,
 }
 
 define_observable! {

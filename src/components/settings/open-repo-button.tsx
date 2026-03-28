@@ -8,8 +8,8 @@ export function OpenRepoButton({ repo }: { repo: { url: string, slug: string } }
 			type="button"
 			variant="ghost"
 			size="icon-sm"
-			aria-label={`Open ${repo.slug} on GitHub`}
-			title="Open on GitHub"
+			aria-label={`Open ${repo.slug}`}
+			title="Open Repo"
 			onClick={async () => {
 				await openUrl(repo.url);
 			}}

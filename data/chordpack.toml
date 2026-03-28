@@ -1,0 +1,9 @@
+name = "Chord's default chordpack"
+
+[packages]
+"@keychord/chords-chord" = { git = "https://github.com/KeyChord/chords-chord", rev = "cadbab32608aa9f14efff136f6401b020b0f6f26" }
+"@keychord/chords-commands" = { git = "https://github.com/KeyChord/chords-commands", rev = "a4c22e59476d657393543320f0abf39ffceedc70" }
+"@keychord/chords-os" = { git = "https://github.com/KeyChord/chords-os", rev = "0f1a5e859144a52bd21878c2725aa546226a34b9" }
+"@keychord/chords-menu" = { git = "https://github.com/KeyChord/chords-menu", rev = "4650c1cb83bfad57600655249d2d0e5fbf2a2dc0" }
+"@keychord/chords-com.apple" = { git = "https://github.com/KeyChord/chords-com.apple", rev = "0b8df687cca0b383fb8543355b9e213501cbb670" }
+"@keychord/chords-tray" = { git = "https://github.com/KeyChord/chords-tray", rev = "357764a150348bb11a1763f24656e51fe8ef7c31" }

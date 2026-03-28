@@ -54,7 +54,7 @@ export function ChordReposCard() {
 	);
 }
 
-function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url: string } }) {
+function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, pinnedRev?: string | null, url: string } }) {
 	return (
 		<div key={repo.slug} className="rounded-lg border bg-background/80 px-3 py-3">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -62,6 +62,11 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 					<div className="flex items-center gap-2">
 						<p className="truncate font-medium">{repo.slug}</p>
 						<Badge variant="secondary">GitHub</Badge>
+						{repo.pinnedRev
+							? (
+									<Badge variant="outline">Pinned</Badge>
+								)
+							: null}
 						{repo.headShortSha
 							? (
 									<Badge variant="outline" className="font-mono text-[11px]">
@@ -73,7 +78,7 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 				</div>
 				<div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
 					<OpenRepoButton repo={repo} />
-					<SyncRepoButton repo={repo} />
+					{repo.pinnedRev ? null : <SyncRepoButton repo={repo} />}
 					<RepoActionsMenuButton repo={repo} />
 				</div>
 			</div>

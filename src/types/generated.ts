@@ -5,93 +5,94 @@
 export type Key = string;
 
 export interface AppPermissionsState {
-	isAutostartEnabled?: boolean;
-	isInputMonitoringEnabled?: boolean;
-	isAccessibilityEnabled?: boolean;
+	isAutostartEnabled?: boolean
+	isInputMonitoringEnabled?: boolean
+	isAccessibilityEnabled?: boolean
 }
 
 export interface AppSettingsState {
-	bundleIdsNeedingRelaunch: string[];
-	showMenuBarIcon: boolean;
-	showDockIcon: boolean;
-	hideGuideByDefault: boolean;
+	bundleIdsNeedingRelaunch: string[]
+	showMenuBarIcon: boolean
+	showDockIcon: boolean
+	hideGuideByDefault: boolean
 }
 
 export interface ShortcutChord {
-	keys: Key[];
+	keys: Key[]
 }
 
 /** Represents a parsed keyboard shortcut, e.g. "cmd+shift+n". */
 export interface Shortcut {
-	chords: ShortcutChord[];
+	chords: ShortcutChord[]
 }
 
-export type ChordJsArgs = 
-	| { type: "Eval", value: string };
+export type ChordJsArgs
+	= | { type: 'Eval', value: string };
 
 export interface ChordJsInvocation {
-	export_name: string;
-	args: ChordJsArgs;
+	export_name: string
+	args: ChordJsArgs
 }
 
 export interface Chord {
-	keys: Key[];
-	index: number;
-	name: string;
-	shortcut?: Shortcut;
-	shell?: string;
-	js?: ChordJsInvocation;
+	keys: Key[]
+	index: number
+	name: string
+	shortcut?: Shortcut
+	shell?: string
+	js?: ChordJsInvocation
 }
 
 export interface PlaceholderChordInfo {
-	filePath: string;
-	scope: string;
-	scopeKind: string;
-	name: string;
-	placeholder: string;
-	sequenceTemplate: string;
-	sequencePrefix: string;
-	sequenceSuffix: string;
-	assignedSequence?: string;
+	filePath: string
+	scope: string
+	scopeKind: string
+	name: string
+	placeholder: string
+	sequenceTemplate: string
+	sequencePrefix: string
+	sequenceSuffix: string
+	assignedSequence?: string
 }
 
 export interface ChordFilesState {
-	rawFilesAsJsonStrings: Record<string, string>;
-	placeholderChords: PlaceholderChordInfo[];
+	rawFilesAsJsonStrings: Record<string, string>
+	placeholderChords: PlaceholderChordInfo[]
 }
 
 export interface ChorderState {
-	keyBuffer: Key[];
-	pressedChord?: Chord;
-	activeChord?: Chord;
-	isShiftPressed: boolean;
-	isIndicatorVisible: boolean;
+	keyBuffer: Key[]
+	pressedChord?: Chord
+	activeChord?: Chord
+	isShiftPressed: boolean
+	isIndicatorVisible: boolean
 }
 
 export interface DesktopAppMetadata {
-	bundleId: string;
-	displayName?: string;
-	iconDataUrl?: string;
+	bundleId: string
+	displayName?: string
+	iconDataUrl?: string
 }
 
 export interface DesktopAppManagerState {
-	appsNeedingRelaunch: string[];
-	appsMetadata: Record<string, DesktopAppMetadata>;
+	appsNeedingRelaunch: string[]
+	appsMetadata: Record<string, DesktopAppMetadata>
 }
 
 export interface FrontmostState {
-	frontmostAppBundleId?: string;
+	frontmostAppBundleId?: string
 }
 
 export interface GitRepo {
-	owner: string;
-	name: string;
-	slug: string;
-	url: string;
-	localPath: string;
-	headShortSha?: string;
+	owner: string
+	name: string
+	slug: string
+	url: string
+	localPath: string
+	headShortSha?: string
+	pinnedRev?: string
 }
 
 export interface GitReposState {
-	repos: Record<string, GitRepo>;
+	repos: Record<string, GitRepo>
 }

@@ -15,6 +15,7 @@ use tauri_plugin_log::{Target, TargetKind};
 
 mod api;
 mod app;
+mod chordpack;
 mod constants;
 pub mod git;
 mod input;

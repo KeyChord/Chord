@@ -1,8 +1,8 @@
 use crate::app::SafeAppHandle;
-use crate::git::{GitHubRepoRef, clone_repo};
+use crate::git::{GitHubRepoRef, clone_repo, clone_repo_at_revision};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -30,23 +30,20 @@ impl GitReposStore {
         })
     }
 
-    fn add(&self, repo: GitRepo) -> Result<()> {
-        // Filesystem first
-        let id = repo.slug.clone();
-        let value = serde_json::to_value(repo.clone())?;
-        self.store.set(id.clone(), value);
-        self.save()?;
-
-        let state = self.observable.get_state()?;
-        let mut repos = state.repos.clone();
-        repos.insert(id, repo);
-        self.observable.set_state(GitReposState { repos })?;
-
+    fn save(&self) -> Result<()> {
+        self.store.save()?;
         Ok(())
     }
 
-    fn save(&self) -> Result<()> {
-        self.store.save()?;
+    fn add(&self, repo: GitRepo) -> Result<()> {
+        let mut state = self.observable.get_state()?.repos.clone();
+        state.insert(repo.slug.clone(), repo);
+        self.replace_all(state)
+    }
+
+    fn replace_all(&self, repos: HashMap<String, GitRepo>) -> Result<()> {
+        rewrite_repos(self.store.as_ref(), &repos)?;
+        self.observable.set_state(GitReposState { repos })?;
         Ok(())
     }
 
@@ -60,23 +57,9 @@ impl GitReposStore {
             .remove(&id)
             .with_context(|| format!("Repository {id} has not been added yet"))?;
 
-        self.store.delete(id.clone());
-        self.save()?;
-
-        self.observable.set_state(GitReposState { repos })?;
-
+        self.replace_all(repos)?;
         let repo_path = PathBuf::from(&removed_repo.local_path);
-        if repo_path.exists() {
-            fs::remove_dir_all(&repo_path)
-                .with_context(|| format!("Failed to remove local repo cache at {}", repo_path.display()))?;
-
-            if let Some(parent) = repo_path.parent() {
-                if parent.read_dir()?.next().is_none() {
-                    let _ = fs::remove_dir(parent);
-                }
-            }
-        }
-
+        remove_repo_cache(&repo_path)?;
         Ok(())
     }
 
@@ -121,6 +104,39 @@ impl GitReposStore {
 
         Ok(())
     }
+
+    pub fn replace_with_pinned_repos(&self, repos: Vec<PinnedGitRepoSpec>) -> Result<Vec<GitRepo>> {
+        let repos_root = self.github_repos_dir()?;
+        let previous_repos = self.observable.get_state()?.repos.clone();
+        let desired_slugs = repos
+            .iter()
+            .map(|repo| repo.repo_ref.slug())
+            .collect::<HashSet<_>>();
+
+        let mut next_repos = HashMap::with_capacity(repos.len());
+        for spec in repos {
+            let repo_path = spec.repo_ref.local_path(&repos_root);
+            clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
+            let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
+            next_repos.insert(repo.slug.clone(), repo);
+        }
+
+        self.replace_all(next_repos.clone())?;
+
+        for repo in previous_repos.values() {
+            if !desired_slugs.contains(&repo.slug) {
+                remove_repo_cache(&PathBuf::from(&repo.local_path))?;
+            }
+        }
+
+        Ok(next_repos.into_values().collect())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PinnedGitRepoSpec {
+    pub repo_ref: GitHubRepoRef,
+    pub rev: String,
 }
 
 fn load_repos(store: &Store<Wry>) -> Result<HashMap<String, GitRepo>> {
@@ -164,5 +180,24 @@ fn rewrite_repos(store: &Store<Wry>, repos: &HashMap<String, GitRepo>) -> Result
         store.set(slug.clone(), value);
     }
     store.save()?;
+    Ok(())
+}
+
+fn remove_repo_cache(repo_path: &PathBuf) -> Result<()> {
+    if repo_path.exists() {
+        fs::remove_dir_all(repo_path).with_context(|| {
+            format!(
+                "Failed to remove local repo cache at {}",
+                repo_path.display()
+            )
+        })?;
+
+        if let Some(parent) = repo_path.parent() {
+            if parent.read_dir()?.next().is_none() {
+                let _ = fs::remove_dir(parent);
+            }
+        }
+    }
+
     Ok(())
 }
