@@ -21,7 +21,7 @@ pub trait Api {
     async fn reset_default_chords() -> AppResult<()>;
     async fn remove_git_repo(repo: String) -> AppResult<()>;
     async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
-    async fn list_local_chord_folders() -> AppResult<Vec<LocalChordPackage>>;
+    async fn list_local_chord_folders() -> AppResult<Vec<String>>;
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;
     async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;

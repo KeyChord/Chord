@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use crate::app::chord_package_manager::ChordJsPackage;
-use crate::models::{Chord, ChordInput, ChordString};
-use crate::models::chords_file::ChordsFile;
+use crate::models::{Chord, ChordInput, ChordString, ChordsFile};
 
 type AppBundleId = String;
 

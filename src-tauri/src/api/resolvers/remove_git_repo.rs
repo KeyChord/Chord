@@ -6,7 +6,7 @@ pub async fn remove_git_repo(api: ApiImpl, repo: String) -> AppResult<()> {
     let store = handle.app_git_repos_store();
     store.remove_repo(&repo)?;
 
-    let chord_registry = handle.app_chord_registry();
-    chord_registry.reload().await?;
+    let chord_pm = handle.chord_package_manager();
+    chord_pm.reload_all().await?;
     Ok(())
 }

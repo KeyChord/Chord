@@ -13,6 +13,7 @@ pub async fn remove_placeholder_chord_binding(
         file_path,
         sequence_template,
     })?;
-    handle.app_chord_registry().reload().await?;
+    handle.chord_package_manager().reload_all().await?;
+
     Ok(())
 }

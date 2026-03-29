@@ -19,7 +19,6 @@ use crate::observables::{
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-use crate::app::chord_js_package::ChordJsPackageRegistry;
 use crate::app::chord_package_manager::ChordPackageManager;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
@@ -60,7 +59,6 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         )?,
         settings: AppSettings::new(safe_handle.clone(), settings_observable.clone())?,
         chord_package_registry: ChordPackageRegistry::new_empty(safe_handle.clone())?,
-        chord_js_package_registry: ChordJsPackageRegistry::new(safe_handle.clone()),
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,

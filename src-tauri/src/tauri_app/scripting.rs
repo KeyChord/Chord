@@ -38,8 +38,8 @@ pub fn handle_url(url: &str) -> Result<()> {
 
 pub fn reload_configs(handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let chord_js_package_registry = handle.chord_js_package_registry();
-        if let Err(e) = chord_js_package_registry.reload_all_packages().await {
+        let chord_pm = handle.chord_package_manager();
+        if let Err(e) = chord_pm.reload_all().await {
             log::error!("Failed to reload packages: {}", e);
         }
     });

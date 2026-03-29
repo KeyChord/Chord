@@ -19,7 +19,7 @@ use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use crate::app::AppHandleExt;
-use crate::app::chord_js_package::PackageSpecifier;
+use crate::app::chord_package_manager::PackageSpecifier;
 
 mod chord_module;
 

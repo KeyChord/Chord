@@ -21,6 +21,8 @@ pub async fn set_placeholder_chord_binding(
     };
 
     store.set(key, entry)?;
-    handle.app_chord_registry().reload().await?;
+    let chord_pm = handle.chord_package_manager();
+    chord_pm.reload_all().await?;
+    
     Ok(())
 }

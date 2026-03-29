@@ -8,10 +8,9 @@ mod chord_action;
 pub use chord_action::*;
 mod raw_chord_package;
 pub use raw_chord_package::*;
-pub use crate::app::chord_package_manager::chord_package::*;
-mod shortcut_simulation;
-pub mod chords_file;
+mod chords_file;
+pub use chords_file::*;
 mod chord_input;
 pub use chord_input::*;
-
+mod shortcut_simulation;
 pub use shortcut_simulation::*;

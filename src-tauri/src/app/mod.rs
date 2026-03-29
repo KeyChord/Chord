@@ -3,7 +3,6 @@ pub use safe_app_handle::SafeAppHandle;
 
 pub mod chord_package_manager;
 pub mod chord_package_registry;
-pub mod chord_js_package;
 pub mod chord_runner;
 pub mod chorder;
 pub mod context;

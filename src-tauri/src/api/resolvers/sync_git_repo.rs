@@ -10,6 +10,6 @@ pub async fn sync_git_repo(api: ApiImpl, repo: String) -> AppResult<GitRepo> {
     store.sync_repo(repo_ref.clone())?;
 
     let chord_package_manager = handle.chord_package_manager();
-    chord_package_manager.re().await?;
+    chord_package_manager.reload_all().await?;
     Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
 }
