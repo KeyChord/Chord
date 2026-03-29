@@ -1,17 +1,12 @@
-use crate::app::SafeAppHandle;
 use anyhow::Result;
-use std::sync::Arc;
 use serde::Serialize;
 use typeshare::typeshare;
-use crate::app::chord_runner::shortcut::ChordShortcutActionRunner;
-use crate::models::{Chord, ChordAction, ChordJavascriptAction, ChordShellAction, ChordShortcutAction};
-use async_trait::async_trait;
-use crate::app::chord_runner::javascript::{ChordActionTaskJavascriptRunner, JavascriptChordActionTaskRunner};
-use crate::app::chord_runner::shell::ShellChordActionTaskRunner;
+use crate::models::ChordAction;
+use self::shortcut::{ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
+use self::javascript::{JavascriptChordActionTaskRun, JavascriptChordActionTaskRunner};
+use self::shell::{ShellChordActionTaskRun, ShellChordActionTaskRunner};
 
 pub mod javascript;
-pub mod registry;
-pub mod runtime;
 pub mod shell;
 pub mod shortcut;
 
@@ -22,33 +17,46 @@ pub struct ChordActionTask {
     pub num_times: u32
 }
 
-pub trait ChordActionTaskRun {
-    fn id(&self) -> u32;
+pub enum ChordActionTaskRun {
+    Javascript(JavascriptChordActionTaskRun),
+    Shell(ShellChordActionTaskRun),
+    Shortcut(ShortcutChordActionTaskRun)
 }
 
-trait ChordActionTaskRunner {
-    /// Called when the chord keys are pressed down.
-    fn start(&self, task: ChordActionTask) -> Result<Option<Box<dyn ChordActionTaskRun>>>;
+struct ChordActionTaskRunner {
+    javascript: JavascriptChordActionTaskRunner,
+    shell: ShellChordActionTaskRunner,
+    shortcut: ShortcutChordActionTaskRunner
+}
 
-    /// Called when the chord keys are lifted. Can be a no-op.
-    fn end(&self, task_run: dyn ChordActionTaskRun) -> Result<Option<()>>;
+impl ChordActionTaskRunner {
+    /// Called when the chord keys are pressed down.
+    pub fn start(&self, task: ChordActionTask) -> Result<ChordActionTaskRun> {
+        let task_run = match task.action {
+            ChordAction::Javascript(action) => ChordActionTaskRun::Javascript(self.javascript.start(action, task.num_times)?),
+            ChordAction::Shell(action) => ChordActionTaskRun::Shell(self.shell.start(action, task.num_times)?),
+            ChordAction::Shortcut(action) => ChordActionTaskRun::Shortcut(self.shortcut.start(action, task.num_times)?)
+        };
+        Ok(task_run)
+    }
+
+    /// Called when the chord keys are lifted. Async is needed for buffering chords.
+    pub async fn end(&self, task_run: ChordActionTaskRun) -> Result<()> {
+        match task_run {
+            ChordActionTaskRun::Javascript(task_run) => self.javascript.end(task_run).await?,
+            ChordActionTaskRun::Shell(task_run) => self.shell.end(task_run).await?,
+            ChordActionTaskRun::Shortcut(task_run) => self.shortcut.end(task_run).await?
+        };
+        Ok(())
+    }
 
     /// Called if the user explicitly presses `Esc` or reloads the config
-    fn abort(&self, task_run: dyn ChordActionTaskRun) -> Result<Option<Box<dyn ChordActionTaskRun>>>;
-}
-
-struct ChordActionTaskRunnerRegistry {
-    runners: Vec<Arc<dyn ChordActionTaskRunner>>
-}
-
-impl ChordActionTaskRunnerRegistry {
-    pub fn with_default_runners(handle: SafeAppHandle) -> Self {
-        Self {
-            runners: vec![
-                Arc::new(JavascriptChordActionTaskRunner::new(handle)),
-                Arc::new(ShellChordActionTaskRunner::new(handle)),
-                Arc::new(ChordShortcutActionRunner::new(handle)),
-            ],
-        }
+    pub fn abort(&self, task_run: ChordActionTaskRun) -> Result<()> {
+        match task_run {
+            ChordActionTaskRun::Javascript(task_run) => self.javascript.abort(task_run)?,
+            ChordActionTaskRun::Shell(task_run) => self.shell.abort(task_run)?,
+            ChordActionTaskRun::Shortcut(task_run) => self.shortcut.abort(task_run)?
+        };
+        Ok(())
     }
 }

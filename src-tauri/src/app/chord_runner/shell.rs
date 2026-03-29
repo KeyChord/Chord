@@ -1,10 +1,15 @@
 use crate::app::SafeAppHandle;
 use tokio::process::Command;
-use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun, ChordActionTaskRunner};
-use crate::models::{ChordAction, ChordShellAction};
+use crate::models::ShellChordAction;
+use anyhow::Result;
+use tauri::async_runtime::JoinHandle;
 
 pub struct ShellChordActionTaskRunner {
     _handle: SafeAppHandle,
+}
+
+pub struct ShellChordActionTaskRun {
+    join_handle: JoinHandle<()>
 }
 
 impl ShellChordActionTaskRunner {
@@ -13,34 +18,37 @@ impl ShellChordActionTaskRunner {
     }
 }
 
-impl ChordActionTaskRunner for ShellChordActionTaskRunner {
-    fn start(&self, task: ChordActionTask) -> Result<Option<ChordActionTaskRun>> {
-        let ChordAction::Shell(action) = task.action else {
-            return Ok(None);
-        };
-
+impl ShellChordActionTaskRunner {
+    pub fn start(&self, action: ShellChordAction, num_times: u32) -> Result<ShellChordActionTaskRun> {
         let join_handle = tauri::async_runtime::spawn(async move {
-            run_shell_command(action.command.clone()).await
+            for _ in 0..num_times {
+                run_shell_command(&action.command).await
+            }
         });
 
-        Ok(Some(ChordActionTaskRun {
-            id: 0,
-            task
-        }))
+        Ok(ShellChordActionTaskRun {
+            join_handle
+        })
     }
 
-    fn end() {}
+    pub async fn end(&self, task_run: ShellChordActionTaskRun) -> Result<()> {
+        task_run.join_handle.await?;
+        Ok(())
+    }
 
-    fn abort(&self) {}
+    pub fn abort(&self, task_run: ShellChordActionTaskRun) -> Result<()> {
+        task_run.join_handle.abort();
+        Ok(())
+    }
 }
 
-async fn run_shell_command(shell: String) {
+async fn run_shell_command(shell: &str) {
     let mut command = Command::new("sh");
-    command.arg("-c").arg(&shell);
+    command.arg("-c").arg(shell);
     log::debug!("Running shell command: {:?}", command);
 
     match command.output().await {
-        Ok(output) => log_shell_output(&shell, output),
+        Ok(output) => log_shell_output(shell, output),
         Err(e) => {
             log::error!("failed to run shell command `{shell}`: {e}");
         }

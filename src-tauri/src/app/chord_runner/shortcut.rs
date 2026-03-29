@@ -1,28 +1,15 @@
 use crate::app::SafeAppHandle;
-use crate::input::Key;
 use anyhow::Result;
-use keycode::KeyMappingCode;
-use std::str::FromStr;
-use crate::models::{ChordShortcutAction, SimulatedShortcutAction};
+use crate::app::chord_runner::{ChordActionTaskRun, ChordActionTaskRunner};
+use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 
-pub struct ChordShortcutActionRunner {
+pub struct ShortcutChordActionTaskRunner {
     handle: SafeAppHandle,
 }
 
-impl ChordShortcutActionRunner {
+impl ShortcutChordActionTaskRunner {
     pub fn new(handle: SafeAppHandle) -> Self {
         Self { handle }
-    }
-
-    // TODO: a runner shouldn't know how many times it's being run, and should handle internal state
-    pub fn start(&self, action: &ChordShortcutAction, num_times: u32) -> Result<()> {
-        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(action, num_times))?;
-        Ok(())
-    }
-
-    pub fn end(&self, action: &ChordShortcutAction) -> Result<()> {
-        self.simulate_shortcut_actions(self.get_end_simulated_shortcut_actions(action))?;
-        Ok(())
     }
 
     // We use `rdev` for simulate instead of Enigo because rdev sends actual keypresses
@@ -54,7 +41,7 @@ impl ChordShortcutActionRunner {
         Ok(())
     }
 
-    fn get_start_simulated_shortcut_actions(&self, action: &ChordShortcutAction, num_times: u32) -> Vec<SimulatedShortcutAction> {
+    fn get_start_simulated_shortcut_actions(&self, action: &ShortcutChordAction, num_times: u32) -> Vec<SimulatedShortcutAction> {
         let mut actions = Vec::new();
         let suppress_shift = !action.simulated_shortcut.has_shift();
 
@@ -79,7 +66,7 @@ impl ChordShortcutActionRunner {
         actions
     }
 
-    fn get_end_simulated_shortcut_actions(&self, action: &ChordShortcutAction) -> Vec<SimulatedShortcutAction> {
+    fn get_end_simulated_shortcut_actions(&self, action: &ShortcutChordAction) -> Vec<SimulatedShortcutAction> {
         let suppress_shift = !action.simulated_shortcut.has_shift();
         action.simulated_shortcut.chords
             .last()
@@ -93,5 +80,30 @@ impl ChordShortcutActionRunner {
                     .map(|k| SimulatedShortcutAction::Release(k, suppress_shift))
             })
             .collect()
+    }
+}
+
+pub struct ShortcutChordActionTaskRun {
+    end_simulated_shortcut_actions: Vec<SimulatedShortcutAction>
+}
+
+impl ShortcutChordActionTaskRunner {
+
+    pub fn start(&self, action: ShortcutChordAction, num_times: u32) -> Result<ShortcutChordActionTaskRun> {
+        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(&action, num_times))?;
+
+        Ok(ShortcutChordActionTaskRun {
+            end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(&action)
+        })
+    }
+
+    pub async fn end(&self, task_run: ShortcutChordActionTaskRun) -> Result<()> {
+        self.simulate_shortcut_actions(task_run.end_simulated_shortcut_actions)?;
+        Ok(())
+    }
+
+    // TODO
+    pub fn abort(&self, _task_run: ShortcutChordActionTaskRun) -> Result<()> {
+        Ok(())
     }
 }
