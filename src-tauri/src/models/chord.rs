@@ -9,7 +9,7 @@ pub type ChordString = String;
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct Chord {
-    pub string: ChordString,
+    pub string_key: ChordString,
 
     /// The keys that make up the chord (extracted from the TOML key)
     pub trigger: ChordTrigger,

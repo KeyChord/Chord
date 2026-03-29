@@ -11,6 +11,21 @@ pub enum ChordTrigger {
     Pattern(Regex)
 }
 
+impl ChordTrigger {
+    pub fn matches(&self, keys: &[Key]) -> bool {
+        match self {
+            ChordTrigger::Keys(trigger_keys) => trigger_keys == keys,
+            ChordTrigger::Pattern(regex) => {
+                let Some(sequence_str) = Key::serialize_sequence(keys) else {
+                    return false;
+                };
+
+                regex.is_match(&sequence_str)
+            }
+        }
+    }
+}
+
 impl Serialize for ChordTrigger {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

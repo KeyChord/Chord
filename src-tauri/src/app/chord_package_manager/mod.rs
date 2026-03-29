@@ -2,11 +2,11 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use crate::app::chord_js_package_registry::ChordJsPackage;
 use crate::app::SafeAppHandle;
-use crate::models::{ChordPackage, RawChordPackage};
+use crate::models::{ChordInput, ChordPackage, RawChordPackage};
 use crate::models::chords_file::ChordsFile;
+use crate::input::Key;
 use fast_radix_trie::StringRadixMap;
 
-mod package_loader;
 pub mod chord_package;
 
 
@@ -31,13 +31,23 @@ impl ChordPackageManager {
             let mut chords_file = ChordsFile::parse(&contents);
             chords_file.relpath = path.clone();
 
-            if path == "chords/global.toml" {
-                for chord in chords_file.chords {
-                    global_chords.insert(chord.string.clone(), chord);
+            for chord in &chords_file.chords {
+                let first_char = chord.string_key.chars().next();
+                let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
+
+                if is_non_alphanumeric {
+                    global_chords.insert(chord.string_key.clone(), chord.clone());
                 }
-            } else if path.starts_with("chords/") && path.ends_with(".toml") {
-                let bundle_id = &path[7..path.len()-5];
-                app_chords_files.insert(bundle_id.to_string(), chords_file);
+            }
+
+            if path.starts_with("chords/") && path.ends_with("/macos.toml") {
+                let bundle_id = &path[7..path.len() - 11];
+                let bundle_id = bundle_id.replace('/', ".");
+                app_chords_files.insert(bundle_id, chords_file);
+            } else if path == "chords/macos.toml" {
+                // If it's directly under chords/, we can treat it as a special case or ignore if it needs a bundle ID
+                // For now, let's assume it might be for a 'global' context or similar if it has no bundle ID path
+                app_chords_files.insert("".to_string(), chords_file);
             }
         }
 
@@ -79,5 +89,26 @@ impl ChordPackageManager {
         } else {
             Ok(raw_chord_package.dirname.clone())
         }
+    }
+
+    pub fn resolve_package_for_input(&self, input: &ChordInput) -> Option<ChordPackage> {
+        let packages = self.packages.read().unwrap();
+
+        if let Some(app_id) = &input.application_id {
+            for package in packages.values() {
+                if package.app_chords_files.contains_key(app_id) {
+                    return Some(package.clone());
+                }
+            }
+        }
+
+        let sequence_str = Key::serialize_sequence(&input.keys)?;
+        for package in packages.values() {
+            if package.global_chords.contains_key(&sequence_str) {
+                return Some(package.clone());
+            }
+        }
+
+        None
     }
 }

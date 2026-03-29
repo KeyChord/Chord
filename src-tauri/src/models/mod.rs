@@ -11,5 +11,7 @@ pub use raw_chord_package::*;
 pub use crate::app::chord_package_manager::chord_package::*;
 mod shortcut_simulation;
 pub mod chords_file;
+mod chord_input;
+pub use chord_input::*;
 
 pub use shortcut_simulation::*;

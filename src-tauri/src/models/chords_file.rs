@@ -128,7 +128,7 @@ impl ChordsFile {
                         };
 
                         chords.push(Chord {
-                            string: key.clone(),
+                            string_key: key.clone(),
                             trigger,
                             name: chord_name,
                             index,

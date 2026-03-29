@@ -1,15 +1,15 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 use crate::app::SafeAppHandle;
-use crate::quickjs::with_js;
+use crate::quickjs::{with_js, reset_js};
 use anyhow::Result;
-use fast_radix_trie::{BorrowedBytes, StringRadixMap};
+use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 
 /// A registry of all the loaded JavaScript packages (from the `js/` folder of chord packages)
 pub struct ChordJsPackageRegistry {
     /// The key is the name of the chord package (e.g. "@keychord/chords-menu")
-    packages: HashMap<String, ChordJsPackage>,
+    packages: RwLock<HashMap<String, ChordJsPackage>>,
 
     handle: SafeAppHandle
 }
@@ -71,14 +71,14 @@ impl ChordJsPackage {
 
 impl ChordJsPackageRegistry {
     pub fn new(handle: SafeAppHandle) -> Self {
-        Self { handle, packages: HashMap::new() }
+        Self { handle, packages: RwLock::new(HashMap::new()) }
     }
 
-    pub fn get_package_by_name(&self, package_name: &str) -> Option<&ChordJsPackage> {
-        self.packages.get(package_name)
+    pub fn get_package_by_name(&self, package_name: &str) -> Option<ChordJsPackage> {
+        self.packages.read().unwrap().get(package_name).cloned()
     }
 
-    pub async fn load_package(&mut self, package_name: &str, files: Vec<(String, String)>) -> Result<()> {
+    pub async fn load_package(&self, package_name: &str, files: Vec<(String, String)>) -> Result<()> {
         let handle = self.handle.try_handle()?;
         let mut exported_files = StringRadixMap::new();
 
@@ -99,13 +99,36 @@ impl ChordJsPackageRegistry {
                 .map_err(|e| anyhow::anyhow!(e))?;
         };
 
-        self.packages.insert(package_name.to_string(), ChordJsPackage { exported_files });
+        self.packages.write().unwrap().insert(package_name.to_string(), ChordJsPackage { exported_files });
 
         Ok(())
     }
 
     pub async fn reload_all_packages(&self) -> Result<()> {
-        todo!()
+        let handle = self.handle.try_handle()?;
+        reset_js(handle.clone()).await?;
+
+        let packages = self.packages.read().unwrap().clone();
+
+        for (package_name, package) in packages {
+            for (file_relpath, js) in package.exported_files {
+                let package_name_bytes = package_name.as_bytes().to_vec();
+                with_js(handle.clone(), move |ctx| {
+                    Box::pin(async move {
+                        let module = Module::declare(ctx.clone(), package_name_bytes, js)?;
+                        let meta = module.meta()?;
+                        meta.set("url", file_relpath)?;
+                        let (_evaluated, promise) = module.eval()?;
+                        promise.into_future::<()>().await?;
+                        Ok(())
+                    })
+                })
+                    .await
+                    .map_err(|e| anyhow::anyhow!(e))?;
+            }
+        }
+
+        Ok(())
     }
 }
 
