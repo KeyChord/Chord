@@ -13,7 +13,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{Emitter, Listener};
 use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
-use crate::models::{ChordInput, ShortcutChordAction};
+use crate::models::ChordInput;
 
 mod ui;
 

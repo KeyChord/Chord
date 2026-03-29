@@ -1,4 +1,3 @@
-use crate::app::chord_package_registry::ChordPackageRegistry;
 use crate::app::chord_runner::{ChordActionTaskRunner};
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
@@ -58,11 +57,10 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
             permissions_observable.clone(),
         )?,
         settings: AppSettings::new(safe_handle.clone(), settings_observable.clone())?,
-        chord_package_registry: ChordPackageRegistry::new_empty(safe_handle.clone())?,
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_package_manager: ChordPackageManager::new(safe_handle.clone()),
+        chord_package_manager: ChordPackageManager::new(safe_handle.clone())?,
         chord_action_task_runner: ChordActionTaskRunner::new(safe_handle.clone()),
         desktop_app_manager: DesktopAppManager::new(
             safe_handle.clone(),
@@ -91,11 +89,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 }
 
 async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
-    let raw_chord_packages = handle.app_chord_package_registry().import_all_packages()?;
-    let chord_package_manager = handle.chord_package_manager();
-    for raw_chord_package in raw_chord_packages {
-        chord_package_manager.load_package(raw_chord_package).await?;
-    }
+    let chord_pm = handle.chord_package_manager();
+    chord_pm.reload_all().await?;
     Ok(())
 }
 

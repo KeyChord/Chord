@@ -1,6 +1,5 @@
 use crate::app::SafeAppHandle;
 use anyhow::Result;
-use crate::app::chord_runner::{ChordActionTaskRun, ChordActionTaskRunner};
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 
 pub struct ShortcutChordActionTaskRunner {

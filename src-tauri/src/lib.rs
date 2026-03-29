@@ -1,6 +1,5 @@
 use crate::api::{Api, ApiImpl};
-use crate::app::{AppHandleExt, SafeAppHandle};
-use crate::observables::{ChorderObservable, GitReposObservable};
+use crate::app::AppHandleExt;
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
 use parking_lot::deadlock;

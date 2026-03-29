@@ -1,4 +1,5 @@
-use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
+use crate::app::chord_package_manager::git::GitChordPackageRegistry;
+use crate::app::chord_package_manager::local::LocalPackageRegistry;
 use crate::app::SafeAppHandle;
 use crate::models::RawChordPackage;
 

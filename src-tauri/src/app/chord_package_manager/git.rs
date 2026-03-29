@@ -2,7 +2,7 @@ use crate::app::SafeAppHandle;
 use crate::observables::GitReposObservable;
 use anyhow::Result;
 use std::path::PathBuf;
-use crate::app::chord_package_registry::LocalPackageRegistry;
+use crate::app::chord_package_manager::local::LocalPackageRegistry;
 use crate::models::RawChordPackage;
 
 pub struct GitChordPackageRegistry {

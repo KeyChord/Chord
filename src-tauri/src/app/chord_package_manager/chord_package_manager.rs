@@ -3,26 +3,37 @@ use std::sync::RwLock;
 use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage};
+use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::app::SafeAppHandle;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
 use crate::quickjs::with_js;
+use anyhow::Result;
 
 pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
+    pub registry: ChordPackageRegistry,
 
     handle: SafeAppHandle,
 }
 
 
 impl ChordPackageManager {
-    pub fn new(handle: SafeAppHandle) -> Self {
-        Self { handle, packages: RwLock::new(HashMap::new()) }
+    pub fn new(handle: SafeAppHandle) -> Result<Self> {
+        Ok(Self {
+            packages: RwLock::new(HashMap::new()),
+            registry: ChordPackageRegistry::new_empty(handle.clone())?,
+            handle
+        })
     }
 
-    pub async fn reload_all(&self) -> anyhow::Result<()> {
-        for package in self.packages.read().unwrap().values() {
+    pub async fn reload_all(&self) -> Result<()> {
+        let raw_chord_packages = self.registry.import_all_packages()?;
+        self.packages.write().expect("poisoned").clear();
+        for raw_chord_package in raw_chord_packages {
+            self.load_package(raw_chord_package).await?;
         }
+
         Ok(())
     }
 
@@ -30,7 +41,7 @@ impl ChordPackageManager {
         self.packages.read().unwrap().get(package_name).cloned()
     }
 
-    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> anyhow::Result<ChordPackage> {
+    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
         let name = self.get_package_name(&raw_chord_package)?;
         let mut app_chords_files = HashMap::new();
         let mut global_chords = HashMap::new();
@@ -76,7 +87,7 @@ impl ChordPackageManager {
         Ok(chord_package)
     }
 
-    async fn load_js_package(&self, package_name: &str, files: &StringRadixMap<String>) -> anyhow::Result<Option<ChordJsPackage>> {
+    async fn load_js_package(&self, package_name: &str, files: &StringRadixMap<String>) -> Result<Option<ChordJsPackage>> {
         if files.is_empty() {
             return Ok(None)     ;
         }
@@ -114,7 +125,7 @@ impl ChordPackageManager {
         }
     }
 
-    fn get_package_name(&self, raw_chord_package: &RawChordPackage) -> anyhow::Result<String> {
+    fn get_package_name(&self, raw_chord_package: &RawChordPackage) -> Result<String> {
         if let Some(name) = self.get_package_name_from_package_json(raw_chord_package)? {
             Ok(name)
         } else {
