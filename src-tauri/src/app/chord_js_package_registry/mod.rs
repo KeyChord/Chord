@@ -14,6 +14,7 @@ pub struct ChordJsPackageRegistry {
     handle: SafeAppHandle
 }
 
+#[derive(Clone)]
 pub struct ChordJsPackage {
     /// The keys are just the file relpaths, e.g. `js/menu.js`
     exported_files: StringRadixMap<String>
@@ -59,6 +60,10 @@ impl<'a> PackageSpecifier<'a> {
 }
 
 impl ChordJsPackage {
+    pub fn new(exported_files: StringRadixMap<String>) -> Self {
+        Self { exported_files }
+    }
+
     pub fn resolve_import(&self, import_specifier: &str) -> Option<&String> {
         self.exported_files.get(import_specifier)
     }
@@ -97,6 +102,10 @@ impl ChordJsPackageRegistry {
         self.packages.insert(package_name.to_string(), ChordJsPackage { exported_files });
 
         Ok(())
+    }
+
+    pub async fn reload_all_packages(&self) -> Result<()> {
+        todo!()
     }
 }
 

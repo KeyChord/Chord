@@ -22,6 +22,7 @@ pub struct JavascriptChordActionTaskRunner {
     handle: SafeAppHandle,
 }
 
+#[derive(Debug)]
 pub struct JavascriptChordActionTaskRun {
     join_handle: JoinHandle<Result<()>>
 }
@@ -33,15 +34,16 @@ impl JavascriptChordActionTaskRunner {
 }
 
 impl JavascriptChordActionTaskRunner {
-    pub fn start(&self, action: JavascriptChordAction, num_times: u32) -> Result<JavascriptChordActionTaskRun> {
+    pub fn start(&self, action: &JavascriptChordAction, num_times: u32) -> Result<JavascriptChordActionTaskRun> {
         let handle = self.handle.try_handle()?;
         let handle = handle.clone();
         let module_specifier = action.module_specifier.clone();
+        let args = action.args.clone();
 
         let join_handle = tauri::async_runtime::spawn( async move {
             with_js(handle, move |ctx| {
                 Box::pin(async move {
-                    let args = action.args
+                    let args = args
                         .into_iter()
                         .map(|value| {
                             rquickjs_serde::to_value(ctx.clone(), value)

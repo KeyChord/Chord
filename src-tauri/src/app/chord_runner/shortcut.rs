@@ -83,17 +83,18 @@ impl ShortcutChordActionTaskRunner {
     }
 }
 
+#[derive(Debug)]
 pub struct ShortcutChordActionTaskRun {
     end_simulated_shortcut_actions: Vec<SimulatedShortcutAction>
 }
 
 impl ShortcutChordActionTaskRunner {
 
-    pub fn start(&self, action: ShortcutChordAction, num_times: u32) -> Result<ShortcutChordActionTaskRun> {
-        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(&action, num_times))?;
+    pub fn start(&self, action: &ShortcutChordAction, num_times: u32) -> Result<ShortcutChordActionTaskRun> {
+        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(action, num_times))?;
 
         Ok(ShortcutChordActionTaskRun {
-            end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(&action)
+            end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(action)
         })
     }
 

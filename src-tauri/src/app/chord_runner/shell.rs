@@ -8,6 +8,7 @@ pub struct ShellChordActionTaskRunner {
     _handle: SafeAppHandle,
 }
 
+#[derive(Debug)]
 pub struct ShellChordActionTaskRun {
     join_handle: JoinHandle<()>
 }
@@ -19,10 +20,11 @@ impl ShellChordActionTaskRunner {
 }
 
 impl ShellChordActionTaskRunner {
-    pub fn start(&self, action: ShellChordAction, num_times: u32) -> Result<ShellChordActionTaskRun> {
+    pub fn start(&self, action: &ShellChordAction, num_times: u32) -> Result<ShellChordActionTaskRun> {
+        let command = action.command.clone();
         let join_handle = tauri::async_runtime::spawn(async move {
             for _ in 0..num_times {
-                run_shell_command(&action.command).await
+                run_shell_command(&command).await
             }
         });
 

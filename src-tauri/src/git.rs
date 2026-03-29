@@ -73,7 +73,7 @@ impl GitHubRepoRef {
             name: self.name,
             slug,
             url,
-            local_path: local_path.display().to_string(),
+            local_path,
             head_short_sha,
             pinned_rev: None,
         }

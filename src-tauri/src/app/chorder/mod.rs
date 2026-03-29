@@ -1,6 +1,4 @@
 use self::ui::{ChorderIndicatorUi, NativeSurfaceRect};
-use crate::app::chord_package::Chord;
-use crate::app::chord_runner::runtime::ChordPayload;
 use crate::app::{AppHandleExt, SafeAppHandle};
 use crate::input::Key;
 use crate::input::KeyEvent;
@@ -14,12 +12,14 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{Emitter, Listener};
+use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
+use crate::models::{ChordAction, ShortcutChordAction};
 
 mod ui;
 
 pub struct AppChorder {
     pub ui: ChorderIndicatorUi,
-    held_keys: Mutex<HashSet<Key>>,
+    active_task_run: Mutex<ChordActionTaskRun>,
 
     observable: Arc<ChorderObservable>,
     handle: SafeAppHandle,
@@ -171,7 +171,7 @@ impl AppChorder {
         let non_shift_modifiers = Key::non_shift_modifiers();
         let handle = self.handle.try_handle()?;
         let context = handle.app_context();
-        let chord_runner = handle.chord_runner();
+        let chord_action_task_runner = handle.chord_action_task_runner();
         let Some(device_state) = &context.device_state else {
             log::debug!("no accessibility permissions");
             return Ok(());
@@ -196,8 +196,9 @@ impl AppChorder {
             KeyEvent::Release(Key(code)) => {
                 let state = self.observable.get_state()?;
 
-                if let Some(pressed_chord) = &state.pressed_chord {
+                if let Some(pressed_chord_keys) = &state.pressed_chord_keys {
                     if code == &KeyMappingCode::CapsLock {
+                        chord_action_task_runner.end_task();
                         chord_runner.release_chord(pressed_chord)?;
                     } else if pressed_chord.keys.last().is_some_and(|k| &k.0 == code) {
                         chord_runner.release_chord(pressed_chord)?;
@@ -219,34 +220,40 @@ impl AppChorder {
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
                 self.ensure_active()?;
 
-                let chord_registry = handle.app_chord_registry();
                 let frontmost = handle.observable_state::<FrontmostObservable>()?;
                 let state = self.observable.get_state()?;
                 let key_buffer = state.key_buffer.clone();
+                let chord_package_manager = handle.chord_package_manager();
 
                 // An empty `key_buffer` means we should execute the last executed chord
                 if key_buffer.is_empty() {
                     // If there isn't an active chord, then do nothing
-                    let Some(last_chord) = &state.active_chord else {
+                    let Some(active_chord_keys) = &state.active_chord_keys else {
                         log::error!("Key buffer is empty and no chord is active");
                         return Ok(());
                     };
 
                     let application_id = frontmost.frontmost_app_bundle_id.clone();
+                    let chord_package = chord_package_manager.resolve_package(&active_chord_keys, application_id);
+
                     let chord_runtime =
-                        chord_registry.get_chord_runtime(&last_chord.keys, application_id);
+                        chord_registry.get_chord_runtime(&active_chord_keys, application_id);
                     if let Some(chord_runtime) = chord_runtime {
-                        chord_runner.press_chord(
-                            chord_runtime,
-                            &ChordPayload {
-                                chord: last_chord.clone(),
-                                num_times: 1,
-                            },
-                        )?;
+                        let task = ChordActionTask {
+                            action: ChordAction::Shortcut(ShortcutChordAction {
+                                simulated_shortcut
+                            }),
+                            num_times: 1,
+                        };
+                        let task_run = chord_action_task_runner.start_task(&task)?;
+                        {
+                            let lock = self.active_task_run.lock();
+                            *lock = task_run;
+                        }
                         self.observable.set_state(state.with_session(
                             vec![],
-                            state.active_chord.clone(),
-                            state.active_chord.clone(),
+                            state.active_chord_keys.clone(),
+                            state.active_chord_keys.clone(),
                         ))?;
                     } else {
                         // e.g. we ran it on a different app

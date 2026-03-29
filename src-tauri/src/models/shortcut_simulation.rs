@@ -3,7 +3,6 @@ use keycode::KeyMappingCode;
 use serde::Serialize;
 use typeshare::typeshare;
 use crate::input::Key;
-use crate::models::ChordShortcutAction;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]

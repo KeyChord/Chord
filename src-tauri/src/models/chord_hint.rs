@@ -4,13 +4,13 @@ use serde::ser::SerializeStruct;
 use serde::Serialize;
 use crate::input::Key;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct ChordHint {
-    pattern: ChordHintPattern,
-    description: String
+    pub pattern: ChordHintPattern,
+    pub description: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ChordHintPattern {
     Keys(Vec<Key>),
     Regex(Regex)

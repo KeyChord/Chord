@@ -1,8 +1,9 @@
 use crate::app::SafeAppHandle;
-use crate::app::chord_package::ChordPackage;
 use crate::observables::GitReposObservable;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::path::PathBuf;
+use crate::app::chord_package_registry::LocalPackageRegistry;
+use crate::models::RawChordPackage;
 
 pub struct GitChordPackageRegistry {
     #[allow(dead_code)]
@@ -17,14 +18,11 @@ impl GitChordPackageRegistry {
         Ok(Self { dir, handle })
     }
 
-    pub fn load_all_packages(&self) -> Result<Vec<ChordPackage>> {
+    pub fn import_all_packages(&self) -> Result<Vec<RawChordPackage>> {
         let mut packages = Vec::new();
         let state = self.handle.observable_state::<GitReposObservable>()?;
         for repo in state.repos.values() {
-            match gix::open(&repo.local_path)
-                .context(format!("failed to open repo {}", repo.slug))
-                .and_then(|repo_handle| ChordPackage::load_from_git_repo(&repo_handle))
-            {
+            match LocalPackageRegistry::import_from_local_folder(repo.local_path.as_path()) {
                 Ok(package) => packages.push(package),
                 Err(error) => log::warn!("Skipping repo {}: {error}", repo.slug),
             }

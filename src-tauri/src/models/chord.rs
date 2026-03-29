@@ -2,10 +2,15 @@ use serde::Serialize;
 use typeshare::typeshare;
 use crate::models::{ChordAction, ChordTrigger};
 
+/// This is the string key in the TOML file which maps to the chord
+pub type ChordString = String;
+
 /// A regular chord entry composed of static characters
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct Chord {
+    pub string: ChordString,
+
     /// The keys that make up the chord (extracted from the TOML key)
     pub trigger: ChordTrigger,
 

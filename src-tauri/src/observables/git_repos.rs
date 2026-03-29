@@ -1,6 +1,7 @@
 use crate::define_observable;
 use serde::Serialize;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use typeshare::typeshare;
 
 #[typeshare]
@@ -20,7 +21,7 @@ pub struct GitRepo {
     pub name: String,
     pub slug: String,
     pub url: String,
-    pub local_path: String,
+    pub local_path: PathBuf,
     pub head_short_sha: Option<String>,
     #[serde(default)]
     pub pinned_rev: Option<String>,

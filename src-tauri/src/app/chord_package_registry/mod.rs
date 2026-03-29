@@ -1,10 +1,10 @@
 use crate::app::SafeAppHandle;
-use crate::app::chord_package::ChordPackage;
 
 mod git;
 pub use git::*;
 mod local;
 pub use local::*;
+use crate::models::RawChordPackage;
 
 pub struct ChordPackageRegistry {
     pub git: GitChordPackageRegistry,
@@ -12,17 +12,17 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    pub fn new_unloaded(handle: SafeAppHandle) -> anyhow::Result<Self> {
+    pub fn new_empty(handle: SafeAppHandle) -> anyhow::Result<Self> {
         Ok(Self {
             git: GitChordPackageRegistry::new(handle.clone())?,
             local: LocalPackageRegistry::new(handle),
         })
     }
 
-    pub fn load_all_chord_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {
+    pub fn import_all_packages(&self) -> anyhow::Result<Vec<RawChordPackage>> {
         let mut packages = Vec::new();
-        packages.extend(self.git.load_all_packages()?);
-        packages.extend(self.local.load_all_packages()?);
+        packages.extend(self.git.import_all_packages()?);
+        packages.extend(self.local.import_all_packages()?);
         Ok(packages)
     }
 }

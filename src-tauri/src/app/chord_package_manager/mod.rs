@@ -1,23 +1,17 @@
-mod loader;
-mod parser;
-mod file;
-mod chords_file_parser;
-mod chords_file_models;
-
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-use fast_radix_trie::StringRadixMap;
-use walkdir::WalkDir;
-use crate::app::chord_package::raw::ChordPackage;
-use crate::app::chord_runner::runtime::ChordRuntime;
-use crate::app::placeholder_chord_store::{PlaceholderChordStoreEntry, PlaceholderChordStoreKey};
+use std::sync::RwLock;
+use crate::app::chord_js_package_registry::ChordJsPackage;
 use crate::app::SafeAppHandle;
-use crate::input::Key;
-use crate::observables::PlaceholderChordInfo;
+use crate::models::{ChordPackage, RawChordPackage};
+use crate::models::chords_file::ChordsFile;
+use fast_radix_trie::StringRadixMap;
 
-struct ChordPackageManager {
-    packages: HashMap<String, ChordPackage>,
+mod package_loader;
+pub mod chord_package;
+
+
+pub struct ChordPackageManager {
+    packages: RwLock<HashMap<String, ChordPackage>>,
 
     handle: SafeAppHandle,
 }
@@ -25,96 +19,65 @@ struct ChordPackageManager {
 
 impl ChordPackageManager {
     pub fn new(handle: SafeAppHandle) -> Self {
-        Self { handle, packages: HashMap::new() }
+        Self { handle, packages: RwLock::new(HashMap::new()) }
     }
 
+    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> anyhow::Result<ChordPackage> {
+        let name = self.get_package_name(&raw_chord_package)?;
+        let mut app_chords_files = HashMap::new();
+        let mut global_chords = HashMap::new();
 
-    pub async fn load_packages(&self, chord_packages: Vec<ChordPackage>) -> anyhow::Result<()> {
-        let handle = self.handle.try_handle()?;
-        for chord_package in &chord_packages {
-            let js_files = chord_package.js_files.clone();
-            let js_package_registry = handle.app_chord_js_package_registry();
-            for (relpath, contents) in js_files {
-                js_package_registry.load_module(contents).await?;
+        for (path, contents) in raw_chord_package.chords_files_contents {
+            let mut chords_file = ChordsFile::parse(&contents);
+            chords_file.relpath = path.clone();
+
+            if path == "chords/global.toml" {
+                for chord in chords_file.chords {
+                    global_chords.insert(chord.string.clone(), chord);
+                }
+            } else if path.starts_with("chords/") && path.ends_with(".toml") {
+                let bundle_id = &path[7..path.len()-5];
+                app_chords_files.insert(bundle_id.to_string(), chords_file);
             }
         }
 
-        let placeholder_entries = handle.app_placeholder_chord_store().entries();
-        let (
-            global_chords_to_runtime_key,
-            app_runtime_map,
-            runtime_bundle_ids,
-            runtime_order,
-            raw_files_map,
-            mut placeholder_chords,
-        ) = ChordRunnerRegistry::parse_packages(chord_packages, &placeholder_entries)?;
-        placeholder_chords.sort_by(|left, right| {
-            left.scope_kind
-                .cmp(&right.scope_kind)
-                .then(left.scope.cmp(&right.scope))
-                .then(left.name.cmp(&right.name))
-                .then(left.placeholder.cmp(&right.placeholder))
-        });
-
-        // Load the metadata
-        // TODO: this hangs for some reason
-        // let desktop_app_manager = handle.desktop_app_manager();
-        // let bundle_ids: Vec<&str> = app_runtime_map.keys().map(|k| k.as_str()).collect();
-        // desktop_app_manager.load_apps_metadata(&bundle_ids)?;
-
-        // Set state before setting observable
-        {
-            let mut map = self.global_chords_to_runtime_key.lock().expect("poisoned");
-            *map = global_chords_to_runtime_key;
+        let mut exported_files = StringRadixMap::new();
+        for (path, js) in raw_chord_package.js_files_contents {
+            exported_files.insert(path, js);
         }
 
-        let runtime_index = app_runtime_map
-            .into_iter()
-            .map(|(runtime_id, runtime)| (runtime_id, Arc::new(runtime)))
-            .collect::<HashMap<_, _>>();
-        let mut runtimes = HashMap::<String, Vec<Arc<ChordRuntime>>>::new();
-        let mut seen_runtime_ids = HashSet::new();
-        let mut deduped_runtime_order = runtime_order
-            .into_iter()
-            .rev()
-            .filter(|runtime_id| seen_runtime_ids.insert(runtime_id.clone()))
-            .collect::<Vec<_>>();
-        deduped_runtime_order.reverse();
-        for runtime_id in deduped_runtime_order {
-            let Some(bundle_id) = runtime_bundle_ids.get(&runtime_id) else {
-                continue;
-            };
-            let Some(runtime) = runtime_index.get(&runtime_id) else {
-                continue;
-            };
-            runtimes
-                .entry(bundle_id.clone())
-                .or_default()
-                .push(runtime.clone());
+        let js_package = if !exported_files.is_empty() {
+            Some(ChordJsPackage::new(exported_files))
+        } else {
+            None
+        };
+
+        let chord_package = ChordPackage {
+            name: name.clone(),
+            js_package,
+            app_chords_files,
+            global_chords
+        };
+
+        self.packages.write().unwrap().insert(name, chord_package.clone());
+
+        Ok(chord_package)
+    }
+
+    fn get_package_name_from_package_json(&self, raw_chord_package: &RawChordPackage) -> anyhow::Result<Option<String>> {
+        if let Some(package_json_contents) = &raw_chord_package.package_json_contents {
+            let json: serde_json::Value = serde_json::from_str(package_json_contents)?;
+            Ok(json.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()))
+        } else {
+            Ok(None)
         }
+    }
 
-        {
-            let mut map = self.runtime_index.lock().expect("poisoned");
-            *map = runtime_index;
+    fn get_package_name(&self, raw_chord_package: &RawChordPackage) -> anyhow::Result<String> {
+        if let Some(name) = self.get_package_name_from_package_json(raw_chord_package)? {
+            Ok(name)
+        } else {
+            Ok(raw_chord_package.dirname.clone())
         }
-
-        {
-            let mut map = self.runtimes.lock().expect("poisoned");
-            *map = runtimes;
-        }
-
-        let raw_files_as_json_strings = raw_files_map
-            .iter()
-            .map(|(k, v)| Ok((k.clone(), serde_json::to_string(v)?)))
-            .collect::<anyhow::Result<HashMap<_, _>>>()?;
-        log::debug!("Setting {} raw files", raw_files_as_json_strings.len());
-        self.observable.set_state(ChordFilesState {
-            raw_files_as_json_strings,
-            placeholder_chords,
-            loaded_packages,
-        })?;
-
-        Ok(())
     }
 }
-

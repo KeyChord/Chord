@@ -1,6 +1,5 @@
 use crate::app::chord_package_registry::ChordPackageRegistry;
-use crate::app::chord_runner::ChordRunner;
-use crate::app::chord_runner::registry::ChordRunnerRegistry;
+use crate::app::chord_runner::{ChordActionTaskRunner};
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
 use crate::app::desktop_app::DesktopAppManager;
@@ -20,6 +19,8 @@ use crate::observables::{
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
+use crate::app::chord_js_package_registry::ChordJsPackageRegistry;
+use crate::app::chord_package_manager::ChordPackageManager;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -58,15 +59,13 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
             permissions_observable.clone(),
         )?,
         settings: AppSettings::new(safe_handle.clone(), settings_observable.clone())?,
-        chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
+        chord_package_registry: ChordPackageRegistry::new_empty(safe_handle.clone())?,
+        chord_js_package_registry: ChordJsPackageRegistry::new(safe_handle.clone()),
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRunnerRegistry::new_empty(
-            safe_handle.clone(),
-            chord_files_observable.clone(),
-        ),
-        chord_runner: ChordRunner::new(safe_handle.clone()),
+        chord_package_manager: ChordPackageManager::new(safe_handle.clone()),
+        chord_action_task_runner: ChordActionTaskRunner::new(safe_handle.clone()),
         desktop_app_manager: DesktopAppManager::new(
             safe_handle.clone(),
             desktop_app_manager_observable,
@@ -75,7 +74,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
-    tauri::async_runtime::spawn(load_chords(handle.clone()));
+    tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
     tauri::async_runtime::spawn(load_permissions(handle.clone()));
 
     // Create tray
@@ -93,17 +92,12 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn load_chords(handle: AppHandle) -> anyhow::Result<()> {
-    let chord_packages = handle.app_chord_package_registry().load_all_chord_packages()?;
-    let chord_registry = handle.app_chord_registry();
-    log::debug!(
-        "Loading packages: {:?}",
-        chord_packages
-            .iter()
-            .map(|p| p.root_dir.clone())
-            .collect::<Vec<_>>()
-    );
-    chord_registry.load_packages(chord_packages).await?;
+async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
+    let raw_chord_packages = handle.app_chord_package_registry().import_all_packages()?;
+    let chord_package_manager = handle.chord_package_manager();
+    for raw_chord_package in raw_chord_packages {
+        chord_package_manager.load_package(raw_chord_package).await?;
+    }
     Ok(())
 }
 

@@ -1,13 +1,15 @@
 use crate::app::SafeAppHandle;
-use crate::app::chord_package::ChordPackage;
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use fast_radix_trie::StringRadixMap;
 use tauri::Wry;
 use tauri_plugin_store::Store;
+use walkdir::WalkDir;
+use crate::models::RawChordPackage;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -26,9 +28,6 @@ impl LocalChordPackage {
         &self.path
     }
 
-    pub fn load(&self) -> anyhow::Result<ChordPackage> {
-        ChordPackage::load_from_local_folder(&self.path)
-    }
 }
 
 pub struct LocalPackageRegistry {
@@ -40,15 +39,14 @@ impl LocalPackageRegistry {
         Self { safe_handle }
     }
 
-    pub fn list(&self) -> anyhow::Result<Vec<LocalChordPackage>> {
+    pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
             .read_paths()?
             .into_iter()
             .map(PathBuf::from)
-            .map(LocalChordPackage::new)
             .collect::<Vec<_>>();
 
-        packages.sort_by(|left, right| left.path().cmp(right.path()));
+        packages.sort_by(|left, right| left.cmp(right));
         Ok(packages)
     }
 
@@ -83,16 +81,16 @@ impl LocalPackageRegistry {
         Ok(package)
     }
 
-    pub fn load_all_packages(&self) -> anyhow::Result<Vec<ChordPackage>> {
+    pub fn import_all_packages(&self) -> anyhow::Result<Vec<RawChordPackage>> {
         let mut packages = Vec::new();
 
-        for local_package in self.list()? {
-            match local_package.load() {
+        for local_package_path in self.list_package_paths()? {
+            match Self::import_from_local_folder(local_package_path.as_path()) {
                 Ok(package) => packages.push(package),
                 Err(error) => {
                     log::warn!(
-                        "Skipping local folder {}: {error}",
-                        local_package.path().display()
+                        "Error importing local folder {}: {error}, skipping",
+                        local_package_path.display()
                     );
                 }
             }
@@ -142,4 +140,68 @@ impl LocalPackageRegistry {
 
         Ok(canonical_path)
     }
+
+    pub fn import_from_local_folder(root: &Path) -> anyhow::Result<RawChordPackage> {
+        let mut chords_files_contents = StringRadixMap::new();
+        let mut js_files_contents = StringRadixMap::new();
+        let mut bin_files_contents = StringRadixMap::new();
+
+        let dirname = root.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
+
+        // --- walk only specific dirs ---
+        for dir in ["chords", "js", "bin"] {
+            let dir_path = root.join(dir);
+
+            if !dir_path.exists() {
+                continue;
+            }
+
+            for entry in WalkDir::new(&dir_path) {
+                let entry = entry?;
+                let path = entry.path();
+
+                if !path.is_file() {
+                    continue;
+                }
+
+                let relative_path = path.strip_prefix(root)?;
+                let key = relative_path.to_string_lossy().to_string();
+
+                match dir {
+                    "chords" => {
+                        if is_supported_macos_chord_filename(relative_path) {
+                            let content = fs::read_to_string(path)?;
+                            chords_files_contents.insert(key, content);
+                        }
+                    }
+                    "js" => {
+                        let content = fs::read_to_string(path)?;
+                        js_files_contents.insert(key, content);
+                    }
+                    "bin" => {
+                        let content = fs::read(path)?;
+                        bin_files_contents.insert(key, content);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(RawChordPackage {
+            dirname,
+            package_json_contents,
+            chords_files_contents,
+            js_files_contents,
+            bin_files_contents,
+        })
+    }
+}
+
+fn is_supported_macos_chord_filename(path: &Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+
+    file_name == "macos.toml" || file_name.ends_with(".macos.toml")
 }
