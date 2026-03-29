@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use serde::Serialize;
+use typeshare::typeshare;
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::models::{Chord, ChordInput, ChordString, ChordsFile};
 
 type AppBundleId = String;
 
-#[derive(Clone)]
+#[typeshare]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChordPackage {
     /// The `name` property of the `package.json` file; defaults to the folder name if not present.
     pub name: String,

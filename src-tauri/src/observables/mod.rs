@@ -3,6 +3,8 @@ use crate::app::SafeAppHandle;
 
 mod chord_files;
 pub use chord_files::*;
+mod chord_package_manager;
+pub use chord_package_manager::*;
 mod chorder;
 pub use chorder::*;
 mod desktop_app_manager;

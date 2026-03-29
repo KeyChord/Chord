@@ -2,10 +2,13 @@ use bitflags::__private::serde::Serializer;
 use regex::Regex;
 use serde::ser::SerializeStruct;
 use serde::Serialize;
+use typeshare::typeshare;
 use crate::input::Key;
 
+#[typeshare]
 #[derive(Debug, Serialize, Clone)]
 pub struct ChordHint {
+    #[typeshare(typescript(type = "any"))]
     pub pattern: ChordHintPattern,
     pub description: String
 }

@@ -5,101 +5,151 @@
 export type Key = string;
 
 export interface AppPermissionsState {
-	isAutostartEnabled?: boolean
-	isInputMonitoringEnabled?: boolean
-	isAccessibilityEnabled?: boolean
+	isAutostartEnabled?: boolean;
+	isInputMonitoringEnabled?: boolean;
+	isAccessibilityEnabled?: boolean;
 }
 
 export interface AppSettingsState {
-	bundleIdsNeedingRelaunch: string[]
-	showMenuBarIcon: boolean
-	showDockIcon: boolean
-	hideGuideByDefault: boolean
+	bundleIdsNeedingRelaunch: string[];
+	showMenuBarIcon: boolean;
+	showDockIcon: boolean;
+	hideGuideByDefault: boolean;
 }
 
-export interface ShortcutChord {
-	keys: Key[]
-}
+export type ChordAction = 
+	| { type: "Shortcut", content: ShortcutChordAction }
+	| { type: "Shell", content: ShellChordAction }
+	| { type: "Javascript", content: JavascriptChordAction };
 
-/** Represents a parsed keyboard shortcut, e.g. "cmd+shift+n". */
-export interface Shortcut {
-	chords: ShortcutChord[]
-}
-
-export type ChordJsArgs
-	= | { type: 'Eval', value: string };
-
-export interface ChordJsInvocation {
-	export_name: string
-	args: ChordJsArgs
-}
-
+/** A regular chord entry composed of static characters */
 export interface Chord {
-	keys: Key[]
-	index: number
-	name: string
-	shortcut?: Shortcut
-	shell?: string
-	js?: ChordJsInvocation
+	string_key: ChordString;
+	/** The keys that make up the chord (extracted from the TOML key) */
+	trigger: ChordTrigger;
+	/** A mandatory chord name */
+	name: string;
+	/** The relative index of the chord inside the TOML file */
+	index: number;
+	/** A list of actions (as fallbacks) to execute when the chord is triggered */
+	actions: ChordAction[];
+}
+
+export interface ChordActionTask {
+	action: ChordAction;
+	num_times: number;
 }
 
 export interface PlaceholderChordInfo {
-	filePath: string
-	scope: string
-	scopeKind: string
-	name: string
-	placeholder: string
-	sequenceTemplate: string
-	sequencePrefix: string
-	sequenceSuffix: string
-	assignedSequence?: string
+	filePath: string;
+	scope: string;
+	scopeKind: string;
+	name: string;
+	placeholder: string;
+	sequenceTemplate: string;
+	sequencePrefix: string;
+	sequenceSuffix: string;
+	assignedSequence?: string;
 }
 
 export interface LoadedChordPackageInfo {
-	name: string
-	kind: string
-	path: string
+	name: string;
+	kind: string;
+	path: string;
 }
 
 export interface ChordFilesState {
-	rawFilesAsJsonStrings: Record<string, string>
-	placeholderChords: PlaceholderChordInfo[]
-	loadedPackages: LoadedChordPackageInfo[]
+	rawFilesAsJsonStrings: Record<string, string>;
+	placeholderChords: PlaceholderChordInfo[];
+	loadedPackages: LoadedChordPackageInfo[];
+}
+
+export interface ChordHint {
+	pattern: any;
+	description: string;
+}
+
+export interface ChordsFile {
+	name: string;
+	meta: Record<string, string>;
+	relpath: string;
+	js: Record<string, string>;
+	chords: Chord[];
+	chordHints: ChordHint[];
+}
+
+export interface ChordPackage {
+	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
+	name: string;
+	jsPackage?: ChordJsPackage;
+	appChordsFiles: Record<AppBundleId, ChordsFile>;
+	globalChords: Record<ChordString, Chord>;
+}
+
+export interface ChordPackageManagerState {
+	packages: ChordPackage[];
 }
 
 export interface ChorderState {
-	keyBuffer: Key[]
-	pressedChord?: Chord
-	activeChord?: Chord
-	isShiftPressed: boolean
-	isIndicatorVisible: boolean
+	keyBuffer: Key[];
+	pressedChordKeys?: Key[];
+	activeChordKeys?: Key[];
+	isShiftPressed: boolean;
+	isIndicatorVisible: boolean;
 }
 
 export interface DesktopAppMetadata {
-	bundleId: string
-	displayName?: string
-	iconDataUrl?: string
+	bundleId: string;
+	displayName?: string;
+	iconDataUrl?: string;
 }
 
 export interface DesktopAppManagerState {
-	appsNeedingRelaunch: string[]
-	appsMetadata: Record<string, DesktopAppMetadata>
+	appsNeedingRelaunch: string[];
+	appsMetadata: Record<string, DesktopAppMetadata>;
+}
+
+export interface ExportedFunctionInvocation {
+	export_name: string;
+	args: Value[];
 }
 
 export interface FrontmostState {
-	frontmostAppBundleId?: string
+	frontmostAppBundleId?: string;
 }
 
 export interface GitRepo {
-	owner: string
-	name: string
-	slug: string
-	url: string
-	localPath: string
-	headShortSha?: string
-	pinnedRev?: string
+	owner: string;
+	name: string;
+	slug: string;
+	url: string;
+	localPath: PathBuf;
+	headShortSha?: string;
+	pinnedRev?: string;
 }
 
 export interface GitReposState {
-	repos: Record<string, GitRepo>
+	repos: Record<string, GitRepo>;
 }
+
+export interface JavascriptChordAction {
+	module_specifier: string;
+	args: Value[];
+}
+
+export interface ShellChordAction {
+	command: string;
+}
+
+export interface SimulatedShortcutChord {
+	keys: Key[];
+}
+
+export interface SimulatedShortcut {
+	chords: SimulatedShortcutChord[];
+}
+
+export interface ShortcutChordAction {
+	simulated_shortcut: SimulatedShortcut;
+}
+

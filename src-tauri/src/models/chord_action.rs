@@ -4,6 +4,7 @@ use crate::models::shortcut_simulation::SimulatedShortcut;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", content = "content")]
 pub enum ChordAction {
     Shortcut(ShortcutChordAction),
     Shell(ShellChordAction),

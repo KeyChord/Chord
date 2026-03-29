@@ -4,8 +4,11 @@ use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, JavascriptChord
 use crate::input::Key;
 use std::str::FromStr;
 use regex::Regex;
+use typeshare::typeshare;
 
+#[typeshare]
 #[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ChordsFile {
     pub name: String,
     pub meta: HashMap<String, String>,

@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import { useChordFilesState } from '../../utils/state.ts';
 
 export function ChordsTab() {
-	const { loadedPackages } = useChordFilesState();
+	const { loadedPackages } = use();
 	const addLocalChordFolderMutation = useMutation({
 		mutationFn: taurpc.addLocalChordFolder,
 	});

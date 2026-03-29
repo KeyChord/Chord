@@ -10,20 +10,23 @@ use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use gix::bstr::ByteVec;
 use parking_lot::RwLock;
+use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 
 pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
     pub registry: ChordPackageRegistry,
 
+    observable: ChordPackageManagerObservable,
     handle: SafeAppHandle,
 }
 
 
 impl ChordPackageManager {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
+    pub fn new(handle: SafeAppHandle, observable: ChordPackageManagerObservable) -> Result<Self> {
         Ok(Self {
             packages: RwLock::new(HashMap::new()),
             registry: ChordPackageRegistry::new_empty(handle.clone())?,
+            observable,
             handle
         })
     }
@@ -32,9 +35,13 @@ impl ChordPackageManager {
         let raw_chord_packages = self.registry.import_all_packages()?;
         self.packages.write().clear();
 
+        let mut chord_packages = Vec::new();
         for raw_chord_package in raw_chord_packages {
-            self.load_package(raw_chord_package).await?;
+            chord_packages.push(self.load_package(raw_chord_package).await?);
         }
+        self.observable.set_state(ChordPackageManagerState {
+            packages: chord_packages
+        })?;
 
         Ok(())
     }

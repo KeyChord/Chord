@@ -1,13 +1,16 @@
+use std::collections::HashMap;
 use fast_radix_trie::StringRadixMap;
+use serde::Serialize;
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChordJsPackage {
     /// The keys are just the file relpaths, e.g. `js/menu.js`
-    exported_files: StringRadixMap<String>
+    exported_files: HashMap<String, String>
 }
 
 impl ChordJsPackage {
-    pub fn new(exported_files: StringRadixMap<String>) -> Self {
+    pub fn new(exported_files: HashMap<String, String>) -> Self {
         Self { exported_files }
     }
 

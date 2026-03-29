@@ -4,7 +4,6 @@ use crate::input::Key;
 use typeshare::typeshare;
 
 
-#[typeshare]
 #[derive(Debug, Clone)]
 pub enum ChordTrigger {
     Keys(Vec<Key>),
