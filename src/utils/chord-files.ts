@@ -1,4 +1,4 @@
-import type { PlaceholderChordInfo } from '#/types/generated.ts';
+import type { ChordPackage, PlaceholderChordInfo } from '#/types/generated.ts';
 import mapObject from 'map-obj';
 import { useChordPackageManagerState } from './state.ts';
 
@@ -41,58 +41,22 @@ function materializePlaceholderChords(
 	};
 }
 
-function resolveRawFiles(
-	rawFilesAsJsonStrings: Record<string, string>,
-	placeholderChords: PlaceholderChordInfo[],
-) {
-	const placeholdersByFile = placeholderChords.reduce<Record<string, PlaceholderChordInfo[]>>(
-		(result, placeholder) => {
-			result[placeholder.filePath] ??= [];
-			result[placeholder.filePath].push(placeholder);
-			return result;
-		},
-		{},
-	);
-
-	return mapObject(rawFilesAsJsonStrings, (filePath, value) => {
-		const file = JSON.parse(value) as RawChordFile;
-		return [filePath, materializePlaceholderChords(file, placeholdersByFile[filePath] ?? [])];
-	});
-}
-
 // The reason why we do one chord file at a time is because resolving is expensive
 export function useChordFile(bundleId: string | undefined): Record<string, RawChord> {
 	// const { rawFilesAsJsonStrings, placeholderChords } = useChordFilesState();
   const { packages } = useChordPackageManagerState();
-
-	const rawFilesAsJson = resolveRawFiles({}, []);
-	const chords = getGlobalChords(rawFilesAsJson);
-
-	if (bundleId !== undefined) {
-		for (const [sequence, chord] of Object.entries(resolveChords(rawFilesAsJson, bundleId))) {
-			chords[sequence] = chord;
-		}
-	}
+	const chords = getGlobalChords(packages);
 
 	return chords;
 }
 
-function getGlobalChords(rawFilesAsJson: Record<string, RawChordFile>) {
-	const chords: Record<string, RawChord> = {};
+function getGlobalChords(packages: ChordPackage[]) {
+	const globalChords: Record<string, RawChord> = {};
+  for (const pkg of packages) {
+    Object.assign(globalChords, pkg.globalChords);
+  }
 
-	for (const [filePath, file] of sortedChordFileEntries(rawFilesAsJson)) {
-		if (bundleIdFromFilePath(filePath) !== GLOBAL_RUNTIME_ID) {
-			continue;
-		}
-
-		for (const [sequence, chord] of Object.entries(file.chords ?? {})) {
-			if (sequence[0]?.toUpperCase() === sequence[0]) {
-				chords[sequence] = Array.isArray(chord) ? chord[0] : chord;
-			}
-		}
-	}
-
-	return chords;
+	return globalChords;
 }
 
 function supportedChordFileName(fileName: string) {
@@ -117,48 +81,4 @@ function runtimeInfoFromFilePath(filePath: string) {
 		: `${bundleId}#${fileName.slice(0, -'.macos.toml'.length)}`;
 
 	return { bundleId, runtimeId };
-}
-
-function sortedChordFileEntries(rawFilesAsJson: Record<string, RawChordFile>) {
-	return Object.entries(rawFilesAsJson).sort(([leftPath], [rightPath]) => {
-		const leftIsBase = leftPath.endsWith('/macos.toml') || leftPath === 'chords/macos.toml';
-		const rightIsBase = rightPath.endsWith('/macos.toml') || rightPath === 'chords/macos.toml';
-		return Number(rightIsBase) - Number(leftIsBase) || leftPath.localeCompare(rightPath);
-	});
-}
-
-function bundleIdFromFilePath(filePath: string) {
-	return runtimeInfoFromFilePath(filePath)?.bundleId;
-}
-
-function resolveChordsForFile(
-	rawFilesAsJson: Record<string, RawChordFile>,
-	filePath: string,
-): Record<string, RawChord> {
-	const file = rawFilesAsJson[filePath] ?? {};
-	return mapObject(file.chords ?? {}, (key, value) => {
-		if (Array.isArray(value)) {
-			return [key, value[0]];
-		}
-
-		return [key, value];
-	});
-}
-
-function resolveChords(
-	rawFilesAsJson: Record<string, RawChordFile>,
-	bundleId: string,
-): Record<string, RawChord> {
-	const chords: Record<string, RawChord> = {};
-	const filePaths = sortedChordFileEntries(rawFilesAsJson)
-		.map(([filePath]) => filePath)
-		.filter(filePath => bundleIdFromFilePath(filePath) === bundleId);
-
-	for (const filePath of filePaths) {
-		for (const [sequence, chord] of Object.entries(resolveChordsForFile(rawFilesAsJson, filePath))) {
-			chords[sequence] = chord;
-		}
-	}
-
-	return chords;
 }
