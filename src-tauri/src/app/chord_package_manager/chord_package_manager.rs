@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
 use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage};
@@ -7,8 +6,10 @@ use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::app::SafeAppHandle;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
-use crate::quickjs::with_js;
-use anyhow::Result;
+use crate::quickjs::{format_js_error, with_js};
+use anyhow::{Context, Result};
+use gix::bstr::ByteVec;
+use parking_lot::RwLock;
 
 pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
@@ -29,7 +30,8 @@ impl ChordPackageManager {
 
     pub async fn reload_all(&self) -> Result<()> {
         let raw_chord_packages = self.registry.import_all_packages()?;
-        self.packages.write().expect("poisoned").clear();
+        self.packages.write().clear();
+
         for raw_chord_package in raw_chord_packages {
             self.load_package(raw_chord_package).await?;
         }
@@ -38,7 +40,7 @@ impl ChordPackageManager {
     }
 
     pub fn get_package_by_name(&self, package_name: &str) -> Option<ChordPackage> {
-        self.packages.read().unwrap().get(package_name).cloned()
+        self.packages.read().get(package_name).cloned()
     }
 
     pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
@@ -59,14 +61,11 @@ impl ChordPackageManager {
                 }
             }
 
-            if path.starts_with("chords/") && path.ends_with("/macos.toml") {
-                let bundle_id = &path[7..path.len() - 11];
-                let bundle_id = bundle_id.replace('/', ".");
+            if let Some(inner) = path.strip_prefix("chords/").and_then(|p| p.strip_suffix("/macos.toml")) {
+                let bundle_id = inner.replace('/', ".");
                 app_chords_files.insert(bundle_id, chords_file);
-            } else if path == "chords/macos.toml" {
-                // If it's directly under chords/, we can treat it as a special case or ignore if it needs a bundle ID
-                // For now, let's assume it might be for a 'global' context or similar if it has no bundle ID path
-                app_chords_files.insert("".to_string(), chords_file);
+            } else {
+                app_chords_files.insert("/global".to_string(), chords_file);
             }
         }
 
@@ -82,7 +81,7 @@ impl ChordPackageManager {
             global_chords
         };
 
-        self.packages.write().unwrap().insert(name, chord_package.clone());
+        self.packages.write().insert(name, chord_package.clone());
 
         Ok(chord_package)
     }
@@ -101,7 +100,14 @@ impl ChordPackageManager {
             let js_string = js.clone();
             with_js(handle.clone(), move |ctx| {
                 Box::pin(async move {
-                    let module = Module::declare(ctx.clone(), package_name_bytes, js_string)?;
+                    let module = Module::declare(ctx.clone(), package_name_bytes.clone(), js_string.clone()).map_err(
+                        |e| anyhow::format_err!(
+                            "error declaring module {:?}\nerror:{}\nfile:\n{}",
+                            package_name_bytes.clone().into_string(),
+                            format_js_error(&ctx, e),
+                            js_string.clone()
+                        )
+                    )?;
                     let meta = module.meta()?;
                     meta.set("url", file_relpath)?;
                     let (_evaluated, promise) = module.eval()?;
@@ -134,7 +140,7 @@ impl ChordPackageManager {
     }
 
     pub fn resolve_package_for_input(&self, input: &ChordInput) -> Option<ChordPackage> {
-        let packages = self.packages.read().unwrap();
+        let packages = self.packages.read();
 
         if let Some(app_id) = &input.application_id {
             for package in packages.values() {

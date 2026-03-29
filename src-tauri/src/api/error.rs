@@ -10,6 +10,8 @@ pub enum AppError {
 
 impl From<anyhow::Error> for AppError {
     fn from(e: anyhow::Error) -> Self {
+        let full_detail = format!("{:?}", e);
+        eprintln!("Error occurred: {}", full_detail);
         AppError::Message(e.to_string())
     }
 }

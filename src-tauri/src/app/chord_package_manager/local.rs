@@ -176,8 +176,10 @@ impl LocalPackageRegistry {
                         }
                     }
                     "js" => {
-                        let content = fs::read_to_string(path)?;
-                        js_files_contents.insert(key, content);
+                        if path.ends_with(".js") {
+                            let content = fs::read_to_string(path)?;
+                            js_files_contents.insert(key, content);
+                        }
                     }
                     "bin" => {
                         let content = fs::read(path)?;
