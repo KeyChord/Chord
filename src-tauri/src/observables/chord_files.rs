@@ -19,11 +19,21 @@ pub struct PlaceholderChordInfo {
 }
 
 #[typeshare]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoadedChordPackageInfo {
+    pub name: String,
+    pub kind: String,
+    pub path: String,
+}
+
+#[typeshare]
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordFilesState {
     pub raw_files_as_json_strings: HashMap<String, String>,
     pub placeholder_chords: Vec<PlaceholderChordInfo>,
+    pub loaded_packages: Vec<LoadedChordPackageInfo>,
 }
 
 define_observable!(

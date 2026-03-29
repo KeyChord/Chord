@@ -55,9 +55,16 @@ export interface PlaceholderChordInfo {
 	assignedSequence?: string
 }
 
+export interface LoadedChordPackageInfo {
+	name: string
+	kind: string
+	path: string
+}
+
 export interface ChordFilesState {
 	rawFilesAsJsonStrings: Record<string, string>
 	placeholderChords: PlaceholderChordInfo[]
+	loadedPackages: LoadedChordPackageInfo[]
 }
 
 export interface ChorderState {

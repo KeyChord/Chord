@@ -1,7 +1,5 @@
 use crate::api::{Api, ApiImpl};
-#[allow(unused_imports)]
 use crate::app::{AppHandleExt, SafeAppHandle};
-#[allow(unused_imports)]
 use crate::observables::{ChorderObservable, GitReposObservable};
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
@@ -20,6 +18,7 @@ mod constants;
 pub mod git;
 mod input;
 mod mode;
+mod models;
 mod observables;
 mod quickjs;
 mod setup;

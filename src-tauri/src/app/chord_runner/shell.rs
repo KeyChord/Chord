@@ -1,20 +1,37 @@
 use crate::app::SafeAppHandle;
 use tokio::process::Command;
+use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun, ChordActionTaskRunner};
+use crate::models::{ChordAction, ChordShellAction};
 
-pub struct ChordShellRunner {
+pub struct ShellChordActionTaskRunner {
     _handle: SafeAppHandle,
 }
 
-impl ChordShellRunner {
+impl ShellChordActionTaskRunner {
     pub fn new(handle: SafeAppHandle) -> Self {
         Self { _handle: handle }
     }
+}
 
-    pub fn run_shell_command(&self, shell: String) {
-        tauri::async_runtime::spawn(async move {
-            run_shell_command(shell).await;
+impl ChordActionTaskRunner for ShellChordActionTaskRunner {
+    fn start(&self, task: ChordActionTask) -> Result<Option<ChordActionTaskRun>> {
+        let ChordAction::Shell(action) = task.action else {
+            return Ok(None);
+        };
+
+        let join_handle = tauri::async_runtime::spawn(async move {
+            run_shell_command(action.command.clone()).await
         });
+
+        Ok(Some(ChordActionTaskRun {
+            id: 0,
+            task
+        }))
     }
+
+    fn end() {}
+
+    fn abort(&self) {}
 }
 
 async fn run_shell_command(shell: String) {

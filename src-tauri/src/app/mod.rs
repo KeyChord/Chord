@@ -4,6 +4,7 @@ pub use safe_app_handle::SafeAppHandle;
 // App globals
 pub mod chord_package;
 pub mod chord_package_registry;
+pub mod chord_js_package_registry;
 pub mod chord_runner;
 pub mod chorder;
 pub mod context;
@@ -15,6 +16,7 @@ pub mod global_hotkey_store;
 pub mod permissions;
 pub mod placeholder_chord_store;
 pub mod settings;
+mod chord_package_manager;
 
 macro_rules! define_app_managed {
     (
@@ -66,6 +68,7 @@ macro_rules! define_app_managed {
 define_app_managed! {
     chord_runner: self::chord_runner::ChordRunner => chord_runner,
     chord_package_registry: self::chord_package_registry::ChordPackageRegistry => app_chord_package_registry,
+    chord_js_package_registry: self::chord_js_package_registry::ChordJsPackageRegistry => app_chord_js_package_registry,
     chord_registry: self::chord_runner::registry::ChordRunnerRegistry => app_chord_registry,
     dev_lockfile_detector: self::dev_lockfile_detector::DevLockfileDetector => app_dev_lockfile_detector,
     desktop_app_manager: self::desktop_app::DesktopAppManager => desktop_app_manager,

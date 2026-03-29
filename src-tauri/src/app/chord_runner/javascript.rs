@@ -1,3 +1,4 @@
+use std::pin::Pin;
 use crate::app::SafeAppHandle;
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::Result;
@@ -7,96 +8,111 @@ use llrt_core::libs::utils::result::ResultExt;
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
 use serde::Serialize;
 use typeshare::typeshare;
+use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun, ChordActionTaskRunner};
+use crate::models::{ChordAction, ChordJavascriptAction};
+
+#[typeshare(typescript(type = "any"))]
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ExportedFunctionInvocation {
+    pub export_name: String,
+    pub args: Vec<toml::Value>,
+}
 
 #[derive(Clone)]
-pub struct ChordJavascriptRunner {
+pub struct JavascriptChordActionTaskRunner {
     handle: SafeAppHandle,
 }
 
-#[typeshare(typescript(type = "any"))]
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "type", content = "value")]
-pub enum ChordJsArgs {
-    #[typeshare(skip)]
-    Values(Vec<toml::Value>),
-    Eval(String),
+struct JavascriptChordActionTaskRun {
+    id: u32,
+    future: Pin<Box<dyn Future<Output = ()> + Send>>,
 }
 
-#[typeshare(typescript(type = "any"))]
-#[derive(Debug, Clone, PartialEq, Serialize)]
-pub struct ChordJsInvocation {
-    pub export_name: String,
-    pub args: ChordJsArgs,
+impl ChordActionTaskRun for JavascriptChordActionTaskRun {
+    fn id(&self) -> u32 {
+        self.id
+    }
 }
 
-impl ChordJavascriptRunner {
+impl JavascriptChordActionTaskRunner {
     pub fn new(handle: SafeAppHandle) -> Self {
         Self { handle }
     }
+}
 
-    pub async fn execute_chord_javascript(
-        &self,
-        module_path: String,
-        invocation: ChordJsInvocation,
-        num_times: usize,
-    ) -> Result<()> {
+impl ChordActionTaskRunner for JavascriptChordActionTaskRunner {
+    fn start(&self, task: ChordActionTask) -> Result<Option<Box<dyn ChordActionTaskRun>>> {
+        let ChordAction::Javascript(action) = task.action else {
+            return Ok(None);
+        };
+
         let handle = self.handle.try_handle()?;
-        let export_name = invocation.export_name.clone();
-        let module_path_for_error = module_path.clone();
+        let export_name = action.export_name.clone();
 
-        with_js(handle.clone(), move |ctx| {
+        let future = with_js(handle.clone(), move |ctx| {
+            let args = convert_js_args(&ctx, action.args.clone());
+
             Box::pin(async move {
-                call_js_export(ctx.clone(), module_path, invocation, num_times)
-                    .await
-                    .map_err(|error| {
-                        anyhow::anyhow!(
-                            "failed to execute JS export `{}` from `{}`:\n{}",
-                            export_name,
-                            module_path_for_error,
-                            format_js_error(&ctx, error)
-                        )
-                    })
-            })
-        })
-        .await?;
+                for _ in 0..task.num_times {
+                    call_js_export(ctx.clone(), "todo".into(), action.export_name, args?)
+                        .await
+                        .map_err(|error| {
+                            anyhow::anyhow!(
+                                "failed to execute JS export `{}`:\n{}",
+                                export_name,
+                                format_js_error(&ctx, error)
+                            )
+                        })?;
+                }
 
-        Ok(())
+                Ok(())
+            })
+        });
+
+        let task_run: Option<Box<dyn ChordActionTaskRun>> = Some(
+            Box::new(JavascriptChordActionTaskRun {
+                id: 0,
+                future: Box::pin(future) as Pin<Box<dyn Future<Output = ()> + Send>>,
+            })
+        );
+
+        Ok(task_run)
     }
+
+    /// No-op (most of the time). In the future, we'll likely return an object
+    fn end(&self, task_run: JavascriptChordActionTaskRun) {}
+    fn abort(&self, task_run: JavascriptChordActionTaskRun) {}
 }
 
 async fn call_js_export<'js>(
     ctx: Ctx<'js>,
     module_path: String,
-    invocation: ChordJsInvocation,
-    num_times: usize,
+    export_name: String,
+    args: Vec<Value<'js>>,
 ) -> rquickjs::Result<()> {
-    for _ in 0..num_times {
-        let export_name = invocation.export_name.clone();
-        let module_promise = Module::import(&ctx, module_path.to_string())?;
-        let module = module_promise.into_future::<Object>().await?;
-        let mut export: Value<'js> = module.get(export_name.clone())?;
-        if let Some(promise) = export.as_promise().cloned() {
-            export = promise.into_future::<Value<'js>>().await?;
-        }
-        let function = export.as_function().cloned().or_throw_msg(
-            &ctx,
-            &format!(
-                "JS export `{}` did not resolve to a function: {:?}",
-                export_name, export
-            ),
-        )?;
-        let args = convert_js_args(&ctx, invocation.args.clone())?;
-        let mut args_builder = Args::new(ctx.clone(), args.len());
-        for value in args {
-            args_builder.push_arg(value)?;
-        }
-        let mut result: Value<'js> = function.call_arg(args_builder)?;
-        if let Some(promise) = result.as_promise().cloned() {
-            result = promise.into_future::<Value<'js>>().await?;
-        }
-        if result.as_bool().is_some_and(|b| b == false) {
-            log::error!("Function {} returned false:", export_name)
-        }
+    let module_promise = Module::import(&ctx, module_path.to_string())?;
+    let module = module_promise.into_future::<Object>().await?;
+    let mut export: Value<'js> = module.get(export_name.clone())?;
+    if let Some(promise) = export.as_promise().cloned() {
+        export = promise.into_future::<Value<'js>>().await?;
+    }
+    let function = export.as_function().cloned().or_throw_msg(
+        &ctx,
+        &format!(
+            "JS export `{}` did not resolve to a function: {:?}",
+            export_name, export
+        ),
+    )?;
+    let mut args_builder = Args::new(ctx.clone(), args.len());
+    for value in args {
+        args_builder.push_arg(value)?;
+    }
+    let mut result: Value<'js> = function.call_arg(args_builder)?;
+    if let Some(promise) = result.as_promise().cloned() {
+        result = promise.into_future::<Value<'js>>().await?;
+    }
+    if result.as_bool().is_some_and(|b| b == false) {
+        log::error!("Function {} returned false:", export_name)
     }
 
     Ok(())

@@ -5,9 +5,8 @@ use llrt_core::libs::utils::result::ResultExt;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
-#[allow(unused_imports)]
 use rquickjs::{
-    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, Function, JsLifetime, Module, Object,
+    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, JsLifetime, Module, Object,
     Value,
     loader::{Loader, Resolver},
     module::Declared,
@@ -19,6 +18,8 @@ use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
+use crate::app::AppHandleExt;
+use crate::app::chord_js_package_registry::PackageSpecifier;
 
 mod chord_module;
 
@@ -108,21 +109,37 @@ impl ModuleResolver {
 }
 
 impl Resolver for ModuleResolver {
-    fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base: &str, name: &str) -> rquickjs::Result<String> {
-        // `.` from `.js`
-        if name.contains(".") || name == "chord" {
-            return Ok(name.into());
-        }
-
-        if name == "readline"
-            || name == "node:readline"
-            || name == "readline/promises"
-            || name == "node:readline/promises"
+    /// Our resolver ensures that modules within a js/ folder can ONLY access other JS files inside that
+    /// folder. Thus, we need to have a list of all the modules inside a specific chord package's JS
+    /// folder.
+    ///
+    /// To ensure consist module specifiers and avoid leaking implementation details in terms of
+    /// where the package is stored on the filesystem, the module specifier of a JavaScript file
+    /// in a chord package is always `name` + `relpath` (including /js/), e.g. `@keychord/chords-menu/js/menu.js`
+    fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base_module_specifier: &str, import_specifier: &str) -> rquickjs::Result<String> {
+        if import_specifier == "readline"
+            || import_specifier == "node:readline"
+            || import_specifier == "readline/promises"
+            || import_specifier == "node:readline/promises"
         {
             return Ok("readline".into());
         }
 
-        self.llrt_resolver.resolve(ctx, base, name)
+        let specifier = PackageSpecifier::parse(base_module_specifier);
+        let userdata = ctx.userdata::<AppUserData>();
+        if let Some(userdata) = userdata {
+            if let Some(handle) = &userdata.handle {
+                let js_package_registry = handle.app_chord_js_package_registry();
+                let js_package = js_package_registry.get_package_by_name(specifier.package);
+                if let Some(js_package) = js_package {
+                    if js_package.resolve_import(&import_specifier).is_some() {
+                        return Ok(format!("{}/{}", specifier.package, import_specifier))
+                    }
+                }
+            }
+        }
+
+        self.llrt_resolver.resolve(ctx, base_module_specifier, import_specifier)
     }
 }
 
@@ -135,22 +152,23 @@ impl ModuleLoader {
     pub fn new(llrt_loader: llrt_modules::module::loader::ModuleLoader) -> Self {
         Self { llrt_loader }
     }
+
+    fn get_module<'js>(&self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
+        let module = match name {
+            "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
+            "readline" | "node:readline" => {
+                Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
+            }
+            "readline/promises" | "node:readline/promises" => {
+                Module::declare_def::<ReadlinePromisesModule, _>(ctx.clone(), "readline/promises")
+            }
+            _ => return Ok(None),
+        };
+
+        Some(module).transpose()
+    }
 }
 
-fn get_module<'js>(ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
-    let module = match name {
-        "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
-        "readline" | "node:readline" => {
-            Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
-        }
-        "readline/promises" | "node:readline/promises" => {
-            Module::declare_def::<ReadlinePromisesModule, _>(ctx.clone(), "readline/promises")
-        }
-        _ => return Ok(None),
-    };
-
-    Some(module).transpose()
-}
 
 fn attempted_module_path(name: &str) -> String {
     let path = Path::new(name);
@@ -179,7 +197,7 @@ fn with_module_load_context(name: &str, error: Error) -> Error {
 
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
-        let module = get_module(ctx, name)?;
+        let module = self.get_module(ctx, name)?;
         Ok(match module {
             Some(module) => module,
             None => self
