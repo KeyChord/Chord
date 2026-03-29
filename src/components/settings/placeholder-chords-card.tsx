@@ -11,7 +11,7 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { Input } from '#/components/ui/input.tsx';
-import { useChordFilesState, useDesktopAppManagerState } from '#/utils/state.ts';
+import { useChordPackageManagerState, useDesktopAppManagerState } from '#/utils/state.ts';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -19,29 +19,10 @@ const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
 	const [input, setInput] = useState('');
-	const { placeholderChords } = useChordFilesState();
+	const { packages } = useChordPackageManagerState();
 	const { appsMetadata } = useDesktopAppManagerState();
 	const normalizedFilter = input.trim().toLowerCase();
-	const filteredPlaceholders = placeholderChords.filter((placeholder) => {
-		if (!normalizedFilter) {
-			return true;
-		}
-
-		const appLabel
-			= placeholder.scopeKind === 'app'
-				? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
-				: 'Global';
-
-		return [
-			placeholder.name,
-			placeholder.placeholder,
-			placeholder.sequenceTemplate,
-			placeholder.assignedSequence ?? '',
-			placeholder.scope,
-			appLabel,
-			placeholder.filePath,
-		].some(value => value.toLowerCase().includes(normalizedFilter));
-	});
+	const filteredPlaceholders: any[] = []
 
 	return (
 		<Card size="sm">
@@ -64,7 +45,6 @@ export function PlaceholderChordsCard() {
 						placeholder="Filter by app, chord, placeholder, sequence, or file"
 					/>
 					<Badge variant="outline" className="self-start sm:self-center">
-						{placeholderChords.length}
 						{' '}
 						placeholders
 					</Badge>
@@ -113,7 +93,7 @@ function PlaceholderChordRow({
 }: {
 	appLabel: string
 	appMetadata?: DesktopAppMetadata
-	placeholder: ReturnType<typeof useChordFilesState>['placeholderChords'][number]
+	placeholder: any
 }) {
 	const [draftSequence, setDraftSequence] = useState(placeholder.assignedSequence ?? '');
 	const setPlaceholderChordBindingMutation = useMutation({

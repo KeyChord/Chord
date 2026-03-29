@@ -11,10 +11,7 @@ use crate::app::placeholder_chord_store::PlaceholderChordStore;
 use crate::app::settings::AppSettings;
 use crate::app::{AppHandleExt, AppManaged, SafeAppHandle};
 use crate::lock_file::AppLockFile;
-use crate::observables::{
-    AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable,
-    DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable,
-};
+use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
@@ -38,9 +35,9 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         AppSettingsObservable::new(safe_handle.clone())?,
     );
     let frontmost_observable = manage(app.handle(), FrontmostObservable::new(safe_handle.clone())?);
-    let chord_files_observable = manage(
+    let chord_package_manager_observable = manage(
         app.handle(),
-        ChordFilesObservable::new(safe_handle.clone())?,
+        ChordPackageManagerObservable::new(safe_handle.clone())?,
     );
     let desktop_app_manager_observable = manage(
         app.handle(),
@@ -60,7 +57,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
         placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
         git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_package_manager: ChordPackageManager::new(safe_handle.clone())?,
+        chord_package_manager: ChordPackageManager::new(safe_handle.clone(), chord_package_manager_observable)?,
         chord_action_task_runner: ChordActionTaskRunner::new(safe_handle.clone()),
         desktop_app_manager: DesktopAppManager::new(
             safe_handle.clone(),

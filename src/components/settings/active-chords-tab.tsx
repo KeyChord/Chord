@@ -8,11 +8,11 @@ import {
 } from '#/components/ui/card.tsx';
 import { Input } from '#/components/ui/input.tsx';
 import { useState } from 'react';
-import { useChordFilesState } from '../../utils/state.ts';
+import { useChordPackageManagerState } from '../../utils/state.ts';
 
 export function ActiveChordsTab() {
 	const [searchInput, setSearchInput] = useState('');
-	const { rawFilesAsJsonStrings } = useChordFilesState();
+	const { packages } = useChordPackageManagerState();
 
 	return (
 		<Card size="sm">
@@ -32,7 +32,6 @@ export function ActiveChordsTab() {
 						placeholder="Filter by app, trigger, name, or action"
 					/>
 					<Badge variant="outline" className="self-start sm:self-center">
-						{Object.values(rawFilesAsJsonStrings).length}
 						{' '}
 						matches
 					</Badge>

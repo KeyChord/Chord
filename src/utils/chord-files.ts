@@ -1,6 +1,6 @@
 import type { PlaceholderChordInfo } from '#/types/generated.ts';
 import mapObject from 'map-obj';
-import { useChordFilesState } from './state.ts';
+import { useChordPackageManagerState } from './state.ts';
 
 interface RawChord {
 	index: number
@@ -62,8 +62,10 @@ function resolveRawFiles(
 
 // The reason why we do one chord file at a time is because resolving is expensive
 export function useChordFile(bundleId: string | undefined): Record<string, RawChord> {
-	const { rawFilesAsJsonStrings, placeholderChords } = useChordFilesState();
-	const rawFilesAsJson = resolveRawFiles(rawFilesAsJsonStrings, placeholderChords);
+	// const { rawFilesAsJsonStrings, placeholderChords } = useChordFilesState();
+  const { packages } = useChordPackageManagerState();
+
+	const rawFilesAsJson = resolveRawFiles({}, []);
 	const chords = getGlobalChords(rawFilesAsJson);
 
 	if (bundleId !== undefined) {

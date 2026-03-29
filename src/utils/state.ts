@@ -3,6 +3,7 @@ import type {
 	AppSettingsState,
 	ChorderState,
 	ChordFilesState,
+	ChordPackageManagerState,
 	DesktopAppManagerState,
 	FrontmostState,
 	GitReposState,
@@ -36,6 +37,6 @@ export const useChorderState = await createUseTauriState<ChorderState>('chorder'
 export const useSettingsState = await createUseTauriState<AppSettingsState>('settings');
 export const usePermissionsState = await createUseTauriState<AppPermissionsState>('permissions');
 export const useGitRepoStoreState = await createUseTauriState<GitReposState>('git-repos');
-export const useChordFilesState = await createUseTauriState<ChordFilesState>('chord-files');
 export const useFrontmostState = await createUseTauriState<FrontmostState>('frontmost');
+export const useChordPackageManagerState = await createUseTauriState<ChordPackageManagerState>('chord-package-manager');
 export const useDesktopAppManagerState = await createUseTauriState<DesktopAppManagerState>('desktop-app-manager');

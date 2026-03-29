@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage};
@@ -7,7 +8,7 @@ use crate::app::SafeAppHandle;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
 use crate::quickjs::{format_js_error, with_js};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use gix::bstr::ByteVec;
 use parking_lot::RwLock;
 use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
@@ -16,13 +17,13 @@ pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
     pub registry: ChordPackageRegistry,
 
-    observable: ChordPackageManagerObservable,
+    observable: Arc<ChordPackageManagerObservable>,
     handle: SafeAppHandle,
 }
 
 
 impl ChordPackageManager {
-    pub fn new(handle: SafeAppHandle, observable: ChordPackageManagerObservable) -> Result<Self> {
+    pub fn new(handle: SafeAppHandle, observable: Arc<ChordPackageManagerObservable>) -> Result<Self> {
         Ok(Self {
             packages: RwLock::new(HashMap::new()),
             registry: ChordPackageRegistry::new_empty(handle.clone())?,
@@ -99,7 +100,7 @@ impl ChordPackageManager {
         }
 
         let handle = self.handle.try_handle()?;
-        let mut exported_files = StringRadixMap::new();
+        let mut exported_files = HashMap::new();
 
         for (file_relpath, js) in files.iter() {
             let package_name_bytes = package_name.as_bytes().to_vec();

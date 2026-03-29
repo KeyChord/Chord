@@ -18,10 +18,10 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { FolderPlus, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChordFilesState } from '../../utils/state.ts';
+import { useChordPackageManagerState } from '../../utils/state.ts';
 
 export function ChordsTab() {
-	const { loadedPackages } = use();
+	const { packages } = useChordPackageManagerState();
 	const addLocalChordFolderMutation = useMutation({
 		mutationFn: taurpc.addLocalChordFolder,
 	});
@@ -53,7 +53,7 @@ export function ChordsTab() {
 					</div>
 					<div className="flex items-center gap-2">
 						<Badge variant="outline">
-							{loadedPackages.length}
+							{packages.length}
 							{' '}
 							loaded
 						</Badge>
@@ -72,7 +72,7 @@ export function ChordsTab() {
 				</div>
 			</CardHeader>
 			<CardContent className="space-y-3 pt-0">
-				{loadedPackages.length === 0
+				{packages.length === 0
 					? (
 							<Empty className="rounded-lg border bg-muted/20 py-10">
 								<EmptyHeader>
@@ -88,18 +88,14 @@ export function ChordsTab() {
 						)
 					: (
 							<div className="space-y-2">
-								{loadedPackages.map(chordPackage => (
+								{packages.map(pkg => (
 									<div
-										key={chordPackage.path}
+										key={pkg.name}
 										className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
 									>
 										<div className="min-w-0">
-											<p className="font-medium">{chordPackage.name}</p>
-											<p className="truncate text-xs text-muted-foreground">{chordPackage.path}</p>
+											<p className="font-medium">{pkg.name}</p>
 										</div>
-										<Badge variant={chordPackage.kind === 'Local' ? 'secondary' : 'outline'}>
-											{chordPackage.kind}
-										</Badge>
 									</div>
 								))}
 							</div>
