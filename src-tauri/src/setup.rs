@@ -19,7 +19,7 @@ use crate::observables::{
 use crate::tauri_app;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
-use crate::app::chord_js_package_registry::ChordJsPackageRegistry;
+use crate::app::chord_js_package::ChordJsPackageRegistry;
 use crate::app::chord_package_manager::ChordPackageManager;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895

@@ -1,10 +1,10 @@
+use crate::models::RawChordPackage;
 use crate::app::SafeAppHandle;
 
 mod git;
 pub use git::*;
 mod local;
 pub use local::*;
-use crate::models::RawChordPackage;
 
 pub struct ChordPackageRegistry {
     pub git: GitChordPackageRegistry,

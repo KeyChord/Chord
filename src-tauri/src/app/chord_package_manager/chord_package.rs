@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use crate::app::chord_js_package_registry::ChordJsPackage;
-use crate::input::Key;
+use crate::app::chord_package_manager::ChordJsPackage;
 use crate::models::{Chord, ChordInput, ChordString};
 use crate::models::chords_file::ChordsFile;
 

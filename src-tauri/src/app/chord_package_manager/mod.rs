@@ -1,14 +1,19 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
-use crate::app::chord_js_package_registry::ChordJsPackage;
 use crate::app::SafeAppHandle;
 use crate::models::{ChordInput, ChordPackage, RawChordPackage};
 use crate::models::chords_file::ChordsFile;
 use crate::input::Key;
 use fast_radix_trie::StringRadixMap;
+use anyhow
+::Result;
+use llrt_core::Module;
+use crate::quickjs::with_js;
 
-pub mod chord_package;
-
+mod chord_package;
+pub use chord_package::*;
+mod chord_js_package;
+pub use chord_js_package::*;
 
 pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
@@ -22,7 +27,17 @@ impl ChordPackageManager {
         Self { handle, packages: RwLock::new(HashMap::new()) }
     }
 
-    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> anyhow::Result<ChordPackage> {
+    pub async fn reload_all(&self) -> Result<()> {
+        for package in self.packages.read().unwrap().values() {
+        }
+        Ok(())
+    }
+
+    pub fn get_package_by_name(&self, package_name: &str) -> Option<ChordPackage> {
+        self.packages.read().unwrap().get(package_name).cloned()
+    }
+
+    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
         let name = self.get_package_name(&raw_chord_package)?;
         let mut app_chords_files = HashMap::new();
         let mut global_chords = HashMap::new();
@@ -51,16 +66,10 @@ impl ChordPackageManager {
             }
         }
 
-        let mut exported_files = StringRadixMap::new();
-        for (path, js) in raw_chord_package.js_files_contents {
-            exported_files.insert(path, js);
-        }
-
-        let js_package = if !exported_files.is_empty() {
-            Some(ChordJsPackage::new(exported_files))
-        } else {
-            None
-        };
+        let js_package = self.load_js_package(
+            &name,
+            &raw_chord_package.js_files_contents
+        ).await?;
 
         let chord_package = ChordPackage {
             name: name.clone(),
@@ -72,6 +81,35 @@ impl ChordPackageManager {
         self.packages.write().unwrap().insert(name, chord_package.clone());
 
         Ok(chord_package)
+    }
+
+    async fn load_js_package(&self, package_name: &str, files: &StringRadixMap<String>) -> Result<Option<ChordJsPackage>> {
+        if files.is_empty() {
+            return Ok(None)     ;
+        }
+
+        let handle = self.handle.try_handle()?;
+        let mut exported_files = StringRadixMap::new();
+
+        for (file_relpath, js) in files.iter() {
+            let package_name_bytes = package_name.as_bytes().to_vec();
+            exported_files.insert(file_relpath.clone(), js.clone());
+            let js_string = js.clone();
+            with_js(handle.clone(), move |ctx| {
+                Box::pin(async move {
+                    let module = Module::declare(ctx.clone(), package_name_bytes, js_string)?;
+                    let meta = module.meta()?;
+                    meta.set("url", file_relpath)?;
+                    let (_evaluated, promise) = module.eval()?;
+                    promise.into_future::<()>().await?;
+                    Ok(())
+                })
+            })
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+        };
+
+        Ok(Some(ChordJsPackage::new(exported_files)))
     }
 
     fn get_package_name_from_package_json(&self, raw_chord_package: &RawChordPackage) -> anyhow::Result<Option<String>> {
@@ -110,5 +148,23 @@ impl ChordPackageManager {
         }
 
         None
+    }
+}
+
+fn get_package_name(specifier: &str) -> &str {
+    if specifier.starts_with('@') {
+        // Scoped: @scope/name/...
+        let mut parts = specifier.splitn(3, '/');
+        match (parts.next(), parts.next()) {
+            (Some(scope), Some(name)) => {
+                // return "@scope/name"
+                let len = scope.len() + 1 + name.len();
+                &specifier[..len]
+            }
+            _ => specifier, // fallback if malformed
+        }
+    } else {
+        // Unscoped: name/...
+        specifier.split('/').next().unwrap_or(specifier)
     }
 }

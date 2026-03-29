@@ -14,7 +14,7 @@ impl ShortcutChordActionTaskRunner {
 
     // We use `rdev` for simulate instead of Enigo because rdev sends actual keypresses
     // instead of enigo's input injection (this works better in some apps, e.g. cmd+1 in IntelliJ)
-    fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
+    pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
         let events: Vec<(rdev::EventType, bool)> = actions
             .into_iter()
             .map(|action| -> Result<(rdev::EventType, bool)> {
@@ -41,7 +41,7 @@ impl ShortcutChordActionTaskRunner {
         Ok(())
     }
 
-    fn get_start_simulated_shortcut_actions(&self, action: &ShortcutChordAction, num_times: u32) -> Vec<SimulatedShortcutAction> {
+    pub fn get_start_simulated_shortcut_actions(&self, action: &ShortcutChordAction, num_times: u32) -> Vec<SimulatedShortcutAction> {
         let mut actions = Vec::new();
         let suppress_shift = !action.simulated_shortcut.has_shift();
 
@@ -66,7 +66,7 @@ impl ShortcutChordActionTaskRunner {
         actions
     }
 
-    fn get_end_simulated_shortcut_actions(&self, action: &ShortcutChordAction) -> Vec<SimulatedShortcutAction> {
+    pub fn get_end_simulated_shortcut_actions(&self, action: &ShortcutChordAction) -> Vec<SimulatedShortcutAction> {
         let suppress_shift = !action.simulated_shortcut.has_shift();
         action.simulated_shortcut.chords
             .last()

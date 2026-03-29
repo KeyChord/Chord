@@ -1,5 +1,4 @@
 use crate::app::AppHandleExt;
-use crate::app::chord_runner::shortcut::Shortcut;
 use crate::app::desktop_app::{
     init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
@@ -16,6 +15,7 @@ use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
 use std::collections::HashSet;
+use crate::models::{ShortcutChordAction, SimulatedShortcut};
 
 pub struct ChordModule;
 
@@ -202,41 +202,34 @@ fn on_app_terminate<'js>(
 
 fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
-    let chord_runner = handle.chord_runner();
-    let shortcut =
-        Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
-    chord_runner
-        .shortcut
-        .press_shortcut(shortcut, 1)
-        .or_throw_msg(&ctx, "failed to press shortcut")?;
+    let runner = handle.chord_action_task_runner();
+    let simulated_shortcut = key.parse::<SimulatedShortcut>()
+        .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
+    runner.shortcut.simulate_shortcut_actions(
+        runner.shortcut.get_start_simulated_shortcut_actions(
+            &ShortcutChordAction { simulated_shortcut },
+            1
+        )
+    ).or_throw_msg(&ctx, "failed to press shortcut")?;
     Ok(())
 }
 
 fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
-    let chord_runner = handle.chord_runner();
-    let shortcut =
-        Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
-    chord_runner
-        .shortcut
-        .release_shortcut(shortcut)
-        .or_throw_msg(&ctx, "failed to release shortcut")?;
+    let runner = handle.chord_action_task_runner();
+    let simulated_shortcut = key.parse::<SimulatedShortcut>()
+        .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
+    runner.shortcut.simulate_shortcut_actions(
+        runner.shortcut.get_end_simulated_shortcut_actions(
+            &ShortcutChordAction { simulated_shortcut }
+        )
+    ).or_throw_msg(&ctx, "failed to release shortcut")?;
     Ok(())
 }
 
 fn tap(ctx: Ctx, key: String) -> rquickjs::Result<()> {
-    let handle = app_handle(&ctx)?;
-    let chord_runner = handle.chord_runner();
-    let shortcut =
-        Shortcut::parse(&key).or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
-    chord_runner
-        .shortcut
-        .press_shortcut(shortcut.clone(), 1)
-        .or_throw_msg(&ctx, "failed to press shortcut")?;
-    chord_runner
-        .shortcut
-        .release_shortcut(shortcut.clone())
-        .or_throw_msg(&ctx, "failed to press shortcut")?;
+    press(ctx.clone(), key.clone())?;
+    release(ctx.clone(), key)?;
     Ok(())
 }
 

@@ -28,7 +28,7 @@ pub enum ChordActionTaskRun {
 pub struct ChordActionTaskRunner {
     javascript: JavascriptChordActionTaskRunner,
     shell: ShellChordActionTaskRunner,
-    shortcut: ShortcutChordActionTaskRunner
+    pub shortcut: ShortcutChordActionTaskRunner
 }
 
 impl ChordActionTaskRunner {

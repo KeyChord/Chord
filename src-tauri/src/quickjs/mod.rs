@@ -19,7 +19,7 @@ use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
 use crate::app::AppHandleExt;
-use crate::app::chord_js_package_registry::PackageSpecifier;
+use crate::app::chord_js_package::PackageSpecifier;
 
 mod chord_module;
 
@@ -129,9 +129,9 @@ impl Resolver for ModuleResolver {
         let userdata = ctx.userdata::<AppUserData>();
         if let Some(userdata) = userdata {
             if let Some(handle) = &userdata.handle {
-                let js_package_registry = handle.app_chord_js_package_registry();
-                let js_package = js_package_registry.get_package_by_name(specifier.package);
-                if let Some(js_package) = js_package {
+                let chord_pm = handle.chord_package_manager();
+                let chord_package = chord_pm.get_package_by_name(specifier.package);
+                if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
                     if js_package.resolve_import(&import_specifier).is_some() {
                         return Ok(format!("{}/{}", specifier.package, import_specifier))
                     }
