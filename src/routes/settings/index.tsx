@@ -12,6 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { useState } from 'react';
+import { useChordPackageManagerState } from '../../utils/state.ts';
 
 export const Route = createFileRoute('/settings/')({
 	component: Settings,
@@ -25,6 +26,7 @@ function Settings() {
 	});
 	const shouldShowOnboarding
 		= startupStatusQuery.data?.shouldShowOnboarding === true && !dismissedOnboarding;
+    console.log(useChordPackageManagerState())
 
 	return (
 		<>
