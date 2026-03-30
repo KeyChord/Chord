@@ -5,7 +5,7 @@ import { Checkbox } from '#/components/ui/checkbox.tsx';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '#/components/ui/empty.tsx';
 import { Input } from '#/components/ui/input.tsx';
 import { useMutation } from '@tanstack/react-query';
-import { CheckCircle2, Plus, Search } from 'lucide-react';
+import { CheckCircle2, Plus, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import officialChordReposData from '../../../data/official-chord-repos.json';
@@ -29,6 +29,9 @@ export function BrowseTab() {
 	const installedRepoSlugs = new Set(Object.values(repos).map(repo => repo.slug.toLowerCase()));
 	const addGitRepoMutation = useMutation({
 		mutationFn: taurpc.addGitRepo,
+	});
+	const removeGitRepoMutation = useMutation({
+		mutationFn: (slug: string) => taurpc.removeGitRepo(slug),
 	});
 
 	const filteredRepos = officialChordRepos.filter((repo) => {
@@ -54,6 +57,11 @@ export function BrowseTab() {
 	async function addRepo(repo: OfficialChordRepo) {
 		await addGitRepoMutation.mutateAsync(repo.url);
 		toast.success(`Added ${repo.name}.`);
+	}
+
+	async function removeRepo(slug: string, repoName: string) {
+		await removeGitRepoMutation.mutateAsync(slug);
+		toast.success(`Removed ${repoName}.`);
 	}
 
 	async function addSelectedRepos() {
@@ -222,24 +230,42 @@ export function BrowseTab() {
 												</div>
 											</label>
 
-											<Button
-												type="button"
-												variant={isInstalled ? 'secondary' : 'outline'}
-												size="sm"
-												onClick={() => {
-													void addRepo(repo);
-												}}
-												disabled={isInstalled || addGitRepoMutation.isPending}
-											>
-												{isInstalled
-													? 'Added'
-													: (
-															<>
-																<Plus />
-																Add Repo
-															</>
-														)}
-											</Button>
+											{isInstalled && slug
+												? (
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+															onClick={() => {
+																void removeRepo(slug, repo.name);
+															}}
+															disabled={removeGitRepoMutation.isPending}
+														>
+															<Trash2 />
+															Uninstall
+														</Button>
+													)
+												: (
+														<Button
+															type="button"
+															variant="outline"
+															size="sm"
+															onClick={() => {
+																void addRepo(repo);
+															}}
+															disabled={addGitRepoMutation.isPending}
+														>
+															{addGitRepoMutation.isPending && addGitRepoMutation.variables === repo.url
+																? 'Adding...'
+																: (
+																		<>
+																			<Plus />
+																			Add Repo
+																		</>
+																	)}
+														</Button>
+													)}
 										</div>
 									</div>
 								);

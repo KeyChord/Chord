@@ -137,14 +137,14 @@ impl ParsedChordsFile {
                 if let Ok(keys) = Key::parse_sequence(raw_pattern) {
                     ChordHintPattern::Keys(keys)
                 } else {
-                    ChordHintPattern::Regex(Regex::new("")?)
+                    anyhow::bail!("invalid key sequence: {}", raw_pattern)
                 }
             }
         } else {
             if let Ok(keys) = Key::parse_sequence(raw_pattern) {
                 ChordHintPattern::Keys(keys)
             } else {
-                ChordHintPattern::Regex(Regex::new(raw_pattern)?)
+                anyhow::bail!("invalid key sequence: {}", raw_pattern)
             }
 
         };
@@ -156,15 +156,79 @@ impl ParsedChordsFile {
         })
     }
 
+    fn parse_trigger(key: &str, value: &Table) -> Result<ChordTrigger> {
+        let raw_trigger = key;
+
+        let trigger = if raw_trigger.contains('(') {
+            ChordTrigger::Pattern(Regex::new(key)?)
+        } else {
+            ChordTrigger::Keys(Key::parse_sequence(key)?)
+        };
+
+        Ok(trigger)
+    }
+
+    fn parse_actions(key: &str, value: &Table) -> Result<Vec<ChordAction>> {
+        let mut actions = Vec::new();
+        if let Some(shortcut) = value.get("shortcut") {
+            let shortcut = shortcut.as_str().context("shortcut property must be a string")?;
+            let simulated_shortcut = SimulatedShortcut::from_str(shortcut)?;
+            actions.push(ChordAction::Shortcut(ShortcutChordAction { simulated_shortcut }));
+        }
+
+        if let Some(shell) = value.get("shell") {
+            let shell = shell.as_str().context("shell property must be a string")?;
+            actions.push(ChordAction::Shell(ShellChordAction { command: shell.to_string() }));
+        }
+
+        for (k, v) in value {
+            if k.starts_with("emit:") {
+                let event_key = k.strip_prefix("emit:").unwrap_or_default().to_string();
+                let args = v.as_array().context("emit value must be an array")?;
+                actions.push(ChordAction::Emit(EmitChordAction {
+                    event_key,
+                    args: args.clone(),
+                }));
+            }
+        }
+
+        if actions.is_empty() {
+            log::warn!("couldn't find any actions for chord {:?}", value);
+        }
+
+        Ok(actions)
+    }
+
+
+    fn parse_chord(key: &str, chord: &Table, index: u32) -> Result<Chord> {
+        let raw_trigger = key;
+        let actions = Self::parse_actions(key, chord)?;
+        let trigger = Self::parse_trigger(key, chord)?;
+        let chord_name = chord.get("name").and_then(|n| n.as_str());
+        Ok(Chord {
+            raw_trigger: raw_trigger.to_string(),
+            trigger,
+            name: chord_name.unwrap_or_default().to_string(),
+            index,
+            actions,
+        })
+    }
+
     pub fn compile(&self, parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>) -> Result<CompiledChordsFile> {
+        log::debug!("compiling chords file {}", self.name);
+
         let mut chords = self.chords.clone();
         let mut chord_hints = self.chord_hints.clone();
         for import in &self.imports {
+            log::debug!("import {:?}", import);
             let imported_file = parsed_chords_files.get(&Path::new("chords").join(&import.file)).context("import file not found")?;
+            log::debug!("resolved import file: {:?}", imported_file.name);
             let compiled_file = imported_file.compile(parsed_chords_files)?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
         }
+
+        log::debug!("finished compiling chords file {}", self.name);
 
         Ok(CompiledChordsFile {
             name: self.name.clone(),
@@ -181,20 +245,20 @@ impl FromStr for ParsedChordsFile {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let value: toml::Value = toml::from_str(s)?;
-        let table = value.as_table().context("root must be a table")?;
-        let name = table.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
-        let meta = Self::parse_meta(table)?;
-        let handlers = Self::parse_handlers(table)?;
-        let imports = Self::parse_imports(table)?;
+        let root = value.as_table().context("root must be a table")?;
+        let name = root.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
+        let meta = Self::parse_meta(root)?;
+        let handlers = Self::parse_handlers(root)?;
+        let imports = Self::parse_imports(root)?;
 
         let mut chords = Vec::new();
         let mut chord_hints = Vec::new();
         let mut index = 0;
 
-        if let Some(chords_val) = table.get("chords") {
-            let chords_table = chords_val.as_table().context("chords must be a table")?;
-            for (key, value) in chords_table {
-                let table = {
+        if let Some(raw_chords) = root.get("chords") {
+            let raw_chords = raw_chords.as_table().context("chords must be a table")?;
+            for (key, value) in raw_chords {
+                let chord_value = {
                     if let Some(table) = value.as_table() {
                         table
                     } else {
@@ -205,55 +269,19 @@ impl FromStr for ParsedChordsFile {
                     }
                 };
 
-                // hint
                 if key.starts_with('?') {
-                    let hint = Self::parse_hint(key, table)?;
-                    chord_hints.push(hint);
+                    if let Ok(hint) = Self::parse_hint(key, chord_value).inspect_err(|e| {
+                        log::warn!("skipping hint because of parse error: {}", e)
+                    }) {
+                        chord_hints.push(hint);
+                    }
                 } else {
-                    let raw_trigger = key;
-                    let mut actions = Vec::new();
-
-                    if let Some(shortcut) = value.get("shortcut") {
-                        let shortcut = shortcut.as_str().context("shortcut property must be a string")?;
-                        let simulated_shortcut = SimulatedShortcut::from_str(shortcut)?;
-                    actions.push(ChordAction::Shortcut(ShortcutChordAction { simulated_shortcut }));
+                    if let Ok(chord) = Self::parse_chord(key, chord_value, index).inspect_err(|e| {
+                        log::warn!("skipping chord because of parse error: {}", e)
+                    }) {
+                        chords.push(chord);
                     }
-
-                    if let Some(shell) = value.get("shell") {
-                        let shell = shell.as_str().context("shell property must be a string")?;
-                        actions.push(ChordAction::Shell(ShellChordAction { command: shell.to_string() }));
-                    }
-
-                    for (k, v) in table {
-                        if k.starts_with("emit:") {
-                            let event_key = k.strip_prefix("emit:").unwrap_or_default().to_string();
-                            let args = v.as_array().context("emit value must be an array")?;
-                            actions.push(ChordAction::Emit(EmitChordAction {
-                                event_key,
-                                args: args.clone(),
-                            }));
-                        }
-                    }
-
-                    if actions.is_empty() {
-                        log::warn!("couldn't find any actions for chord {:?}", table);
-                    }
-
-                    let trigger = if raw_trigger.contains('(') {
-                        ChordTrigger::Pattern(Regex::new(key)?)
-                    } else {
-                        ChordTrigger::Keys(Key::parse_sequence(key)?)
-                    };
-
-                    let chord_name = value.get("name").and_then(|n| n.as_str());
-                    chords.push(Chord {
-                        raw_trigger: raw_trigger.clone(),
-                        trigger,
-                        name: chord_name.unwrap_or_default().to_string(),
-                        index,
-                        actions,
-                    });
-                    index += 1;
+                    index += 1
                 }
             }
         }

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
@@ -45,7 +45,15 @@ impl ChordPackageManager {
 
         let mut chord_packages = Vec::new();
         for raw_chord_package in raw_chord_packages {
-            chord_packages.push(self.load_package(raw_chord_package).await?);
+            let package_name = self.get_package_name(&raw_chord_package).unwrap_or(raw_chord_package.dirname.clone());
+            match self.load_package(raw_chord_package).await {
+                Ok(package) => {
+                    chord_packages.push(package);
+                }
+                Err(e) => {
+                    log::error!("skipping package {} because of loading error: {:?}", package_name, e)
+                }
+            };
         }
         self.observable.set_state(ChordPackageManagerState {
             packages: chord_packages
@@ -78,7 +86,7 @@ impl ChordPackageManager {
 
         for (path, parsed_chord_file) in &parsed_chords_files {
             let chords_file = parsed_chord_file.compile(&parsed_chords_files)?;
-            log::debug!("compiled chords file {}/{:#?} with {} chords", name, path, chords_file.chords.len());
+            log::debug!("compiled chords file {:#?} with {} chords", Path::new(&name).join(path), chords_file.chords.len());
 
             for chord in &chords_file.chords {
                 let first_char = chord.raw_trigger.chars().next();

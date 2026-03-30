@@ -171,10 +171,8 @@ impl LocalPackageRegistry {
 
                 match dir {
                     "chords" => {
-                        if is_supported_macos_chord_filename(relpath) {
-                            let content = fs::read_to_string(path)?;
-                            chords_files_contents.insert(relpath.to_path_buf(), content);
-                        }
+                        let content = fs::read_to_string(path)?;
+                        chords_files_contents.insert(relpath.to_path_buf(), content);
                     }
                     "js" => {
                         if path.extension().is_some_and(|ext| ext == "js") {
