@@ -170,8 +170,10 @@ impl ChordPackageManager {
             let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
             let path = PathBuf::from(path);
             for package in packages.values() {
-                if package.app_chords_files.contains_key(&path) {
-                    return Some(package.clone());
+                if let Some(chords_file) = package.app_chords_files.get(&path) {
+                    if chords_file.chords.iter().find(|c| c.trigger.matches(&input.keys)).is_some() {
+                        return Some(package.clone())
+                    }
                 }
             }
         }

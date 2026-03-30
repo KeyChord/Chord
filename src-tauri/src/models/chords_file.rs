@@ -26,6 +26,9 @@ pub struct ChordsFile {
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
 
+    /// This is the object exposed to the JS handler. This maximizes compatibility so that even if
+    /// our internal representation changes, a user's scripts will continue to work because it only
+    /// depends on the actual TOML structure and not how we parse it.
     #[typeshare(typescript = "ChordsFileRaw")]
     pub raw: serde_json::Value
 }

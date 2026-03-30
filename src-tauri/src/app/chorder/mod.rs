@@ -151,7 +151,7 @@ impl AppChorder {
         tauri::async_runtime::spawn(async move {
             let chord_action_task_runner = handle.chord_action_task_runner();
             if let Err(e) = chord_action_task_runner.end_task(task_run).await {
-                log::error!("Error: {}", e);
+                log::error!("error ending task: {:?}", e);
             }
         });
         Ok(())

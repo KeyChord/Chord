@@ -72,7 +72,7 @@ impl ChordPackage {
                         initiator_file_relpath: chord_reference.chords_file_path,
                         action: ChordTaskAction::Handler(HandlerChordAction {
                         file: handler.file.clone(),
-                        handler_args: handler.args.clone(),
+                        build_args: handler.args.clone(),
                         event_args: emit.args.clone()
                     }), num_times })
                 } else {

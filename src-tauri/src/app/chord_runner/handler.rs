@@ -32,7 +32,7 @@ impl HandlerChordActionTaskRunner {
     pub fn start(&self, task: &ChordActionTask, action: &HandlerChordAction) -> Result<HandlerChordActionTaskRun> {
         let handle = self.handle.clone();
         let file = action.file.clone();
-        let handler_args = action.handler_args.clone();
+        let build_args = action.build_args.clone();
         let event_args = action.event_args.clone();
         let package_name = task.package_name.clone();
         let num_times = task.num_times;
@@ -54,7 +54,7 @@ impl HandlerChordActionTaskRunner {
                             })
                             .collect::<rquickjs::Result<Vec<_>>>()?;
 
-                        let handler_args = handler_args
+                        let build_args = build_args
                             .into_iter()
                             .map(|value| {
                                 rquickjs_serde::to_value(ctx.clone(), value)
@@ -66,13 +66,14 @@ impl HandlerChordActionTaskRunner {
                         log::debug!("retrieving default export of {}", module_specifier);
                         let build_handler_fn = get_default_export(ctx.clone(), &module_specifier).await?;
 
-                        let mut args = Args::new(ctx.clone(), event_args.len());
-                        let context = Object::new(ctx.clone())?;
-                        context.set("chordsFile", rquickjs_serde::to_value(ctx.clone(), context_chords_file).or_throw_msg(&ctx, "failed to parse chords file")?)?;
-                        args.this(context)?;
-                        for value in handler_args.clone() {
+                        let mut args = Args::new(ctx.clone(), build_args.len());
+                        let build_context = Object::new(ctx.clone())?;
+                        build_context.set("chordsFile", rquickjs_serde::to_value(ctx.clone(), context_chords_file).or_throw_msg(&ctx, "failed to parse chords file")?)?;
+                        args.this(build_context)?;
+                        for value in build_args.clone() {
                             args.push_arg(value)?;
                         }
+                        log::debug!("calling build_handler with args {:?}", build_args);
                         let mut handler: Value = build_handler_fn.call_arg(args)?;
                         if let Some(promise) = handler.as_promise().cloned() {
                             handler = promise.into_future::<Value>().await?;
@@ -80,11 +81,17 @@ impl HandlerChordActionTaskRunner {
                         let handler_fn = handler.as_function().or_throw_msg(&ctx, "the default export function must return a function")?;
 
                         for _ in 0..num_times {
-                            let mut args_builder = Args::new(ctx.clone(), event_args.len());
+                            let mut args = Args::new(ctx.clone(), event_args.len());
                             for value in event_args.clone() {
-                                args_builder.push_arg(value)?;
+                                args.push_arg(value)?;
                             }
-                            let mut result: Value = handler_fn.call_arg(args_builder)?;
+                            let handler_context = Object::new(ctx.clone())?;
+                            // TODO
+                            handler_context.set("focusedAppId", "")?;
+                            args.this(handler_context)?;
+
+                            log::debug!("calling handler with args {:?}", event_args);
+                            let mut result: Value = handler_fn.call_arg(args)?;
                             if let Some(promise) = result.as_promise().cloned() {
                                 result = promise.into_future::<Value>().await?;
                             }
