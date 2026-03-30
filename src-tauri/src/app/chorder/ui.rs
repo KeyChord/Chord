@@ -8,10 +8,11 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize, NSString};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
+use arc_swap::ArcSwap;
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
+use tauri_nspanel::{CollectionBehavior, Panel, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
 const INDICATOR_WIDTH: u32 = 640;
@@ -27,11 +28,10 @@ pub struct NativeSurfaceRect {
     pub radius: f64,
 }
 
-#[derive(Clone)]
 pub struct ChorderIndicatorUi {
     pub handle: AppHandle,
     pub is_visible: Arc<AtomicBool>,
-    pub panel: Option<Arc<dyn Panel>>,
+    pub panel: ArcSwap<Option<PanelHandle<Wry>>>
 }
 
 impl ChorderIndicatorUi {
@@ -39,8 +39,41 @@ impl ChorderIndicatorUi {
         Self {
             handle,
             is_visible: Arc::new(AtomicBool::new(false)),
-            panel: None,
+            panel: ArcSwap::new(Arc::new(None))
         }
+    }
+
+    pub fn init(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        let panel = window.to_panel::<IndicatorPanel>().unwrap();
+        panel.set_level(PanelLevel::ScreenSaver.into());
+        panel.set_has_shadow(false);
+        panel.set_opaque(false);
+        panel.set_transparent(true);
+        panel.set_ignores_mouse_events(true);
+        panel.set_accepts_mouse_moved_events(false);
+        panel.set_movable_by_window_background(false);
+        panel.set_works_when_modal(false);
+        panel.set_becomes_key_only_if_needed(false);
+        panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().into());
+        panel.set_floating_panel(true);
+        panel.set_hides_on_deactivate(false);
+        let _ = panel.make_first_responder(None);
+        panel.resign_key_window();
+        panel.resign_main_window();
+        panel
+            .as_panel()
+            .setAnimationBehavior(NSWindowAnimationBehavior::None);
+        panel.set_collection_behavior(
+            CollectionBehavior::new()
+                .can_join_all_spaces()
+                .stationary()
+                .full_screen_auxiliary()
+                .ignores_cycle()
+                .into(),
+        );
+        self.panel.store(Arc::new(Some(panel)));
+        Ok(())
     }
 
     fn restore_frontmost_app(bundle_id: &str, pid: i32) {
@@ -88,33 +121,6 @@ impl ChorderIndicatorUi {
         let _ = window.set_focusable(false);
         let _ = window.set_ignore_cursor_events(true);
 
-        let panel = window.to_panel::<IndicatorPanel>()?;
-        panel.set_level(PanelLevel::ScreenSaver.into());
-        panel.set_has_shadow(false);
-        panel.set_opaque(false);
-        panel.set_transparent(true);
-        panel.set_ignores_mouse_events(true);
-        panel.set_accepts_mouse_moved_events(false);
-        panel.set_movable_by_window_background(false);
-        panel.set_works_when_modal(false);
-        panel.set_becomes_key_only_if_needed(false);
-        panel.set_style_mask(StyleMask::empty().borderless().nonactivating_panel().into());
-        panel.set_floating_panel(true);
-        panel.set_hides_on_deactivate(false);
-        let _ = panel.make_first_responder(None);
-        panel.resign_key_window();
-        panel.resign_main_window();
-        panel
-            .as_panel()
-            .setAnimationBehavior(NSWindowAnimationBehavior::None);
-        panel.set_collection_behavior(
-            CollectionBehavior::new()
-                .can_join_all_spaces()
-                .stationary()
-                .full_screen_auxiliary()
-                .ignores_cycle()
-                .into(),
-        );
 
         Ok(window)
     }
@@ -180,10 +186,14 @@ impl ChorderIndicatorUi {
 
     fn show(&self) -> Result<()> {
         log::debug!("Showing chorder panel");
-        let panel = self.panel.clone().unwrap();
+        let panel = self.panel.load_full();
         let is_visible = self.is_visible.clone();
 
         self.handle.clone().run_on_main_thread(move || {
+            let Some(panel) = panel.as_ref() else {
+                return;
+            };
+
             let current_pid = std::process::id() as i32;
             let previous_frontmost = NSWorkspace::sharedWorkspace()
                 .frontmostApplication()
@@ -237,10 +247,11 @@ impl ChorderIndicatorUi {
     }
 
     pub fn reveal(&self) -> Result<()> {
-        let panel = self.panel.clone().unwrap();
-
+        let panel = self.panel.load_full();
         self.handle.run_on_main_thread(move || {
-            panel.set_alpha_value(1.0);
+            if let Some(panel) = panel.as_ref() {
+                panel.set_alpha_value(1.0);
+            }
         })?;
 
         Ok(())
@@ -249,10 +260,12 @@ impl ChorderIndicatorUi {
     fn hide(&self) -> Result<()> {
         log::debug!("Hiding chorder panel");
         let is_visible = self.is_visible.clone();
-        let panel = self.panel.clone().unwrap();
+        let panel = self.panel.load_full();
 
         self.handle.clone().run_on_main_thread(move || {
-            panel.hide();
+            if let Some(panel) = panel.as_ref() {
+                panel.hide();
+            }
             is_visible.store(false, Ordering::Relaxed);
         })?;
 

@@ -1,4 +1,4 @@
-import type { DesktopAppMetadata } from '../../types/generated.ts';
+import type { PlaceholderChordInfo, DesktopAppMetadata } from '../../types/generated.ts';
 import { taurpc } from '#/api/taurpc.ts';
 import { AppIcon } from '#/components/settings/app-icon.tsx';
 import { Badge } from '#/components/ui/badge.tsx';
@@ -19,10 +19,26 @@ const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
 	const [input, setInput] = useState('');
-	const { packages } = useChordPackageManagerState();
+	// Destructure placeholderChords from the hook. This assumes the hook actually provides it.
+	// The type definition might be outdated.
+	const { placeholderChords = [] } = useChordPackageManagerState() as any; // Using 'as any' for now to bridge potential type gap.
 	const { appsMetadata } = useDesktopAppManagerState();
 	const normalizedFilter = input.trim().toLowerCase();
-	const filteredPlaceholders: any[] = []
+
+	// Populate filteredPlaceholders based on placeholderChords and input
+	const filteredPlaceholders: PlaceholderChordInfo[] = placeholderChords.filter((placeholder: PlaceholderChordInfo) => {
+		const appLabel = placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
+			? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
+			: 'Global';
+
+		return (
+			placeholder.name.toLowerCase().includes(normalizedFilter) ||
+			placeholder.placeholder.toLowerCase().includes(normalizedFilter) ||
+			placeholder.sequenceTemplate.toLowerCase().includes(normalizedFilter) ||
+			placeholder.filePath.toLowerCase().includes(normalizedFilter) ||
+			appLabel.toLowerCase().includes(normalizedFilter)
+		);
+	});
 
 	return (
 		<Card size="sm">
@@ -62,11 +78,11 @@ export function PlaceholderChordsCard() {
 								<div className="space-y-2">
 									{filteredPlaceholders.map((placeholder) => {
 										const appMetadata
-											= placeholder.scopeKind === 'app'
+											= placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
 												? appsMetadata[placeholder.scope]
 												: undefined;
 										const appLabel
-											= placeholder.scopeKind === 'app'
+											= placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
 												? appMetadata?.displayName?.trim() || placeholder.scope
 												: 'Global';
 

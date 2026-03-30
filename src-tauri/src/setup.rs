@@ -10,7 +10,7 @@ use crate::app::global_hotkey_store::GlobalHotkeyStore;
 use crate::app::permissions::AppPermissions;
 use crate::app::placeholder_chord_store::PlaceholderChordStore;
 use crate::app::settings::AppSettings;
-use crate::app::{AppHandleExt, AppManaged};
+use crate::app::AppHandleExt;
 use crate::lock_file::AppLockFile;
 use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
 use crate::tauri_app;
@@ -40,7 +40,7 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
     s.0.init(manage(app.handle(), FrontmostObservable::new(handle.clone())?))?;
     s.1.init(manage(app.handle(), ChorderObservable::new(handle.clone())?))?;
-    // s.2.init()?;
+    s.2.init()?;
     // s.3.init()?;
     s.4.init(manage(
         app.handle(),

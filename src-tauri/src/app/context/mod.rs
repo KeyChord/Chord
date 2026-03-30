@@ -32,13 +32,13 @@ impl StateSingleton for AppContext {
             handle,
             key_event_state,
             app_mode_state_machine,
-            device_state: None,
+            device_state
         }
     }
 }
 
 impl AppContext {
-    pub fn init() -> Result<()> {
+    pub fn init(&self) -> Result<()> {
         Ok(())
     }
 

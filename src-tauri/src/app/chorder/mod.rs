@@ -45,6 +45,7 @@ impl AppChorder {
     pub fn init(&self, observable: ChorderObservable) -> Result<()> {
         self.observable.init(observable);
 
+        self.ui.init()?;
         let surface_window = self.ui.get_or_create_window()?;
         let surface_handle = self.ui.handle.clone();
         let listener_window = surface_window.clone();
