@@ -77,7 +77,10 @@ export function FirstRunOnboarding({
 							<CardDescription className="max-w-[620px] text-[15px] leading-6 text-slate-600">
 								This setup window stays visible on first launch so the app does not disappear into a
 								hidden tray-only state. Grant Accessibility and Input Monitoring, then continue into
-								the full settings view.
+								the full settings view. If you use a development build, macOS may list the app under
+								its debug executable name or path instead of “Chord”, and on some OS versions the row
+								may not appear in System Settings even though permission was recorded—toggle once after
+								the prompt, or search the list for "chord" or "Chord (Development)".
 							</CardDescription>
 						</div>
 					</CardHeader>

@@ -1,8 +1,9 @@
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use crate::observables::{AppPermissionsObservable, AppPermissionsState, Observable};
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::sync::mpsc;
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 use tauri_plugin_autostart::ManagerExt;
 use crate::app::state::StateSingleton;
 
@@ -124,4 +125,55 @@ pub fn open_system_settings(url: &str, permission_name: &str) {
     if let Err(error) = std::process::Command::new("open").arg(url).spawn() {
         log::error!("Failed to open {permission_name} settings: {error}");
     }
+}
+
+fn run_on_main_thread_sync<R: Runtime, F>(handle: &AppHandle<R>, f: F) -> Result<()>
+where
+    F: FnOnce() + Send + 'static,
+{
+    let (tx, rx) = mpsc::sync_channel(0);
+    handle
+        .run_on_main_thread(move || {
+            f();
+            let _ = tx.send(());
+        })
+        .context("schedule main-thread dispatch")?;
+    rx.recv()
+        .context("main thread finished without signaling (channel closed)")?;
+    Ok(())
+}
+
+/// `AXIsProcessTrustedWithOptions` must run on the main thread; otherwise the prompt can appear but
+/// TCC may not associate the app correctly with the bundle UI in System Settings.
+#[cfg(target_os = "macos")]
+pub fn request_accessibility_prompt_sync<R: Runtime>(handle: &AppHandle<R>) -> Result<()> {
+    log::info!(
+        "Requesting accessibility trust for executable {:?}",
+        std::env::current_exe().ok()
+    );
+    run_on_main_thread_sync(handle, || {
+        macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+    })
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn request_accessibility_prompt_sync<R: Runtime>(_handle: &AppHandle<R>) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[link(name = "IOKit", kind = "framework")]
+unsafe extern "C" {
+    fn IOHIDRequestAccess(request: u32);
+}
+
+/// Registers this process for Input Monitoring (`kIOHIDRequestTypeListenEvent`) on the main thread.
+pub fn register_input_monitoring_sync<R: Runtime>(handle: &AppHandle<R>) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        run_on_main_thread_sync(handle, || unsafe {
+            IOHIDRequestAccess(1);
+        })?;
+    }
+    Ok(())
 }
