@@ -380,20 +380,21 @@ export function Chords() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
+      const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : []
 
 			const matchingChords = activeChords.filter(chord =>
-				prefixTokens.every((token, tokenIndex) => chord.rawTrigger[tokenIndex] === token),
+				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
 			);
 			const activeTokens = new Set(
 				matchingChords
-					.map(chord => chord.rawTrigger[columnIndex])
+					.map(chord => getChordKeys(chord)[columnIndex])
 					.filter((token): token is string => Boolean(token)),
 			);
 
 			const rows = sortTokens(activeTokens).map((token) => {
 				const sequenceKey = [...prefixTokens, token].join('').toLowerCase()
 				const exactChord = matchingChords.find(
-					chord => chord.rawTrigger[columnIndex] === token && chord.rawTrigger.length === columnIndex + 1,
+					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 				);
 
 				return {
