@@ -59,14 +59,18 @@ impl GitHubRepoRef {
         format!("https://github.com/{}", self.slug())
     }
 
-    pub fn local_path(&self, repos_root: &Path) -> PathBuf {
-        repos_root.join(&self.owner).join(&self.name)
+    pub fn local_path(&self, repos_root: &Path, rev: Option<&str>) -> PathBuf {
+        let base = repos_root.join(&self.owner).join(&self.name);
+        match rev {
+            Some(rev) => base.join(rev),
+            None => base.join("HEAD"),
+        }
     }
 
     pub fn into_repo(self, repos_root: &Path) -> GitRepo {
         let slug = self.slug();
         let url = self.url();
-        let local_path = self.local_path(repos_root);
+        let local_path = self.local_path(repos_root, None);
         let head_short_sha = repo_head_short_sha(&local_path);
         GitRepo {
             owner: self.owner,
@@ -80,9 +84,20 @@ impl GitHubRepoRef {
     }
 
     pub fn into_pinned_repo(self, repos_root: &Path, rev: impl Into<String>) -> GitRepo {
-        let mut repo = self.into_repo(repos_root);
-        repo.pinned_rev = Some(rev.into());
-        repo
+        let rev_str = rev.into();
+        let slug = self.slug();
+        let url = self.url();
+        let local_path = self.local_path(repos_root, Some(&rev_str));
+        let head_short_sha = repo_head_short_sha(&local_path);
+        GitRepo {
+            owner: self.owner,
+            name: self.name,
+            slug,
+            url,
+            local_path,
+            head_short_sha,
+            pinned_rev: Some(rev_str),
+        }
     }
 }
 

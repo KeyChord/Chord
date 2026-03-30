@@ -71,11 +71,14 @@ impl ChordPackage {
                         // Replace all $1, $2, ... with the captured match from the regex
                         let mut args = Vec::new();
                         let input_string = input.keys.iter().map(|k| k.to_char(false).unwrap_or_default()).collect::<String>();
-                        if let Some(captures) = regex.captures(&input_string) {
-                            for arg in &emit.args {
-                                if let Some(arg) = arg.as_str() {
-                                    if arg.starts_with("$") {
-                                        if let Ok(index) = arg[1..].parse::<usize>() {
+
+                        log::debug!("replacing capture args with regex {:?} matching {}", regex, input_string);
+
+                        for arg in &emit.args {
+                            if let Some(arg) = arg.as_str() {
+                                if arg.starts_with("$") {
+                                    if let Ok(index) = arg[1..].parse::<usize>() {
+                                        if let Some(captures) = regex.captures(&input_string) {
                                             args.push(toml::Value::String(
                                                 captures.get(index).map_or("", |m| m.as_str()).to_string())
                                             );
@@ -83,9 +86,9 @@ impl ChordPackage {
                                         }
                                     }
                                 }
-
-                                args.push(arg.clone());
                             }
+
+                            args.push(arg.clone());
                         }
                         args
                     },

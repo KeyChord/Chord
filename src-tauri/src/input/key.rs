@@ -391,9 +391,9 @@ impl Key {
             }
             Minus => {
                 if shift {
-                    '-'
-                } else {
                     '_'
+                } else {
+                    '-'
                 }
             }
             Equal => {

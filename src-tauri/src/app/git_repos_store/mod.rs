@@ -28,8 +28,39 @@ impl GitReposStore {
     pub fn init(&self, observable: GitReposObservable) -> Result<()> {
         self.observable.init(observable);
 
-        let repos = load_repos(self.store()?.as_ref())?;
-        log::debug!("repos: {:?}", repos);
+        let mut repos = load_repos(self.store()?.as_ref())?;
+        let repos_root = self.github_repos_dir()?;
+
+        let mut changed = false;
+        for repo in repos.values_mut() {
+            let repo_ref = GitHubRepoRef {
+                owner: repo.owner.clone(),
+                name: repo.name.clone(),
+            };
+            let expected_path = repo_ref.local_path(&repos_root, repo.pinned_rev.as_deref());
+            if repo.local_path != expected_path {
+                if repo.local_path.exists() && !expected_path.exists() {
+                    log::info!(
+                        "Moving repo {} from {} to {}",
+                        repo.slug,
+                        repo.local_path.display(),
+                        expected_path.display()
+                    );
+                    if let Some(parent) = expected_path.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
+                    if let Err(e) = fs::rename(&repo.local_path, &expected_path) {
+                        log::error!("Failed to move repo {}: {}", repo.slug, e);
+                    }
+                }
+                repo.local_path = expected_path;
+                changed = true;
+            }
+        }
+
+        if changed {
+            rewrite_repos(self.store()?.as_ref(), &repos)?;
+        }
 
         self.observable.set_state(GitReposState { repos })?;
         Ok(())
@@ -75,7 +106,7 @@ impl GitReposStore {
 
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
         let repos_root = self.github_repos_dir()?;
-        let repo_path = repo_ref.local_path(&repos_root);
+        let repo_path = repo_ref.local_path(&repos_root, None);
         let repo = if repo_path.join(".git").exists() {
             repo_ref.into_repo(&repos_root)
         } else {
@@ -88,7 +119,11 @@ impl GitReposStore {
 
     pub fn sync_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
         let repos_root = self.github_repos_dir()?;
-        let repo_path = repo_ref.local_path(&repos_root);
+        let state = self.observable.get_state()?;
+        let current_repo = state.repos.get(&repo_ref.slug());
+        let pinned_rev = current_repo.and_then(|r| r.pinned_rev.as_deref());
+
+        let repo_path = repo_ref.local_path(&repos_root, pinned_rev);
 
         if !repo_path.join(".git").exists() {
             anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
@@ -96,13 +131,16 @@ impl GitReposStore {
 
         crate::git::refresh_repo(&repo_ref, &repo_path)?;
 
-        let repo = repo_ref.into_repo(&repos_root);
+        let repo = match pinned_rev {
+            Some(rev) => repo_ref.into_pinned_repo(&repos_root, rev),
+            None => repo_ref.into_repo(&repos_root),
+        };
+
         let key = repo.slug.clone();
         let value = serde_json::to_value(repo.clone())?;
         self.store()?.set(key.clone(), value);
         self.save()?;
 
-        let state = self.observable.get_state()?;
         let mut repos = state.repos.clone();
         repos.insert(key, repo);
         self.observable.set_state(GitReposState { repos })?;
@@ -120,7 +158,7 @@ impl GitReposStore {
 
         let mut next_repos = HashMap::with_capacity(repos.len());
         for spec in repos {
-            let repo_path = spec.repo_ref.local_path(&repos_root);
+            let repo_path = spec.repo_ref.local_path(&repos_root, Some(&spec.rev));
             // Use the new function to handle both cloning if not exists, and fetching/updating if exists.
             update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
@@ -144,7 +182,7 @@ impl GitReposStore {
         let mut current_repos = state.repos.clone();
 
         for spec in repos {
-            let repo_path = spec.repo_ref.local_path(&repos_root);
+            let repo_path = spec.repo_ref.local_path(&repos_root, Some(&spec.rev));
             update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
             current_repos.insert(repo.slug.clone(), repo);
