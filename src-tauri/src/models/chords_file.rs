@@ -184,6 +184,10 @@ impl FromStr for ChordsFile {
                         }
                     }
 
+                    if actions.is_empty() {
+                        log::warn!("couldn't find any actions for chord {:?}", table);
+                    }
+
                     let trigger = if key.contains('(') {
                         ChordTrigger::Pattern(Regex::new(key).unwrap_or_else(|_| Regex::new("").unwrap()))
                     } else {

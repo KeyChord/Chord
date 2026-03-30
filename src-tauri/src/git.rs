@@ -163,52 +163,86 @@ fn checkout_repo_revision(repo_path: &Path, rev: &str) -> anyhow::Result<()> {
         })?;
 
     if checkout_output.status.success() {
-        return Ok(());
+        // Successfully checked out directly
+    } else {
+        let fetch_output = Command::new("git")
+            .arg("-C")
+            .arg(repo_path)
+            .arg("fetch")
+            .arg("--depth")
+            .arg("1")
+            .arg("origin")
+            .arg(trimmed_rev)
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to fetch revision {trimmed_rev} for {}",
+                    repo_path.display()
+                )
+            })?;
+
+        anyhow::ensure!(
+            fetch_output.status.success(),
+            "Failed to fetch revision {trimmed_rev} for {}: {}",
+            repo_path.display(),
+            String::from_utf8_lossy(&fetch_output.stderr).trim()
+        );
+
+        let final_checkout_output = Command::new("git")
+            .arg("-C")
+            .arg(repo_path)
+            .arg("checkout")
+            .arg("--detach")
+            .arg("FETCH_HEAD")
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to check out fetched revision {trimmed_rev} in {}",
+                    repo_path.display()
+                )
+            })?;
+
+        anyhow::ensure!(
+            final_checkout_output.status.success(),
+            "Failed to check out revision {trimmed_rev} in {}: {}",
+            repo_path.display(),
+            String::from_utf8_lossy(&final_checkout_output.stderr).trim()
+        );
+
+        // --- Added verification step ---
+        let current_head_output = Command::new("git")
+            .arg("-C")
+            .arg(repo_path)
+            .arg("rev-parse")
+            .arg("HEAD")
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to run git rev-parse HEAD for verification in {}",
+                    repo_path.display()
+                )
+            })?;
+
+        anyhow::ensure!(
+            current_head_output.status.success(),
+            "Failed to get current HEAD for verification in {}: {}",
+            repo_path.display(),
+            String::from_utf8_lossy(&current_head_output.stderr).trim()
+        );
+
+        let current_sha = String::from_utf8_lossy(&current_head_output.stdout).trim().to_string();
+        // Ensure the rev from chordpack.toml is also trimmed for comparison
+        let target_rev_trimmed = trimmed_rev.trim();
+
+        anyhow::ensure!(
+            current_sha == target_rev_trimmed,
+            "Verified HEAD commit {} does not match target revision {} for repository at {}",
+            current_sha,
+            target_rev_trimmed,
+            repo_path.display()
+        );
+        // --- End of added verification step ---
     }
-
-    let fetch_output = Command::new("git")
-        .arg("-C")
-        .arg(repo_path)
-        .arg("fetch")
-        .arg("--depth")
-        .arg("1")
-        .arg("origin")
-        .arg(trimmed_rev)
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to fetch revision {trimmed_rev} for {}",
-                repo_path.display()
-            )
-        })?;
-
-    anyhow::ensure!(
-        fetch_output.status.success(),
-        "Failed to fetch revision {trimmed_rev} for {}: {}",
-        repo_path.display(),
-        String::from_utf8_lossy(&fetch_output.stderr).trim()
-    );
-
-    let final_checkout_output = Command::new("git")
-        .arg("-C")
-        .arg(repo_path)
-        .arg("checkout")
-        .arg("--detach")
-        .arg("FETCH_HEAD")
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to check out fetched revision {trimmed_rev} in {}",
-                repo_path.display()
-            )
-        })?;
-
-    anyhow::ensure!(
-        final_checkout_output.status.success(),
-        "Failed to check out revision {trimmed_rev} in {}: {}",
-        repo_path.display(),
-        String::from_utf8_lossy(&final_checkout_output.stderr).trim()
-    );
 
     Ok(())
 }
