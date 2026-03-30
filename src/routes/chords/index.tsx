@@ -155,7 +155,7 @@ function ChordKeyRow({
 	descriptionFontSize,
 }: {
 	token: string
-	description?: string
+	description?: string,
 	isSelected?: boolean
 	isDimmed?: boolean
 	keySize: number
@@ -319,27 +319,38 @@ export function Chords() {
 		};
 	}, [surfaceVersion]);
 
-	const activeChords: Chord[] = [];
+	const activeAppChords: Chord[] = [];
 	const hintsByRawPattern: Record<string, ChordHint> = {};
   const globalChords: ChordReference[] = []
 
 	for (const chordPackage of packages) {
     globalChords.push(...chordPackage.globalChords);
-    for (const [filepath, file] of Object.entries(chordPackage.appChordsFiles)) {
-      if (path.dirname(filepath).replaceAll('/', '.') === frontmostAppBundleId) {
+
+    for (const [bundleId, file] of Object.entries(chordPackage.appChordsFiles)) {
+      for (const hint of file.chordHints) {
+        // bad check for global
+        if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
+          hintsByRawPattern[hint.rawPattern] = hint
+        }
+      }
+
+      if (bundleId === frontmostAppBundleId) {
         for (const hint of file.chordHints) {
           hintsByRawPattern[hint.rawPattern] = hint;
         }
 
         for (const chord of file.chords) {
-          activeChords.push(chord)
+          activeAppChords.push(chord)
         }
       }
     }
 	}
 
+  const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)]
+
 	const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
-	const normalizedActiveChordTokens = state.activeChord?.keys.map(normalizeToken) ?? [];
+	const normalizedActiveChordTokens = state.activeChordKeys?.map(normalizeToken) ?? [];
+
 	const shouldHighlightActiveChord
 		= state.isShiftPressed
 			&& normalizedBufferTokens.length === 0
@@ -359,6 +370,7 @@ export function Chords() {
 		10,
 	);
 	const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
+
 	const keyColumns = Array.from(
 		{
 			length: shouldHighlightActiveChord
@@ -367,23 +379,26 @@ export function Chords() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
-			const matchingChords = parsedChords.filter(chord =>
-				prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
+      const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : []
+
+			const matchingChords = activeChords.filter(chord =>
+				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
 			);
 			const activeTokens = new Set(
 				matchingChords
-					.map(chord => chord.keys[columnIndex])
+					.map(chord => getChordKeys(chord)[columnIndex])
 					.filter((token): token is string => Boolean(token)),
 			);
+
 			const rows = sortTokens(activeTokens).map((token) => {
-				const sequenceKey = [...prefixTokens, token].join('');
+				const sequenceKey = [...prefixTokens, token].join('').toLowerCase()
 				const exactChord = matchingChords.find(
-					chord => chord.keys[columnIndex] === token && chord.keys.length === columnIndex + 1,
+					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 				);
 
 				return {
 					token,
-					description: descriptionsBySequence[sequenceKey] ?? exactChord?.chord.name ?? '',
+					description: hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
 				};
 			});
 
