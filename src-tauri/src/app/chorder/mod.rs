@@ -258,6 +258,7 @@ impl AppChorder {
                     // A non-empty key_buffer means we should execute the chord.
                     log::debug!("Executing key_buffer {:?}", key_buffer);
                     let Some(task) = self.resolve_task_from_keys(&key_buffer, 1)? else {
+                        log::debug!("task not found for key_buffer {:?}", key_buffer);
                         self.observable.set_state(state.clear_session())?;
                         return Ok(());
                     };
