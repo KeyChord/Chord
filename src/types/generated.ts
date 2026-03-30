@@ -43,6 +43,8 @@ export type ChordTaskAction =
 	| { type: "Handler", content: HandlerChordAction };
 
 export interface ChordActionTask {
+	package_name: string;
+	initiator_file_relpath: PathBuf;
 	action: ChordTaskAction;
 	num_times: number;
 }
@@ -66,14 +68,15 @@ export interface ChordsFileImports {
 export interface ChordsFile {
 	name: string;
 	meta: Record<string, string>;
-	relpath: string;
 	handlers: Record<string, ChordsFileHandler>;
 	imports: ChordsFileImports[];
 	chords: Chord[];
 	chordHints: ChordHint[];
+	raw: Value;
 }
 
 export interface ChordReference {
+	packageName: string;
 	chordsFilePath: PathBuf;
 	chord: Chord;
 }
@@ -148,10 +151,18 @@ export interface HandlerChordAction {
 export interface RawChordPackage {
 	/** The dirname is needed for inferring the chord package name when package.json isn't present */
 	dirname: string;
-	package_json_contents?: string;
-	chords_files_contents: Record<PathBuf, string>;
-	js_files_contents: Record<PathBuf, string>;
-	bin_files_contents: Record<PathBuf, number[]>;
+	packageJsonContents?: string;
+	chordsFilesContents: Record<PathBuf, string>;
+	jsFilesContents: Record<PathBuf, string>;
+	binFilesContents: Record<PathBuf, number[]>;
+}
+
+export interface RawChordsFile {
+	name: string;
+	meta: Record<string, string>;
+	handlers: Record<string, ChordsFileHandler>;
+	chords: Record<string, Value>;
+	imports: ChordsFileImports[];
 }
 
 export interface ShellChordAction {

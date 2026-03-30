@@ -9,6 +9,7 @@ use typeshare::typeshare;
 /// details about where the package is located on the filesystem.
 #[typeshare]
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RawChordPackage {
     /// The dirname is needed for inferring the chord package name when package.json isn't present
     pub dirname: String,

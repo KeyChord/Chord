@@ -80,6 +80,23 @@ pub fn run_app() {
     let log_plugin = tauri_plugin_log::Builder::new()
         .clear_targets()
         .level(log::LevelFilter::Debug)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] {}:{} - {}",
+                record.level(),
+                record
+                    .file()
+                    .and_then(|f| {
+                        let path = std::path::Path::new(f);
+                        let file_name = path.file_name()?.to_str()?;
+                        let parent = path.parent()?.file_name()?.to_str()?;
+                        Some(format!("{}/{}", parent, file_name))
+                    })
+                    .unwrap_or_else(|| "unknown".to_string()),
+                record.line().unwrap_or(0),
+                message
+            ))
+        })
         .targets([
             Target::new(TargetKind::Stdout),
             Target::new(TargetKind::LogDir {

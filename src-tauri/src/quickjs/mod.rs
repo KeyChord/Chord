@@ -125,6 +125,15 @@ impl Resolver for ModuleResolver {
             return Ok("readline".into());
         }
 
+        if import_specifier == "chord" {
+            return Ok("chord".into());
+        }
+
+        // If we load it directly from memory, it should be already cached
+        if base_module_specifier == "" {
+            return Ok(import_specifier.into())
+        }
+
         let specifier = PackageSpecifier::parse(base_module_specifier);
         let userdata = ctx.userdata::<AppUserData>();
         if let Some(userdata) = userdata {
@@ -139,7 +148,9 @@ impl Resolver for ModuleResolver {
             }
         }
 
-        self.llrt_resolver.resolve(ctx, base_module_specifier, import_specifier)
+        self.llrt_resolver.resolve(ctx, base_module_specifier, import_specifier).inspect_err(|e| {
+            log::error!("failed to resolve module: {:?}", e)
+        })
     }
 }
 

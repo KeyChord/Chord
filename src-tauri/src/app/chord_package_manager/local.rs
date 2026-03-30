@@ -146,7 +146,6 @@ impl LocalPackageRegistry {
     }
 
     pub fn import_from_local_folder(root: &Path) -> anyhow::Result<RawChordPackage> {
-        log::debug!("importing chord package from folder {:?}", root);
         let mut chords_files_contents = HashMap::new();
         let mut js_files_contents = HashMap::new();
         let mut bin_files_contents = HashMap::new();
@@ -156,7 +155,6 @@ impl LocalPackageRegistry {
 
         for dir in ["chords", "js", "bin"] {
             let dir_path = root.join(dir);
-
             if !dir_path.exists() {
                 continue;
             }
@@ -179,7 +177,7 @@ impl LocalPackageRegistry {
                         }
                     }
                     "js" => {
-                        if path.ends_with(".js") {
+                        if path.extension().is_some_and(|ext| ext == "js") {
                             let content = fs::read_to_string(path)?;
                             js_files_contents.insert(relpath.to_path_buf(), content);
                         }
@@ -193,7 +191,7 @@ impl LocalPackageRegistry {
             }
         }
 
-        log::debug!("loaded chord package from {:?}: {} js files, {} chords files, {} bin files", root, js_files_contents.len(), chords_files_contents.len(), bin_files_contents.len());
+        log::debug!("loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}", root, js_files_contents.keys(), chords_files_contents.keys(), bin_files_contents.keys());
 
         Ok(RawChordPackage {
             dirname,

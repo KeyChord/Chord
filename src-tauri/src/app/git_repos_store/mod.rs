@@ -137,6 +137,22 @@ impl GitReposStore {
 
         Ok(next_repos.into_values().collect())
     }
+
+    pub fn ensure_pinned_repos(&self, repos: Vec<PinnedGitRepoSpec>) -> Result<()> {
+        let repos_root = self.github_repos_dir()?;
+        let state = self.observable.get_state()?;
+        let mut current_repos = state.repos.clone();
+
+        for spec in repos {
+            let repo_path = spec.repo_ref.local_path(&repos_root);
+            update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
+            let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
+            current_repos.insert(repo.slug.clone(), repo);
+        }
+
+        self.replace_all(current_repos)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]

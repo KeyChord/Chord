@@ -129,7 +129,7 @@ impl ChordPackageManager {
                             "error declaring module {:?}\nerror:{}\nfile:\n{}",
                             module_specifier,
                             format_js_error(&ctx, e),
-                            js_string.clone()
+                            format!("{}...", js_string.chars().take(100).collect::<String>())
                         )
                     )?;
                     let meta = module.meta()?;

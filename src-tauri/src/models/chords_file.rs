@@ -24,7 +24,22 @@ pub struct ChordsFile {
     pub imports: Vec<ChordsFileImports>,
 
     pub chords: Vec<Chord>,
-    pub chord_hints: Vec<ChordHint>
+    pub chord_hints: Vec<ChordHint>,
+
+    #[typeshare(typescript = "ChordsFileRaw")]
+    pub raw: serde_json::Value
+}
+
+#[typeshare]
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RawChordsFile {
+    pub name: String,
+    pub meta: HashMap<String, String>,
+    pub handlers: HashMap<String, ChordsFileHandler>,
+    #[typeshare(typescript = "Record<string, any>")]
+    pub chords: HashMap<String, toml::Value>,
+    pub imports: Vec<ChordsFileImports>,
 }
 
 /// Currently only supports JavaScript handlers
@@ -33,6 +48,7 @@ pub struct ChordsFile {
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
     pub file: String,
+    #[typeshare(typescript = "any[]")]
     pub args: Vec<toml::Value>
 }
 
@@ -208,10 +224,13 @@ impl FromStr for ChordsFile {
             }
         }
 
+        let raw = serde_json::to_value(value.clone())?;
+
         log::debug!("finished parsing chord file with name '{}'", name);
 
         Ok(Self {
             name: name.to_string(),
+            raw,
             meta,
             handlers,
             imports,

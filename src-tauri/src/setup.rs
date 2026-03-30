@@ -16,6 +16,7 @@ use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordP
 use crate::tauri_app;
 use tauri::{AppHandle, Manager};
 use crate::app::chord_package_manager::ChordPackageManager;
+use crate::chordpack::load_default_chordpack;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -88,6 +89,14 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 }
 
 async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
+    #[cfg(debug_assertions)]
+    {
+        log::debug!("Development mode detected, syncing default chordpack");
+        let store = handle.app_git_repos_store();
+        let default_chordpack = load_default_chordpack()?;
+        store.ensure_pinned_repos(default_chordpack)?;
+    }
+
     let chord_pm = handle.chord_package_manager();
     chord_pm.reload_all().await?;
     Ok(())

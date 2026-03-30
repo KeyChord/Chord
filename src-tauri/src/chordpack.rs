@@ -16,6 +16,16 @@ struct ChordpackPackageSource {
 }
 
 pub fn load_default_chordpack() -> anyhow::Result<Vec<PinnedGitRepoSpec>> {
+    #[cfg(debug_assertions)]
+    {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../data/chordpack.toml");
+        if path.exists() {
+            log::debug!("Loading chordpack from disk: {}", path.display());
+            let contents = std::fs::read_to_string(path)?;
+            return parse_chordpack(&contents);
+        }
+    }
+
     parse_chordpack(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../data/chordpack.toml"

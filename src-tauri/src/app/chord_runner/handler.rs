@@ -1,5 +1,5 @@
 use crate::quickjs::{format_js_error, with_js};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
@@ -8,6 +8,7 @@ use serde::Serialize;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 use typeshare::typeshare;
+use crate::app::AppHandleExt;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
 
@@ -36,49 +37,67 @@ impl HandlerChordActionTaskRunner {
         let package_name = task.package_name.clone();
         let num_times = task.num_times;
 
-        let join_handle = tauri::async_runtime::spawn( async move {
+        let chord_pm = self.handle.chord_package_manager();
+        let package = chord_pm.get_package_by_name(&package_name).context("could not get package")?;
+        let initiator_chords_file = package.app_chords_files.get(&task.initiator_file_relpath).context("could not get chord file")?;
+        let context_chords_file = serde_json::to_value(initiator_chords_file.clone())?;
+
+        let join_handle = tauri::async_runtime::spawn(async move {
             with_js(handle, move |ctx| {
                 Box::pin(async move {
-                    let event_args = event_args
-                        .into_iter()
-                        .map(|value| {
-                            rquickjs_serde::to_value(ctx.clone(), value)
-                                .or_throw_msg(&ctx, "failed to convert event TOML arguments")
-                        })
-                        .collect::<rquickjs::Result<Vec<_>>>()?;
+                    async {
+                        let event_args = event_args
+                            .into_iter()
+                            .map(|value| {
+                                rquickjs_serde::to_value(ctx.clone(), value)
+                                    .or_throw_msg(&ctx, "failed to convert event TOML arguments")
+                            })
+                            .collect::<rquickjs::Result<Vec<_>>>()?;
 
-                    let handler_args = handler_args
-                        .into_iter()
-                        .map(|value| {
-                            rquickjs_serde::to_value(ctx.clone(), value)
-                                .or_throw_msg(&ctx, "failed to convert handler TOML arguments")
-                        })
-                        .collect::<rquickjs::Result<Vec<_>>>()?;
+                        let handler_args = handler_args
+                            .into_iter()
+                            .map(|value| {
+                                rquickjs_serde::to_value(ctx.clone(), value)
+                                    .or_throw_msg(&ctx, "failed to convert handler TOML arguments")
+                            })
+                            .collect::<rquickjs::Result<Vec<_>>>()?;
 
-                    let module_specifier = format!("{}/js/{}", package_name, file);
-                    let handler = get_default_export(ctx.clone(), &module_specifier, handler_args.clone())
-                        .await
-                        .map_err(|error| {
-                            anyhow::anyhow!(
-                                "failed to execute JS default export:\n{}",
-                                format_js_error(&ctx, error)
-                            )
-                        })?;
+                        let module_specifier = format!("{}/js/{}", package_name, file);
+                        log::debug!("retrieving default export of {}", module_specifier);
+                        let build_handler_fn = get_default_export(ctx.clone(), &module_specifier).await?;
 
-                    for _ in 0..num_times {
-                        let mut args_builder = Args::new(ctx.clone(), event_args.len());
-                        for value in event_args.clone() {
-                            args_builder.push_arg(value)?;
+                        let mut args = Args::new(ctx.clone(), event_args.len());
+                        let context = Object::new(ctx.clone())?;
+                        context.set("chordsFile", rquickjs_serde::to_value(ctx.clone(), context_chords_file).or_throw_msg(&ctx, "failed to parse chords file")?)?;
+                        args.this(context)?;
+                        for value in handler_args.clone() {
+                            args.push_arg(value)?;
                         }
-                        let mut result: Value = handler.call_arg(args_builder)?;
-                        if let Some(promise) = result.as_promise().cloned() {
-                            result = promise.into_future::<Value>().await?;
+                        let mut handler: Value = build_handler_fn.call_arg(args)?;
+                        if let Some(promise) = handler.as_promise().cloned() {
+                            handler = promise.into_future::<Value>().await?;
+                        }
+                        let handler_fn = handler.as_function().or_throw_msg(&ctx, "the default export function must return a function")?;
+
+                        for _ in 0..num_times {
+                            let mut args_builder = Args::new(ctx.clone(), event_args.len());
+                            for value in event_args.clone() {
+                                args_builder.push_arg(value)?;
+                            }
+                            let mut result: Value = handler_fn.call_arg(args_builder)?;
+                            if let Some(promise) = result.as_promise().cloned() {
+                                result = promise.into_future::<Value>().await?;
+                            }
+
+                            log::debug!("handler task result: {:?}", result);
                         }
 
-                        log::debug!("handler task result: {:?}", result);
+                        Ok::<(), rquickjs::Error>(())
                     }
-
-                    Ok(())
+                        .await
+                        .map_err(|e| {
+                            anyhow::Error::msg(format_js_error(&ctx, e))
+                        })
                 })
             }).await
         });
@@ -102,7 +121,6 @@ impl HandlerChordActionTaskRunner {
 async fn get_default_export<'js>(
     ctx: Ctx<'js>,
     module_specifier: &str,
-    args: Vec<Value<'js>>,
 ) -> rquickjs::Result<Function<'js>> {
     let module_promise = Module::import(&ctx, module_specifier.to_string())?;
     let module = module_promise.into_future::<Object>().await?;
