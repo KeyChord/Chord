@@ -304,12 +304,15 @@ impl AppChorder {
         let chord_package_manager = self.handle.chord_package_manager();
         let input = ChordInput { keys: keys.to_vec(), application_id };
         let Some(chord_package) = chord_package_manager.resolve_package_for_input(&input) else {
+            log::debug!("package for input {:?} not found", input);
             return Ok(None);
         };
+        log::debug!("found package {} for input {:?}", chord_package.name, input);
         let Some(chord) = chord_package.resolve_chord_for_input(&input) else {
             return Ok(None);
         };
         let Some(action) = chord.actions.first() else {
+            log::debug!("no action for chord {:?}", chord);
             return Ok(None)
         };
         let task = ChordActionTask {

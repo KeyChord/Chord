@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
-use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage};
+use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
 use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
@@ -64,7 +63,7 @@ impl ChordPackageManager {
         let mut global_chords = HashMap::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
-            let mut chords_file = ChordsFile::parse(&contents);
+            let mut chords_file = contents.parse::<ChordsFile>()?;
             chords_file.relpath = path.clone();
 
             for chord in &chords_file.chords {
@@ -72,13 +71,13 @@ impl ChordPackageManager {
                 let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
 
                 if is_non_alphanumeric {
-                    global_chords.insert(chord.string_key.clone(), chord.clone());
+                    global_chords.insert(chord.string_key.clone(), ChordReference { chords_file_path: path.clone(), chord: chord.clone() });
                 }
             }
 
             if let Some(inner) = path.strip_prefix("chords/").and_then(|p| p.strip_suffix("/macos.toml")) {
                 let bundle_id = inner.replace('/', ".");
-                app_chords_files.insert(bundle_id, chords_file);
+                app_chords_files.insert(bundle_id, chords_file.clone());
             } else {
                 app_chords_files.insert("/global".to_string(), chords_file);
             }
