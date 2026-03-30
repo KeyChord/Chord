@@ -42,7 +42,7 @@ impl AppPermissions {
 
     pub async fn load(&self) -> Result<()> {
         let state = self.observable.get_state()?;
-        self.observable.set_state(AppPermissionsState {
+        let new_state = AppPermissionsState {
             is_input_monitoring_enabled: Some(
                 tauri_plugin_macos_permissions::check_input_monitoring_permission().await,
             ),
@@ -50,7 +50,9 @@ impl AppPermissions {
                 tauri_plugin_macos_permissions::check_accessibility_permission().await,
             ),
             is_autostart_enabled: state.is_autostart_enabled,
-        })?;
+        };
+        log::debug!("loaded app permissions: {:?}", new_state);
+        self.observable.set_state(new_state)?;
         Ok(())
     }
 

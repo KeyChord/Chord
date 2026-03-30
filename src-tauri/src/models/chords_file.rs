@@ -207,6 +207,8 @@ impl FromStr for ChordsFile {
             }
         }
 
+        log::debug!("finished parsing chord file with name '{}'", name);
+
         Ok(Self {
             name: name.to_string(),
             meta,

@@ -63,6 +63,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         DesktopAppManagerObservable::new(handle.clone())?,
     ))?;
 
+    log::debug!("initialized all singletons");
+
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
     tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
@@ -79,6 +81,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     if startup_status.should_show_onboarding {
         settings.ui.open()?;
     }
+
+    log::debug!("finished setup()");
 
     Ok(())
 }
