@@ -50,7 +50,7 @@ impl FromStr for ChordsFile {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let value: toml::Value = toml::from_str(s)?;
         let table = value.as_table().context("root must be a table")?;
-        let name = table.get("name").and_then(|v| v.as_str()).context("must have a name")?;
+        let name = table.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
 
         let mut meta = HashMap::new();
         if let Some(meta_val) = table.get("meta") {

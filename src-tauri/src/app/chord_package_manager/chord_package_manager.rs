@@ -63,7 +63,12 @@ impl ChordPackageManager {
         let mut global_chords = HashMap::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
-            let mut chords_file = contents.parse::<ChordsFile>()?;
+            let Ok(mut chords_file) = contents.parse::<ChordsFile>().inspect_err(|e| {
+                log::error!("error when loading package {}; failed to parse chords file {}:\n{}", name, e, contents);
+            }) else {
+                continue;
+            };
+
             chords_file.relpath = path.clone();
 
             for chord in &chords_file.chords {
