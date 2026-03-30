@@ -146,6 +146,7 @@ impl LocalPackageRegistry {
     }
 
     pub fn import_from_local_folder(root: &Path) -> anyhow::Result<RawChordPackage> {
+        log::debug!("importing chord package from folder {:?}", root);
         let mut chords_files_contents = HashMap::new();
         let mut js_files_contents = HashMap::new();
         let mut bin_files_contents = HashMap::new();
@@ -153,7 +154,6 @@ impl LocalPackageRegistry {
         let dirname = root.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
 
-        // --- walk only specific dirs ---
         for dir in ["chords", "js", "bin"] {
             let dir_path = root.join(dir);
 
@@ -192,6 +192,8 @@ impl LocalPackageRegistry {
                 }
             }
         }
+
+        log::debug!("loaded chord package from {:?}: {} js files, {} chords files, {} bin files", root, js_files_contents.len(), chords_files_contents.len(), bin_files_contents.len());
 
         Ok(RawChordPackage {
             dirname,

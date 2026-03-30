@@ -24,6 +24,7 @@ pub struct ChordPackage {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordReference {
+    pub package_name: String,
     pub chords_file_path: PathBuf,
     pub chord: Chord,
 }
@@ -35,13 +36,18 @@ impl ChordPackage {
             let chords_file_path = Path::new(&path);
             if let Some(chords_file) = self.app_chords_files.get(chords_file_path) {
                 if let Some(chord) = chords_file.chords.iter().find(|c| c.trigger.matches(&input.keys)) {
-                    return Some(ChordReference { chord: chord.clone(), chords_file_path: chords_file_path.to_path_buf() });
+                    return Some(ChordReference {
+                        package_name: self.name.clone(),
+                        chord: chord.clone(),
+                        chords_file_path: chords_file_path.to_path_buf()
+                    });
                 }
             }
         }
 
         self.global_chords.iter().find(|c| c.chord.trigger.matches(&input.keys))
             .map(|c| ChordReference {
+                package_name: self.name.clone(),
                 chords_file_path: c.chords_file_path.clone(),
                 chord: c.chord.clone()
             })
@@ -61,7 +67,10 @@ impl ChordPackage {
                 // For now, we assume the handler for the event that was emitted lives in the same file
                 let handler = chords_file.handlers.get(&emit.event_key);
                 if let Some(handler) = handler {
-                    Some(ChordActionTask { action: ChordTaskAction::Handler(HandlerChordAction {
+                    Some(ChordActionTask {
+                        package_name: chord_reference.package_name,
+                        initiator_file_relpath: chord_reference.chords_file_path,
+                        action: ChordTaskAction::Handler(HandlerChordAction {
                         file: handler.file.clone(),
                         handler_args: handler.args.clone(),
                         event_args: emit.args.clone()
@@ -72,10 +81,18 @@ impl ChordPackage {
                 }
             },
             ChordAction::Shortcut(shortcut) => {
-                Some(ChordActionTask { action: ChordTaskAction::Shortcut(shortcut.clone()), num_times })
+                Some(ChordActionTask {
+                    package_name: chord_reference.package_name,
+                    initiator_file_relpath: chord_reference.chords_file_path,
+                    action: ChordTaskAction::Shortcut(shortcut.clone()), num_times
+                })
             }
             ChordAction::Shell(shell) => {
-                Some(ChordActionTask { action: ChordTaskAction::Shell(shell.clone()), num_times })
+                Some(ChordActionTask {
+                    package_name: chord_reference.package_name,
+                    initiator_file_relpath: chord_reference.chords_file_path,
+                    action: ChordTaskAction::Shell(shell.clone()), num_times
+                })
             }
         })
     }

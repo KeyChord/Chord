@@ -7,7 +7,7 @@ use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
 use crate::quickjs::{format_js_error, with_js};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use gix::bstr::ByteVec;
 use parking_lot::RwLock;
 use tauri::AppHandle;
@@ -60,11 +60,13 @@ impl ChordPackageManager {
 
     pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
         let name = self.get_package_name(&raw_chord_package)?;
+        log::debug!("loading package {}", name);
+
         let mut app_chords_files = HashMap::new();
         let mut global_chords = Vec::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
-            let Ok(mut chords_file) = contents.parse::<ChordsFile>().inspect_err(|e| {
+            let Ok(chords_file) = contents.parse::<ChordsFile>().inspect_err(|e| {
                 log::error!("error when loading package {}; failed to parse chords file {}:\n{}", name, e, contents);
             }) else {
                 continue;
@@ -75,7 +77,11 @@ impl ChordPackageManager {
                 let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
 
                 if is_non_alphanumeric {
-                    global_chords.push(ChordReference { chords_file_path: path.clone(), chord: chord.clone() });
+                    global_chords.push(ChordReference {
+                        package_name: name.clone(),
+                        chords_file_path: path.clone(),
+                        chord: chord.clone()
+                    });
                 }
             }
 
@@ -100,23 +106,28 @@ impl ChordPackageManager {
     }
 
     async fn load_js_package(&self, package_name: &str, files: &HashMap<PathBuf, String>) -> Result<Option<ChordJsPackage>> {
+        log::debug!("loading JS package {}", package_name);
+
         if files.is_empty() {
-            return Ok(None)     ;
+            log::debug!("JS package {} was empty", package_name);
+            return Ok(None);
         }
 
         let mut exported_files = HashMap::new();
 
         for (file_relpath, js) in files.iter() {
-            let package_name_bytes = package_name.as_bytes().to_vec();
             exported_files.insert(file_relpath.clone(), js.clone());
             let file_relpath = file_relpath.to_owned();
             let js_string = js.clone();
+            let path = PathBuf::from(package_name).join(file_relpath.clone());
+            let module_specifier = path.to_str().context("invalid path")?.to_string();
             with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
-                    let module = Module::declare(ctx.clone(), package_name_bytes.clone(), js_string.clone()).map_err(
+                    log::debug!("declaring module {}", module_specifier);
+                    let module = Module::declare(ctx.clone(), module_specifier.clone(), js_string.clone()).map_err(
                         |e| anyhow::format_err!(
                             "error declaring module {:?}\nerror:{}\nfile:\n{}",
-                            package_name_bytes.clone().into_string(),
+                            module_specifier,
                             format_js_error(&ctx, e),
                             js_string.clone()
                         )

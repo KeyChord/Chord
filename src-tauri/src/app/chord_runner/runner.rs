@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use serde::Serialize;
 use tauri::AppHandle;
 use typeshare::typeshare;
@@ -9,6 +10,8 @@ use crate::models::{ChordAction, ChordTaskAction};
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct ChordActionTask {
+    pub package_name: String,
+    pub initiator_file_relpath: PathBuf,
     pub action: ChordTaskAction,
     pub num_times: u32
 }
@@ -39,9 +42,9 @@ impl ChordActionTaskRunner {
     pub fn start_task(&self, task: &ChordActionTask) -> anyhow::Result<ChordActionTaskRun> {
         log::debug!("Starting task: {:?}", task);
         let task_run = match &task.action {
-            ChordTaskAction::Handler(action) => ChordActionTaskRun::Handler(self.handler.start(action, task.num_times)?),
-            ChordTaskAction::Shell(action) => ChordActionTaskRun::Shell(self.shell.start(action, task.num_times)?),
-            ChordTaskAction::Shortcut(action) => ChordActionTaskRun::Shortcut(self.shortcut.start(action, task.num_times)?)
+            ChordTaskAction::Handler(action) => ChordActionTaskRun::Handler(self.handler.start(task, action)?),
+            ChordTaskAction::Shell(action) => ChordActionTaskRun::Shell(self.shell.start(task, action)?),
+            ChordTaskAction::Shortcut(action) => ChordActionTaskRun::Shortcut(self.shortcut.start(task, action)?)
         };
         Ok(task_run)
     }

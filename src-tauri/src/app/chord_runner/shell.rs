@@ -3,6 +3,7 @@ use crate::models::ShellChordAction;
 use anyhow::Result;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
+use crate::app::chord_runner::ChordActionTask;
 
 pub struct ShellChordActionTaskRunner {
     _handle: AppHandle,
@@ -20,8 +21,9 @@ impl ShellChordActionTaskRunner {
 }
 
 impl ShellChordActionTaskRunner {
-    pub fn start(&self, action: &ShellChordAction, num_times: u32) -> Result<ShellChordActionTaskRun> {
+    pub fn start(&self, task: &ChordActionTask, action: &ShellChordAction) -> Result<ShellChordActionTaskRun> {
         let command = action.command.clone();
+        let num_times = task.num_times;
         let join_handle = tauri::async_runtime::spawn(async move {
             for _ in 0..num_times {
                 run_shell_command(&command).await

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use tauri::AppHandle;
+use crate::app::chord_runner::ChordActionTask;
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 
 pub struct ShortcutChordActionTaskRunner {
@@ -89,8 +90,8 @@ pub struct ShortcutChordActionTaskRun {
 
 impl ShortcutChordActionTaskRunner {
 
-    pub fn start(&self, action: &ShortcutChordAction, num_times: u32) -> Result<ShortcutChordActionTaskRun> {
-        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(action, num_times))?;
+    pub fn start(&self, task: &ChordActionTask, action: &ShortcutChordAction) -> Result<ShortcutChordActionTaskRun> {
+        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(action, task.num_times))?;
 
         Ok(ShortcutChordActionTaskRun {
             end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(action)

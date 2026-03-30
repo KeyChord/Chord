@@ -8,6 +8,7 @@ use serde::Serialize;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 use typeshare::typeshare;
+use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
 
 #[derive(Clone)]
@@ -27,11 +28,13 @@ impl HandlerChordActionTaskRunner {
 }
 
 impl HandlerChordActionTaskRunner {
-    pub fn start(&self, action: &HandlerChordAction, num_times: u32) -> Result<HandlerChordActionTaskRun> {
+    pub fn start(&self, task: &ChordActionTask, action: &HandlerChordAction) -> Result<HandlerChordActionTaskRun> {
         let handle = self.handle.clone();
         let file = action.file.clone();
         let handler_args = action.handler_args.clone();
         let event_args = action.event_args.clone();
+        let package_name = task.package_name.clone();
+        let num_times = task.num_times;
 
         let join_handle = tauri::async_runtime::spawn( async move {
             with_js(handle, move |ctx| {
@@ -52,7 +55,8 @@ impl HandlerChordActionTaskRunner {
                         })
                         .collect::<rquickjs::Result<Vec<_>>>()?;
 
-                    let handler = get_default_export(ctx.clone(), &file, handler_args.clone())
+                    let module_specifier = format!("{}/js/{}", package_name, file);
+                    let handler = get_default_export(ctx.clone(), &module_specifier, handler_args.clone())
                         .await
                         .map_err(|error| {
                             anyhow::anyhow!(
