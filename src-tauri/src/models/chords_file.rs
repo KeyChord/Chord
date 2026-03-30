@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, ShellChordAction, ShortcutChordAction, SimulatedShortcut, ChordHintPattern, EmitChordAction, RawChordPackage};
 use crate::input::Key;
 use std::str::FromStr;
@@ -47,7 +47,7 @@ pub struct CompiledChordsFile {
 }
 
 #[typeshare]
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RawChordsFile {
     pub name: String,
@@ -60,7 +60,7 @@ pub struct RawChordsFile {
 
 /// Currently only supports JavaScript handlers
 #[typeshare]
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
     pub file: String,
@@ -70,7 +70,7 @@ pub struct ChordsFileHandler {
 
 // New struct for imports
 #[typeshare]
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileImport {
     pub file: String,

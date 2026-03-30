@@ -4,7 +4,7 @@ use serde::Serialize;
 use typeshare::typeshare;
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, ParsedChordsFile, HandlerChordAction, CompiledChordsFile};
+use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, ParsedChordsFile, HandlerChordAction, CompiledChordsFile, RawChordsFile};
 use anyhow::Result;
 
 #[typeshare]
@@ -16,7 +16,8 @@ pub struct ChordPackage {
 
     pub js_package: Option<ChordJsPackage>,
 
-    pub app_chords_files: HashMap<PathBuf, CompiledChordsFile>,
+    pub raw_chords_files: HashMap<PathBuf, RawChordsFile>,
+    pub compiled_chords_files: HashMap<PathBuf, CompiledChordsFile>,
     pub global_chords: Vec<ChordReference>
 }
 
@@ -34,7 +35,7 @@ impl ChordPackage {
         if let Some(app_id) = &input.application_id {
             let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
             let chords_file_path = Path::new(&path);
-            if let Some(chords_file) = self.app_chords_files.get(chords_file_path) {
+            if let Some(chords_file) = self.compiled_chords_files.get(chords_file_path) {
                 if let Some(chord) = chords_file.chords.iter().find(|c| c.trigger.matches(&input.keys)) {
                     return Some(ChordReference {
                         package_name: self.name.clone(),
@@ -60,7 +61,7 @@ impl ChordPackage {
 
         Ok(match action {
             ChordAction::Emit(emit) => {
-                let Some(chords_file) = self.app_chords_files.get(&chord_reference.chords_file_path) else {
+                let Some(chords_file) = self.compiled_chords_files.get(&chord_reference.chords_file_path) else {
                     anyhow::bail!("referenced chords file not found: {:?}", chord_reference.chords_file_path);
                 };
 
