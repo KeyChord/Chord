@@ -14,7 +14,7 @@ rev = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
 
 [packages."@keychord/chords-menu"]
 git = "https://github.com/KeyChord/chords-menu"
-rev = "b0583c1ef8ed84f84aae922cca760d800a9e777c"
+rev = "d17435f29fbcae83fcc372fccbbbb3189011f72d"
 
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
