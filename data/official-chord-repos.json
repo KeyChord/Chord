@@ -10,5 +10,9 @@
   {
     "name": "JetBrains Chords",
     "url": "https://github.com/KeyChord/chords-jetbrains"
+  },
+  {
+    "name": "Terminal Chords",
+    "url": "https://github.com/KeyChord/chords-terminal"
   }
 ]

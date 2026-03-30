@@ -93,8 +93,8 @@ export function ActiveChordsTab() {
 		};
 	}, [packages, normalizedFilter, appsMetadata]);
 
-	const isLoading = false; // Assuming data is available immediately from hooks
-	const isSuccess = true; // Assuming data is available immediately from hooks
+	// Removed dummy isLoading and isSuccess, assuming state is derived directly.
+	// The actual loading state would need to come from the state hooks if available.
 
 	return (
 		<Card size="sm">
@@ -119,9 +119,7 @@ export function ActiveChordsTab() {
 					</Badge>
 				</div>
 
-				{isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading active chords...</p>
-        ) : packages.length === 0 ? ( // Check if packages are loaded
+				{packages.length === 0 ? ( // Check if packages are loaded
           <p className="text-sm text-muted-foreground">No chord packages are currently loaded.</p>
         ) : activeChords.filteredActiveChords.length === 0 ? (
           <p className="text-sm text-muted-foreground">No chords match that filter.</p>
