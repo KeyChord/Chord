@@ -2,7 +2,7 @@ use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::{
     Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile,
-    HandlerChordAction, ParsedChordsFile, RawChordsFile,
+    HandlerChordAction, RawChordsFile,
 };
 use anyhow::Result;
 use serde::Serialize;
@@ -134,7 +134,7 @@ impl ChordPackage {
                         }
                         args
                     }
-                    ChordTrigger::Keys(keys) => emit.args.clone(),
+                    ChordTrigger::Keys(_keys) => emit.args.clone(),
                 };
                 if let Some(handler) = handler {
                     Some(ChordActionTask {

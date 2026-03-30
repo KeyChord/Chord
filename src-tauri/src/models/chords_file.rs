@@ -45,7 +45,7 @@ pub struct CompiledChordsFile {
     pub name: String,
     pub path: PathBuf,
     pub meta: HashMap<String, String>,
-    pub handlers: Vec<ChordsFileHandler>,
+    pub handlers: Vec<CompiledChordsFileHandler>,
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
 }
@@ -71,12 +71,22 @@ pub struct RawChordsFile {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
-    pub event: String,
     pub file: String,
     #[typeshare(typescript = "any[]")]
     #[serde(default)]
     pub args: Vec<toml::Value>,
 }
+
+#[typeshare]
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledChordsFileHandler {
+    pub event: String,
+    pub file: String,
+    #[typeshare(typescript = "any[]")]
+    pub args: Vec<toml::Value>,
+}
+
 
 // New struct for imports
 #[typeshare]
@@ -122,7 +132,6 @@ impl ParsedChordsFile {
                     }
                 }
                 let handler = ChordsFileHandler {
-                    event: key.to_string(),
                     file: file.to_string(),
                     args: args_vec,
                 };
@@ -253,7 +262,10 @@ impl ParsedChordsFile {
 
         let mut chords = self.chords.clone();
         let mut chord_hints = self.chord_hints.clone();
-        let mut handlers: Vec<_> = self.handlers.values().cloned().collect();
+        let mut handlers = Vec::new();
+        for (event, handler) in &self.handlers {
+            handlers.push(CompiledChordsFileHandler { event: event.clone(), args: handler.args.clone(), file: handler.file.clone() });
+        }
 
         for import in &self.imports {
             let imported_file_path = Path::new("chords").join(&import.file);

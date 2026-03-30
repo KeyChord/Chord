@@ -57,10 +57,9 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
                 let chorder = handle.app_chorder();
                 match chorder.ui.toggle_inspector() {
                     Ok(is_open) => {
-                        let tray = handle.tray_by_id(TRAY_ID).unwrap();
-                        let menu = tray.menu().unwrap();
+                        let menu= handle.menu().unwrap();
                         if let Some(item) = menu.get(OPEN_INSPECTOR_MENU_ID) {
-                            if let Some(text_item) = item.as_menu_item() {
+                            if let Some(text_item) = item.as_menuitem() {
                                 let _ = text_item.set_text(if is_open {
                                     "Close Inspector"
                                 } else {
