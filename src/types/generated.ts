@@ -19,9 +19,9 @@ export interface AppSettingsState {
 
 /** The action that a chord can define. */
 export type ChordAction = 
-	| { type: "Shortcut", content: ShortcutChordAction }
-	| { type: "Shell", content: ShellChordAction }
-	| { type: "Emit", content: EmitChordAction };
+	| { type: "shortcut", content: ShortcutChordAction }
+	| { type: "shell", content: ShellChordAction }
+	| { type: "emit", content: EmitChordAction };
 
 /** A regular chord entry composed of static characters */
 export interface Chord {
@@ -38,9 +38,9 @@ export interface Chord {
 
 /** The action that a chord task is meant to execute. */
 export type ChordTaskAction = 
-	| { type: "Shortcut", content: ShortcutChordAction }
-	| { type: "Shell", content: ShellChordAction }
-	| { type: "Handler", content: HandlerChordAction };
+	| { type: "shortcut", content: ShortcutChordAction }
+	| { type: "shell", content: ShellChordAction }
+	| { type: "handler", content: HandlerChordAction };
 
 export interface ChordActionTask {
 	package_name: string;
@@ -58,21 +58,28 @@ export interface ChordHint {
 /** Currently only supports JavaScript handlers */
 export interface ChordsFileHandler {
 	file: string;
-	args: Value[];
+	args?: Value[];
 }
 
-export interface ChordsFileImports {
+export interface ChordsFileImport {
 	file: string;
 }
 
-export interface ChordsFile {
+export interface RawChordsFile {
+	name: string;
+	meta?: Record<string, string>;
+	handlers?: Record<string, ChordsFileHandler>;
+	chords?: Record<string, Value>;
+	imports?: ChordsFileImport[];
+}
+
+/** A chords file that has imports inlined. */
+export interface CompiledChordsFile {
 	name: string;
 	meta: Record<string, string>;
 	handlers: Record<string, ChordsFileHandler>;
-	imports: ChordsFileImports[];
 	chords: Chord[];
 	chordHints: ChordHint[];
-	raw: Value;
 }
 
 export interface ChordReference {
@@ -85,7 +92,8 @@ export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
 	name: string;
 	jsPackage?: ChordJsPackage;
-	appChordsFiles: Record<PathBuf, ChordsFile>;
+	rawChordsFiles: Record<PathBuf, RawChordsFile>;
+	compiledChordsFiles: Record<PathBuf, CompiledChordsFile>;
 	globalChords: ChordReference[];
 }
 
@@ -113,7 +121,7 @@ export interface DesktopAppManagerState {
 }
 
 export interface EmitChordAction {
-	event_key: string;
+	eventKey: string;
 	args: Value[];
 }
 
@@ -138,8 +146,23 @@ export interface GitReposState {
 /** Currently, we only support JavaScript handlers */
 export interface HandlerChordAction {
 	file: string;
-	handler_args: Value[];
-	event_args: Value[];
+	buildArgs: Value[];
+	eventArgs: Value[];
+}
+
+export interface ParsedChordsFile {
+	name: string;
+	meta: Record<string, string>;
+	handlers: Record<string, ChordsFileHandler>;
+	imports: ChordsFileImport[];
+	chords: Chord[];
+	chordHints: ChordHint[];
+	/**
+	 * This is the object exposed to the JS handler. This maximizes compatibility so that even if
+	 * our internal representation changes, a user's scripts will continue to work because it only
+	 * depends on the actual TOML structure and not how we parse it.
+	 */
+	raw: Value;
 }
 
 /**
@@ -157,14 +180,6 @@ export interface RawChordPackage {
 	binFilesContents: Record<PathBuf, number[]>;
 }
 
-export interface RawChordsFile {
-	name: string;
-	meta: Record<string, string>;
-	handlers: Record<string, ChordsFileHandler>;
-	chords: Record<string, Value>;
-	imports: ChordsFileImports[];
-}
-
 export interface ShellChordAction {
 	command: string;
 }
@@ -178,6 +193,6 @@ export interface SimulatedShortcut {
 }
 
 export interface ShortcutChordAction {
-	simulated_shortcut: SimulatedShortcut;
+	simulatedShortcut: SimulatedShortcut;
 }
 

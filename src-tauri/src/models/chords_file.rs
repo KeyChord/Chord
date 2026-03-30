@@ -51,10 +51,14 @@ pub struct CompiledChordsFile {
 #[serde(rename_all = "camelCase")]
 pub struct RawChordsFile {
     pub name: String,
+    #[serde(default)]
     pub meta: HashMap<String, String>,
+    #[serde(default)]
     pub handlers: HashMap<String, ChordsFileHandler>,
     #[typeshare(typescript = "Record<string, any>")]
+    #[serde(default)]
     pub chords: HashMap<String, toml::Value>,
+    #[serde(default)]
     pub imports: Vec<ChordsFileImport>,
 }
 
@@ -65,6 +69,7 @@ pub struct RawChordsFile {
 pub struct ChordsFileHandler {
     pub file: String,
     #[typeshare(typescript = "any[]")]
+    #[serde(default)]
     pub args: Vec<toml::Value>
 }
 

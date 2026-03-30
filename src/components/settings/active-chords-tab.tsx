@@ -30,10 +30,10 @@ export function ActiveChordsTab() {
 
 		packages.forEach((pkg: ChordPackage) => {
 			// Process global chords
-			Object.entries(pkg.globalChords).forEach(([stringKey, chord]) => {
+			pkg.globalChords.forEach(({ chord }) => {
 				const matchesFilter =
 					normalizeString(chord.name).includes(normalizedFilter) ||
-					normalizeString(chord.string_key).includes(normalizedFilter) ||
+					normalizeString(chord.rawTrigger).includes(normalizedFilter) ||
 					chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
 
 				if (matchesFilter) {
@@ -47,14 +47,14 @@ export function ActiveChordsTab() {
 			});
 
 			// Process app-specific chords
-			Object.entries(pkg.appChordsFiles).forEach(([appBundleId, chordsFile]) => {
+			Object.entries(pkg.compiledChordsFiles).forEach(([appBundleId, chordsFile]) => {
 				const appMetadata = appsMetadata[appBundleId as AppBundleId];
 				const appLabel = appMetadata?.displayName?.trim() || appBundleId;
 
 				chordsFile.chords.forEach((chord: Chord) => {
 					const matchesFilter =
 						normalizeString(chord.name).includes(normalizedFilter) ||
-						normalizeString(chord.string_key).includes(normalizedFilter) ||
+						normalizeString(chord.rawTrigger).includes(normalizedFilter) ||
 						normalizeString(appLabel).includes(normalizedFilter) ||
 						chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
 

@@ -326,7 +326,7 @@ export function Chords() {
 	for (const chordPackage of packages) {
     globalChords.push(...chordPackage.globalChords);
 
-    for (const [bundleId, file] of Object.entries(chordPackage.appChordsFiles)) {
+    for (const [bundleId, file] of Object.entries(chordPackage.compiledChordsFiles)) {
       for (const hint of file.chordHints) {
         // bad check for global
         if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
