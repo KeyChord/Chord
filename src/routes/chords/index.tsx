@@ -326,7 +326,8 @@ export function Chords() {
 	for (const chordPackage of packages) {
     globalChords.push(...chordPackage.globalChords);
 
-    for (const [bundleId, file] of Object.entries(chordPackage.compiledChordsFiles)) {
+    for (const [relpath, file] of Object.entries(chordPackage.compiledChordsFiles)) {
+      const bundleId = relpath.split('/').slice(1, -1).join('.')
       for (const hint of file.chordHints) {
         // bad check for global
         if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
@@ -379,21 +380,20 @@ export function Chords() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
-      const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : []
 
 			const matchingChords = activeChords.filter(chord =>
-				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
+				prefixTokens.every((token, tokenIndex) => chord.rawTrigger[tokenIndex] === token),
 			);
 			const activeTokens = new Set(
 				matchingChords
-					.map(chord => getChordKeys(chord)[columnIndex])
+					.map(chord => chord.rawTrigger[columnIndex])
 					.filter((token): token is string => Boolean(token)),
 			);
 
 			const rows = sortTokens(activeTokens).map((token) => {
 				const sequenceKey = [...prefixTokens, token].join('').toLowerCase()
 				const exactChord = matchingChords.find(
-					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
+					chord => chord.rawTrigger[columnIndex] === token && chord.rawTrigger.length === columnIndex + 1,
 				);
 
 				return {
