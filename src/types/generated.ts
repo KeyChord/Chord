@@ -17,10 +17,11 @@ export interface AppSettingsState {
 	hideGuideByDefault: boolean;
 }
 
+/** The action that a chord can define. */
 export type ChordAction = 
 	| { type: "Shortcut", content: ShortcutChordAction }
 	| { type: "Shell", content: ShellChordAction }
-	| { type: "Javascript", content: JavascriptChordAction };
+	| { type: "Emit", content: EmitChordAction };
 
 /** A regular chord entry composed of static characters */
 export interface Chord {
@@ -35,33 +36,15 @@ export interface Chord {
 	actions: ChordAction[];
 }
 
+/** The action that a chord task is meant to execute. */
+export type ChordTaskAction = 
+	| { type: "Shortcut", content: ShortcutChordAction }
+	| { type: "Shell", content: ShellChordAction }
+	| { type: "Handler", content: HandlerChordAction };
+
 export interface ChordActionTask {
-	action: ChordAction;
+	action: ChordTaskAction;
 	num_times: number;
-}
-
-export interface PlaceholderChordInfo {
-	filePath: string;
-	scope: string;
-	scopeKind: string;
-	name: string;
-	placeholder: string;
-	sequenceTemplate: string;
-	sequencePrefix: string;
-	sequenceSuffix: string;
-	assignedSequence?: string;
-}
-
-export interface LoadedChordPackageInfo {
-	name: string;
-	kind: string;
-	path: string;
-}
-
-export interface ChordFilesState {
-	rawFilesAsJsonStrings: Record<string, string>;
-	placeholderChords: PlaceholderChordInfo[];
-	loadedPackages: LoadedChordPackageInfo[];
 }
 
 export interface ChordHint {
@@ -69,21 +52,37 @@ export interface ChordHint {
 	description: string;
 }
 
+/** Currently only supports JavaScript handlers */
+export interface ChordsFileHandler {
+	file: string;
+	args: Value[];
+}
+
+export interface ChordsFileImports {
+	file: string;
+}
+
 export interface ChordsFile {
 	name: string;
 	meta: Record<string, string>;
 	relpath: string;
-	js: Record<string, string>;
+	handlers: Record<string, ChordsFileHandler>;
+	imports: ChordsFileImports[];
 	chords: Chord[];
 	chordHints: ChordHint[];
+}
+
+export interface ChordReference {
+	chordsFilePath: string;
+	chord: Chord;
 }
 
 export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
 	name: string;
 	jsPackage?: ChordJsPackage;
-	appChordsFiles: Record<AppBundleId, ChordsFile>;
-	globalChords: Record<ChordString, Chord>;
+	appChordsFiles: Record<string, ChordsFile>;
+	globalChords: Record<ChordString, ChordReference>;
 }
 
 export interface ChordPackageManagerState {
@@ -109,8 +108,8 @@ export interface DesktopAppManagerState {
 	appsMetadata: Record<string, DesktopAppMetadata>;
 }
 
-export interface ExportedFunctionInvocation {
-	export_name: string;
+export interface EmitChordAction {
+	event_key: string;
 	args: Value[];
 }
 
@@ -132,9 +131,11 @@ export interface GitReposState {
 	repos: Record<string, GitRepo>;
 }
 
-export interface JavascriptChordAction {
-	module_specifier: string;
-	args: Value[];
+/** Currently, we only support JavaScript handlers */
+export interface HandlerChordAction {
+	file: string;
+	handler_args: Value[];
+	event_args: Value[];
 }
 
 export interface ShellChordAction {

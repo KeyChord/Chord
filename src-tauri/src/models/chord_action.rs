@@ -15,6 +15,7 @@ pub enum ChordAction {
 /// The action that a chord task is meant to execute.
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type", content = "content")]
 pub enum ChordTaskAction {
     Shortcut(ShortcutChordAction),
     Shell(ShellChordAction),
