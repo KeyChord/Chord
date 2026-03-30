@@ -309,9 +309,12 @@ impl AppChorder {
         };
         log::debug!("found package {} for input {:?}", chord_package.name, input);
         let Some(chord_ref) = chord_package.resolve_chord_for_input(&input) else {
+            log::debug!("couldn't resolve chord in package {} for input {:?}", chord_package.name, input);
             return Ok(None);
         };
+        log::debug!("resolved chord: {:?}", chord_ref);
         let task = chord_package.resolve_task(chord_ref, num_times)?;
+        log::debug!("resolved task: {:?}", task);
         Ok(task)
     }
 
