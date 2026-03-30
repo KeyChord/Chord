@@ -1,4 +1,3 @@
-use crate::app::SafeAppHandle;
 use crate::git::{GitHubRepoRef, clone_repo, clone_repo_at_revision};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
@@ -6,32 +5,38 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::Wry;
-use tauri_plugin_store::Store;
+use tauri::{AppHandle, Manager, Wry};
+use tauri_plugin_store::{Store, StoreExt};
+use crate::app::state::StateSingleton;
 
-#[derive(Clone)]
 pub struct GitReposStore {
-    pub store: Arc<Store<Wry>>,
-    observable: Arc<GitReposObservable>,
+    observable: GitReposObservable,
+    handle: AppHandle,
+}
 
-    handle: SafeAppHandle,
+impl StateSingleton for GitReposStore {
+    fn new(handle: AppHandle) -> Self {
+        Self { handle, observable: GitReposObservable::none() }
+    }
 }
 
 impl GitReposStore {
-    pub fn new(handle: SafeAppHandle, observable: Arc<GitReposObservable>) -> Result<Self> {
-        let store = handle.store("repos.json")?;
-        let repos = load_repos(store.as_ref())?;
+    pub fn store(&self) -> Result<Arc<Store<Wry>>>{
+        Ok(self.handle.store("repos.json")?)
+    }
+
+    pub fn init(&mut self, observable: GitReposObservable) -> Result<()> {
+        self.observable = observable;
+
+        let repos = load_repos(self.store()?.as_ref())?;
         log::debug!("repos: {:?}", repos);
-        observable.set_state(GitReposState { repos })?;
-        Ok(Self {
-            handle,
-            store,
-            observable,
-        })
+
+        self.observable.set_state(GitReposState { repos })?;
+        Ok(())
     }
 
     fn save(&self) -> Result<()> {
-        self.store.save()?;
+        self.store()?.save()?;
         Ok(())
     }
 
@@ -42,7 +47,7 @@ impl GitReposStore {
     }
 
     fn replace_all(&self, repos: HashMap<String, GitRepo>) -> Result<()> {
-        rewrite_repos(self.store.as_ref(), &repos)?;
+        rewrite_repos(self.store()?.as_ref(), &repos)?;
         self.observable.set_state(GitReposState { repos })?;
         Ok(())
     }
@@ -94,7 +99,7 @@ impl GitReposStore {
         let repo = repo_ref.into_repo(&repos_root);
         let key = repo.slug.clone();
         let value = serde_json::to_value(repo.clone())?;
-        self.store.set(key.clone(), value);
+        self.store()?.set(key.clone(), value);
         self.save()?;
 
         let state = self.observable.get_state()?;

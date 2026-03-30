@@ -1,5 +1,5 @@
 use self::ui::{ChorderIndicatorUi, NativeSurfaceRect};
-use crate::app::{AppHandleExt, SafeAppHandle};
+use crate::app::{AppHandleExt};
 use crate::input::Key;
 use crate::input::KeyEvent;
 use crate::observables::{ChorderObservable, ChorderState, FrontmostObservable, Observable};
@@ -11,8 +11,9 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Duration;
-use tauri::{Emitter, Listener};
+use tauri::{AppHandle, Emitter, Listener};
 use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
+use crate::app::state::StateSingleton;
 use crate::models::ChordInput;
 
 mod ui;
@@ -24,22 +25,36 @@ pub struct AppChorder {
     /// Prevents double-pressing keys when a key is held for a while
     held_keys: Mutex<HashSet<Key>>,
 
-    observable: Arc<ChorderObservable>,
-    handle: SafeAppHandle,
+    observable: ChorderObservable,
+    handle: AppHandle,
+}
+
+impl StateSingleton for AppChorder {
+    fn new(handle: AppHandle) -> Self {
+        Self {
+            ui: ChorderIndicatorUi::new(handle.clone()),
+            active_task_run: Mutex::new(None),
+            held_keys: Mutex::new(HashSet::new()),
+            observable: ChorderObservable::none(),
+            handle,
+        }
+    }
 }
 
 impl AppChorder {
-    pub fn new(handle: SafeAppHandle, observable: Arc<ChorderObservable>) -> Result<Self> {
-        let ui = ChorderIndicatorUi::new(handle.clone())?;
-        let surface_window = ui.window.clone();
-        let surface_handle = ui.handle.clone();
+    pub fn init(&mut self, observable: ChorderObservable) -> Result<()> {
+        self.observable = observable;
+        
+        let surface_window = self.ui.get_or_create_window()?;
+        let surface_handle = self.ui.handle.clone();
         let listener_window = surface_window.clone();
+        let listener_window2 = surface_window.clone();
         listener_window.listen(
             "chorder-surface-rect",
             move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
                 Ok(rect) => {
                     if let Err(error) = ChorderIndicatorUi::configure_window_surface(
-                        &surface_window,
+                        &listener_window2,
                         surface_handle.clone(),
                         rect,
                     ) {
@@ -52,51 +67,37 @@ impl AppChorder {
             },
         );
 
-        let preload_ui = ui.clone();
-        ui.window.once("chorder-window-ready", move |_| {
-            if let Err(error) = Self::preload_ui(&preload_ui) {
-                log::error!("Failed to preload chorder panel: {error}");
-            }
-        });
-
-        Ok(Self {
-            ui,
-            active_task_run: Mutex::new(None),
-            held_keys: Mutex::new(HashSet::new()),
-            observable,
-            handle,
-        })
+        Ok(())
     }
 
-    fn emit_will_show(window: &tauri::WebviewWindow) {
-        if let Err(error) = window.emit("chorder-will-show", ()) {
-            log::error!("Failed to emit chorder will-show event: {error}");
-        }
+    fn emit_will_show(&self) -> Result<()> {
+        let window = self.ui.get_or_create_window()?;
+        window.emit("chorder-will-show", ())?;
+        Ok(())
     }
 
-    fn emit_visibility_changed(&self, visible: bool) {
-        if let Err(error) = self.ui.window.emit("chorder-visibility-changed", visible) {
-            log::error!("Failed to emit chorder visibility change: {error}");
-        }
+    fn emit_visibility_changed(&self, visible: bool) -> Result<()> {
+        let window = self.ui.get_or_create_window()?;
+        window.emit("chorder-visibility-changed", visible)?;
+        Ok(())
     }
 
-    fn prepare_surface_before_reveal(window: &tauri::WebviewWindow) {
+    fn prepare_surface_before_reveal(&self) -> Result<()> {
+        let window = self.ui.get_or_create_window()?;
         let (tx, rx) = mpsc::sync_channel(1);
         window.once("chorder-surface-ready", move |_| {
             let _ = tx.send(());
         });
-        Self::emit_will_show(window);
-
-        if rx.recv_timeout(Duration::from_millis(160)).is_err() {
-            log::debug!("Timed out waiting for chorder surface to prepare before reveal");
-        }
+        self.emit_will_show()?;
+        rx.recv_timeout(Duration::from_millis(160))?;
+        Ok(())
     }
 
-    fn preload_ui(ui: &ChorderIndicatorUi) -> Result<()> {
+    fn preload_ui(&self, ui: &ChorderIndicatorUi) -> Result<()> {
         log::debug!("Preloading chorder panel");
 
         if ui.ensure_visible()? {
-            Self::prepare_surface_before_reveal(&ui.window);
+            self.prepare_surface_before_reveal()?;
             ui.ensure_hidden()?;
         }
 
@@ -105,9 +106,9 @@ impl AppChorder {
 
     pub fn ensure_active(&self) -> Result<()> {
         if self.ui.ensure_visible()? {
-            Self::prepare_surface_before_reveal(&self.ui.window);
+            self.prepare_surface_before_reveal();
             self.ui.reveal()?;
-            self.emit_visibility_changed(true);
+            self.emit_visibility_changed(true)?;
         }
         Ok(())
     }
@@ -121,7 +122,7 @@ impl AppChorder {
 
         self.observable.set_state(state.clear_session())?;
         if self.ui.ensure_hidden()? {
-            self.emit_visibility_changed(false);
+            self.emit_visibility_changed(false)?;
         }
         Ok(())
     }
@@ -145,7 +146,7 @@ impl AppChorder {
     }
 
     fn spawn_end_task(&self, task_run: ChordActionTaskRun) -> Result<()> {
-        let handle = self.handle.try_handle()?.clone();
+        let handle = self.handle.clone();
         tauri::async_runtime::spawn(async move {
             let chord_action_task_runner = handle.chord_action_task_runner();
             if let Err(e) = chord_action_task_runner.end_task(task_run).await {
@@ -184,8 +185,7 @@ impl AppChorder {
         }
 
         let non_shift_modifiers = Key::non_shift_modifiers();
-        let handle = self.handle.try_handle()?;
-        let context = handle.app_context();
+        let context = self.handle.app_context();
         let Some(device_state) = &context.device_state else {
             log::debug!("no accessibility permissions");
             return Ok(());
@@ -297,10 +297,9 @@ impl AppChorder {
     }
 
     fn resolve_task_from_keys(&self, keys: &[Key], num_times: u32) -> Result<Option<ChordActionTask>> {
-        let handle = self.handle.try_handle()?;
-        let frontmost = handle.observable_state::<FrontmostObservable>()?;
+        let frontmost = self.handle.observable_state::<FrontmostObservable>()?;
         let application_id = frontmost.frontmost_app_bundle_id.clone();
-        let chord_package_manager = handle.chord_package_manager();
+        let chord_package_manager = self.handle.chord_package_manager();
         let input = ChordInput { keys: keys.to_vec(), application_id };
         let Some(chord_package) = chord_package_manager.resolve_package_for_input(&input) else {
             return Ok(None);
@@ -327,8 +326,7 @@ impl AppChorder {
     }
 
     fn run_task(&self, task: ChordActionTask) -> Result<()> {
-        let handle = self.handle.try_handle()?;
-        let runner = handle.chord_action_task_runner();
+        let runner = self.handle.chord_action_task_runner();
         let task_run = runner.start_task(&task)?;
         let mut lock = self.active_task_run.lock();
         *lock = Some(task_run);

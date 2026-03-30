@@ -1,4 +1,3 @@
-use crate::app::SafeAppHandle;
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
@@ -6,9 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use fast_radix_trie::StringRadixMap;
-use tauri::Wry;
-use tauri_plugin_store::Store;
+use tauri::{AppHandle, Wry};
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_store::{Store, StoreExt};
 use walkdir::WalkDir;
+use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
@@ -31,13 +32,16 @@ impl LocalChordPackage {
 }
 
 pub struct LocalPackageRegistry {
-    safe_handle: SafeAppHandle,
+    handle: AppHandle,
+}
+
+impl StateSingleton for LocalPackageRegistry {
+    fn new(handle: AppHandle) -> Self {
+        Self { handle }
+    }
 }
 
 impl LocalPackageRegistry {
-    pub fn new(safe_handle: SafeAppHandle) -> Self {
-        Self { safe_handle }
-    }
 
     pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
@@ -52,7 +56,7 @@ impl LocalPackageRegistry {
 
     pub fn pick(&self) -> anyhow::Result<Option<LocalChordPackage>> {
         let Some(folder_path) = self
-            .safe_handle
+            .handle
             .dialog()
             .file()
             .set_title("Select Local Chord Folder")
@@ -104,7 +108,7 @@ impl LocalPackageRegistry {
     }
 
     fn sources_store(&self) -> anyhow::Result<Arc<Store<Wry>>> {
-        self.safe_handle
+        self.handle
             .store(CHORD_SOURCES_STORE_PATH)
             .context("failed to open chord sources store")
     }

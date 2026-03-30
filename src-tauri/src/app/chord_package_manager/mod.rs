@@ -3,9 +3,12 @@ pub use chord_package::*;
 mod chord_js_package;
 pub use chord_js_package::*;
 mod chord_package_manager;
-pub mod git;
-pub mod local;
-pub mod registry;
-
 pub use chord_package_manager::*;
+pub mod git;
+pub use git::*;
+pub mod local;
+pub use local::*;
+pub mod registry;
+pub use registry::*;
+
 

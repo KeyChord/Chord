@@ -4,32 +4,39 @@ use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage};
 use crate::app::chord_package_manager::registry::ChordPackageRegistry;
-use crate::app::SafeAppHandle;
 use crate::input::Key;
 use crate::models::{ChordInput, ChordsFile, RawChordPackage};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::Result;
 use gix::bstr::ByteVec;
 use parking_lot::RwLock;
+use tauri::AppHandle;
+use crate::app::state::StateSingleton;
 use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 
 pub struct ChordPackageManager {
     packages: RwLock<HashMap<String, ChordPackage>>,
     pub registry: ChordPackageRegistry,
 
-    observable: Arc<ChordPackageManagerObservable>,
-    handle: SafeAppHandle,
+    observable: ChordPackageManagerObservable,
+    handle: AppHandle,
 }
 
+impl StateSingleton for ChordPackageManager {
+    fn new(handle: AppHandle) -> Self {
+        Self {
+            packages: RwLock::new(HashMap::new()),
+            registry: ChordPackageRegistry::new(handle.clone()),
+            observable: ChordPackageManagerObservable::none(),
+            handle
+        }
+    }
+}
 
 impl ChordPackageManager {
-    pub fn new(handle: SafeAppHandle, observable: Arc<ChordPackageManagerObservable>) -> Result<Self> {
-        Ok(Self {
-            packages: RwLock::new(HashMap::new()),
-            registry: ChordPackageRegistry::new_empty(handle.clone())?,
-            observable,
-            handle
-        })
+    pub fn init(&mut self, observable: ChordPackageManagerObservable) -> Result<()> {
+        self.observable = observable;
+        Ok(())
     }
 
     pub async fn reload_all(&self) -> Result<()> {
@@ -99,14 +106,13 @@ impl ChordPackageManager {
             return Ok(None)     ;
         }
 
-        let handle = self.handle.try_handle()?;
         let mut exported_files = HashMap::new();
 
         for (file_relpath, js) in files.iter() {
             let package_name_bytes = package_name.as_bytes().to_vec();
             exported_files.insert(file_relpath.clone(), js.clone());
             let js_string = js.clone();
-            with_js(handle.clone(), move |ctx| {
+            with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
                     let module = Module::declare(ctx.clone(), package_name_bytes.clone(), js_string.clone()).map_err(
                         |e| anyhow::format_err!(

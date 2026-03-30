@@ -1,6 +1,3 @@
-mod safe_app_handle;
-pub use safe_app_handle::SafeAppHandle;
-
 pub mod chord_package_manager;
 pub mod chord_runner;
 pub mod chorder;
@@ -13,6 +10,7 @@ pub mod global_hotkey_store;
 pub mod permissions;
 pub mod placeholder_chord_store;
 pub mod settings;
+pub mod state;
 
 macro_rules! define_app_managed {
     (

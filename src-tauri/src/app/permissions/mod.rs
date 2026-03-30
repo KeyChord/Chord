@@ -1,37 +1,43 @@
-use crate::app::SafeAppHandle;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use crate::observables::{AppPermissionsObservable, AppPermissionsState, Observable};
 use anyhow::Result;
 use std::sync::Arc;
+use tauri::AppHandle;
+use tauri_plugin_autostart::ManagerExt;
+use crate::app::state::StateSingleton;
 
 pub struct AppPermissions {
-    _input_monitoring: AppPermissionsInputMonitoring,
-    _accessibility: AppPermissionsAccessibility,
+    input_monitoring: AppPermissionsInputMonitoring,
+    accessibility: AppPermissionsAccessibility,
 
-    observable: Arc<AppPermissionsObservable>,
-    handle: SafeAppHandle,
+    observable: AppPermissionsObservable,
+    handle: AppHandle,
+}
+
+impl StateSingleton for AppPermissions {
+    fn new(handle: AppHandle) -> Self {
+        Self {
+            input_monitoring: AppPermissionsInputMonitoring::new(handle.clone()),
+            accessibility: AppPermissionsAccessibility::new(handle.clone()),
+            observable: AppPermissionsObservable::none(),
+            handle,
+        }
+    }
 }
 
 impl AppPermissions {
-    pub fn new_unloaded(
-        handle: SafeAppHandle,
-        observable: Arc<AppPermissionsObservable>,
-    ) -> Result<Self> {
-        let input_monitoring =
-            AppPermissionsInputMonitoring::new(handle.clone(), observable.clone())?;
-        let accessibility = AppPermissionsAccessibility::new(handle.clone(), observable.clone())?;
-        let is_autolaunch_enabled = handle.autolaunch().is_enabled()?;
-        observable.set_state(AppPermissionsState {
+    pub fn init(&mut self, observable: AppPermissionsObservable) -> Result<()> {
+        self.observable = observable;
+        
+        self.input_monitoring.init(&self.observable)?;
+        self.accessibility.init(&self.observable)?;
+        let is_autolaunch_enabled = self.handle.autolaunch().is_enabled()?;
+        self.observable.set_state(AppPermissionsState {
             is_input_monitoring_enabled: None,
             is_accessibility_enabled: None,
             is_autostart_enabled: Some(is_autolaunch_enabled),
         })?;
-        Ok(Self {
-            handle,
-            observable,
-            _input_monitoring: input_monitoring,
-            _accessibility: accessibility,
-        })
+        Ok(())
     }
 
     pub async fn load(&self) -> Result<()> {
@@ -70,39 +76,45 @@ impl AppPermissions {
     }
 }
 
-pub struct AppPermissionsInputMonitoring {}
+pub struct AppPermissionsInputMonitoring {
+    handle: AppHandle
+}
 
 impl AppPermissionsInputMonitoring {
-    pub fn new(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
-        let handle = handle.clone();
+    pub fn new(handle: AppHandle) -> Self {
+        Self { handle }
+    }
+
+    pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
+        let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_input_monitoring_enabled.is_some_and(|s| s) {
-                handle.on_safe(|handle| {
-                    if let Err(e) = register_caps_lock_input_handler(handle.clone()) {
-                        log::error!("Failed to handle caps lock input: {e}");
-                    }
-                });
+                if let Err(e) = register_caps_lock_input_handler(handle.clone()) {
+                    log::error!("Failed to handle caps lock input: {e}");
+                }
             }
         }))?;
-
-        Ok(Self {})
+        Ok(())
     }
 }
 
-pub struct AppPermissionsAccessibility {}
+pub struct AppPermissionsAccessibility {
+    handle: AppHandle
+}
 
 impl AppPermissionsAccessibility {
-    pub fn new(handle: SafeAppHandle, observable: Arc<AppPermissionsObservable>) -> Result<Self> {
-        let handle = handle.clone();
+    pub fn new(handle: AppHandle) -> Self {
+        Self { handle }
+    }
+
+    pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
+        let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_accessibility_enabled.is_some_and(|s| s) {
-                handle.on_safe(|handle| {
-                    register_key_event_input_grabber(handle.clone());
-                });
+                register_key_event_input_grabber(handle.clone());
             }
         }))?;
-
-        Ok(Self {})
+        Ok(())
     }
 }
 

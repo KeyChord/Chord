@@ -1,6 +1,7 @@
+use tauri::AppHandle;
 use crate::app::chord_package_manager::git::GitChordPackageRegistry;
 use crate::app::chord_package_manager::local::LocalPackageRegistry;
-use crate::app::SafeAppHandle;
+use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
 
 pub struct ChordPackageRegistry {
@@ -9,11 +10,11 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    pub fn new_empty(handle: SafeAppHandle) -> anyhow::Result<Self> {
-        Ok(Self {
-            git: GitChordPackageRegistry::new(handle.clone())?,
-            local: LocalPackageRegistry::new(handle),
-        })
+    pub fn new(handle: AppHandle) -> Self {
+        Self {
+            git: GitChordPackageRegistry::new(handle.clone()),
+            local: LocalPackageRegistry::new(handle.clone()),
+        }
     }
 
     pub fn import_all_packages(&self) -> anyhow::Result<Vec<RawChordPackage>> {

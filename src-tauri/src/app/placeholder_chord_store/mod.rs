@@ -1,12 +1,10 @@
-#[allow(unused_imports)]
-use crate::api::{AppError, AppResult};
-use crate::app::SafeAppHandle;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tauri::Wry;
-use tauri_plugin_store::Store;
+use tauri::{AppHandle, Wry};
+use tauri_plugin_store::{Store, StoreExt};
+use crate::app::state::StateSingleton;
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
 
@@ -23,17 +21,21 @@ pub struct PlaceholderChordStoreEntry {
 
 #[derive(Clone)]
 pub struct PlaceholderChordStore {
-    pub store: Arc<Store<Wry>>,
+    pub handle:AppHandle
+}
+
+impl StateSingleton for PlaceholderChordStore {
+    fn new(handle: AppHandle) -> Self {
+        Self { handle }
+    }
 }
 
 impl PlaceholderChordStore {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let store = handle.store(PLACEHOLDER_CHORDS_STORE_PATH)?;
-        Ok(Self { store })
+    pub fn store(&self) -> Result<Arc<Store<Wry>>> {
+        Ok(self.handle.store(PLACEHOLDER_CHORDS_STORE_PATH)?)
     }
-
-    pub fn entries(&self) -> HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry> {
-        self.store
+    pub fn entries(&self) -> Result<HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>> {
+Ok(        self.store()?
             .entries()
             .into_iter()
             .filter_map(|(key, value)| {
@@ -42,12 +44,12 @@ impl PlaceholderChordStore {
                     serde_json::from_value::<PlaceholderChordStoreEntry>(value.clone()).ok()?;
                 Some((parsed_key, parsed_value))
             })
-            .collect()
+            .collect())
     }
 
     #[allow(dead_code)]
-    pub fn entry(&self, key: &PlaceholderChordStoreKey) -> Option<PlaceholderChordStoreEntry> {
-        self.entries().get(key).cloned()
+    pub fn entry(&self, key: &PlaceholderChordStoreKey) -> Result<Option<PlaceholderChordStoreEntry>> {
+        Ok(self.entries()?.get(key).cloned())
     }
 
     fn serialize_key(key: &PlaceholderChordStoreKey) -> String {
@@ -55,7 +57,7 @@ impl PlaceholderChordStore {
     }
 
     fn save(&self) -> Result<()> {
-        self.store.save()?;
+        self.store()?.save()?;
         Ok(())
     }
 
@@ -67,14 +69,14 @@ impl PlaceholderChordStore {
         let serialized_key = Self::serialize_key(&key);
         let value =
             serde_json::to_value(entry).expect("placeholder chord store entry should serialize");
-        self.store.set(serialized_key, value);
+        self.store()?.set(serialized_key, value);
         self.save()?;
         Ok(())
     }
 
     pub fn remove(&self, key: &PlaceholderChordStoreKey) -> Result<()> {
         let serialized_key = Self::serialize_key(key);
-        self.store.delete(serialized_key);
+        self.store()?.delete(serialized_key);
         self.save()?;
         Ok(())
     }

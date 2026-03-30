@@ -1,23 +1,22 @@
-use crate::app::SafeAppHandle;
+use crate::app::AppHandleExt;
 use crate::observables::GitReposObservable;
 use anyhow::Result;
-use std::path::PathBuf;
+use tauri::AppHandle;
 use crate::app::chord_package_manager::local::LocalPackageRegistry;
+use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
 
 pub struct GitChordPackageRegistry {
-    #[allow(dead_code)]
-    pub dir: PathBuf,
+    handle: AppHandle,
+}
 
-    handle: SafeAppHandle,
+impl StateSingleton for GitChordPackageRegistry {
+    fn new(handle: AppHandle) -> Self {
+        Self { handle }
+    }
 }
 
 impl GitChordPackageRegistry {
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let dir = handle.path().app_cache_dir()?;
-        Ok(Self { dir, handle })
-    }
-
     pub fn import_all_packages(&self) -> Result<Vec<RawChordPackage>> {
         let mut packages = Vec::new();
         let state = self.handle.observable_state::<GitReposObservable>()?;

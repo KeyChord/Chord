@@ -1,5 +1,4 @@
 use crate::IndicatorPanel;
-use crate::app::SafeAppHandle;
 use anyhow::Result;
 use objc2::msg_send;
 use objc2_app_kit::{
@@ -11,7 +10,7 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{WebviewUrl, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
@@ -30,13 +29,20 @@ pub struct NativeSurfaceRect {
 
 #[derive(Clone)]
 pub struct ChorderIndicatorUi {
-    pub handle: SafeAppHandle,
+    pub handle: AppHandle,
     pub is_visible: Arc<AtomicBool>,
-    pub panel: Arc<dyn Panel>,
-    pub window: WebviewWindow,
+    pub panel: Option<Arc<dyn Panel>>,
 }
 
 impl ChorderIndicatorUi {
+    pub fn new(handle: AppHandle) -> Self {
+        Self {
+            handle,
+            is_visible: Arc::new(AtomicBool::new(false)),
+            panel: None,
+        }
+    }
+
     fn restore_frontmost_app(bundle_id: &str, pid: i32) {
         let bundle_id = NSString::from_str(bundle_id);
         let running_apps =
@@ -55,9 +61,13 @@ impl ChorderIndicatorUi {
         }
     }
 
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let window = handle
-            .new_webview_window_builder("chords", WebviewUrl::App("index.html".into()))?
+    pub fn get_or_create_window(&self) -> Result<WebviewWindow> {
+        if let Some(window) = self.handle.get_webview_window("chords") {
+            return Ok(window);
+        }
+
+        let window =
+            WebviewWindowBuilder::new(&self.handle, "chords", WebviewUrl::App("index.html".into()))
             .title("Chords")
             .inner_size(640.0, 180.0)
             .visible(false)
@@ -106,12 +116,7 @@ impl ChorderIndicatorUi {
                 .into(),
         );
 
-        Ok(Self {
-            handle,
-            is_visible: Arc::new(AtomicBool::new(false)),
-            window,
-            panel,
-        })
+        Ok(window)
     }
 
     pub fn is_visible(&self) -> bool {
@@ -127,7 +132,7 @@ impl ChorderIndicatorUi {
     }
 
     pub fn open_inspector(&self) -> Result<()> {
-        let window = self.window.clone();
+        let window = self.get_or_create_window()?;
         window.show()?;
         window.unminimize()?;
         window.set_focus()?;
@@ -138,7 +143,7 @@ impl ChorderIndicatorUi {
 
     pub fn configure_window_surface(
         window: &WebviewWindow,
-        handle: SafeAppHandle,
+        handle: AppHandle,
         rect: NativeSurfaceRect,
     ) -> Result<()> {
         let ns_view = Self::webview_ns_view(window)?;
@@ -175,7 +180,7 @@ impl ChorderIndicatorUi {
 
     fn show(&self) -> Result<()> {
         log::debug!("Showing chorder panel");
-        let panel = self.panel.clone();
+        let panel = self.panel.clone().unwrap();
         let is_visible = self.is_visible.clone();
 
         self.handle.clone().run_on_main_thread(move || {
@@ -232,7 +237,7 @@ impl ChorderIndicatorUi {
     }
 
     pub fn reveal(&self) -> Result<()> {
-        let panel = self.panel.clone();
+        let panel = self.panel.clone().unwrap();
 
         self.handle.run_on_main_thread(move || {
             panel.set_alpha_value(1.0);
@@ -244,7 +249,7 @@ impl ChorderIndicatorUi {
     fn hide(&self) -> Result<()> {
         log::debug!("Hiding chorder panel");
         let is_visible = self.is_visible.clone();
-        let panel = self.panel.clone();
+        let panel = self.panel.clone().unwrap();
 
         self.handle.clone().run_on_main_thread(move || {
             panel.hide();

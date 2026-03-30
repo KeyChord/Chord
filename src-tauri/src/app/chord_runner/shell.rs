@@ -1,11 +1,11 @@
-use crate::app::SafeAppHandle;
 use tokio::process::Command;
 use crate::models::ShellChordAction;
 use anyhow::Result;
+use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 
 pub struct ShellChordActionTaskRunner {
-    _handle: SafeAppHandle,
+    _handle: AppHandle,
 }
 
 #[derive(Debug)]
@@ -14,7 +14,7 @@ pub struct ShellChordActionTaskRun {
 }
 
 impl ShellChordActionTaskRunner {
-    pub fn new(handle: SafeAppHandle) -> Self {
+    pub fn new(handle: AppHandle) -> Self {
         Self { _handle: handle }
     }
 }

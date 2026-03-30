@@ -241,7 +241,7 @@ fn get_global_hotkey(
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
     let shortcut = global_hotkey_store
-        .entries()
+        .entries().or_throw_msg(&ctx, "bad entries")?
         .into_iter()
         .find_map(|(shortcut, entry)| {
             (entry.bundle_id == bundle_id && entry.hotkey_id == hotkey_id).then_some(shortcut)
@@ -257,7 +257,7 @@ fn register_global_hotkey(
 ) -> rquickjs::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
-    let all = global_hotkey_store.entries();
+    let all = global_hotkey_store.entries().or_throw_msg(&ctx, "bad store")?;
 
     // idempotent: if this hotkey is already registered, return the existing shortcut
     if let Some(existing) = all.iter().find_map(|(shortcut, entry)| {

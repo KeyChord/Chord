@@ -1,13 +1,13 @@
-use crate::app::SafeAppHandle;
 use anyhow::Result;
+use tauri::AppHandle;
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 
 pub struct ShortcutChordActionTaskRunner {
-    handle: SafeAppHandle,
+    handle: AppHandle,
 }
 
 impl ShortcutChordActionTaskRunner {
-    pub fn new(handle: SafeAppHandle) -> Self {
+    pub fn new(handle: AppHandle) -> Self {
         Self { handle }
     }
 

@@ -1,9 +1,9 @@
 use serde::Serialize;
+use tauri::AppHandle;
 use typeshare::typeshare;
 use crate::app::chord_runner::{JavascriptChordActionTaskRun, JavascriptChordActionTaskRunner};
 use crate::app::chord_runner::{ShellChordActionTaskRun, ShellChordActionTaskRunner};
 use crate::app::chord_runner::{ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
-use crate::app::SafeAppHandle;
 use crate::models::ChordAction;
 
 #[typeshare]
@@ -27,7 +27,7 @@ pub struct ChordActionTaskRunner {
 }
 
 impl ChordActionTaskRunner {
-    pub fn new(handle: SafeAppHandle) -> Self {
+    pub fn new(handle: AppHandle) -> Self {
         Self {
             javascript:  JavascriptChordActionTaskRunner::new(handle.clone()),
             shell: ShellChordActionTaskRunner::new(handle.clone()),

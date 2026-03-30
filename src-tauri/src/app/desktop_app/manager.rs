@@ -1,4 +1,3 @@
-use crate::app::SafeAppHandle;
 use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
@@ -17,16 +16,23 @@ use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 pub struct DesktopAppManager {
-    observable: Arc<DesktopAppManagerObservable>,
-    _handle: SafeAppHandle,
+    observable: DesktopAppManagerObservable,
+    _handle: AppHandle,
+}
+
+impl StateSingleton for DesktopAppManager {
+    fn new(handle: AppHandle) -> Self {
+        DesktopAppManager {
+            observable: DesktopAppManagerObservable::none(),
+            _handle: handle,
+        }
+    }
 }
 
 impl DesktopAppManager {
-    pub fn new(handle: SafeAppHandle, observable: Arc<DesktopAppManagerObservable>) -> Self {
-        DesktopAppManager {
-            observable,
-            _handle: handle,
-        }
+    pub fn init(&mut self, observable: DesktopAppManagerObservable) -> Result<()> {
+        self.observable = observable;
+        Ok(())
     }
 
     #[allow(dead_code)]
@@ -394,3 +400,4 @@ use crate::app::desktop_app::DesktopApp;
 use crate::quickjs::with_js;
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;
+use crate::app::state::StateSingleton;

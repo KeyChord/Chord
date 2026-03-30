@@ -1,4 +1,3 @@
-use crate::app::SafeAppHandle;
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::Result;
 use llrt_core::function::Args;
@@ -6,6 +5,7 @@ use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
 use serde::Serialize;
+use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 use typeshare::typeshare;
 use crate::models::JavascriptChordAction;
@@ -19,7 +19,7 @@ pub struct ExportedFunctionInvocation {
 
 #[derive(Clone)]
 pub struct JavascriptChordActionTaskRunner {
-    handle: SafeAppHandle,
+    handle: AppHandle,
 }
 
 #[derive(Debug)]
@@ -28,15 +28,14 @@ pub struct JavascriptChordActionTaskRun {
 }
 
 impl JavascriptChordActionTaskRunner {
-    pub fn new(handle: SafeAppHandle) -> Self {
+    pub fn new(handle: AppHandle) -> Self {
         Self { handle }
     }
 }
 
 impl JavascriptChordActionTaskRunner {
     pub fn start(&self, action: &JavascriptChordAction, num_times: u32) -> Result<JavascriptChordActionTaskRun> {
-        let handle = self.handle.try_handle()?;
-        let handle = handle.clone();
+        let handle = self.handle.clone();
         let module_specifier = action.module_specifier.clone();
         let args = action.args.clone();
 
