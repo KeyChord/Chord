@@ -311,7 +311,7 @@ impl AppChorder {
         let Some(chord_ref) = chord_package.resolve_chord_for_input(&input) else {
             return Ok(None);
         };
-        let task = chord_package.resolve_task(chord_ref, 1)?;
+        let task = chord_package.resolve_task(chord_ref, num_times)?;
         Ok(task)
     }
 
