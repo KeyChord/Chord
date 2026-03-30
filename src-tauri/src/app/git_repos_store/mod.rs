@@ -1,4 +1,4 @@
-use crate::git::{GitHubRepoRef, clone_repo, clone_repo_at_revision};
+use crate::git::{GitHubRepoRef, clone_repo, clone_repo_at_revision, update_or_clone_repo_at_revision};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
@@ -121,7 +121,8 @@ impl GitReposStore {
         let mut next_repos = HashMap::with_capacity(repos.len());
         for spec in repos {
             let repo_path = spec.repo_ref.local_path(&repos_root);
-            clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
+            // Use the new function to handle both cloning if not exists, and fetching/updating if exists.
+            update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
             next_repos.insert(repo.slug.clone(), repo);
         }
