@@ -60,7 +60,7 @@ impl ChordPackageManager {
     pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
         let name = self.get_package_name(&raw_chord_package)?;
         let mut app_chords_files = HashMap::new();
-        let mut global_chords = HashMap::new();
+        let mut global_chords = Vec::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
             let Ok(mut chords_file) = contents.parse::<ChordsFile>().inspect_err(|e| {
@@ -72,11 +72,11 @@ impl ChordPackageManager {
             chords_file.relpath = path.clone();
 
             for chord in &chords_file.chords {
-                let first_char = chord.string_key.chars().next();
+                let first_char = chord.raw_trigger.chars().next();
                 let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
 
                 if is_non_alphanumeric {
-                    global_chords.insert(chord.string_key.clone(), ChordReference { chords_file_path: path.clone(), chord: chord.clone() });
+                    global_chords.push(ChordReference { chords_file_path: path.clone(), chord: chord.clone() });
                 }
             }
 
@@ -170,7 +170,7 @@ impl ChordPackageManager {
 
         let sequence_str = Key::serialize_sequence(&input.keys)?;
         for package in packages.values() {
-            if package.global_chords.contains_key(&sequence_str) {
+            if package.global_chords.iter().find(|c| c.chord.raw_trigger == sequence_str).is_some() {
                 return Some(package.clone());
             }
         }

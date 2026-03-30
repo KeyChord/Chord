@@ -98,28 +98,29 @@ impl ChordsFile {
     fn parse_hint(key: &str, value: &Table) -> Result<ChordHint> {
         let chord_name = value.get("name").and_then(|n| n.as_str());
 
-        let pattern_str = &key[1..];
-        let pattern = if pattern_str.contains('(') {
-            if let Ok(re) = Regex::new(pattern_str) {
+        let raw_pattern = &key[1..];
+        let pattern = if raw_pattern.contains('(') {
+            if let Ok(re) = Regex::new(raw_pattern) {
                 ChordHintPattern::Regex(re)
             } else {
-                if let Ok(keys) = Key::parse_sequence(pattern_str) {
+                if let Ok(keys) = Key::parse_sequence(raw_pattern) {
                     ChordHintPattern::Keys(keys)
                 } else {
                     ChordHintPattern::Regex(Regex::new("")?)
                 }
             }
         } else {
-            if let Ok(keys) = Key::parse_sequence(pattern_str) {
+            if let Ok(keys) = Key::parse_sequence(raw_pattern) {
                 ChordHintPattern::Keys(keys)
             } else {
-                ChordHintPattern::Regex(Regex::new(pattern_str)?)
+                ChordHintPattern::Regex(Regex::new(raw_pattern)?)
             }
 
         };
 
         Ok(ChordHint {
             pattern,
+            raw_pattern: raw_pattern.to_string(),
             description: chord_name.unwrap_or_default().to_string(),
         })
     }
@@ -160,6 +161,7 @@ impl FromStr for ChordsFile {
                     let hint = Self::parse_hint(key, table)?;
                     chord_hints.push(hint);
                 } else {
+                    let raw_trigger = key;
                     let mut actions = Vec::new();
 
                     if let Some(shortcut) = value.get("shortcut") {
@@ -188,7 +190,7 @@ impl FromStr for ChordsFile {
                         log::warn!("couldn't find any actions for chord {:?}", table);
                     }
 
-                    let trigger = if key.contains('(') {
+                    let trigger = if raw_trigger.contains('(') {
                         ChordTrigger::Pattern(Regex::new(key).unwrap_or_else(|_| Regex::new("").unwrap()))
                     } else {
                         ChordTrigger::Keys(Key::parse_sequence(key)?)
@@ -196,7 +198,7 @@ impl FromStr for ChordsFile {
 
                     let chord_name = value.get("name").and_then(|n| n.as_str());
                     chords.push(Chord {
-                        string_key: key.clone(),
+                        raw_trigger: raw_trigger.clone(),
                         trigger,
                         name: chord_name.unwrap_or_default().to_string(),
                         index,

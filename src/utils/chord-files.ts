@@ -8,14 +8,18 @@ interface RawChord {
 }
 
 export function useChordFile(bundleId: string | undefined): Record<string, RawChord> {
-  const { packages } = useChordPackageManagerState();
 	const chords = getGlobalChords(packages);
 
   if (bundleId !== undefined) {
     for (const pkg of packages) {
       const chordsFile = pkg.appChordsFiles[bundleId];
       if (chordsFile) {
-        Object.assign(chords, chordsFile.chords)
+        for (const chord of chordsFile.chords) {
+          chords[chord.string_key] = chord
+        }
+        for (const hint of chordsFile.chordHints) {
+          chords[hint.pattern] = hint
+        }
       }
     }
   }

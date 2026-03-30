@@ -24,7 +24,7 @@ const defaultSelectedRepoUrls = officialChordRepos.map(repo => repo.url);
 export function BrowseTab() {
 	const { repos } = useGitRepoStoreState();
 	const [searchInput, setSearchInput] = useState('');
-	const [selectedRepoUrls, setSelectedRepoUrls] = useState(defaultSelectedRepoUrls);
+	const [selectedRepoUrls, setSelectedRepoUrls] = useState<string[]>([]);
 
 	const installedRepoSlugs = new Set(Object.values(repos).map(repo => repo.slug.toLowerCase()));
 	const addGitRepoMutation = useMutation({

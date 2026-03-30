@@ -1,17 +1,19 @@
-use serde::Serialize;
+use regex::Regex;
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 use typeshare::typeshare;
+use crate::input::Key;
 use crate::models::{ChordAction, ChordTrigger};
-
-/// This is the string key in the TOML file which maps to the chord
-pub type ChordString = String;
 
 /// A regular chord entry composed of static characters
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Chord {
-    pub string_key: ChordString,
+    pub raw_trigger: String,
 
     /// The keys that make up the chord (extracted from the TOML key)
+    #[typeshare(typescript(type = "{ keys: string[] } | { regex: string }"))]
     pub trigger: ChordTrigger,
 
     /// A mandatory chord name

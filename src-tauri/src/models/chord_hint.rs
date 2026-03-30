@@ -1,15 +1,16 @@
-use bitflags::__private::serde::Serializer;
 use regex::Regex;
 use serde::ser::SerializeStruct;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use typeshare::typeshare;
 use crate::input::Key;
 
 #[typeshare]
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChordHint {
-    #[typeshare(typescript(type = "any"))]
+    #[typeshare(typescript(type = "{ keys: string[] } | { regex: string }"))]
     pub pattern: ChordHintPattern,
+    pub raw_pattern: String,
     pub description: String
 }
 
@@ -32,7 +33,7 @@ impl Serialize for ChordHintPattern {
             }
             ChordHintPattern::Regex(regex) => {
                 let mut s = serializer.serialize_struct("ChordTrigger", 1)?;
-                s.serialize_field("pattern", regex.as_str())?;
+                s.serialize_field("regex", regex.as_str())?;
                 s.end()
             }
         }

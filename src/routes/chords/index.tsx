@@ -1,11 +1,13 @@
 import { Kbd } from '#/components/ui/kbd.tsx';
 import { useChordFile } from '#/utils/chord-files.ts';
-import { useChorderState, useFrontmostState } from '#/utils/state.ts';
+import { useChorderState, useChordPackageManagerState, useFrontmostState } from '#/utils/state.ts';
 import { cn } from '#/utils/style.ts';
 import { createFileRoute } from '@tanstack/react-router';
 import { emit, listen } from '@tauri-apps/api/event';
 import getPrettyKey from 'pretty-key';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { Chord, ChordHint, ChordReference } from '../../types/generated.ts';
+import path from 'pathe'
 
 export const Route = createFileRoute('/chords/')({
 	component: Chords,
@@ -19,11 +21,6 @@ const INDICATOR_TRANSITION_MS = 240;
 const HIDDEN_X_OFFSET_PX = 40;
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
-type RawChord = ReturnType<typeof useChordFile>[string];
-interface ParsedChord {
-	keys: string[]
-	chord: RawChord
-}
 
 function clamp(value: number, min: number, max: number) {
 	return Math.min(Math.max(value, min), max);
@@ -195,7 +192,8 @@ function ChordKeyRow({
 export function Chords() {
 	const state = useChorderState();
 	const { frontmostAppBundleId } = useFrontmostState();
-	const rawChords = useChordFile(frontmostAppBundleId);
+  const { packages } = useChordPackageManagerState();
+
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
 	const [indicatorProgress, setIndicatorProgress] = useState(() =>
@@ -321,35 +319,23 @@ export function Chords() {
 		};
 	}, [surfaceVersion]);
 
-	const parsedChords: ParsedChord[] = [];
-	const descriptionsBySequence: Record<string, string> = {};
+	const activeChords: Chord[] = [];
+	const hintsByRawPattern: Record<string, ChordHint> = {};
+  const globalChords: ChordReference[] = []
 
-	for (const [sequence, chord] of Object.entries(rawChords)) {
-		if (!sequence) {
-			continue;
-		}
+	for (const chordPackage of packages) {
+    globalChords.push(...chordPackage.globalChords);
+    for (const [filepath, file] of Object.entries(chordPackage.appChordsFiles)) {
+      if (path.dirname(filepath).replaceAll('/', '.') === frontmostAppBundleId) {
+        for (const hint of file.chordHints) {
+          hintsByRawPattern[hint.rawPattern] = hint;
+        }
 
-		if (sequence.startsWith('?')) {
-			if (!chord?.name) {
-				continue;
-			}
-
-			try {
-				for (const expandedSequence of expandDescriptionSequence(sequence.slice(1))) {
-					descriptionsBySequence[parseSequence(expandedSequence).join('')] = chord.name;
-				}
-			}
-			catch {
-				// Ignore invalid description-only entries in the overlay.
-			}
-
-			continue;
-		}
-
-		parsedChords.push({
-			keys: parseSequence(sequence),
-			chord,
-		});
+        for (const chord of file.chords) {
+          activeChords.push(chord)
+        }
+      }
+    }
 	}
 
 	const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);

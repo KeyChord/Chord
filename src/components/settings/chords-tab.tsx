@@ -89,15 +89,26 @@ export function ChordsTab() {
 					: (
 							<div className="space-y-2">
 								{packages.map(pkg => (
-									<div
-										key={pkg.name}
-										className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
-									>
-										<div className="min-w-0">
-											<p className="font-medium">{pkg.name}</p>
-										</div>
-									</div>
-								))}
+									<div key={pkg.name} className="rounded-lg border bg-background/80 px-3 py-3">
+									    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
+									        <div className="min-w-0">
+									            <p className="font-medium">{pkg.name}</p>
+									        </div>
+									    </div>
+									    {pkg.chords && pkg.chords.length > 0 ? (
+									        <div className="ml-4 space-y-1">
+									            {pkg.chords.map((chord) => (
+									                <p key={chord} className="text-sm text-muted-foreground">
+									                    - {chord}
+									                </p>
+									            ))}
+									        </div>
+									    ) : (
+									        <div className="ml-4">
+									            <p className="text-sm text-muted-foreground italic">No chords loaded for this package.</p>
+									        </div>
+									    )}
+									</div>								))}
 							</div>
 						)}
 			</CardContent>

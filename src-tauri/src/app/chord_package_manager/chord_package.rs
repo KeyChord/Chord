@@ -3,7 +3,7 @@ use serde::Serialize;
 use typeshare::typeshare;
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordString, ChordTaskAction, ChordsFile, HandlerChordAction};
+use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordsFile, HandlerChordAction};
 use anyhow::Result;
 
 #[typeshare]
@@ -16,7 +16,7 @@ pub struct ChordPackage {
     pub js_package: Option<ChordJsPackage>,
 
     pub app_chords_files: HashMap<String, ChordsFile>,
-    pub global_chords: HashMap<ChordString, ChordReference>
+    pub global_chords: Vec<ChordReference>
 }
 
 #[typeshare]
@@ -38,7 +38,7 @@ impl ChordPackage {
             }
         }
 
-        self.global_chords.values().find(|c| c.chord.trigger.matches(&input.keys))
+        self.global_chords.iter().find(|c| c.chord.trigger.matches(&input.keys))
             .map(|c| ChordReference {
                 chords_file_path: c.chords_file_path.clone(),
                 chord: c.chord.clone()
