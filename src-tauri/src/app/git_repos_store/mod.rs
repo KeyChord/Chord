@@ -16,7 +16,7 @@ pub struct GitReposStore {
 
 impl StateSingleton for GitReposStore {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: GitReposObservable::none() }
+        Self { handle, observable: GitReposObservable::empty() }
     }
 }
 
@@ -25,8 +25,8 @@ impl GitReposStore {
         Ok(self.handle.store("repos.json")?)
     }
 
-    pub fn init(&mut self, observable: GitReposObservable) -> Result<()> {
-        self.observable = observable;
+    pub fn init(&self, observable: GitReposObservable) -> Result<()> {
+        self.observable.init(observable);
 
         let repos = load_repos(self.store()?.as_ref())?;
         log::debug!("repos: {:?}", repos);

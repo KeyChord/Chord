@@ -53,7 +53,7 @@ macro_rules! define_app_managed {
             fn observable_state<T: $crate::observables::Observable>(
                 &self,
             ) -> ::anyhow::Result<::std::sync::Arc<T::State>> {
-                Ok(::tauri::Manager::state::<::std::sync::Arc<T>>(self).inner().get_state()?)
+                Ok(::tauri::Manager::state::<T>(self).get_state()?)
             }
         }
     };

@@ -34,16 +34,18 @@ pub struct AppFrontmost {
 
 impl StateSingleton for AppFrontmost {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: FrontmostObservable::none() }
+        Self { handle, observable: FrontmostObservable::empty() }
     }
 }
 
 impl AppFrontmost {
     pub fn init(&self, observable: FrontmostObservable) -> Result<()> {
+        self.observable.init(observable);
+
         let workspace = NSWorkspace::sharedWorkspace();
         if let Some(application) = workspace.frontmostApplication() {
             if let Some(bundle_id) = application.bundleIdentifier() {
-                observable.set_state(FrontmostState {
+                self.observable.set_state(FrontmostState {
                     frontmost_app_bundle_id: Some(bundle_id.to_string()),
                 })?;
             }

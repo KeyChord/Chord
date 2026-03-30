@@ -35,7 +35,7 @@ impl StateSingleton for AppChorder {
             ui: ChorderIndicatorUi::new(handle.clone()),
             active_task_run: Mutex::new(None),
             held_keys: Mutex::new(HashSet::new()),
-            observable: ChorderObservable::none(),
+            observable: ChorderObservable::empty(),
             handle,
         }
     }
@@ -44,7 +44,7 @@ impl StateSingleton for AppChorder {
 impl AppChorder {
     pub fn init(&mut self, observable: ChorderObservable) -> Result<()> {
         self.observable = observable;
-        
+
         let surface_window = self.ui.get_or_create_window()?;
         let surface_handle = self.ui.handle.clone();
         let listener_window = surface_window.clone();

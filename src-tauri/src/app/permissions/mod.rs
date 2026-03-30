@@ -19,16 +19,16 @@ impl StateSingleton for AppPermissions {
         Self {
             input_monitoring: AppPermissionsInputMonitoring::new(handle.clone()),
             accessibility: AppPermissionsAccessibility::new(handle.clone()),
-            observable: AppPermissionsObservable::none(),
+            observable: AppPermissionsObservable::empty(),
             handle,
         }
     }
 }
 
 impl AppPermissions {
-    pub fn init(&mut self, observable: AppPermissionsObservable) -> Result<()> {
-        self.observable = observable;
-        
+    pub fn init(&self, observable: AppPermissionsObservable) -> Result<()> {
+        self.observable.init(observable);
+
         self.input_monitoring.init(&self.observable)?;
         self.accessibility.init(&self.observable)?;
         let is_autolaunch_enabled = self.handle.autolaunch().is_enabled()?;

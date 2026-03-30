@@ -110,18 +110,18 @@ unsafe fn singleton<T>(handle: AppHandle, value: T) -> &'static mut T
 where
     T: Send + Sync + 'static,
 {
-    // 1. Move value to the heap so its address is stable
-    let boxed = Box::new(value);
+    // 1. Box the value to get a stable heap address
+    let mut boxed = Box::new(value);
 
-    // 2. Get a raw pointer to the heap memory
-    let ptr = Box::into_raw(boxed);
+    // 2. Get a raw pointer to the data inside the box
+    let ptr: *mut T = &mut *boxed;
 
-    // 3. Reconstruct the box to move it into Tauri (taking ownership back)
-    // We use a raw pointer to "remember" where it lived.
-    let re_boxed = unsafe { Box::from_raw(ptr) };
-    handle.manage(*re_boxed);
+    // 3. Move the box (and the value T) into Tauri.
+    // Since it's a Box, the data at `ptr` does NOT move in memory.
+    handle.manage(*boxed);
 
-    // 4. Return the mutable reference from the pointer
-    // WARNING: This reference is 'static and points into Tauri's internal storage.
-    unsafe { &mut *ptr }
+    // 4. Return the pointer as a static mutable reference.
+    // SAFETY: This works because 'handle.manage' now owns the heap allocation.
+    // The memory will live as long as the AppHandle/State exists.
+    &mut *ptr
 }

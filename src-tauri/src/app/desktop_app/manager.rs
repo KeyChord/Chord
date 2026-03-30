@@ -23,7 +23,7 @@ pub struct DesktopAppManager {
 impl StateSingleton for DesktopAppManager {
     fn new(handle: AppHandle) -> Self {
         DesktopAppManager {
-            observable: DesktopAppManagerObservable::none(),
+            observable: DesktopAppManagerObservable::empty(),
             _handle: handle,
         }
     }
@@ -31,7 +31,7 @@ impl StateSingleton for DesktopAppManager {
 
 impl DesktopAppManager {
     pub fn init(&mut self, observable: DesktopAppManagerObservable) -> Result<()> {
-        self.observable = observable;
+        self.observable.init(observable);
         Ok(())
     }
 

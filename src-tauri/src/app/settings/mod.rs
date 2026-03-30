@@ -19,15 +19,15 @@ impl StateSingleton for AppSettings {
     fn new(handle: AppHandle) -> Self {
         Self {
             ui: SettingsUi::new(handle.clone()),
-            observable: AppSettingsObservable::none(),
+            observable: AppSettingsObservable::empty(),
             handle,
         }
     }
 }
 
 impl AppSettings {
-    pub fn init(&mut self, observable: AppSettingsObservable) -> Result<()> {
-        self.observable = observable;
+    pub fn init(&self, observable: AppSettingsObservable) -> Result<()> {
+        self.observable.init(observable);
         Ok(())
     }
 
@@ -69,7 +69,7 @@ impl AppSettings {
     fn apply_state(&self, state: &AppSettingsState) -> Result<()> {
         self.apply_menu_bar_icon_visibility(state.show_menu_bar_icon)?;
         self.apply_dock_icon_visibility(state.show_dock_icon)?;
-        self.apply_guide_visibility(!state.hide_guide_by_default)?;
+        // self.apply_guide_visibility(!state.hide_guide_by_default)?;
         Ok(())
     }
 
@@ -84,18 +84,6 @@ impl AppSettings {
     fn apply_dock_icon_visibility(&self, visible: bool) -> Result<()> {
         #[cfg(target_os = "macos")]
         self.handle.set_dock_visibility(visible)?;
-
-        Ok(())
-    }
-
-    // UNSAFE
-    fn apply_guide_visibility(&self, visible: bool) -> Result<()> {
-        let chorder = self.handle.state::<Arc<ChorderObservable>>();
-        let current_state = chorder.get_state()?;
-        chorder.set_state(crate::observables::ChorderState {
-            is_indicator_visible: visible,
-            ..current_state.as_ref().clone()
-        })?;
 
         Ok(())
     }

@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use tauri::AppHandle;
-
 mod chord_package_manager;
 pub use chord_package_manager::*;
 mod chorder;
@@ -37,7 +36,9 @@ pub trait Observable: Sized + Send + Sync + 'static {
         observer: observable_property::Observer<std::sync::Arc<Self::State>>,
     ) -> anyhow::Result<observable_property::ObserverId>;
 
+    fn empty() -> Self;
     fn new(handle: AppHandle) -> anyhow::Result<Self>;
+    fn init(&self, observable: Self);
 }
 
 pub fn get_all_observable_states(
@@ -62,13 +63,10 @@ macro_rules! define_observable {
         #[derive(Clone)]
         $(#[$meta])*
         $vis struct $name {
-            state: ::std::sync::Arc<::std::option::Option<::observable_property::ObservableProperty<::std::sync::Arc<$state>>>>,
+            state: ::std::sync::Arc<::arc_swap::ArcSwap<::std::option::Option<::observable_property::ObservableProperty<::std::sync::Arc<$state>>>>>,
         }
 
         impl $name {
-            pub fn none() -> Self {
-                Self { state: ::std::sync::Arc::new(::std::option::Option::None) }
-            }
         }
 
         impl $crate::observables::Observable for $name {
@@ -77,8 +75,16 @@ macro_rules! define_observable {
             const ID: &'static str = $id;
             const EVENT: &'static str = ::std::concat!("state:", $id);
 
+            fn empty() -> Self {
+                Self { state: ::std::sync::Arc::new(::arc_swap::ArcSwap::new(::std::sync::Arc::new(::std::option::Option::None))) }
+            }
+
+            fn init(&self, observable: Self) {
+                self.state.store(observable.state.load_full())
+            }
+
             fn get_state(&self) -> ::anyhow::Result<::std::sync::Arc<Self::State>> {
-                if let Some(self_state) = &*self.state {
+                if let Some(self_state) = self.state.load().as_ref() {
                     Ok(self_state.get()?)
                 } else {
                     anyhow::bail!("no state")
@@ -86,7 +92,7 @@ macro_rules! define_observable {
             }
 
             fn set_state(&self, state: Self::State) -> ::anyhow::Result<()> {
-                if let Some(self_state) = &*self.state {
+                if let Some(self_state) = self.state.load().as_ref() {
                     Ok(self_state.set(::std::sync::Arc::new(state))?)
                 } else {
                     anyhow::bail!("no state")
@@ -109,14 +115,14 @@ macro_rules! define_observable {
                     }
                 }))?;
 
-                Ok(Self { state: ::std::sync::Arc::new(::std::option::Option::Some(state)) })
+                Ok(Self { state: ::std::sync::Arc::new(::arc_swap::ArcSwap::new(::std::sync::Arc::new(::std::option::Option::Some(state)))) })
             }
 
             fn subscribe(
                 &self,
                 observer: ::observable_property::Observer<::std::sync::Arc<Self::State>>,
             ) -> ::anyhow::Result<observable_property::ObserverId> {
-                if let Some(self_state) = &*self.state {
+                if let Some(self_state) = self.state.load().as_ref() {
                     Ok(self_state.subscribe(observer)?)
                 } else {
                     anyhow::bail!("no state")
