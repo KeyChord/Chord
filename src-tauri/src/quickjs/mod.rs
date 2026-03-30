@@ -242,17 +242,14 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
 
     let context = AsyncContext::full(&rt).await?;
     async_with!(context => |ctx| {
-        global_attachment.attach(&ctx)?;
-        ctx.store_userdata(AppUserData { handle })?;
+        async {
+            global_attachment.attach(&ctx)?;
+            ctx.store_userdata(AppUserData { handle })?;
 
-        Ok::<_, Error>(())
+            Ok::<_, Error>(())
+        }.await.map_err(|e| anyhow::format_err!("async_with failed: {}", format_js_error(&ctx, e)))
     })
     .await?;
-
-    // Deno makes the app super slow
-    // JS_WORKER.with(move |cell| {
-    //     *cell.borrow_mut() = Some(main_worker);
-    // });
 
     Ok(JsEngine {
         _rt: rt,
