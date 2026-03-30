@@ -26,7 +26,9 @@ pub struct ChorderState {
 
 impl ChorderState {
     pub fn is_idle(&self) -> bool {
-        self.key_buffer.is_empty() && self.pressed_chord_keys.is_none() && self.active_chord_keys.is_none()
+        self.key_buffer.is_empty()
+            && self.pressed_chord_keys.is_none()
+            && self.active_chord_keys.is_none()
     }
 
     pub fn clear_session(&self) -> Self {

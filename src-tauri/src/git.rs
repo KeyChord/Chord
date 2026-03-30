@@ -245,7 +245,9 @@ fn checkout_repo_revision(repo_path: &Path, rev: &str) -> anyhow::Result<()> {
             String::from_utf8_lossy(&current_head_output.stderr).trim()
         );
 
-        let current_sha = String::from_utf8_lossy(&current_head_output.stdout).trim().to_string();
+        let current_sha = String::from_utf8_lossy(&current_head_output.stdout)
+            .trim()
+            .to_string();
         // Ensure the rev from chordpack.toml is also trimmed for comparison
         let target_rev_trimmed = trimmed_rev.trim();
 
@@ -278,8 +280,13 @@ pub fn update_or_clone_repo_at_revision(
     let repo_is_git = destination.exists() && destination.join(".git").exists();
 
     if repo_is_git {
-        log::info!("Repository {} exists at {}. Fetching origin and checking out revision {}.", repo_ref.slug(), destination.display(), trimmed_rev);
-        
+        log::info!(
+            "Repository {} exists at {}. Fetching origin and checking out revision {}.",
+            repo_ref.slug(),
+            destination.display(),
+            trimmed_rev
+        );
+
         // Fetch from origin
         let fetch_output = Command::new("git")
             .current_dir(destination) // Run command in the repo's directory
@@ -316,7 +323,13 @@ pub fn update_or_clone_repo_at_revision(
             String::from_utf8_lossy(&checkout_output.stderr).trim()
         );
     } else {
-        log::info!("Repository {} does not exist at {}. Cloning from {} at revision {}.", repo_ref.slug(), destination.display(), repo_ref.url(), trimmed_rev);
+        log::info!(
+            "Repository {} does not exist at {}. Cloning from {} at revision {}.",
+            repo_ref.slug(),
+            destination.display(),
+            repo_ref.url(),
+            trimmed_rev
+        );
         // If it does not exist, clone it and then checkout the revision
         // `clone_repo_at_revision` calls `clone_repo` and then `checkout_repo_revision`.
         // The `checkout_repo_revision` part handles checking out the specific revision.
@@ -344,20 +357,34 @@ pub fn update_or_clone_repo_at_revision(
         String::from_utf8_lossy(&current_head_output.stderr).trim()
     );
 
-    let current_sha = String::from_utf8_lossy(&current_head_output.stdout).trim().to_string();
-    
+    let current_sha = String::from_utf8_lossy(&current_head_output.stdout)
+        .trim()
+        .to_string();
+
     // Resolve the input revision string to a commit SHA for robust comparison.
     let git_rev_parse_output = Command::new("git")
         .current_dir(destination)
         .arg("rev-parse")
         .arg(trimmed_rev) // Use the trimmed input revision string
         .output()
-        .with_context(|| format!("Failed to rev-parse revision {} in {}", trimmed_rev, destination.display()))?;
+        .with_context(|| {
+            format!(
+                "Failed to rev-parse revision {} in {}",
+                trimmed_rev,
+                destination.display()
+            )
+        })?;
 
     let resolved_sha = if git_rev_parse_output.status.success() {
-        String::from_utf8_lossy(&git_rev_parse_output.stdout).trim().to_string()
+        String::from_utf8_lossy(&git_rev_parse_output.stdout)
+            .trim()
+            .to_string()
     } else {
-        log::warn!("Could not resolve revision {} for {}. Verification will rely on HEAD commit match.", trimmed_rev, destination.display());
+        log::warn!(
+            "Could not resolve revision {} for {}. Verification will rely on HEAD commit match.",
+            trimmed_rev,
+            destination.display()
+        );
         String::new() // Indicates no resolvable SHA from the input revision string
     };
 

@@ -1,15 +1,17 @@
+use crate::input::Key;
+use crate::models::{
+    Chord, ChordAction, ChordHint, ChordHintPattern, ChordTrigger, EmitChordAction,
+    RawChordPackage, ShellChordAction, ShortcutChordAction, SimulatedShortcut,
+};
+use anyhow::Context;
+use anyhow::Result;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
-use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, ShellChordAction, ShortcutChordAction, SimulatedShortcut, ChordHintPattern, EmitChordAction, RawChordPackage};
-use crate::input::Key;
 use std::str::FromStr;
-use anyhow::Context;
-use regex::Regex;
 use toml::Table;
 use typeshare::typeshare;
-use anyhow::Result;
-
 
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
@@ -20,6 +22,7 @@ pub struct ParsedChordsFile {
     // User-defined metadata. Can be anything
     pub meta: HashMap<String, String>,
 
+    // We use a Vec because we need to encode priority
     pub handlers: HashMap<String, ChordsFileHandler>,
 
     pub imports: Vec<ChordsFileImport>,
@@ -31,7 +34,7 @@ pub struct ParsedChordsFile {
     /// our internal representation changes, a user's scripts will continue to work because it only
     /// depends on the actual TOML structure and not how we parse it.
     #[typeshare(typescript = "ChordsFileRaw")]
-    pub raw: serde_json::Value
+    pub raw: serde_json::Value,
 }
 
 /// A chords file that has imports inlined.
@@ -40,8 +43,9 @@ pub struct ParsedChordsFile {
 #[serde(rename_all = "camelCase")]
 pub struct CompiledChordsFile {
     pub name: String,
+    pub path: PathBuf,
     pub meta: HashMap<String, String>,
-    pub handlers: HashMap<String, ChordsFileHandler>,
+    pub handlers: Vec<ChordsFileHandler>,
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
 }
@@ -67,10 +71,11 @@ pub struct RawChordsFile {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
+    pub event: String,
     pub file: String,
     #[typeshare(typescript = "any[]")]
     #[serde(default)]
-    pub args: Vec<toml::Value>
+    pub args: Vec<toml::Value>,
 }
 
 // New struct for imports
@@ -101,17 +106,26 @@ impl ParsedChordsFile {
     fn parse_handlers(table: &Table) -> Result<HashMap<String, ChordsFileHandler>> {
         let mut handlers = HashMap::new();
         if let Some(handlers_val) = table.get("handlers") {
-            let handlers_table = handlers_val.as_table().context("handlers must be a table")?;
+            let handlers_table = handlers_val
+                .as_table()
+                .context("handlers must be a table")?;
             for (key, val) in handlers_table {
                 let handler_table = val.as_table().context("handler must be a table")?;
-                let file = handler_table.get("file").and_then(|v| v.as_str()).context("handler must have the file key")?;
+                let file = handler_table
+                    .get("file")
+                    .and_then(|v| v.as_str())
+                    .context("handler must have the file key")?;
                 let mut args_vec = Vec::new();
                 if let Some(args_val) = handler_table.get("args") {
                     if let Some(args_array) = args_val.as_array() {
                         args_vec = args_array.clone();
                     }
                 }
-                let handler = ChordsFileHandler { file: file.to_string(), args: args_vec };
+                let handler = ChordsFileHandler {
+                    event: key.to_string(),
+                    file: file.to_string(),
+                    args: args_vec,
+                };
                 handlers.insert(key.clone(), handler);
             }
         }
@@ -121,11 +135,18 @@ impl ParsedChordsFile {
     fn parse_imports(table: &Table) -> Result<Vec<ChordsFileImport>> {
         let mut imports = Vec::new();
         if let Some(import_arr_val) = table.get("import") {
-            let import_array = import_arr_val.as_array().context("import must be an array")?;
+            let import_array = import_arr_val
+                .as_array()
+                .context("import must be an array")?;
             for import_val in import_array {
                 let import_table = import_val.as_table().context("import item be a table")?;
-                let file = import_table.get("file").and_then(|f| f.as_str()).context("import must have file key")?;
-                imports.push(ChordsFileImport { file: file.to_string() });
+                let file = import_table
+                    .get("file")
+                    .and_then(|f| f.as_str())
+                    .context("import must have file key")?;
+                imports.push(ChordsFileImport {
+                    file: file.to_string(),
+                });
             }
         }
         Ok(imports)
@@ -151,7 +172,6 @@ impl ParsedChordsFile {
             } else {
                 anyhow::bail!("invalid key sequence: {}", raw_pattern)
             }
-
         };
 
         Ok(ChordHint {
@@ -176,14 +196,20 @@ impl ParsedChordsFile {
     fn parse_actions(key: &str, value: &Table) -> Result<Vec<ChordAction>> {
         let mut actions = Vec::new();
         if let Some(shortcut) = value.get("shortcut") {
-            let shortcut = shortcut.as_str().context("shortcut property must be a string")?;
+            let shortcut = shortcut
+                .as_str()
+                .context("shortcut property must be a string")?;
             let simulated_shortcut = SimulatedShortcut::from_str(shortcut)?;
-            actions.push(ChordAction::Shortcut(ShortcutChordAction { simulated_shortcut }));
+            actions.push(ChordAction::Shortcut(ShortcutChordAction {
+                simulated_shortcut,
+            }));
         }
 
         if let Some(shell) = value.get("shell") {
             let shell = shell.as_str().context("shell property must be a string")?;
-            actions.push(ChordAction::Shell(ShellChordAction { command: shell.to_string() }));
+            actions.push(ChordAction::Shell(ShellChordAction {
+                command: shell.to_string(),
+            }));
         }
 
         for (k, v) in value {
@@ -204,7 +230,6 @@ impl ParsedChordsFile {
         Ok(actions)
     }
 
-
     fn parse_chord(key: &str, chord: &Table, index: u32) -> Result<Chord> {
         let raw_trigger = key;
         let actions = Self::parse_actions(key, chord)?;
@@ -219,26 +244,40 @@ impl ParsedChordsFile {
         })
     }
 
-    pub fn compile(&self, parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>) -> Result<CompiledChordsFile> {
+    pub fn compile(
+        &self,
+        filepath: PathBuf,
+        parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
+    ) -> Result<CompiledChordsFile> {
         log::debug!("compiling chords file {}", self.name);
 
         let mut chords = self.chords.clone();
         let mut chord_hints = self.chord_hints.clone();
+        let mut handlers: Vec<_> = self.handlers.values().cloned().collect();
+
         for import in &self.imports {
-            log::debug!("import {:?}", import);
-            let imported_file = parsed_chords_files.get(&Path::new("chords").join(&import.file)).context("import file not found")?;
-            log::debug!("resolved import file: {:?}", imported_file.name);
-            let compiled_file = imported_file.compile(parsed_chords_files)?;
+            let imported_file_path = Path::new("chords").join(&import.file);
+            let imported_file = parsed_chords_files
+                .get(&imported_file_path)
+                .context("import file not found")?;
+            log::debug!(
+                "resolved import file {:?} from path {:?}",
+                imported_file.name,
+                imported_file_path
+            );
+            let compiled_file = imported_file.compile(imported_file_path, parsed_chords_files)?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
+            handlers.extend(compiled_file.handlers.clone());
         }
 
         log::debug!("finished compiling chords file {}", self.name);
 
         Ok(CompiledChordsFile {
             name: self.name.clone(),
+            path: filepath.clone(),
             meta: self.meta.clone(),
-            handlers: self.handlers.clone(),
+            handlers,
             chords,
             chord_hints,
         })
@@ -251,7 +290,10 @@ impl FromStr for ParsedChordsFile {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let value: toml::Value = toml::from_str(s)?;
         let root = value.as_table().context("root must be a table")?;
-        let name = root.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
+        let name = root
+            .get("name")
+            .and_then(|v| v.as_str())
+            .context("the `name` property must be present")?;
         let meta = Self::parse_meta(root)?;
         let handlers = Self::parse_handlers(root)?;
         let imports = Self::parse_imports(root)?;
@@ -267,23 +309,27 @@ impl FromStr for ParsedChordsFile {
                     if let Some(table) = value.as_table() {
                         table
                     } else {
-                        let array = value.as_array().context("chord value mapping must be a table or an array of tables")?;
-                        let first = array.first().context("chord value mapping must not be empty")?;
-                        let table= first.as_table().context("must be table")?;
+                        let array = value
+                            .as_array()
+                            .context("chord value mapping must be a table or an array of tables")?;
+                        let first = array
+                            .first()
+                            .context("chord value mapping must not be empty")?;
+                        let table = first.as_table().context("must be table")?;
                         table
                     }
                 };
 
                 if key.starts_with('?') {
-                    if let Ok(hint) = Self::parse_hint(key, chord_value).inspect_err(|e| {
-                        log::warn!("skipping hint because of parse error: {}", e)
-                    }) {
+                    if let Ok(hint) = Self::parse_hint(key, chord_value)
+                        .inspect_err(|e| log::warn!("skipping hint because of parse error: {}", e))
+                    {
                         chord_hints.push(hint);
                     }
                 } else {
-                    if let Ok(chord) = Self::parse_chord(key, chord_value, index).inspect_err(|e| {
-                        log::warn!("skipping chord because of parse error: {}", e)
-                    }) {
+                    if let Ok(chord) = Self::parse_chord(key, chord_value, index)
+                        .inspect_err(|e| log::warn!("skipping chord because of parse error: {}", e))
+                    {
                         chords.push(chord);
                     }
                     index += 1

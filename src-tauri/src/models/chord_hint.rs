@@ -1,8 +1,8 @@
+use crate::input::Key;
 use regex::Regex;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use typeshare::typeshare;
-use crate::input::Key;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -11,13 +11,13 @@ pub struct ChordHint {
     #[typeshare(typescript(type = "{ keys: string[] } | { regex: string }"))]
     pub pattern: ChordHintPattern,
     pub raw_pattern: String,
-    pub description: String
+    pub description: String,
 }
 
 #[derive(Debug, Clone)]
 pub enum ChordHintPattern {
     Keys(Vec<Key>),
-    Regex(Regex)
+    Regex(Regex),
 }
 
 impl Serialize for ChordHintPattern {

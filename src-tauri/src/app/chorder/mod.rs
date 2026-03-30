@@ -1,5 +1,5 @@
 use self::ui::{ChorderIndicatorUi, NativeSurfaceRect};
-use crate::app::{AppHandleExt};
+use crate::app::AppHandleExt;
 use crate::input::Key;
 use crate::input::KeyEvent;
 use crate::observables::{ChorderObservable, ChorderState, FrontmostObservable, Observable};
@@ -9,12 +9,12 @@ use keycode::KeyMappingCode;
 use parking_lot::Mutex;
 use std::collections::HashSet;
 
-use std::sync::mpsc;
-use std::time::Duration;
-use tauri::{AppHandle, Emitter, Listener};
 use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
 use crate::app::state::StateSingleton;
 use crate::models::ChordInput;
+use std::sync::mpsc;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Listener};
 
 mod ui;
 
@@ -212,7 +212,9 @@ impl AppChorder {
                 let state = self.observable.get_state()?;
 
                 if let Some(pressed_chord_keys) = &state.pressed_chord_keys {
-                    if code == &KeyMappingCode::CapsLock  || pressed_chord_keys.last().is_some_and(|k| &k.0 == code) {
+                    if code == &KeyMappingCode::CapsLock
+                        || pressed_chord_keys.last().is_some_and(|k| &k.0 == code)
+                    {
                         self.spawn_end_active_task()?;
                     }
                 }
@@ -298,18 +300,29 @@ impl AppChorder {
         should_handle_held_key_event(&mut held_keys, key_event)
     }
 
-    fn resolve_task_from_keys(&self, keys: &[Key], num_times: u32) -> Result<Option<ChordActionTask>> {
+    fn resolve_task_from_keys(
+        &self,
+        keys: &[Key],
+        num_times: u32,
+    ) -> Result<Option<ChordActionTask>> {
         let frontmost = self.handle.observable_state::<FrontmostObservable>()?;
         let application_id = frontmost.frontmost_app_bundle_id.clone();
         let chord_package_manager = self.handle.chord_package_manager();
-        let input = ChordInput { keys: keys.to_vec(), application_id };
+        let input = ChordInput {
+            keys: keys.to_vec(),
+            application_id,
+        };
         let Some(chord_package) = chord_package_manager.resolve_package_for_input(&input) else {
             log::debug!("package for input {:?} not found", input);
             return Ok(None);
         };
         log::debug!("found package {} for input {:?}", chord_package.name, input);
         let Some(chord_ref) = chord_package.resolve_chord_for_input(&input) else {
-            log::debug!("couldn't resolve chord in package {} for input {:?}", chord_package.name, input);
+            log::debug!(
+                "couldn't resolve chord in package {} for input {:?}",
+                chord_package.name,
+                input
+            );
             return Ok(None);
         };
         log::debug!("resolved chord: {:?}", chord_ref);
@@ -318,7 +331,7 @@ impl AppChorder {
         Ok(task)
     }
 
-    fn spawn_end_active_task(&self) -> Result<()>{
+    fn spawn_end_active_task(&self) -> Result<()> {
         let mut guard = self.active_task_run.lock();
         if let Some(active_task_run) = std::mem::take(&mut *guard) {
             self.spawn_end_task(active_task_run)?;
@@ -339,8 +352,10 @@ impl AppChorder {
     }
 
     fn should_toggle_indicator_for_tab_event(key_event: &KeyEvent, is_shift_pressed: bool) -> bool {
-        matches!(key_event, KeyEvent::Press(Key(KeyMappingCode::Tab)) | KeyEvent::Release(Key(KeyMappingCode::Tab)))
-            && is_shift_pressed
+        matches!(
+            key_event,
+            KeyEvent::Press(Key(KeyMappingCode::Tab)) | KeyEvent::Release(Key(KeyMappingCode::Tab))
+        ) && is_shift_pressed
     }
 
     fn next_key_buffer_for_unshifted_press(key_buffer: &[Key], key: &Key) -> Vec<Key> {

@@ -1,9 +1,9 @@
-use tokio::process::Command;
+use crate::app::chord_runner::ChordActionTask;
 use crate::models::ShellChordAction;
 use anyhow::Result;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
-use crate::app::chord_runner::ChordActionTask;
+use tokio::process::Command;
 
 pub struct ShellChordActionTaskRunner {
     _handle: AppHandle,
@@ -11,7 +11,7 @@ pub struct ShellChordActionTaskRunner {
 
 #[derive(Debug)]
 pub struct ShellChordActionTaskRun {
-    join_handle: JoinHandle<()>
+    join_handle: JoinHandle<()>,
 }
 
 impl ShellChordActionTaskRunner {
@@ -21,7 +21,11 @@ impl ShellChordActionTaskRunner {
 }
 
 impl ShellChordActionTaskRunner {
-    pub fn start(&self, task: &ChordActionTask, action: &ShellChordAction) -> Result<ShellChordActionTaskRun> {
+    pub fn start(
+        &self,
+        task: &ChordActionTask,
+        action: &ShellChordAction,
+    ) -> Result<ShellChordActionTaskRun> {
         let command = action.command.clone();
         let num_times = task.num_times;
         let join_handle = tauri::async_runtime::spawn(async move {
@@ -30,9 +34,7 @@ impl ShellChordActionTaskRunner {
             }
         });
 
-        Ok(ShellChordActionTaskRun {
-            join_handle
-        })
+        Ok(ShellChordActionTaskRun { join_handle })
     }
 
     pub async fn end(&self, task_run: ShellChordActionTaskRun) -> Result<()> {

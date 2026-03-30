@@ -1,6 +1,6 @@
+use crate::models::{ChordAction, ChordTrigger};
 use serde::Serialize;
 use typeshare::typeshare;
-use crate::models::{ChordAction, ChordTrigger};
 
 /// A regular chord entry composed of static characters
 #[typeshare]
@@ -22,4 +22,3 @@ pub struct Chord {
     /// A list of actions (as fallbacks) to execute when the chord is triggered
     pub actions: Vec<ChordAction>,
 }
-

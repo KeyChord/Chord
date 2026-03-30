@@ -5,12 +5,12 @@ use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
 
-use tauri::AppHandle;
-use tauri::async_runtime::JoinHandle;
-use typeshare::typeshare;
 use crate::app::AppHandleExt;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
+use tauri::AppHandle;
+use tauri::async_runtime::JoinHandle;
+use typeshare::typeshare;
 
 #[derive(Clone)]
 pub struct HandlerChordActionTaskRunner {
@@ -19,7 +19,7 @@ pub struct HandlerChordActionTaskRunner {
 
 #[derive(Debug)]
 pub struct HandlerChordActionTaskRun {
-    join_handle: JoinHandle<Result<()>>
+    join_handle: JoinHandle<Result<()>>,
 }
 
 impl HandlerChordActionTaskRunner {
@@ -29,7 +29,11 @@ impl HandlerChordActionTaskRunner {
 }
 
 impl HandlerChordActionTaskRunner {
-    pub fn start(&self, task: &ChordActionTask, action: &HandlerChordAction) -> Result<HandlerChordActionTaskRun> {
+    pub fn start(
+        &self,
+        task: &ChordActionTask,
+        action: &HandlerChordAction,
+    ) -> Result<HandlerChordActionTaskRun> {
         let handle = self.handle.clone();
         let file = action.file.clone();
         let build_args = action.build_args.clone();
@@ -38,8 +42,13 @@ impl HandlerChordActionTaskRunner {
         let num_times = task.num_times;
 
         let chord_pm = self.handle.chord_package_manager();
-        let package = chord_pm.get_package_by_name(&package_name).context("could not get package")?;
-        let initiator_chords_file = package.raw_chords_files.get(&task.initiator_file_relpath).context("could not get chord file")?;
+        let package = chord_pm
+            .get_package_by_name(&package_name)
+            .context("could not get package")?;
+        let initiator_chords_file = package
+            .raw_chords_files
+            .get(&task.initiator_file_relpath)
+            .context("could not get chord file")?;
         let context_chords_file = serde_json::to_value(initiator_chords_file.clone())?;
 
         let join_handle = tauri::async_runtime::spawn(async move {
@@ -64,11 +73,16 @@ impl HandlerChordActionTaskRunner {
 
                         let module_specifier = format!("{}/js/{}", package_name, file);
                         log::debug!("retrieving default export of {}", module_specifier);
-                        let build_handler_fn = get_default_export(ctx.clone(), &module_specifier).await?;
+                        let build_handler_fn =
+                            get_default_export(ctx.clone(), &module_specifier).await?;
 
                         let mut args = Args::new(ctx.clone(), build_args.len());
                         let build_context = Object::new(ctx.clone())?;
-                        build_context.set("chordsFile", rquickjs_serde::to_value(ctx.clone(), context_chords_file).or_throw_msg(&ctx, "failed to parse chords file")?)?;
+                        build_context.set(
+                            "chordsFile",
+                            rquickjs_serde::to_value(ctx.clone(), context_chords_file)
+                                .or_throw_msg(&ctx, "failed to parse chords file")?,
+                        )?;
                         args.this(build_context)?;
                         for value in build_args.clone() {
                             args.push_arg(value)?;
@@ -78,7 +92,10 @@ impl HandlerChordActionTaskRunner {
                         if let Some(promise) = handler.as_promise().cloned() {
                             handler = promise.into_future::<Value>().await?;
                         }
-                        let handler_fn = handler.as_function().or_throw_msg(&ctx, "the default export function must return a function")?;
+                        let handler_fn = handler.as_function().or_throw_msg(
+                            &ctx,
+                            "the default export function must return a function",
+                        )?;
 
                         for _ in 0..num_times {
                             let mut args = Args::new(ctx.clone(), event_args.len());
@@ -101,21 +118,18 @@ impl HandlerChordActionTaskRunner {
 
                         Ok::<(), rquickjs::Error>(())
                     }
-                        .await
-                        .map_err(|e| {
-                            anyhow::Error::msg(format_js_error(&ctx, e))
-                        })
+                    .await
+                    .map_err(|e| anyhow::Error::msg(format_js_error(&ctx, e)))
                 })
-            }).await
+            })
+            .await
         });
 
-        Ok(HandlerChordActionTaskRun {
-            join_handle
-        })
+        Ok(HandlerChordActionTaskRun { join_handle })
     }
 
     pub async fn end(&self, task_run: HandlerChordActionTaskRun) -> Result<()> {
-       task_run.join_handle.await?
+        task_run.join_handle.await?
     }
 
     // TODO: implement deep aborting via AbortController

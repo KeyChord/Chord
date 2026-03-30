@@ -1,5 +1,6 @@
-use crate::app::state::StateSingleton;
-use crate::app::chord_runner::{ChordActionTaskRunner};
+use crate::app::AppHandleExt;
+use crate::app::chord_package_manager::ChordPackageManager;
+use crate::app::chord_runner::ChordActionTaskRunner;
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
 use crate::app::desktop_app::DesktopAppManager;
@@ -10,13 +11,16 @@ use crate::app::global_hotkey_store::GlobalHotkeyStore;
 use crate::app::permissions::AppPermissions;
 use crate::app::placeholder_chord_store::PlaceholderChordStore;
 use crate::app::settings::AppSettings;
-use crate::app::AppHandleExt;
+use crate::app::state::StateSingleton;
+use crate::chordpack::load_default_chordpack;
 use crate::lock_file::AppLockFile;
-use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
+use crate::observables::{
+    AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable,
+    ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable,
+    Observable,
+};
 use crate::tauri_app;
 use tauri::{AppHandle, Manager};
-use crate::app::chord_package_manager::ChordPackageManager;
-use crate::chordpack::load_default_chordpack;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -39,8 +43,14 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         singleton(&handle, DesktopAppManager::new(handle.clone())),
     );
 
-    s.0.init(manage(app.handle(), FrontmostObservable::new(handle.clone())?))?;
-    s.1.init(manage(app.handle(), ChorderObservable::new(handle.clone())?))?;
+    s.0.init(manage(
+        app.handle(),
+        FrontmostObservable::new(handle.clone())?,
+    ))?;
+    s.1.init(manage(
+        app.handle(),
+        ChorderObservable::new(handle.clone())?,
+    ))?;
     s.2.init()?;
     // s.3.init()?;
     s.4.init(manage(
@@ -53,7 +63,10 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     ))?;
     // s.6.init()?;
     // s.7.init()?;
-    s.8.init(manage(app.handle(), GitReposObservable::new(handle.clone())?))?;
+    s.8.init(manage(
+        app.handle(),
+        GitReposObservable::new(handle.clone())?,
+    ))?;
     s.9.init(manage(
         app.handle(),
         ChordPackageManagerObservable::new(handle.clone())?,
@@ -117,7 +130,8 @@ where
 
 fn singleton<T>(handle: &AppHandle, value: T) -> tauri::State<T>
 where
-    T: Send + Sync + 'static {
+    T: Send + Sync + 'static,
+{
     handle.manage(value);
     let value = handle.state::<T>();
     value

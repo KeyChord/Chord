@@ -1,8 +1,8 @@
-use tauri::AppHandle;
 use crate::app::chord_package_manager::git::GitChordPackageRegistry;
 use crate::app::chord_package_manager::local::LocalPackageRegistry;
 use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
+use tauri::AppHandle;
 
 pub struct ChordPackageRegistry {
     pub git: GitChordPackageRegistry,

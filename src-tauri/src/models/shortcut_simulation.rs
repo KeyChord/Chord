@@ -1,8 +1,8 @@
-use std::str::FromStr;
+use crate::input::Key;
 use keycode::KeyMappingCode;
 use serde::Serialize;
+use std::str::FromStr;
 use typeshare::typeshare;
-use crate::input::Key;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -15,9 +15,9 @@ impl SimulatedShortcut {
         let has_shift = self.chords.iter().any(|chord| {
             chord.keys.iter().any(|key| {
                 matches!(
-                        key,
-                        Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)
-                    )
+                    key,
+                    Key(KeyMappingCode::ShiftLeft) | Key(KeyMappingCode::ShiftRight)
+                )
             })
         });
 
@@ -57,4 +57,3 @@ pub enum SimulatedShortcutAction {
     Press(Key, bool),
     Release(Key, bool),
 }
-

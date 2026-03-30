@@ -3,7 +3,7 @@ use crate::app::AppHandleExt;
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID};
 use crate::tauri_app::scripting::reload_configs;
-use tauri::{AppHandle, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
+use tauri::{AppHandle, Manager, image::Image, menu::MenuBuilder, tray::TrayIconBuilder};
 
 pub const TRAY_ID: &str = "chord-tray";
 const TRAY_ICON_BYTES: &[u8] =
@@ -15,10 +15,20 @@ fn load_tray_icon() -> tauri::Result<Image<'static>> {
 
 pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
     #[cfg(debug_assertions)]
+    let inspector_text = if handle
+        .get_webview_window("chords")
+        .is_some_and(|w| w.is_visible().unwrap_or(false))
+    {
+        "Close Inspector"
+    } else {
+        "Open Inspector"
+    };
+
+    #[cfg(debug_assertions)]
     let menu = MenuBuilder::new(&handle)
         .text(SETTINGS_MENU_ID, "Show Settings")
         .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs")
-        .text(OPEN_INSPECTOR_MENU_ID, "Open Inspector");
+        .text(OPEN_INSPECTOR_MENU_ID, inspector_text);
 
     #[cfg(not(debug_assertions))]
     let menu = MenuBuilder::new(&handle)
@@ -45,8 +55,23 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
             #[cfg(debug_assertions)]
             OPEN_INSPECTOR_MENU_ID => {
                 let chorder = handle.app_chorder();
-                if let Err(error) = chorder.ui.open_inspector() {
-                    log::error!("Failed to open inspector: {error}");
+                match chorder.ui.toggle_inspector() {
+                    Ok(is_open) => {
+                        let tray = handle.tray_by_id(TRAY_ID).unwrap();
+                        let menu = tray.menu().unwrap();
+                        if let Some(item) = menu.get(OPEN_INSPECTOR_MENU_ID) {
+                            if let Some(text_item) = item.as_menu_item() {
+                                let _ = text_item.set_text(if is_open {
+                                    "Close Inspector"
+                                } else {
+                                    "Open Inspector"
+                                });
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        log::error!("Failed to toggle inspector: {error}");
+                    }
                 }
             }
             QUIT_MENU_ID => {

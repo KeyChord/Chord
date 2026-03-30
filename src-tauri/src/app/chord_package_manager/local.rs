@@ -1,7 +1,9 @@
-use std::collections::HashMap;
+use crate::app::state::StateSingleton;
+use crate::models::RawChordPackage;
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,8 +11,6 @@ use tauri::{AppHandle, Wry};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::{Store, StoreExt};
 use walkdir::WalkDir;
-use crate::app::state::StateSingleton;
-use crate::models::RawChordPackage;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
@@ -28,7 +28,6 @@ impl LocalChordPackage {
     pub fn path(&self) -> &Path {
         &self.path
     }
-
 }
 
 pub struct LocalPackageRegistry {
@@ -42,7 +41,6 @@ impl StateSingleton for LocalPackageRegistry {
 }
 
 impl LocalPackageRegistry {
-
     pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
             .read_paths()?
@@ -150,7 +148,10 @@ impl LocalPackageRegistry {
         let mut js_files_contents = HashMap::new();
         let mut bin_files_contents = HashMap::new();
 
-        let dirname = root.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let dirname = root
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
         let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
 
         for dir in ["chords", "js", "bin"] {
@@ -189,7 +190,13 @@ impl LocalPackageRegistry {
             }
         }
 
-        log::debug!("loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}", root, js_files_contents.keys(), chords_files_contents.keys(), bin_files_contents.keys());
+        log::debug!(
+            "loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}",
+            root,
+            js_files_contents.keys(),
+            chords_files_contents.keys(),
+            bin_files_contents.keys()
+        );
 
         Ok(RawChordPackage {
             dirname,

@@ -1,3 +1,4 @@
+use crate::app::state::StateSingleton;
 use crate::{
     input::{KeyEvent, KeyEventState},
     mode::{AppMode, AppModeStateMachine},
@@ -7,7 +8,6 @@ use device_query::DeviceState;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use tauri::AppHandle;
-use crate::app::state::StateSingleton;
 
 pub struct AppContext {
     pub device_state: Option<DeviceState>,
@@ -15,7 +15,7 @@ pub struct AppContext {
 
     // Not a mutex since it uses Atomics
     app_mode_state_machine: Arc<AppModeStateMachine>,
-    handle: AppHandle
+    handle: AppHandle,
 }
 
 impl StateSingleton for AppContext {
@@ -32,7 +32,7 @@ impl StateSingleton for AppContext {
             handle,
             key_event_state,
             app_mode_state_machine,
-            device_state
+            device_state,
         }
     }
 }

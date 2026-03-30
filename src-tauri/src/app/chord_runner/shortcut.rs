@@ -1,7 +1,7 @@
-use anyhow::Result;
-use tauri::AppHandle;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
+use anyhow::Result;
+use tauri::AppHandle;
 
 pub struct ShortcutChordActionTaskRunner {
     handle: AppHandle,
@@ -41,7 +41,11 @@ impl ShortcutChordActionTaskRunner {
         Ok(())
     }
 
-    pub fn get_start_simulated_shortcut_actions(&self, action: &ShortcutChordAction, num_times: u32) -> Vec<SimulatedShortcutAction> {
+    pub fn get_start_simulated_shortcut_actions(
+        &self,
+        action: &ShortcutChordAction,
+        num_times: u32,
+    ) -> Vec<SimulatedShortcutAction> {
         let mut actions = Vec::new();
         let suppress_shift = !action.simulated_shortcut.has_shift();
 
@@ -66,9 +70,14 @@ impl ShortcutChordActionTaskRunner {
         actions
     }
 
-    pub fn get_end_simulated_shortcut_actions(&self, action: &ShortcutChordAction) -> Vec<SimulatedShortcutAction> {
+    pub fn get_end_simulated_shortcut_actions(
+        &self,
+        action: &ShortcutChordAction,
+    ) -> Vec<SimulatedShortcutAction> {
         let suppress_shift = !action.simulated_shortcut.has_shift();
-        action.simulated_shortcut.chords
+        action
+            .simulated_shortcut
+            .chords
             .last()
             .into_iter()
             .flat_map(|chord| {
@@ -85,16 +94,21 @@ impl ShortcutChordActionTaskRunner {
 
 #[derive(Debug)]
 pub struct ShortcutChordActionTaskRun {
-    end_simulated_shortcut_actions: Vec<SimulatedShortcutAction>
+    end_simulated_shortcut_actions: Vec<SimulatedShortcutAction>,
 }
 
 impl ShortcutChordActionTaskRunner {
-
-    pub fn start(&self, task: &ChordActionTask, action: &ShortcutChordAction) -> Result<ShortcutChordActionTaskRun> {
-        self.simulate_shortcut_actions(self.get_start_simulated_shortcut_actions(action, task.num_times))?;
+    pub fn start(
+        &self,
+        task: &ChordActionTask,
+        action: &ShortcutChordAction,
+    ) -> Result<ShortcutChordActionTaskRun> {
+        self.simulate_shortcut_actions(
+            self.get_start_simulated_shortcut_actions(action, task.num_times),
+        )?;
 
         Ok(ShortcutChordActionTaskRun {
-            end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(action)
+            end_simulated_shortcut_actions: self.get_end_simulated_shortcut_actions(action),
         })
     }
 

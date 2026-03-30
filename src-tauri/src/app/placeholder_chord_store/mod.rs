@@ -1,10 +1,10 @@
+use crate::app::state::StateSingleton;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::app::state::StateSingleton;
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
 
@@ -21,7 +21,7 @@ pub struct PlaceholderChordStoreEntry {
 
 #[derive(Clone)]
 pub struct PlaceholderChordStore {
-    pub handle:AppHandle
+    pub handle: AppHandle,
 }
 
 impl StateSingleton for PlaceholderChordStore {
@@ -35,7 +35,8 @@ impl PlaceholderChordStore {
         Ok(self.handle.store(PLACEHOLDER_CHORDS_STORE_PATH)?)
     }
     pub fn entries(&self) -> Result<HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>> {
-Ok(        self.store()?
+        Ok(self
+            .store()?
             .entries()
             .into_iter()
             .filter_map(|(key, value)| {
@@ -48,7 +49,10 @@ Ok(        self.store()?
     }
 
     #[allow(dead_code)]
-    pub fn entry(&self, key: &PlaceholderChordStoreKey) -> Result<Option<PlaceholderChordStoreEntry>> {
+    pub fn entry(
+        &self,
+        key: &PlaceholderChordStoreKey,
+    ) -> Result<Option<PlaceholderChordStoreEntry>> {
         Ok(self.entries()?.get(key).cloned())
     }
 

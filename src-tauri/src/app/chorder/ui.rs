@@ -1,5 +1,6 @@
 use crate::IndicatorPanel;
 use anyhow::Result;
+use arc_swap::ArcSwap;
 use objc2::msg_send;
 use objc2_app_kit::{
     NSRunningApplication, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
@@ -10,9 +11,10 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use arc_swap::ArcSwap;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
-use tauri_nspanel::{CollectionBehavior, Panel, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
+use tauri_nspanel::{
+    CollectionBehavior, Panel, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt,
+};
 use window_vibrancy::NSVisualEffectViewTagged;
 
 const INDICATOR_WIDTH: u32 = 640;
@@ -31,7 +33,7 @@ pub struct NativeSurfaceRect {
 pub struct ChorderIndicatorUi {
     pub handle: AppHandle,
     pub is_visible: Arc<AtomicBool>,
-    pub panel: ArcSwap<Option<PanelHandle<Wry>>>
+    pub panel: ArcSwap<Option<PanelHandle<Wry>>>,
 }
 
 impl ChorderIndicatorUi {
@@ -39,7 +41,7 @@ impl ChorderIndicatorUi {
         Self {
             handle,
             is_visible: Arc::new(AtomicBool::new(false)),
-            panel: ArcSwap::new(Arc::new(None))
+            panel: ArcSwap::new(Arc::new(None)),
         }
     }
 
@@ -101,26 +103,25 @@ impl ChorderIndicatorUi {
 
         let window =
             WebviewWindowBuilder::new(&self.handle, "chords", WebviewUrl::App("index.html".into()))
-            .title("Chords")
-            .inner_size(640.0, 180.0)
-            .visible(false)
-            .focused(false)
-            .focusable(false)
-            .transparent(true)
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .maximizable(false)
-            .minimizable(false)
-            .visible_on_all_workspaces(true)
-            .shadow(false)
-            .accept_first_mouse(false)
-            .build()?;
+                .title("Chords")
+                .inner_size(640.0, 180.0)
+                .visible(false)
+                .focused(false)
+                .focusable(false)
+                .transparent(true)
+                .decorations(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .maximizable(false)
+                .minimizable(false)
+                .visible_on_all_workspaces(true)
+                .shadow(false)
+                .accept_first_mouse(false)
+                .build()?;
 
         let _ = window.set_focusable(false);
         let _ = window.set_ignore_cursor_events(true);
-
 
         Ok(window)
     }
@@ -137,14 +138,21 @@ impl ChorderIndicatorUi {
         }
     }
 
-    pub fn open_inspector(&self) -> Result<()> {
+    pub fn toggle_inspector(&self) -> Result<bool> {
         let window = self.get_or_create_window()?;
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        #[cfg(debug_assertions)]
-        window.open_devtools();
-        Ok(())
+        if window.is_visible()? {
+            window.hide()?;
+            #[cfg(debug_assertions)]
+            window.close_devtools();
+            Ok(false)
+        } else {
+            window.show()?;
+            window.unminimize()?;
+            window.set_focus()?;
+            #[cfg(debug_assertions)]
+            window.open_devtools();
+            Ok(true)
+        }
     }
 
     pub fn configure_window_surface(

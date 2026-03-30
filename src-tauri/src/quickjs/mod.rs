@@ -1,3 +1,5 @@
+use crate::app::AppHandleExt;
+use crate::app::chord_package_manager::PackageSpecifier;
 use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
 use llrt_core::function::Args;
@@ -6,8 +8,7 @@ use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
 use rquickjs::{
-    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, JsLifetime, Module, Object,
-    Value,
+    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, JsLifetime, Module, Object, Value,
     loader::{Loader, Resolver},
     module::Declared,
 };
@@ -18,8 +19,6 @@ use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
-use crate::app::AppHandleExt;
-use crate::app::chord_package_manager::PackageSpecifier;
 
 mod chord_module;
 
@@ -116,7 +115,12 @@ impl Resolver for ModuleResolver {
     /// To ensure consist module specifiers and avoid leaking implementation details in terms of
     /// where the package is stored on the filesystem, the module specifier of a JavaScript file
     /// in a chord package is always `name` + `relpath` (including /js/), e.g. `@keychord/chords-menu/js/menu.js`
-    fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base_module_specifier: &str, import_specifier: &str) -> rquickjs::Result<String> {
+    fn resolve<'js>(
+        &mut self,
+        ctx: &Ctx<'js>,
+        base_module_specifier: &str,
+        import_specifier: &str,
+    ) -> rquickjs::Result<String> {
         if import_specifier == "readline"
             || import_specifier == "node:readline"
             || import_specifier == "readline/promises"
@@ -131,7 +135,7 @@ impl Resolver for ModuleResolver {
 
         // If we load it directly from memory, it should be already cached
         if base_module_specifier == "" {
-            return Ok(import_specifier.into())
+            return Ok(import_specifier.into());
         }
 
         let specifier = PackageSpecifier::parse(base_module_specifier);
@@ -142,15 +146,15 @@ impl Resolver for ModuleResolver {
                 let chord_package = chord_pm.get_package_by_name(specifier.package);
                 if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
                     if js_package.resolve_import(&import_specifier).is_some() {
-                        return Ok(format!("{}/{}", specifier.package, import_specifier))
+                        return Ok(format!("{}/{}", specifier.package, import_specifier));
                     }
                 }
             }
         }
 
-        self.llrt_resolver.resolve(ctx, base_module_specifier, import_specifier).inspect_err(|e| {
-            log::error!("failed to resolve module: {:?}", e)
-        })
+        self.llrt_resolver
+            .resolve(ctx, base_module_specifier, import_specifier)
+            .inspect_err(|e| log::error!("failed to resolve module: {:?}", e))
     }
 }
 
@@ -164,7 +168,11 @@ impl ModuleLoader {
         Self { llrt_loader }
     }
 
-    fn get_module<'js>(&self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
+    fn get_module<'js>(
+        &self,
+        ctx: &Ctx<'js>,
+        name: &str,
+    ) -> rquickjs::Result<Option<Module<'js, Declared>>> {
         let module = match name {
             "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
             "readline" | "node:readline" => {
@@ -179,7 +187,6 @@ impl ModuleLoader {
         Some(module).transpose()
     }
 }
-
 
 fn attempted_module_path(name: &str) -> String {
     let path = Path::new(name);

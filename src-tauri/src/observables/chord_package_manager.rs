@@ -1,10 +1,10 @@
+use crate::app::chord_package_manager::ChordPackage;
 use crate::define_observable;
 use serde::Serialize;
 use typeshare::typeshare;
-use crate::app::chord_package_manager::ChordPackage;
 
 struct ChordPackageInfo {
-    name: String
+    name: String,
 }
 
 #[typeshare]
@@ -18,5 +18,3 @@ define_observable! {
     pub struct ChordPackageManagerObservable(ChordPackageManagerState);
     id: "chord-package-manager";
 }
-
-

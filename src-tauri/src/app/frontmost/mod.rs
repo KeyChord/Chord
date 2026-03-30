@@ -1,10 +1,10 @@
+use crate::app::state::StateSingleton;
 use crate::observables::{FrontmostObservable, FrontmostState, Observable};
 use anyhow::Result;
 use frontmost::{Detector, start_nsrunloop};
 use objc2_app_kit::NSWorkspace;
 use std::thread;
 use tauri::AppHandle;
-use crate::app::state::StateSingleton;
 
 #[derive(Debug)]
 struct FrontmostTracker {
@@ -29,12 +29,15 @@ impl frontmost::app::FrontmostApp for FrontmostTracker {
 
 pub struct AppFrontmost {
     observable: FrontmostObservable,
-    handle: AppHandle
+    handle: AppHandle,
 }
 
 impl StateSingleton for AppFrontmost {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: FrontmostObservable::placeholder() }
+        Self {
+            handle,
+            observable: FrontmostObservable::placeholder(),
+        }
     }
 }
 

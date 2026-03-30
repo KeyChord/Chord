@@ -1,13 +1,13 @@
-use taurpc_macros::taurpc_api;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::observables::GitRepo;
 use crate::startup::StartupStatusInfo;
+use taurpc_macros::taurpc_api;
 
 mod api;
 pub use api::*;
 mod error;
-pub use error::*;
 use crate::app::chord_package_manager::local::LocalChordPackage;
+pub use error::*;
 
 #[taurpc_api(export_to = "../src/api/bindings.gen.ts", mod = "resolvers")]
 pub trait Api {

@@ -1,11 +1,11 @@
 use self::ui::SettingsUi;
+use crate::app::state::StateSingleton;
 use crate::observables::{AppSettingsObservable, AppSettingsState, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
-use crate::app::state::StateSingleton;
 
 mod ui;
 

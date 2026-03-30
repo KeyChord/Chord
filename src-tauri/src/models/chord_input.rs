@@ -4,5 +4,5 @@ use crate::input::Key;
 #[derive(Debug)]
 pub struct ChordInput {
     pub keys: Vec<Key>,
-    pub application_id: Option<String>
+    pub application_id: Option<String>,
 }

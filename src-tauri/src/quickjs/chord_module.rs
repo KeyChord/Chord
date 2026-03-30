@@ -4,6 +4,7 @@ use crate::app::desktop_app::{
 };
 use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
 use crate::constants::GLOBAL_HOTKEYS_POOL;
+use crate::models::{ShortcutChordAction, SimulatedShortcut};
 use crate::quickjs::AppUserData;
 use llrt_core::libs::json::stringify::json_stringify;
 use llrt_core::libs::utils::result::ResultExt;
@@ -15,7 +16,6 @@ use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
 use std::collections::HashSet;
-use crate::models::{ShortcutChordAction, SimulatedShortcut};
 
 pub struct ChordModule;
 
@@ -203,27 +203,35 @@ fn on_app_terminate<'js>(
 fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
     let runner = handle.chord_action_task_runner();
-    let simulated_shortcut = key.parse::<SimulatedShortcut>()
+    let simulated_shortcut = key
+        .parse::<SimulatedShortcut>()
         .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
-    runner.shortcut.simulate_shortcut_actions(
-        runner.shortcut.get_start_simulated_shortcut_actions(
-            &ShortcutChordAction { simulated_shortcut },
-            1
+    runner
+        .shortcut
+        .simulate_shortcut_actions(
+            runner.shortcut.get_start_simulated_shortcut_actions(
+                &ShortcutChordAction { simulated_shortcut },
+                1,
+            ),
         )
-    ).or_throw_msg(&ctx, "failed to press shortcut")?;
+        .or_throw_msg(&ctx, "failed to press shortcut")?;
     Ok(())
 }
 
 fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
     let runner = handle.chord_action_task_runner();
-    let simulated_shortcut = key.parse::<SimulatedShortcut>()
+    let simulated_shortcut = key
+        .parse::<SimulatedShortcut>()
         .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
-    runner.shortcut.simulate_shortcut_actions(
-        runner.shortcut.get_end_simulated_shortcut_actions(
-            &ShortcutChordAction { simulated_shortcut }
+    runner
+        .shortcut
+        .simulate_shortcut_actions(
+            runner
+                .shortcut
+                .get_end_simulated_shortcut_actions(&ShortcutChordAction { simulated_shortcut }),
         )
-    ).or_throw_msg(&ctx, "failed to release shortcut")?;
+        .or_throw_msg(&ctx, "failed to release shortcut")?;
     Ok(())
 }
 
@@ -241,7 +249,8 @@ fn get_global_hotkey(
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
     let shortcut = global_hotkey_store
-        .entries().or_throw_msg(&ctx, "bad entries")?
+        .entries()
+        .or_throw_msg(&ctx, "bad entries")?
         .into_iter()
         .find_map(|(shortcut, entry)| {
             (entry.bundle_id == bundle_id && entry.hotkey_id == hotkey_id).then_some(shortcut)
@@ -257,7 +266,9 @@ fn register_global_hotkey(
 ) -> rquickjs::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_global_hotkey_store();
-    let all = global_hotkey_store.entries().or_throw_msg(&ctx, "bad store")?;
+    let all = global_hotkey_store
+        .entries()
+        .or_throw_msg(&ctx, "bad store")?;
 
     // idempotent: if this hotkey is already registered, return the existing shortcut
     if let Some(existing) = all.iter().find_map(|(shortcut, entry)| {

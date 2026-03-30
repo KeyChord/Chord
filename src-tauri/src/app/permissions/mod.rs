@@ -1,11 +1,11 @@
+use crate::app::state::StateSingleton;
 use crate::input::{register_caps_lock_input_handler, register_key_event_input_grabber};
 use crate::observables::{AppPermissionsObservable, AppPermissionsState, Observable};
 use anyhow::{Context, Result};
-use std::sync::mpsc;
 use std::sync::Arc;
+use std::sync::mpsc;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_autostart::ManagerExt;
-use crate::app::state::StateSingleton;
 
 pub struct AppPermissions {
     input_monitoring: AppPermissionsInputMonitoring,
@@ -80,7 +80,7 @@ impl AppPermissions {
 }
 
 pub struct AppPermissionsInputMonitoring {
-    handle: AppHandle
+    handle: AppHandle,
 }
 
 impl AppPermissionsInputMonitoring {
@@ -102,7 +102,7 @@ impl AppPermissionsInputMonitoring {
 }
 
 pub struct AppPermissionsAccessibility {
-    handle: AppHandle
+    handle: AppHandle,
 }
 
 impl AppPermissionsAccessibility {

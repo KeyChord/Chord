@@ -1,12 +1,12 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordJsPackage {
     /// The keys are just the file relpaths, e.g. `js/menu.js`
-    exported_files: HashMap<PathBuf, String>
+    exported_files: HashMap<PathBuf, String>,
 }
 
 impl ChordJsPackage {
@@ -18,7 +18,6 @@ impl ChordJsPackage {
         self.exported_files.get(&PathBuf::from(import_specifier))
     }
 }
-
 
 #[derive(Debug)]
 pub struct PackageSpecifier<'a> {

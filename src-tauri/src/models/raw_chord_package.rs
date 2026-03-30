@@ -1,6 +1,6 @@
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::Serialize;
 use typeshare::typeshare;
 
 /// Mapping of all the relevant files for a chord package.

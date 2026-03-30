@@ -1,13 +1,11 @@
-use serde::ser::{Serialize, SerializeStruct, Serializer};
-use regex::Regex;
 use crate::input::Key;
-
-
+use regex::Regex;
+use serde::ser::{Serialize, SerializeStruct, Serializer};
 
 #[derive(Debug, Clone)]
 pub enum ChordTrigger {
     Keys(Vec<Key>),
-    Pattern(Regex)
+    Pattern(Regex),
 }
 
 impl ChordTrigger {

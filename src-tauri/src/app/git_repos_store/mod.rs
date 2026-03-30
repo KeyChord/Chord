@@ -1,3 +1,4 @@
+use crate::app::state::StateSingleton;
 use crate::git::{GitHubRepoRef, clone_repo, update_or_clone_repo_at_revision};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
@@ -7,7 +8,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::app::state::StateSingleton;
 
 pub struct GitReposStore {
     observable: GitReposObservable,
@@ -16,12 +16,15 @@ pub struct GitReposStore {
 
 impl StateSingleton for GitReposStore {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: GitReposObservable::placeholder() }
+        Self {
+            handle,
+            observable: GitReposObservable::placeholder(),
+        }
     }
 }
 
 impl GitReposStore {
-    pub fn store(&self) -> Result<Arc<Store<Wry>>>{
+    pub fn store(&self) -> Result<Arc<Store<Wry>>> {
         Ok(self.handle.store("repos.json")?)
     }
 

@@ -13,7 +13,7 @@ pub struct GlobalHotkeyStoreEntry {
 
 #[derive(Clone)]
 pub struct GlobalHotkeyStore {
-    pub handle: AppHandle
+    pub handle: AppHandle,
 }
 
 #[derive(Debug)]
@@ -38,7 +38,8 @@ impl GlobalHotkeyStore {
 
     pub fn entries(&self) -> Result<HashMap<String, GlobalHotkeyStoreEntry>> {
         // We clone it to avoid deadlocks (since .entries() calls a lock)
-        Ok(self.store()?
+        Ok(self
+            .store()?
             .entries()
             .into_iter()
             .filter_map(|(k, v)| {

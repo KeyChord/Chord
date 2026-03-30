@@ -15,7 +15,6 @@ pub use permissions::*;
 mod settings;
 pub use settings::*;
 
-
 pub struct ObservableRegistration {
     pub id: &'static str,
     pub get_json: fn(&AppHandle) -> anyhow::Result<serde_json::Value>,

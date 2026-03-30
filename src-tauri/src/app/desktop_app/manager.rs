@@ -397,7 +397,7 @@ mod macos {
 }
 
 use crate::app::desktop_app::DesktopApp;
+use crate::app::state::StateSingleton;
 use crate::quickjs::with_js;
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;
-use crate::app::state::StateSingleton;
