@@ -1,4 +1,3 @@
-use crate::app::state::StateSingleton;
 use anyhow::Result;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
