@@ -74,7 +74,7 @@ export interface ChordsFile {
 }
 
 export interface ChordReference {
-	chordsFilePath: string;
+	chordsFilePath: PathBuf;
 	chord: Chord;
 }
 
@@ -82,7 +82,7 @@ export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
 	name: string;
 	jsPackage?: ChordJsPackage;
-	appChordsFiles: Record<string, ChordsFile>;
+	appChordsFiles: Record<PathBuf, ChordsFile>;
 	globalChords: ChordReference[];
 }
 
@@ -137,6 +137,21 @@ export interface HandlerChordAction {
 	file: string;
 	handler_args: Value[];
 	event_args: Value[];
+}
+
+/**
+ * Mapping of all the relevant files for a chord package.
+ * 
+ * We intentionally don't include the path of the package here to avoid leaking implementation
+ * details about where the package is located on the filesystem.
+ */
+export interface RawChordPackage {
+	/** The dirname is needed for inferring the chord package name when package.json isn't present */
+	dirname: string;
+	package_json_contents?: string;
+	chords_files_contents: Record<PathBuf, string>;
+	js_files_contents: Record<PathBuf, string>;
+	bin_files_contents: Record<PathBuf, number[]>;
 }
 
 export interface ShellChordAction {

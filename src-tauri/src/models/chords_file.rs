@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use serde::Serialize;
 use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, ShellChordAction, ShortcutChordAction, SimulatedShortcut, ChordHintPattern, EmitChordAction};
 use crate::input::Key;
@@ -17,8 +18,6 @@ pub struct ChordsFile {
 
     // User-defined metadata. Can be anything
     pub meta: HashMap<String, String>,
-
-    pub relpath: String,
 
     pub handlers: HashMap<String, ChordsFileHandler>,
 
@@ -214,7 +213,6 @@ impl FromStr for ChordsFile {
         Ok(Self {
             name: name.to_string(),
             meta,
-            relpath: String::new(),
             handlers,
             imports,
             chords,

@@ -37,6 +37,7 @@ impl ChordActionTaskRunner {
 
     /// Called when the chord keys are pressed down.
     pub fn start_task(&self, task: &ChordActionTask) -> anyhow::Result<ChordActionTaskRun> {
+        log::debug!("Starting task: {:?}", task);
         let task_run = match &task.action {
             ChordTaskAction::Handler(action) => ChordActionTaskRun::Handler(self.handler.start(action, task.num_times)?),
             ChordTaskAction::Shell(action) => ChordActionTaskRun::Shell(self.shell.start(action, task.num_times)?),

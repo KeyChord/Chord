@@ -1,21 +1,21 @@
 use std::collections::HashMap;
-use fast_radix_trie::StringRadixMap;
+use std::path::PathBuf;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordJsPackage {
     /// The keys are just the file relpaths, e.g. `js/menu.js`
-    exported_files: HashMap<String, String>
+    exported_files: HashMap<PathBuf, String>
 }
 
 impl ChordJsPackage {
-    pub fn new(exported_files: HashMap<String, String>) -> Self {
+    pub fn new(exported_files: HashMap<PathBuf, String>) -> Self {
         Self { exported_files }
     }
 
     pub fn resolve_import(&self, import_specifier: &str) -> Option<&String> {
-        self.exported_files.get(import_specifier)
+        self.exported_files.get(&PathBuf::from(import_specifier))
     }
 }
 

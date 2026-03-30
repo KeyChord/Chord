@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use fast_radix_trie::StringRadixMap;
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
@@ -69,8 +70,6 @@ impl ChordPackageManager {
                 continue;
             };
 
-            chords_file.relpath = path.clone();
-
             for chord in &chords_file.chords {
                 let first_char = chord.raw_trigger.chars().next();
                 let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
@@ -80,12 +79,7 @@ impl ChordPackageManager {
                 }
             }
 
-            if let Some(inner) = path.strip_prefix("chords/").and_then(|p| p.strip_suffix("/macos.toml")) {
-                let bundle_id = inner.replace('/', ".");
-                app_chords_files.insert(bundle_id, chords_file.clone());
-            } else {
-                app_chords_files.insert("/global".to_string(), chords_file);
-            }
+            app_chords_files.insert(path, chords_file.clone());
         }
 
         let js_package = self.load_js_package(
@@ -105,7 +99,7 @@ impl ChordPackageManager {
         Ok(chord_package)
     }
 
-    async fn load_js_package(&self, package_name: &str, files: &StringRadixMap<String>) -> Result<Option<ChordJsPackage>> {
+    async fn load_js_package(&self, package_name: &str, files: &HashMap<PathBuf, String>) -> Result<Option<ChordJsPackage>> {
         if files.is_empty() {
             return Ok(None)     ;
         }
@@ -115,6 +109,7 @@ impl ChordPackageManager {
         for (file_relpath, js) in files.iter() {
             let package_name_bytes = package_name.as_bytes().to_vec();
             exported_files.insert(file_relpath.clone(), js.clone());
+            let file_relpath = file_relpath.to_owned();
             let js_string = js.clone();
             with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
@@ -127,7 +122,7 @@ impl ChordPackageManager {
                         )
                     )?;
                     let meta = module.meta()?;
-                    meta.set("url", file_relpath)?;
+                    meta.set("url", file_relpath.to_str())?;
                     let (_evaluated, promise) = module.eval()?;
                     promise.into_future::<()>().await?;
                     Ok(())
@@ -161,8 +156,10 @@ impl ChordPackageManager {
         let packages = self.packages.read();
 
         if let Some(app_id) = &input.application_id {
+            let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
+            let path = PathBuf::from(path);
             for package in packages.values() {
-                if package.app_chords_files.contains_key(app_id) {
+                if package.app_chords_files.contains_key(&path) {
                     return Some(package.clone());
                 }
             }

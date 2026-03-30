@@ -1,10 +1,10 @@
+use std::collections::HashMap;
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use fast_radix_trie::StringRadixMap;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_store::{Store, StoreExt};
@@ -146,9 +146,9 @@ impl LocalPackageRegistry {
     }
 
     pub fn import_from_local_folder(root: &Path) -> anyhow::Result<RawChordPackage> {
-        let mut chords_files_contents = StringRadixMap::new();
-        let mut js_files_contents = StringRadixMap::new();
-        let mut bin_files_contents = StringRadixMap::new();
+        let mut chords_files_contents = HashMap::new();
+        let mut js_files_contents = HashMap::new();
+        let mut bin_files_contents = HashMap::new();
 
         let dirname = root.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
@@ -169,25 +169,24 @@ impl LocalPackageRegistry {
                     continue;
                 }
 
-                let relative_path = path.strip_prefix(root)?;
-                let key = relative_path.to_string_lossy().to_string();
+                let relpath = path.strip_prefix(root)?;
 
                 match dir {
                     "chords" => {
-                        if is_supported_macos_chord_filename(relative_path) {
+                        if is_supported_macos_chord_filename(relpath) {
                             let content = fs::read_to_string(path)?;
-                            chords_files_contents.insert(key, content);
+                            chords_files_contents.insert(relpath.to_path_buf(), content);
                         }
                     }
                     "js" => {
                         if path.ends_with(".js") {
                             let content = fs::read_to_string(path)?;
-                            js_files_contents.insert(key, content);
+                            js_files_contents.insert(relpath.to_path_buf(), content);
                         }
                     }
                     "bin" => {
                         let content = fs::read(path)?;
-                        bin_files_contents.insert(key, content);
+                        bin_files_contents.insert(relpath.to_path_buf(), content);
                     }
                     _ => {}
                 }

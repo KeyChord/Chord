@@ -40,7 +40,7 @@ impl HandlerChordActionTaskRunner {
                         .into_iter()
                         .map(|value| {
                             rquickjs_serde::to_value(ctx.clone(), value)
-                                .or_throw_msg(&ctx, "Failed to convert TOML arguments")
+                                .or_throw_msg(&ctx, "failed to convert event TOML arguments")
                         })
                         .collect::<rquickjs::Result<Vec<_>>>()?;
 
@@ -48,7 +48,7 @@ impl HandlerChordActionTaskRunner {
                         .into_iter()
                         .map(|value| {
                             rquickjs_serde::to_value(ctx.clone(), value)
-                                .or_throw_msg(&ctx, "Failed to convert TOML arguments")
+                                .or_throw_msg(&ctx, "failed to convert handler TOML arguments")
                         })
                         .collect::<rquickjs::Result<Vec<_>>>()?;
 
@@ -56,11 +56,10 @@ impl HandlerChordActionTaskRunner {
                         .await
                         .map_err(|error| {
                             anyhow::anyhow!(
-                                    "failed to execute JS default export:\n{}",
-                                    format_js_error(&ctx, error)
-                                )
+                                "failed to execute JS default export:\n{}",
+                                format_js_error(&ctx, error)
+                            )
                         })?;
-
 
                     for _ in 0..num_times {
                         let mut args_builder = Args::new(ctx.clone(), event_args.len());
@@ -71,6 +70,8 @@ impl HandlerChordActionTaskRunner {
                         if let Some(promise) = result.as_promise().cloned() {
                             result = promise.into_future::<Value>().await?;
                         }
+
+                        log::debug!("handler task result: {:?}", result);
                     }
 
                     Ok(())
