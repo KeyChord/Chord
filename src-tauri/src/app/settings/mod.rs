@@ -4,7 +4,7 @@ use crate::observables::{AppSettingsObservable, AppSettingsState, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 
 mod ui;

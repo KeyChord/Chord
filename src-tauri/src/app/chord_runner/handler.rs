@@ -10,7 +10,6 @@ use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
-use typeshare::typeshare;
 
 #[derive(Clone)]
 pub struct HandlerChordActionTaskRunner {

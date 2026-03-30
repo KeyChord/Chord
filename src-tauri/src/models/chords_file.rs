@@ -1,7 +1,7 @@
 use crate::input::Key;
 use crate::models::{
     Chord, ChordAction, ChordHint, ChordHintPattern, ChordTrigger, EmitChordAction,
-    RawChordPackage, ShellChordAction, ShortcutChordAction, SimulatedShortcut,
+    ShellChordAction, ShortcutChordAction, SimulatedShortcut,
 };
 use anyhow::Context;
 use anyhow::Result;
@@ -190,7 +190,7 @@ impl ParsedChordsFile {
         })
     }
 
-    fn parse_trigger(key: &str, value: &Table) -> Result<ChordTrigger> {
+    fn parse_trigger(key: &str, _value: &Table) -> Result<ChordTrigger> {
         let raw_trigger = key;
 
         let trigger = if raw_trigger.contains('(') {
@@ -202,7 +202,7 @@ impl ParsedChordsFile {
         Ok(trigger)
     }
 
-    fn parse_actions(key: &str, value: &Table) -> Result<Vec<ChordAction>> {
+    fn parse_actions(_key: &str, value: &Table) -> Result<Vec<ChordAction>> {
         let mut actions = Vec::new();
         if let Some(shortcut) = value.get("shortcut") {
             let shortcut = shortcut
