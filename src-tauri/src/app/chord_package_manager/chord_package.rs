@@ -4,7 +4,7 @@ use serde::Serialize;
 use typeshare::typeshare;
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordsFile, HandlerChordAction};
+use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, ChordsFile, HandlerChordAction};
 use anyhow::Result;
 
 #[typeshare]
@@ -53,7 +53,7 @@ impl ChordPackage {
             })
     }
 
-    pub fn resolve_task(&self, chord_reference: ChordReference, num_times: u32) -> Result<Option<ChordActionTask>> {
+    pub fn resolve_task(&self, input: &ChordInput, chord_reference: ChordReference, num_times: u32) -> Result<Option<ChordActionTask>> {
         let Some(action) = chord_reference.chord.actions.first() else {
             return Ok(None)
         };
@@ -66,6 +66,31 @@ impl ChordPackage {
 
                 // For now, we assume the handler for the event that was emitted lives in the same file
                 let handler = chords_file.handlers.get(&emit.event_key);
+                let event_args = match chord_reference.chord.trigger {
+                    ChordTrigger::Pattern(regex) => {
+                        // Replace all $1, $2, ... with the captured match from the regex
+                        let mut args = Vec::new();
+                        let input_string = input.keys.iter().map(|k| k.to_char(false).unwrap_or_default()).collect::<String>();
+                        if let Some(captures) = regex.captures(&input_string) {
+                            for arg in &emit.args {
+                                if let Some(arg) = arg.as_str() {
+                                    if arg.starts_with("$") {
+                                        if let Ok(index) = arg[1..].parse::<usize>() {
+                                            args.push(toml::Value::String(
+                                                captures.get(index).map_or("", |m| m.as_str()).to_string())
+                                            );
+                                            continue;
+                                        }
+                                    }
+                                }
+
+                                args.push(arg.clone());
+                            }
+                        }
+                        args
+                    },
+                    ChordTrigger::Keys(keys) => emit.args.clone()
+                };
                 if let Some(handler) = handler {
                     Some(ChordActionTask {
                         package_name: chord_reference.package_name,
@@ -73,7 +98,7 @@ impl ChordPackage {
                         action: ChordTaskAction::Handler(HandlerChordAction {
                         file: handler.file.clone(),
                         build_args: handler.args.clone(),
-                        event_args: emit.args.clone()
+                        event_args,
                     }), num_times })
                 } else {
                     log::debug!("missing handler for event: {}, available handlers: {:?}", emit.event_key, chords_file.handlers.keys());

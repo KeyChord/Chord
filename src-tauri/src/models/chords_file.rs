@@ -209,7 +209,7 @@ impl FromStr for ChordsFile {
                     }
 
                     let trigger = if raw_trigger.contains('(') {
-                        ChordTrigger::Pattern(Regex::new(key).unwrap_or_else(|_| Regex::new("").unwrap()))
+                        ChordTrigger::Pattern(Regex::new(key)?)
                     } else {
                         ChordTrigger::Keys(Key::parse_sequence(key)?)
                     };

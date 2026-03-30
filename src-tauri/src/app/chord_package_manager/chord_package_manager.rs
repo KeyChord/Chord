@@ -178,31 +178,12 @@ impl ChordPackageManager {
             }
         }
 
-        let sequence_str = Key::serialize_sequence(&input.keys)?;
         for package in packages.values() {
-            if package.global_chords.iter().find(|c| c.chord.raw_trigger == sequence_str).is_some() {
+            if package.global_chords.iter().find(|c| c.chord.trigger.matches(&input.keys)).is_some() {
                 return Some(package.clone());
             }
         }
 
         None
-    }
-}
-
-fn get_package_name(specifier: &str) -> &str {
-    if specifier.starts_with('@') {
-        // Scoped: @scope/name/...
-        let mut parts = specifier.splitn(3, '/');
-        match (parts.next(), parts.next()) {
-            (Some(scope), Some(name)) => {
-                // return "@scope/name"
-                let len = scope.len() + 1 + name.len();
-                &specifier[..len]
-            }
-            _ => specifier, // fallback if malformed
-        }
-    } else {
-        // Unscoped: name/...
-        specifier.split('/').next().unwrap_or(specifier)
     }
 }

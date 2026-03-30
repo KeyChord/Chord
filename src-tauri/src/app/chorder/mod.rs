@@ -313,7 +313,7 @@ impl AppChorder {
             return Ok(None);
         };
         log::debug!("resolved chord: {:?}", chord_ref);
-        let task = chord_package.resolve_task(chord_ref, num_times)?;
+        let task = chord_package.resolve_task(&input, chord_ref, num_times)?;
         log::debug!("resolved task: {:?}", task);
         Ok(task)
     }
