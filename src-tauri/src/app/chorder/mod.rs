@@ -308,18 +308,11 @@ impl AppChorder {
             return Ok(None);
         };
         log::debug!("found package {} for input {:?}", chord_package.name, input);
-        let Some(chord) = chord_package.resolve_chord_for_input(&input) else {
+        let Some(chord_ref) = chord_package.resolve_chord_for_input(&input) else {
             return Ok(None);
         };
-        let Some(action) = chord.actions.first() else {
-            log::debug!("no action for chord {:?}", chord);
-            return Ok(None)
-        };
-        let task = ChordActionTask {
-            action: action.clone(),
-            num_times
-        };
-        Ok(Some(task))
+        let task = chord_package.resolve_task(chord_ref, 1)?;
+        Ok(task)
     }
 
     fn spawn_end_active_task(&self) -> Result<()>{

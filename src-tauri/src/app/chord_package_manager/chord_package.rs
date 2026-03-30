@@ -45,7 +45,11 @@ impl ChordPackage {
             })
     }
 
-    pub fn resolve_task(&self, chord_reference: ChordReference, action: ChordAction, num_times: u32) -> Result<Option<ChordActionTask>> {
+    pub fn resolve_task(&self, chord_reference: ChordReference, num_times: u32) -> Result<Option<ChordActionTask>> {
+        let Some(action) = chord_reference.chord.actions.first() else {
+            return Ok(None)
+        };
+
         Ok(match action {
             ChordAction::Emit(emit) => {
                 let Some(chords_file) = self.app_chords_files.get(&chord_reference.chords_file_path) else {
@@ -65,10 +69,10 @@ impl ChordPackage {
                 }
             },
             ChordAction::Shortcut(shortcut) => {
-                Some(ChordActionTask { action: ChordTaskAction::Shortcut(shortcut), num_times })
+                Some(ChordActionTask { action: ChordTaskAction::Shortcut(shortcut.clone()), num_times })
             }
             ChordAction::Shell(shell) => {
-                Some(ChordActionTask { action: ChordTaskAction::Shell(shell), num_times })
+                Some(ChordActionTask { action: ChordTaskAction::Shell(shell.clone()), num_times })
             }
         })
     }
