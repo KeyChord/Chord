@@ -4,7 +4,7 @@ use serde::Serialize;
 use typeshare::typeshare;
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, ChordsFile, HandlerChordAction};
+use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, ParsedChordsFile, HandlerChordAction, CompiledChordsFile};
 use anyhow::Result;
 
 #[typeshare]
@@ -16,7 +16,7 @@ pub struct ChordPackage {
 
     pub js_package: Option<ChordJsPackage>,
 
-    pub app_chords_files: HashMap<PathBuf, ChordsFile>,
+    pub app_chords_files: HashMap<PathBuf, CompiledChordsFile>,
     pub global_chords: Vec<ChordReference>
 }
 

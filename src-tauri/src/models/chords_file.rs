@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::Serialize;
-use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, ShellChordAction, ShortcutChordAction, SimulatedShortcut, ChordHintPattern, EmitChordAction};
+use crate::models::{Chord, ChordAction, ChordHint, ChordTrigger, ShellChordAction, ShortcutChordAction, SimulatedShortcut, ChordHintPattern, EmitChordAction, RawChordPackage};
 use crate::input::Key;
 use std::str::FromStr;
 use anyhow::Context;
@@ -10,10 +10,11 @@ use toml::Table;
 use typeshare::typeshare;
 use anyhow::Result;
 
+
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ChordsFile {
+pub struct ParsedChordsFile {
     pub name: String,
 
     // User-defined metadata. Can be anything
@@ -21,7 +22,7 @@ pub struct ChordsFile {
 
     pub handlers: HashMap<String, ChordsFileHandler>,
 
-    pub imports: Vec<ChordsFileImports>,
+    pub imports: Vec<ChordsFileImport>,
 
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
@@ -33,6 +34,18 @@ pub struct ChordsFile {
     pub raw: serde_json::Value
 }
 
+/// A chords file that has imports inlined.
+#[typeshare]
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CompiledChordsFile {
+    pub name: String,
+    pub meta: HashMap<String, String>,
+    pub handlers: HashMap<String, ChordsFileHandler>,
+    pub chords: Vec<Chord>,
+    pub chord_hints: Vec<ChordHint>,
+}
+
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -42,7 +55,7 @@ pub struct RawChordsFile {
     pub handlers: HashMap<String, ChordsFileHandler>,
     #[typeshare(typescript = "Record<string, any>")]
     pub chords: HashMap<String, toml::Value>,
-    pub imports: Vec<ChordsFileImports>,
+    pub imports: Vec<ChordsFileImport>,
 }
 
 /// Currently only supports JavaScript handlers
@@ -59,11 +72,11 @@ pub struct ChordsFileHandler {
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ChordsFileImports {
+pub struct ChordsFileImport {
     pub file: String,
 }
 
-impl ChordsFile {
+impl ParsedChordsFile {
     fn parse_meta(table: &Table) -> Result<HashMap<String, String>> {
         let mut meta = HashMap::new();
         if let Some(meta_val) = table.get("meta") {
@@ -100,14 +113,14 @@ impl ChordsFile {
         Ok(handlers)
     }
 
-    fn parse_imports(table: &Table) -> Result<Vec<ChordsFileImports>> {
+    fn parse_imports(table: &Table) -> Result<Vec<ChordsFileImport>> {
         let mut imports = Vec::new();
         if let Some(import_arr_val) = table.get("import") {
             let import_array = import_arr_val.as_array().context("import must be an array")?;
             for import_val in import_array {
                 let import_table = import_val.as_table().context("import item be a table")?;
                 let file = import_table.get("file").and_then(|f| f.as_str()).context("import must have file key")?;
-                imports.push(ChordsFileImports { file: file.to_string() });
+                imports.push(ChordsFileImport { file: file.to_string() });
             }
         }
         Ok(imports)
@@ -143,9 +156,27 @@ impl ChordsFile {
         })
     }
 
+    pub fn compile(&self, parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>) -> Result<CompiledChordsFile> {
+        let mut chords = self.chords.clone();
+        let mut chord_hints = self.chord_hints.clone();
+        for import in &self.imports {
+            let imported_file = parsed_chords_files.get(&Path::new("chords").join(&import.file)).context("import file not found")?;
+            let compiled_file = imported_file.compile(parsed_chords_files)?;
+            chords.extend(compiled_file.chords.clone());
+            chord_hints.extend(compiled_file.chord_hints.clone());
+        }
+
+        Ok(CompiledChordsFile {
+            name: self.name.clone(),
+            meta: self.meta.clone(),
+            handlers: self.handlers.clone(),
+            chords,
+            chord_hints,
+        })
+    }
 }
 
-impl FromStr for ChordsFile {
+impl FromStr for ParsedChordsFile {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

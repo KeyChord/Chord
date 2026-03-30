@@ -5,7 +5,7 @@ use typeshare::typeshare;
 use crate::app::chord_runner::{HandlerChordActionTaskRun, HandlerChordActionTaskRunner};
 use crate::app::chord_runner::{ShellChordActionTaskRun, ShellChordActionTaskRunner};
 use crate::app::chord_runner::{ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
-use crate::models::{ChordAction, ChordTaskAction};
+use crate::models::ChordTaskAction;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]

@@ -4,7 +4,7 @@ use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
-use serde::Serialize;
+
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 use typeshare::typeshare;

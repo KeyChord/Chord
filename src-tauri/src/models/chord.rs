@@ -1,8 +1,5 @@
-use regex::Regex;
-use serde::{Serialize, Serializer};
-use serde::ser::SerializeStruct;
+use serde::Serialize;
 use typeshare::typeshare;
-use crate::input::Key;
 use crate::models::{ChordAction, ChordTrigger};
 
 /// A regular chord entry composed of static characters

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use fast_radix_trie::StringRadixMap;
+
 use llrt_core::Module;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
 use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::input::Key;
-use crate::models::{ChordInput, ChordsFile, RawChordPackage};
+use crate::models::{ChordInput, ParsedChordsFile, RawChordPackage};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use gix::bstr::ByteVec;
@@ -65,12 +65,20 @@ impl ChordPackageManager {
         let mut app_chords_files = HashMap::new();
         let mut global_chords = Vec::new();
 
+        let mut parsed_chords_files = HashMap::new();
         for (path, contents) in raw_chord_package.chords_files_contents {
-            let Ok(chords_file) = contents.parse::<ChordsFile>().inspect_err(|e| {
+            let Ok(parsed_chords_file) = contents.parse::<ParsedChordsFile>().inspect_err(|e| {
                 log::error!("error when loading package {}; failed to parse chords file {}:\n{}", name, e, contents);
             }) else {
                 continue;
             };
+
+            parsed_chords_files.insert(path, parsed_chords_file);
+        }
+
+        for (path, parsed_chord_file) in &parsed_chords_files {
+            let chords_file = parsed_chord_file.compile(&parsed_chords_files)?;
+            log::debug!("compiled chords file {}/{:#?} with {} chords", name, path, chords_file.chords.len());
 
             for chord in &chords_file.chords {
                 let first_char = chord.raw_trigger.chars().next();
@@ -85,8 +93,9 @@ impl ChordPackageManager {
                 }
             }
 
-            app_chords_files.insert(path, chords_file.clone());
+            app_chords_files.insert(path.to_owned(), chords_file);
         }
+
 
         let js_package = self.load_js_package(
             &name,
@@ -187,3 +196,4 @@ impl ChordPackageManager {
         None
     }
 }
+

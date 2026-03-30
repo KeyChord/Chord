@@ -8,7 +8,7 @@ use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
 use parking_lot::Mutex;
 use std::collections::HashSet;
-use std::sync::Arc;
+
 use std::sync::mpsc;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener};

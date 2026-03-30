@@ -1,4 +1,4 @@
-use crate::git::{GitHubRepoRef, clone_repo, clone_repo_at_revision, update_or_clone_repo_at_revision};
+use crate::git::{GitHubRepoRef, clone_repo, update_or_clone_repo_at_revision};
 use crate::observables::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
