@@ -1,4 +1,3 @@
-use crate::app::chord_package::Chord;
 use crate::define_observable;
 use crate::input::Key;
 use serde::Serialize;
@@ -13,10 +12,10 @@ pub struct ChorderState {
     pub key_buffer: Vec<Key>,
 
     // The chord currently being pressed down.
-    pub pressed_chord: Option<Chord>,
+    pub pressed_chord_keys: Option<Vec<Key>>,
 
     // The chord that is "active"
-    pub active_chord: Option<Chord>,
+    pub active_chord_keys: Option<Vec<Key>>,
 
     // Whether Shift is still held down for the current chord-mode interaction.
     pub is_shift_pressed: bool,
@@ -27,14 +26,16 @@ pub struct ChorderState {
 
 impl ChorderState {
     pub fn is_idle(&self) -> bool {
-        self.key_buffer.is_empty() && self.pressed_chord.is_none() && self.active_chord.is_none()
+        self.key_buffer.is_empty()
+            && self.pressed_chord_keys.is_none()
+            && self.active_chord_keys.is_none()
     }
 
     pub fn clear_session(&self) -> Self {
         Self {
             key_buffer: vec![],
-            pressed_chord: None,
-            active_chord: None,
+            pressed_chord_keys: None,
+            active_chord_keys: None,
             is_shift_pressed: false,
             is_indicator_visible: self.is_indicator_visible,
         }
@@ -43,13 +44,13 @@ impl ChorderState {
     pub fn with_session(
         &self,
         key_buffer: Vec<Key>,
-        pressed_chord: Option<Chord>,
-        active_chord: Option<Chord>,
+        pressed_chord_keys: Option<Vec<Key>>,
+        active_chord_keys: Option<Vec<Key>>,
     ) -> Self {
         Self {
             key_buffer,
-            pressed_chord,
-            active_chord,
+            pressed_chord_keys,
+            active_chord_keys,
             is_shift_pressed: self.is_shift_pressed,
             is_indicator_visible: self.is_indicator_visible,
         }
@@ -74,8 +75,8 @@ impl Default for ChorderState {
     fn default() -> Self {
         Self {
             key_buffer: vec![],
-            pressed_chord: None,
-            active_chord: None,
+            pressed_chord_keys: None,
+            active_chord_keys: None,
             is_shift_pressed: false,
             is_indicator_visible: true,
         }

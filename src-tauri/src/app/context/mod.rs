@@ -1,3 +1,4 @@
+use crate::app::state::StateSingleton;
 use crate::{
     input::{KeyEvent, KeyEventState},
     mode::{AppMode, AppModeStateMachine},
@@ -6,6 +7,7 @@ use anyhow::Result;
 use device_query::DeviceState;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use tauri::AppHandle;
 
 pub struct AppContext {
     pub device_state: Option<DeviceState>,
@@ -13,23 +15,31 @@ pub struct AppContext {
 
     // Not a mutex since it uses Atomics
     app_mode_state_machine: Arc<AppModeStateMachine>,
+    handle: AppHandle,
 }
 
-impl AppContext {
-    pub fn new() -> Result<Self> {
+impl StateSingleton for AppContext {
+    fn new(handle: AppHandle) -> Self {
         let device_state = if macos_accessibility_client::accessibility::application_is_trusted() {
             Some(DeviceState {})
         } else {
             None
         };
-
         let app_mode_state_machine = Arc::new(AppModeStateMachine::new(device_state.clone()));
+        let key_event_state = KeyEventState::new(app_mode_state_machine.clone());
 
-        Ok(Self {
-            device_state,
-            key_event_state: KeyEventState::new(app_mode_state_machine.clone()),
+        Self {
+            handle,
+            key_event_state,
             app_mode_state_machine,
-        })
+            device_state,
+        }
+    }
+}
+
+impl AppContext {
+    pub fn init(&self) -> Result<()> {
+        Ok(())
     }
 
     pub fn get_app_mode(&self) -> AppMode {

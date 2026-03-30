@@ -1,4 +1,3 @@
-use crate::app::SafeAppHandle;
 use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
@@ -10,23 +9,30 @@ use objc2_foundation::NSString;
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
-use std::sync::Arc;
+
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 pub struct DesktopAppManager {
-    observable: Arc<DesktopAppManagerObservable>,
-    _handle: SafeAppHandle,
+    observable: DesktopAppManagerObservable,
+    _handle: AppHandle,
+}
+
+impl StateSingleton for DesktopAppManager {
+    fn new(handle: AppHandle) -> Self {
+        DesktopAppManager {
+            observable: DesktopAppManagerObservable::placeholder(),
+            _handle: handle,
+        }
+    }
 }
 
 impl DesktopAppManager {
-    pub fn new(handle: SafeAppHandle, observable: Arc<DesktopAppManagerObservable>) -> Self {
-        DesktopAppManager {
-            observable,
-            _handle: handle,
-        }
+    pub fn init(&self, observable: DesktopAppManagerObservable) -> Result<()> {
+        self.observable.init(observable);
+        Ok(())
     }
 
     #[allow(dead_code)]
@@ -391,6 +397,7 @@ mod macos {
 }
 
 use crate::app::desktop_app::DesktopApp;
+use crate::app::state::StateSingleton;
 use crate::quickjs::with_js;
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;

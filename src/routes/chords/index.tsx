@@ -1,11 +1,13 @@
 import { Kbd } from '#/components/ui/kbd.tsx';
 import { useChordFile } from '#/utils/chord-files.ts';
-import { useChorderState, useFrontmostState } from '#/utils/state.ts';
+import { useChorderState, useChordPackageManagerState, useFrontmostState } from '#/utils/state.ts';
 import { cn } from '#/utils/style.ts';
 import { createFileRoute } from '@tanstack/react-router';
 import { emit, listen } from '@tauri-apps/api/event';
 import getPrettyKey from 'pretty-key';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { Chord, ChordHint, ChordReference } from '../../types/generated.ts';
+import path from 'pathe'
 
 export const Route = createFileRoute('/chords/')({
 	component: Chords,
@@ -19,11 +21,6 @@ const INDICATOR_TRANSITION_MS = 240;
 const HIDDEN_X_OFFSET_PX = 40;
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
-type RawChord = ReturnType<typeof useChordFile>[string];
-interface ParsedChord {
-	keys: string[]
-	chord: RawChord
-}
 
 function clamp(value: number, min: number, max: number) {
 	return Math.min(Math.max(value, min), max);
@@ -158,7 +155,7 @@ function ChordKeyRow({
 	descriptionFontSize,
 }: {
 	token: string
-	description?: string
+	description?: string,
 	isSelected?: boolean
 	isDimmed?: boolean
 	keySize: number
@@ -195,7 +192,8 @@ function ChordKeyRow({
 export function Chords() {
 	const state = useChorderState();
 	const { frontmostAppBundleId } = useFrontmostState();
-	const rawChords = useChordFile(frontmostAppBundleId);
+  const { packages } = useChordPackageManagerState();
+
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
 	const [indicatorProgress, setIndicatorProgress] = useState(() =>
@@ -321,39 +319,39 @@ export function Chords() {
 		};
 	}, [surfaceVersion]);
 
-	const parsedChords: ParsedChord[] = [];
-	const descriptionsBySequence: Record<string, string> = {};
+	const activeAppChords: Chord[] = [];
+	const hintsByRawPattern: Record<string, ChordHint> = {};
+  const globalChords: ChordReference[] = []
 
-	for (const [sequence, chord] of Object.entries(rawChords)) {
-		if (!sequence) {
-			continue;
-		}
+	for (const chordPackage of packages) {
+    globalChords.push(...chordPackage.globalChords);
 
-		if (sequence.startsWith('?')) {
-			if (!chord?.name) {
-				continue;
-			}
+    for (const [relpath, file] of Object.entries(chordPackage.compiledChordsFiles)) {
+      const bundleId = relpath.split('/').slice(1, -1).join('.')
+      for (const hint of file.chordHints) {
+        // bad check for global
+        if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
+          hintsByRawPattern[hint.rawPattern] = hint
+        }
+      }
 
-			try {
-				for (const expandedSequence of expandDescriptionSequence(sequence.slice(1))) {
-					descriptionsBySequence[parseSequence(expandedSequence).join('')] = chord.name;
-				}
-			}
-			catch {
-				// Ignore invalid description-only entries in the overlay.
-			}
+      if (bundleId === frontmostAppBundleId) {
+        for (const hint of file.chordHints) {
+          hintsByRawPattern[hint.rawPattern] = hint;
+        }
 
-			continue;
-		}
-
-		parsedChords.push({
-			keys: parseSequence(sequence),
-			chord,
-		});
+        for (const chord of file.chords) {
+          activeAppChords.push(chord)
+        }
+      }
+    }
 	}
 
+  const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)]
+
 	const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
-	const normalizedActiveChordTokens = state.activeChord?.keys.map(normalizeToken) ?? [];
+	const normalizedActiveChordTokens = state.activeChordKeys?.map(normalizeToken) ?? [];
+
 	const shouldHighlightActiveChord
 		= state.isShiftPressed
 			&& normalizedBufferTokens.length === 0
@@ -373,6 +371,7 @@ export function Chords() {
 		10,
 	);
 	const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
+
 	const keyColumns = Array.from(
 		{
 			length: shouldHighlightActiveChord
@@ -381,23 +380,26 @@ export function Chords() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
-			const matchingChords = parsedChords.filter(chord =>
-				prefixTokens.every((token, tokenIndex) => chord.keys[tokenIndex] === token),
+      const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : []
+
+			const matchingChords = activeChords.filter(chord =>
+				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
 			);
 			const activeTokens = new Set(
 				matchingChords
-					.map(chord => chord.keys[columnIndex])
+					.map(chord => getChordKeys(chord)[columnIndex])
 					.filter((token): token is string => Boolean(token)),
 			);
+
 			const rows = sortTokens(activeTokens).map((token) => {
-				const sequenceKey = [...prefixTokens, token].join('');
+				const sequenceKey = [...prefixTokens, token].join('').toLowerCase()
 				const exactChord = matchingChords.find(
-					chord => chord.keys[columnIndex] === token && chord.keys.length === columnIndex + 1,
+					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 				);
 
 				return {
 					token,
-					description: descriptionsBySequence[sequenceKey] ?? exactChord?.chord.name ?? '',
+					description: hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
 				};
 			});
 

@@ -1,29 +1,33 @@
 use self::ui::SettingsUi;
-use crate::app::SafeAppHandle;
-use crate::observables::{AppSettingsObservable, AppSettingsState, ChorderObservable, Observable};
+use crate::app::state::StateSingleton;
+use crate::observables::{AppSettingsObservable, AppSettingsState, Observable};
 use crate::tauri_app::startup::APP_STATE_STORE_PATH;
 use crate::tauri_app::tray::TRAY_ID;
 use anyhow::{Context, Result};
-use std::sync::Arc;
-use tauri::Manager;
+use tauri::AppHandle;
+use tauri_plugin_store::StoreExt;
 
 mod ui;
 
 pub struct AppSettings {
     pub ui: SettingsUi,
-    observable: Arc<AppSettingsObservable>,
-    handle: SafeAppHandle,
+    observable: AppSettingsObservable,
+    handle: AppHandle,
+}
+impl StateSingleton for AppSettings {
+    fn new(handle: AppHandle) -> Self {
+        Self {
+            ui: SettingsUi::new(handle.clone()),
+            observable: AppSettingsObservable::placeholder(),
+            handle,
+        }
+    }
 }
 
 impl AppSettings {
-    pub fn new(handle: SafeAppHandle, observable: Arc<AppSettingsObservable>) -> Result<Self> {
-        let ui = SettingsUi::new(handle.clone())?;
-        observable.set_state(Self::load_state(&handle)?)?;
-        Ok(Self {
-            ui,
-            observable,
-            handle,
-        })
+    pub fn init(&self, observable: AppSettingsObservable) -> Result<()> {
+        self.observable.init(observable);
+        Ok(())
     }
 
     pub fn apply_all(&self) -> Result<()> {
@@ -64,12 +68,12 @@ impl AppSettings {
     fn apply_state(&self, state: &AppSettingsState) -> Result<()> {
         self.apply_menu_bar_icon_visibility(state.show_menu_bar_icon)?;
         self.apply_dock_icon_visibility(state.show_dock_icon)?;
-        self.apply_guide_visibility(!state.hide_guide_by_default)?;
+        // self.apply_guide_visibility(!state.hide_guide_by_default)?;
         Ok(())
     }
 
     fn apply_menu_bar_icon_visibility(&self, visible: bool) -> Result<()> {
-        if let Some(tray) = self.handle.handle().tray_by_id(TRAY_ID) {
+        if let Some(tray) = self.handle.tray_by_id(TRAY_ID) {
             tray.set_visible(visible)?;
         }
 
@@ -78,25 +82,12 @@ impl AppSettings {
 
     fn apply_dock_icon_visibility(&self, visible: bool) -> Result<()> {
         #[cfg(target_os = "macos")]
-        self.handle.handle().set_dock_visibility(visible)?;
+        self.handle.set_dock_visibility(visible)?;
 
         Ok(())
     }
 
-    // UNSAFE
-    fn apply_guide_visibility(&self, visible: bool) -> Result<()> {
-        let handle = self.handle.try_handle()?;
-        let chorder = handle.state::<Arc<ChorderObservable>>();
-        let current_state = chorder.get_state()?;
-        chorder.set_state(crate::observables::ChorderState {
-            is_indicator_visible: visible,
-            ..current_state.as_ref().clone()
-        })?;
-
-        Ok(())
-    }
-
-    fn load_state(handle: &SafeAppHandle) -> Result<AppSettingsState> {
+    fn load_state(handle: &AppHandle) -> Result<AppSettingsState> {
         let defaults = AppSettingsState::default();
 
         Ok(AppSettingsState {
@@ -119,7 +110,7 @@ impl AppSettings {
         })
     }
 
-    fn read_bool_setting(handle: &SafeAppHandle, key: &str, default: bool) -> Result<bool> {
+    fn read_bool_setting(handle: &AppHandle, key: &str, default: bool) -> Result<bool> {
         let store = handle
             .store(APP_STATE_STORE_PATH)
             .context("failed to open app state store")?;

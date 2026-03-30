@@ -9,6 +9,8 @@ export const Route = createRootRoute({
 });
 
 function getMutationErrorMessage(error: unknown) {
+  console.error(error);
+
 	if (typeof error === 'string' && error.trim()) {
 		return error;
 	}
@@ -25,6 +27,16 @@ function getMutationErrorMessage(error: unknown) {
 		&& error.message.trim()
 	) {
 		return error.message;
+	}
+
+	if (
+		error
+		&& typeof error === 'object'
+		&& 'Message' in error
+		&& typeof error.Message === 'string'
+		&& error.Message.trim()
+	) {
+		return error.Message;
 	}
 
 	return 'Something went wrong.';

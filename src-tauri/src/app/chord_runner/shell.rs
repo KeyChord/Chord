@@ -1,28 +1,60 @@
-use crate::app::SafeAppHandle;
+use crate::app::chord_runner::ChordActionTask;
+use crate::models::ShellChordAction;
+use anyhow::Result;
+use tauri::AppHandle;
+use tauri::async_runtime::JoinHandle;
 use tokio::process::Command;
 
-#[derive(Clone)]
-pub struct ChordShellRunner {
-    _handle: SafeAppHandle,
+pub struct ShellChordActionTaskRunner {
+    _handle: AppHandle,
 }
 
-impl ChordShellRunner {
-    pub fn new(handle: SafeAppHandle) -> Self {
+#[derive(Debug)]
+pub struct ShellChordActionTaskRun {
+    join_handle: JoinHandle<()>,
+}
+
+impl ShellChordActionTaskRunner {
+    pub fn new(handle: AppHandle) -> Self {
         Self { _handle: handle }
     }
+}
 
-    pub async fn run_shell_command(&self, shell: String) {
-        run_shell_command(shell).await;
+impl ShellChordActionTaskRunner {
+    pub fn start(
+        &self,
+        task: &ChordActionTask,
+        action: &ShellChordAction,
+    ) -> Result<ShellChordActionTaskRun> {
+        let command = action.command.clone();
+        let num_times = task.num_times;
+        let join_handle = tauri::async_runtime::spawn(async move {
+            for _ in 0..num_times {
+                run_shell_command(&command).await
+            }
+        });
+
+        Ok(ShellChordActionTaskRun { join_handle })
+    }
+
+    pub async fn end(&self, task_run: ShellChordActionTaskRun) -> Result<()> {
+        task_run.join_handle.await?;
+        Ok(())
+    }
+
+    pub fn abort(&self, task_run: ShellChordActionTaskRun) -> Result<()> {
+        task_run.join_handle.abort();
+        Ok(())
     }
 }
 
-async fn run_shell_command(shell: String) {
+async fn run_shell_command(shell: &str) {
     let mut command = Command::new("sh");
-    command.arg("-c").arg(&shell);
+    command.arg("-c").arg(shell);
     log::debug!("Running shell command: {:?}", command);
 
     match command.output().await {
-        Ok(output) => log_shell_output(&shell, output),
+        Ok(output) => log_shell_output(shell, output),
         Err(e) => {
             log::error!("failed to run shell command `{shell}`: {e}");
         }

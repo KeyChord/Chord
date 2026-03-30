@@ -1,8 +1,5 @@
 use crate::api::{Api, ApiImpl};
-#[allow(unused_imports)]
-use crate::app::{AppHandleExt, SafeAppHandle};
-#[allow(unused_imports)]
-use crate::observables::{ChorderObservable, GitReposObservable};
+use crate::app::AppHandleExt;
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
 use parking_lot::deadlock;
@@ -15,10 +12,12 @@ use tauri_plugin_log::{Target, TargetKind};
 
 mod api;
 mod app;
+mod chordpack;
 mod constants;
 pub mod git;
 mod input;
 mod mode;
+mod models;
 mod observables;
 mod quickjs;
 mod setup;
@@ -81,6 +80,23 @@ pub fn run_app() {
     let log_plugin = tauri_plugin_log::Builder::new()
         .clear_targets()
         .level(log::LevelFilter::Debug)
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}] {}:{} - {}",
+                record.level(),
+                record
+                    .file()
+                    .and_then(|f| {
+                        let path = std::path::Path::new(f);
+                        let file_name = path.file_name()?.to_str()?;
+                        let parent = path.parent()?.file_name()?.to_str()?;
+                        Some(format!("{}/{}", parent, file_name))
+                    })
+                    .unwrap_or_else(|| "unknown".to_string()),
+                record.line().unwrap_or(0),
+                message
+            ))
+        })
         .targets([
             Target::new(TargetKind::Stdout),
             Target::new(TargetKind::LogDir {
@@ -94,8 +110,8 @@ pub fn run_app() {
     let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api.clone().into_handler()))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
-        .on_menu_event(|_handle, _event| {
-            // tauri_app::menu::handle_menu_event(handle, &event);
+        .on_menu_event(|handle, event| {
+            tauri_app::menu::handle_menu_event(handle, &event);
         })
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())

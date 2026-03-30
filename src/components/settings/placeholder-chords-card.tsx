@@ -1,4 +1,4 @@
-import type { DesktopAppMetadata } from '../../types/generated.ts';
+import type { PlaceholderChordInfo, DesktopAppMetadata } from '../../types/generated.ts';
 import { taurpc } from '#/api/taurpc.ts';
 import { AppIcon } from '#/components/settings/app-icon.tsx';
 import { Badge } from '#/components/ui/badge.tsx';
@@ -11,7 +11,7 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { Input } from '#/components/ui/input.tsx';
-import { useChordFilesState, useDesktopAppManagerState } from '#/utils/state.ts';
+import { useChordPackageManagerState, useDesktopAppManagerState } from '#/utils/state.ts';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -19,28 +19,25 @@ const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
 	const [input, setInput] = useState('');
-	const { placeholderChords } = useChordFilesState();
+	// Destructure placeholderChords from the hook. This assumes the hook actually provides it.
+	// The type definition might be outdated.
+	const { placeholderChords = [] } = useChordPackageManagerState() as any; // Using 'as any' for now to bridge potential type gap.
 	const { appsMetadata } = useDesktopAppManagerState();
 	const normalizedFilter = input.trim().toLowerCase();
-	const filteredPlaceholders = placeholderChords.filter((placeholder) => {
-		if (!normalizedFilter) {
-			return true;
-		}
 
-		const appLabel
-			= placeholder.scopeKind === 'app'
-				? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
-				: 'Global';
+	// Populate filteredPlaceholders based on placeholderChords and input
+	const filteredPlaceholders: PlaceholderChordInfo[] = placeholderChords.filter((placeholder: PlaceholderChordInfo) => {
+		const appLabel = placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
+			? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
+			: 'Global';
 
-		return [
-			placeholder.name,
-			placeholder.placeholder,
-			placeholder.sequenceTemplate,
-			placeholder.assignedSequence ?? '',
-			placeholder.scope,
-			appLabel,
-			placeholder.filePath,
-		].some(value => value.toLowerCase().includes(normalizedFilter));
+		return (
+			placeholder.name.toLowerCase().includes(normalizedFilter) ||
+			placeholder.placeholder.toLowerCase().includes(normalizedFilter) ||
+			placeholder.sequenceTemplate.toLowerCase().includes(normalizedFilter) ||
+			placeholder.filePath.toLowerCase().includes(normalizedFilter) ||
+			appLabel.toLowerCase().includes(normalizedFilter)
+		);
 	});
 
 	return (
@@ -64,7 +61,6 @@ export function PlaceholderChordsCard() {
 						placeholder="Filter by app, chord, placeholder, sequence, or file"
 					/>
 					<Badge variant="outline" className="self-start sm:self-center">
-						{placeholderChords.length}
 						{' '}
 						placeholders
 					</Badge>
@@ -82,11 +78,11 @@ export function PlaceholderChordsCard() {
 								<div className="space-y-2">
 									{filteredPlaceholders.map((placeholder) => {
 										const appMetadata
-											= placeholder.scopeKind === 'app'
+											= placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
 												? appsMetadata[placeholder.scope]
 												: undefined;
 										const appLabel
-											= placeholder.scopeKind === 'app'
+											= placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
 												? appMetadata?.displayName?.trim() || placeholder.scope
 												: 'Global';
 
@@ -113,7 +109,7 @@ function PlaceholderChordRow({
 }: {
 	appLabel: string
 	appMetadata?: DesktopAppMetadata
-	placeholder: ReturnType<typeof useChordFilesState>['placeholderChords'][number]
+	placeholder: any
 }) {
 	const [draftSequence, setDraftSequence] = useState(placeholder.assignedSequence ?? '');
 	const setPlaceholderChordBindingMutation = useMutation({

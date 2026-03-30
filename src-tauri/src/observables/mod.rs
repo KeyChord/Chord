@@ -1,25 +1,23 @@
 use std::collections::HashMap;
-
-mod chord_files;
+use tauri::AppHandle;
+mod chord_package_manager;
+pub use chord_package_manager::*;
 mod chorder;
-mod desktop_app_manager;
-mod frontmost;
-mod git_repos;
-mod permissions;
-mod settings;
-
-use crate::app::SafeAppHandle;
-pub use chord_files::*;
 pub use chorder::*;
+mod desktop_app_manager;
 pub use desktop_app_manager::*;
+mod frontmost;
 pub use frontmost::*;
+mod git_repos;
 pub use git_repos::*;
+mod permissions;
 pub use permissions::*;
+mod settings;
 pub use settings::*;
 
 pub struct ObservableRegistration {
     pub id: &'static str,
-    pub get_json: fn(&SafeAppHandle) -> anyhow::Result<serde_json::Value>,
+    pub get_json: fn(&AppHandle) -> anyhow::Result<serde_json::Value>,
 }
 
 inventory::collect!(ObservableRegistration);
@@ -35,13 +33,15 @@ pub trait Observable: Sized + Send + Sync + 'static {
     fn subscribe(
         &self,
         observer: observable_property::Observer<std::sync::Arc<Self::State>>,
-    ) -> Result<observable_property::ObserverId, observable_property::PropertyError>;
+    ) -> anyhow::Result<observable_property::ObserverId>;
 
-    fn new(handle: crate::app::SafeAppHandle) -> anyhow::Result<Self>;
+    fn placeholder() -> Self;
+    fn new(handle: AppHandle) -> anyhow::Result<Self>;
+    fn init(&self, observable: Self);
 }
 
 pub fn get_all_observable_states(
-    handle: SafeAppHandle,
+    handle: AppHandle,
 ) -> anyhow::Result<HashMap<&'static str, serde_json::Value>> {
     inventory::iter::<ObservableRegistration>
         .into_iter()
@@ -56,9 +56,16 @@ macro_rules! define_observable {
         $vis:vis struct $name:ident($state:ty);
         id: $id:literal $(;)?
     ) => {
+        use tauri::Emitter;
+        use crate::app::AppHandleExt;
+
+        #[derive(Clone)]
         $(#[$meta])*
         $vis struct $name {
-            state: ::observable_property::ObservableProperty<::std::sync::Arc<$state>>,
+            state: ::std::sync::Arc<::arc_swap::ArcSwap<::std::option::Option<::observable_property::ObservableProperty<::std::sync::Arc<$state>>>>>,
+        }
+
+        impl $name {
         }
 
         impl $crate::observables::Observable for $name {
@@ -67,15 +74,31 @@ macro_rules! define_observable {
             const ID: &'static str = $id;
             const EVENT: &'static str = ::std::concat!("state:", $id);
 
+            fn placeholder() -> Self {
+                Self { state: ::std::sync::Arc::new(::arc_swap::ArcSwap::new(::std::sync::Arc::new(::std::option::Option::None))) }
+            }
+
+            fn init(&self, observable: Self) {
+                self.state.store(observable.state.load_full())
+            }
+
             fn get_state(&self) -> ::anyhow::Result<::std::sync::Arc<Self::State>> {
-                Ok(self.state.get()?)
+                if let Some(self_state) = self.state.load().as_ref() {
+                    Ok(self_state.get()?)
+                } else {
+                    anyhow::bail!("no state")
+                }
             }
 
             fn set_state(&self, state: Self::State) -> ::anyhow::Result<()> {
-                Ok(self.state.set(::std::sync::Arc::new(state))?)
+                if let Some(self_state) = self.state.load().as_ref() {
+                    Ok(self_state.set(::std::sync::Arc::new(state))?)
+                } else {
+                    anyhow::bail!("no state")
+                }
             }
 
-            fn new(handle: $crate::app::SafeAppHandle) -> ::anyhow::Result<Self> {
+            fn new(handle: ::tauri::AppHandle) -> ::anyhow::Result<Self> {
                 let state = <Self::State as ::std::default::Default>::default();
                 let state =
                     ::observable_property::ObservableProperty::new(::std::sync::Arc::new(state));
@@ -91,17 +114,18 @@ macro_rules! define_observable {
                     }
                 }))?;
 
-                Ok(Self { state })
+                Ok(Self { state: ::std::sync::Arc::new(::arc_swap::ArcSwap::new(::std::sync::Arc::new(::std::option::Option::Some(state)))) })
             }
 
             fn subscribe(
                 &self,
                 observer: ::observable_property::Observer<::std::sync::Arc<Self::State>>,
-            ) -> ::std::result::Result<
-                ::observable_property::ObserverId,
-                ::observable_property::PropertyError,
-            > {
-                self.state.subscribe(observer)
+            ) -> ::anyhow::Result<observable_property::ObserverId> {
+                if let Some(self_state) = self.state.load().as_ref() {
+                    Ok(self_state.subscribe(observer)?)
+                } else {
+                    anyhow::bail!("no state")
+                }
             }
         }
 
@@ -114,7 +138,7 @@ macro_rules! define_observable {
                 <$name as $crate::observables::Observable>::EVENT;
 
             pub fn get_json(
-                handle: &$crate::app::SafeAppHandle,
+                handle: &::tauri::AppHandle,
             ) -> ::anyhow::Result<::serde_json::Value> {
                 let state = handle.observable_state::<$name>()?;
                 Ok(::serde_json::to_value(state.as_ref())?)

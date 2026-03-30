@@ -1,6 +1,6 @@
 use crate::api::{ApiImpl, AppError, AppResult};
 use crate::app::AppHandleExt;
-use crate::app::chord_runner::shortcut::Shortcut;
+use crate::models::SimulatedShortcut;
 
 pub async fn update_global_shortcut_mapping(
     api: ApiImpl,
@@ -16,7 +16,7 @@ pub async fn update_global_shortcut_mapping(
         return Err(AppError::Message("shortcut cannot be empty".into()));
     }
 
-    Shortcut::parse(new_shortcut)
+    new_shortcut.parse::<SimulatedShortcut>()
         .map_err(|err| AppError::Message(format!("invalid shortcut {new_shortcut:?}: {err}")))?;
 
     store.update_shortcut(old_shortcut, new_shortcut)?;

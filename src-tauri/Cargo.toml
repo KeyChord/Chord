@@ -2,14 +2,13 @@
 name = "chords"
 version = "0.1.0"
 description = "shortcuts reimagined"
-authors = [ "you" ]
 edition = "2024"
 autobins = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
+# The `_lib` suffix may seem redundant, but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "chords_lib"
@@ -52,28 +51,28 @@ rdev = { version = "*", features = [
 ] }
 observable-property = "0.4.2"
 toml = "1.0.6"
-toml_edit = "0.25.4"
 anyhow = "1.0"
+regex = "1.12.2"
 libc = "0.2"
 bitflags = "2.11"
 parking_lot = { version = "0.12", features = [ "deadlock_detection" ] }
 clap = { version = "4.5.60", features = [ "derive" ] }
 keycode = "1"
-include_dir = { version = "0.7", features = [ "glob" ] }
 device_query = "4"
 walkdir = "2.5.0"
 gix = { version = "0.80.0", features = [ "blocking-http-transport-reqwest-rust-tls" ] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
 rquickjs = { version = "0.11.0", features = [ "full-async" ] }
 mac-keycode = "0.0.2"
-fast_radix_trie = "1.1.0"
-llrt_modules = { git = "https://github.com/awslabs/llrt", package = "llrt_modules" }
-llrt_core = { git = "https://github.com/awslabs/llrt", package = "llrt_core", features = [
+# 0.8.1-beta
+llrt_modules = { git = "https://github.com/awslabs/llrt", rev = "09d1d3a4a535501dec832ce7181a621d578f3897", package = "llrt_modules" }
+llrt_core = { git = "https://github.com/awslabs/llrt", rev = "09d1d3a4a535501dec832ce7181a621d578f3897", package = "llrt_core", features = [
 	'no-sdk',
 	'uncompressed',
 ] }
+llrt_utils = { git = "https://github.com/awslabs/llrt", rev = "09d1d3a4a535501dec832ce7181a621d578f3897", package = "llrt_utils" }
 # We need to manually enable all features
-llrt_os = { git = "https://github.com/awslabs/llrt", package = "llrt_os", default-features = true }
+llrt_os = { git = "https://github.com/awslabs/llrt", rev = "09d1d3a4a535501dec832ce7181a621d578f3897", package = "llrt_os", default-features = true }
 llrt_readline = { path = "./crates/llrt_readline" }
 rquickjs-serde = "0.5.0"
 tauri-plugin-store = "2"
@@ -81,9 +80,9 @@ jsonc-parser = "0.32.1"
 typeshare = "1"
 specta = { version = "=2.0.0-rc.22", features = [ "derive" ] }
 taurpc = "0.7.1"
-delegate = "0.13.5"
 thiserror = "2.0.18"
 inventory = "0.3.22"
+arc-swap = "1.9"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
@@ -94,7 +93,7 @@ macos-accessibility-client = "0.0.2"
 frontmost = "1.1.0"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1", version = "2.1.0" }
 raw-window-handle = "0.6"
-window-vibrancy = "0.6.0"
+window-vibrancy = "0.7"
 osakit = "0.3.1"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]

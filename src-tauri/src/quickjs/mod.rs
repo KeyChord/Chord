@@ -1,3 +1,5 @@
+use crate::app::AppHandleExt;
+use crate::app::chord_package_manager::PackageSpecifier;
 use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
 use llrt_core::function::Args;
@@ -5,10 +7,8 @@ use llrt_core::libs::utils::result::ResultExt;
 use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
-#[allow(unused_imports)]
 use rquickjs::{
-    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, Function, JsLifetime, Module, Object,
-    Value,
+    AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, JsLifetime, Module, Object, Value,
     loader::{Loader, Resolver},
     module::Declared,
 };
@@ -108,21 +108,53 @@ impl ModuleResolver {
 }
 
 impl Resolver for ModuleResolver {
-    fn resolve<'js>(&mut self, ctx: &Ctx<'js>, base: &str, name: &str) -> rquickjs::Result<String> {
-        // `.` from `.js`
-        if name.contains(".") || name == "chord" {
-            return Ok(name.into());
-        }
-
-        if name == "readline"
-            || name == "node:readline"
-            || name == "readline/promises"
-            || name == "node:readline/promises"
+    /// Our resolver ensures that modules within a js/ folder can ONLY access other JS files inside that
+    /// folder. Thus, we need to have a list of all the modules inside a specific chord package's JS
+    /// folder.
+    ///
+    /// To ensure consist module specifiers and avoid leaking implementation details in terms of
+    /// where the package is stored on the filesystem, the module specifier of a JavaScript file
+    /// in a chord package is always `name` + `relpath` (including /js/), e.g. `@keychord/chords-menu/js/menu.js`
+    fn resolve<'js>(
+        &mut self,
+        ctx: &Ctx<'js>,
+        base_module_specifier: &str,
+        import_specifier: &str,
+    ) -> rquickjs::Result<String> {
+        if import_specifier == "readline"
+            || import_specifier == "node:readline"
+            || import_specifier == "readline/promises"
+            || import_specifier == "node:readline/promises"
         {
             return Ok("readline".into());
         }
 
-        self.llrt_resolver.resolve(ctx, base, name)
+        if import_specifier == "chord" {
+            return Ok("chord".into());
+        }
+
+        // If we load it directly from memory, it should be already cached
+        if base_module_specifier == "" {
+            return Ok(import_specifier.into());
+        }
+
+        let specifier = PackageSpecifier::parse(base_module_specifier);
+        let userdata = ctx.userdata::<AppUserData>();
+        if let Some(userdata) = userdata {
+            if let Some(handle) = &userdata.handle {
+                let chord_pm = handle.chord_package_manager();
+                let chord_package = chord_pm.get_package_by_name(specifier.package);
+                if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
+                    if js_package.resolve_import(&import_specifier).is_some() {
+                        return Ok(format!("{}/{}", specifier.package, import_specifier));
+                    }
+                }
+            }
+        }
+
+        self.llrt_resolver
+            .resolve(ctx, base_module_specifier, import_specifier)
+            .inspect_err(|e| log::error!("failed to resolve module: {:?}", e))
     }
 }
 
@@ -135,21 +167,25 @@ impl ModuleLoader {
     pub fn new(llrt_loader: llrt_modules::module::loader::ModuleLoader) -> Self {
         Self { llrt_loader }
     }
-}
 
-fn get_module<'js>(ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Option<Module<'js, Declared>>> {
-    let module = match name {
-        "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
-        "readline" | "node:readline" => {
-            Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
-        }
-        "readline/promises" | "node:readline/promises" => {
-            Module::declare_def::<ReadlinePromisesModule, _>(ctx.clone(), "readline/promises")
-        }
-        _ => return Ok(None),
-    };
+    fn get_module<'js>(
+        &self,
+        ctx: &Ctx<'js>,
+        name: &str,
+    ) -> rquickjs::Result<Option<Module<'js, Declared>>> {
+        let module = match name {
+            "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
+            "readline" | "node:readline" => {
+                Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
+            }
+            "readline/promises" | "node:readline/promises" => {
+                Module::declare_def::<ReadlinePromisesModule, _>(ctx.clone(), "readline/promises")
+            }
+            _ => return Ok(None),
+        };
 
-    Some(module).transpose()
+        Some(module).transpose()
+    }
 }
 
 fn attempted_module_path(name: &str) -> String {
@@ -179,7 +215,7 @@ fn with_module_load_context(name: &str, error: Error) -> Error {
 
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
-        let module = get_module(ctx, name)?;
+        let module = self.get_module(ctx, name)?;
         Ok(match module {
             Some(module) => module,
             None => self
@@ -213,17 +249,14 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
 
     let context = AsyncContext::full(&rt).await?;
     async_with!(context => |ctx| {
-        global_attachment.attach(&ctx)?;
-        ctx.store_userdata(AppUserData { handle })?;
+        async {
+            global_attachment.attach(&ctx)?;
+            ctx.store_userdata(AppUserData { handle })?;
 
-        Ok::<_, Error>(())
+            Ok::<_, Error>(())
+        }.await.map_err(|e| anyhow::format_err!("async_with failed: {}", format_js_error(&ctx, e)))
     })
     .await?;
-
-    // Deno makes the app super slow
-    // JS_WORKER.with(move |cell| {
-    //     *cell.borrow_mut() = Some(main_worker);
-    // });
 
     Ok(JsEngine {
         _rt: rt,

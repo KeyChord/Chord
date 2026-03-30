@@ -15,6 +15,7 @@ import {
 } from '#/components/ui/dropdown-menu.tsx';
 import { useMutation } from '@tanstack/react-query';
 import { Ellipsis, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { taurpc } from '../../api/taurpc.ts';
 import { useGitRepoStoreState } from '../../utils/state.ts';
 import { AddRepoButton } from './add-repo-button.tsx';
@@ -30,7 +31,7 @@ export function ChordReposCard() {
 					<div>
 						<CardTitle>Chord Repos</CardTitle>
 						<CardDescription>
-							Added GitHub repos are cloned into the app cache and merged with bundled chords.
+							Added GitHub repos are cloned into the app cache and loaded alongside local chord folders.
 						</CardDescription>
 					</div>
 				</div>
@@ -41,7 +42,7 @@ export function ChordReposCard() {
 					{Object.values(repos).length === 0
 						? (
 								<p className="text-sm text-muted-foreground">
-									No external repos added yet. Bundled chords still load by default.
+									No external repos added yet.
 								</p>
 							)
 						: (
@@ -53,7 +54,7 @@ export function ChordReposCard() {
 	);
 }
 
-function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url: string } }) {
+function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, pinnedRev?: string | null, url: string } }) {
 	return (
 		<div key={repo.slug} className="rounded-lg border bg-background/80 px-3 py-3">
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -61,6 +62,11 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 					<div className="flex items-center gap-2">
 						<p className="truncate font-medium">{repo.slug}</p>
 						<Badge variant="secondary">GitHub</Badge>
+						{repo.pinnedRev
+							? (
+									<Badge variant="outline">Pinned</Badge>
+								)
+							: null}
 						{repo.headShortSha
 							? (
 									<Badge variant="outline" className="font-mono text-[11px]">
@@ -72,7 +78,7 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 				</div>
 				<div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
 					<OpenRepoButton repo={repo} />
-					<SyncRepoButton repo={repo} />
+					{repo.pinnedRev ? null : <SyncRepoButton repo={repo} />}
 					<RepoActionsMenuButton repo={repo} />
 				</div>
 			</div>
@@ -83,6 +89,9 @@ function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, url
 function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
 	const removeGitRepoMutation = useMutation({
 		mutationFn: taurpc.removeGitRepo,
+		onSuccess: () => {
+			toast.success(`Removed ${repo.slug}.`);
+		},
 	});
 
 	return (

@@ -7,7 +7,7 @@ pub async fn list_global_shortcut_mappings(
     let handle = api.handle()?;
     let store = handle.app_global_hotkey_store();
     let mut mappings = store
-        .entries()
+        .entries()?
         .into_iter()
         .map(|(shortcut, entry)| GlobalShortcutMappingInfo {
             shortcut,

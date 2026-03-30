@@ -1,13 +1,14 @@
+use crate::app::state::StateSingleton;
 use crate::observables::{FrontmostObservable, FrontmostState, Observable};
 use anyhow::Result;
 use frontmost::{Detector, start_nsrunloop};
 use objc2_app_kit::NSWorkspace;
-use std::sync::Arc;
 use std::thread;
+use tauri::AppHandle;
 
 #[derive(Debug)]
 struct FrontmostTracker {
-    pub observable: Arc<FrontmostObservable>,
+    observable: FrontmostObservable,
 }
 
 #[cfg(target_os = "macos")]
@@ -27,16 +28,27 @@ impl frontmost::app::FrontmostApp for FrontmostTracker {
 }
 
 pub struct AppFrontmost {
-    #[allow(dead_code)]
-    observable: Arc<FrontmostObservable>,
+    observable: FrontmostObservable,
+    handle: AppHandle,
+}
+
+impl StateSingleton for AppFrontmost {
+    fn new(handle: AppHandle) -> Self {
+        Self {
+            handle,
+            observable: FrontmostObservable::placeholder(),
+        }
+    }
 }
 
 impl AppFrontmost {
-    pub fn new_with_detector(observable: Arc<FrontmostObservable>) -> Result<Self> {
+    pub fn init(&self, observable: FrontmostObservable) -> Result<()> {
+        self.observable.init(observable.clone());
+
         let workspace = NSWorkspace::sharedWorkspace();
         if let Some(application) = workspace.frontmostApplication() {
             if let Some(bundle_id) = application.bundleIdentifier() {
-                observable.set_state(FrontmostState {
+                self.observable.set_state(FrontmostState {
                     frontmost_app_bundle_id: Some(bundle_id.to_string()),
                 })?;
             }
@@ -49,6 +61,6 @@ impl AppFrontmost {
             observable: observable.clone(),
         }));
 
-        Ok(Self { observable })
+        Ok(())
     }
 }

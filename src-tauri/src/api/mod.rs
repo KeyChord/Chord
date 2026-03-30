@@ -1,14 +1,12 @@
-use taurpc_macros::taurpc_api;
-
-use crate::app::chord_package_registry::LocalChordPackage;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::observables::GitRepo;
 use crate::startup::StartupStatusInfo;
+use taurpc_macros::taurpc_api;
 
 mod api;
 pub use api::*;
-
 mod error;
+use crate::app::chord_package_manager::local::LocalChordPackage;
 pub use error::*;
 
 #[taurpc_api(export_to = "../src/api/bindings.gen.ts", mod = "resolvers")]
@@ -18,9 +16,10 @@ pub trait Api {
     async fn get_startup_status() -> AppResult<StartupStatusInfo>;
     async fn complete_onboarding() -> AppResult<()>;
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
+    async fn reset_default_chords() -> AppResult<()>;
     async fn remove_git_repo(repo: String) -> AppResult<()>;
     async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
-    async fn list_local_chord_folders() -> AppResult<Vec<LocalChordPackage>>;
+    async fn list_local_chord_folders() -> AppResult<Vec<String>>;
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;
     async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;

@@ -1,7 +1,6 @@
-use crate::app::chord_package::ChordPackage;
-use crate::app::chord_package_registry::{ChordPackageRegistry, GitChordPackageRegistry};
-use crate::app::chord_runner::ChordRunner;
-use crate::app::chord_runner::registry::ChordRunnerRegistry;
+use crate::app::AppHandleExt;
+use crate::app::chord_package_manager::ChordPackageManager;
+use crate::app::chord_runner::ChordActionTaskRunner;
 use crate::app::chorder::AppChorder;
 use crate::app::context::AppContext;
 use crate::app::desktop_app::DesktopAppManager;
@@ -12,75 +11,77 @@ use crate::app::global_hotkey_store::GlobalHotkeyStore;
 use crate::app::permissions::AppPermissions;
 use crate::app::placeholder_chord_store::PlaceholderChordStore;
 use crate::app::settings::AppSettings;
-use crate::app::{AppHandleExt, AppManaged, SafeAppHandle};
+use crate::app::state::StateSingleton;
+use crate::chordpack::load_default_chordpack;
 use crate::lock_file::AppLockFile;
 use crate::observables::{
-    AppPermissionsObservable, AppSettingsObservable, ChordFilesObservable, ChorderObservable,
-    DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable,
+    AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable,
+    ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable,
+    Observable,
 };
 use crate::tauri_app;
-use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
-    let safe_handle = SafeAppHandle::new(app.handle().clone())?;
-
+    let handle = app.handle().clone();
     let app_lock_file = AppLockFile::acquire(app.handle())?;
     app.handle().manage(app_lock_file);
 
-    let chorder_observable = manage(app.handle(), ChorderObservable::new(safe_handle.clone())?);
-    let git_repos_observable = manage(app.handle(), GitReposObservable::new(safe_handle.clone())?);
-    let permissions_observable = manage(
-        app.handle(),
-        AppPermissionsObservable::new(safe_handle.clone())?,
-    );
-    let settings_observable = manage(
-        app.handle(),
-        AppSettingsObservable::new(safe_handle.clone())?,
-    );
-    let frontmost_observable = manage(app.handle(), FrontmostObservable::new(safe_handle.clone())?);
-    let chord_files_observable = manage(
-        app.handle(),
-        ChordFilesObservable::new(safe_handle.clone())?,
-    );
-    let git_package_registry = manage(
-        app.handle(),
-        GitChordPackageRegistry::new(safe_handle.clone())?,
-    );
-    let desktop_app_manager_observable = manage(
-        app.handle(),
-        DesktopAppManagerObservable::new(safe_handle.clone())?,
+    let s = (
+        singleton(&handle, AppFrontmost::new(handle.clone())),
+        singleton(&handle, AppChorder::new(handle.clone())),
+        singleton(&handle, AppContext::new(handle.clone())),
+        singleton(&handle, DevLockfileDetector::new()),
+        singleton(&handle, AppPermissions::new(handle.clone())),
+        singleton(&handle, AppSettings::new(handle.clone())),
+        singleton(&handle, GlobalHotkeyStore::new(handle.clone())),
+        singleton(&handle, PlaceholderChordStore::new(handle.clone())),
+        singleton(&handle, GitReposStore::new(handle.clone())),
+        singleton(&handle, ChordPackageManager::new(handle.clone())),
+        singleton(&handle, ChordActionTaskRunner::new(handle.clone())),
+        singleton(&handle, DesktopAppManager::new(handle.clone())),
     );
 
-    safe_handle.manage(AppManaged {
-        frontmost: AppFrontmost::new_with_detector(frontmost_observable.clone())?,
-        chorder: AppChorder::new(safe_handle.clone(), chorder_observable.clone())?,
-        context: AppContext::new()?,
-        dev_lockfile_detector: DevLockfileDetector::new(),
-        permissions: AppPermissions::new_unloaded(
-            safe_handle.clone(),
-            permissions_observable.clone(),
-        )?,
-        settings: AppSettings::new(safe_handle.clone(), settings_observable.clone())?,
-        chord_package_registry: ChordPackageRegistry::new_unloaded(safe_handle.clone())?,
-        global_hotkey_store: GlobalHotkeyStore::new(safe_handle.clone())?,
-        placeholder_chord_store: PlaceholderChordStore::new(safe_handle.clone())?,
-        git_repos_store: GitReposStore::new(safe_handle.clone(), git_repos_observable.clone())?,
-        chord_registry: ChordRunnerRegistry::new_empty(
-            safe_handle.clone(),
-            chord_files_observable.clone(),
-        ),
-        chord_runner: ChordRunner::new(safe_handle.clone()),
-        desktop_app_manager: DesktopAppManager::new(
-            safe_handle.clone(),
-            desktop_app_manager_observable,
-        ),
-    });
+    s.0.init(manage(
+        app.handle(),
+        FrontmostObservable::new(handle.clone())?,
+    ))?;
+    s.1.init(manage(
+        app.handle(),
+        ChorderObservable::new(handle.clone())?,
+    ))?;
+    s.2.init()?;
+    // s.3.init()?;
+    s.4.init(manage(
+        app.handle(),
+        AppPermissionsObservable::new(handle.clone())?,
+    ))?;
+    s.5.init(manage(
+        app.handle(),
+        AppSettingsObservable::new(handle.clone())?,
+    ))?;
+    // s.6.init()?;
+    // s.7.init()?;
+    s.8.init(manage(
+        app.handle(),
+        GitReposObservable::new(handle.clone())?,
+    ))?;
+    s.9.init(manage(
+        app.handle(),
+        ChordPackageManagerObservable::new(handle.clone())?,
+    ))?;
+    // s.10.init()?;
+    s.11.init(manage(
+        app.handle(),
+        DesktopAppManagerObservable::new(handle.clone())?,
+    ))?;
+
+    log::debug!("initialized all singletons");
 
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
-    tauri::async_runtime::spawn(load_chords(handle.clone(), git_package_registry));
+    tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
     tauri::async_runtime::spawn(load_permissions(handle.clone()));
 
     // Create tray
@@ -95,24 +96,22 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         settings.ui.open()?;
     }
 
+    log::debug!("finished setup()");
+
     Ok(())
 }
 
-async fn load_chords(
-    handle: AppHandle,
-    git_package_registry: Arc<GitChordPackageRegistry>,
-) -> anyhow::Result<()> {
-    let mut chord_packages = git_package_registry.load_all_packages()?;
-    chord_packages.push(ChordPackage::load_bundled()?);
-    let chord_registry = handle.app_chord_registry();
-    log::debug!(
-        "Loading packages: {:?}",
-        chord_packages
-            .iter()
-            .map(|p| p.root_dir.clone())
-            .collect::<Vec<_>>()
-    );
-    chord_registry.load_packages(chord_packages).await?;
+async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
+    #[cfg(debug_assertions)]
+    {
+        log::debug!("Development mode detected, syncing default chordpack");
+        let store = handle.app_git_repos_store();
+        let default_chordpack = load_default_chordpack()?;
+        store.ensure_pinned_repos(default_chordpack)?;
+    }
+
+    let chord_pm = handle.chord_package_manager();
+    chord_pm.reload_all().await?;
     Ok(())
 }
 
@@ -121,11 +120,19 @@ async fn load_permissions(handle: AppHandle) -> anyhow::Result<()> {
     Ok(permissions.load().await?)
 }
 
-fn manage<T>(handle: &tauri::AppHandle, value: T) -> Arc<T>
+fn manage<T>(handle: &AppHandle, value: T) -> T
+where
+    T: Send + Sync + Clone + 'static,
+{
+    handle.manage(value.clone());
+    value
+}
+
+fn singleton<T>(handle: &AppHandle, value: T) -> tauri::State<T>
 where
     T: Send + Sync + 'static,
 {
-    let value = Arc::new(value);
-    handle.manage(value.clone());
+    handle.manage(value);
+    let value = handle.state::<T>();
     value
 }

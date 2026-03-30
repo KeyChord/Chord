@@ -131,6 +131,8 @@ In addition, because chords don't use modifier keys, you're able to use any exis
 15. Tap(CapsLock)
 </details>
 
+Pressing `Backspace` will delete the last key in your current sequence. Pressing `Shift+Backspace` will clear the entire sequence.
+
 ## Actions
 
 Actions can also take the form of shell commands, which is useful when certain functionality isn't available via a keyboard shortcut:
@@ -149,31 +151,26 @@ In addition to running shortcuts and shell commands, chords can also run arbitra
 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
-[config.js]
-module = '''
-export default (commandId: string) => {
-  // ...
-}
-
-export const menu = (...segments: string[]) => {
-  // ...
-}
-'''
+[js]
+default = "dist/vscode.runtime.js"
+menu = "dist/menu.runtime.js"
 
 [chords]
 # `explorer.newFile` doesn't have a default shortcut in VSCode
-fh = { name = "File: Here", args = [ "explorer.newFile" ] }
-# `args:menu` calls the named `menu` export instead of `default`
-mc = { name = "Menu: Columns", 'args:menu' = [
+fh = { name = "File: Here", 'js:default' = [ "explorer.newFile" ] }
+# `js:menu` calls the named `menu` target instead of `default`
+mc = { name = "Menu: Columns", 'js:menu' = [
 	"View",
 	"Columns"
 ] }
-# String args are evaluated as JavaScript and must return an array
-df = { name = "Dynamic File", args = '["explorer.newFile", Date.now().toString()]' }
+# String JS invocations are evaluated as JavaScript and must return an array
+df = { name = "Dynamic File", 'js:default' = '["explorer.newFile", Date.now().toString()]' }
 # ...
 ```
 
-`args` and `args:*` accept either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
+The top-level `js` table maps invocation targets to JavaScript filenames. Chords must reference those targets with `js:<name>`, most commonly `js:default`.
+
+`js:<name>` accepts either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
 
 Chord embeds the [LLRT runtime](https://github.com/awslabs/llrt), a QuickJS-based JavaScript environment which provides partial compatibility with the Node.js APIs. For more information, see [scripting.md](./scripting.md).
 
@@ -186,9 +183,15 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 - `cmd+ctrl+alt+shift+f{1..12}`
 - `cmd+ctrl+alt+f{1..12}`
 
-## Web Mode (planned)
+## Web Mode
 
-While _Chord Mode_ defaults to app-shortcuts, you can press `Caps` right after (`Caps+Space+Caps` to toggle "Web Mode", which activates chords that apply to the currently focused webpage. In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input. To type regular input, you can press and immediately release `Caps+Space` (similar to toggling `Insert Mode` in Vim), and press it again to re-enable key sequences. To exit _Web Mode_, you can just press `Caps+Space+Caps` again.
+While _Chord Mode_ defaults to app-shortcuts, you can press `Tab` right after (`Caps+Space+Tab`) to toggle "Web Mode", which activates chords that apply to the currently focused webpage.
+
+In _Web Mode_, whenever keys are typed in the browser, they will default to chord sequences instead of input.
+
+To type regular input in _Web Mode_ (e.g. opening a new tab), you should hold `Shift` while typing it out and press `Caps` to run it (obviously, the `Shift` shortcut isn't available in _Web Mode_).
+
+To exit _Web Mode_ and re-enter _Chord Mode_, press `Esc`.
 
 ## Buffering (planned)
 

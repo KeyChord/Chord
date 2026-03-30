@@ -1,6 +1,6 @@
 use crate::IndicatorPanel;
-use crate::app::SafeAppHandle;
 use anyhow::Result;
+use arc_swap::ArcSwap;
 use objc2::msg_send;
 use objc2_app_kit::{
     NSRunningApplication, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
@@ -11,8 +11,10 @@ use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{WebviewUrl, WebviewWindow};
-use tauri_nspanel::{CollectionBehavior, Panel, PanelLevel, StyleMask, WebviewWindowExt};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
+use tauri_nspanel::{
+    CollectionBehavior, Panel, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt,
+};
 use window_vibrancy::NSVisualEffectViewTagged;
 
 const INDICATOR_WIDTH: u32 = 640;
@@ -28,57 +30,24 @@ pub struct NativeSurfaceRect {
     pub radius: f64,
 }
 
-#[derive(Clone)]
 pub struct ChorderIndicatorUi {
-    pub handle: SafeAppHandle,
+    pub handle: AppHandle,
     pub is_visible: Arc<AtomicBool>,
-    pub panel: Arc<dyn Panel>,
-    pub window: WebviewWindow,
+    pub panel: ArcSwap<Option<PanelHandle<Wry>>>,
 }
 
 impl ChorderIndicatorUi {
-    fn restore_frontmost_app(bundle_id: &str, pid: i32) {
-        let bundle_id = NSString::from_str(bundle_id);
-        let running_apps =
-            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
-        let app = running_apps
-            .iter()
-            .find(|app| app.processIdentifier() == pid)
-            .or_else(|| running_apps.iter().next());
-
-        let Some(app) = app else {
-            return;
-        };
-
-        unsafe {
-            let _: bool = msg_send![&**app, activateWithOptions: 0usize];
+    pub fn new(handle: AppHandle) -> Self {
+        Self {
+            handle,
+            is_visible: Arc::new(AtomicBool::new(false)),
+            panel: ArcSwap::new(Arc::new(None)),
         }
     }
 
-    pub fn new(handle: SafeAppHandle) -> Result<Self> {
-        let window = handle
-            .new_webview_window_builder("chords", WebviewUrl::App("index.html".into()))?
-            .title("Chords")
-            .inner_size(640.0, 180.0)
-            .visible(false)
-            .focused(false)
-            .focusable(false)
-            .transparent(true)
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .maximizable(false)
-            .minimizable(false)
-            .visible_on_all_workspaces(true)
-            .shadow(false)
-            .accept_first_mouse(false)
-            .build()?;
-
-        let _ = window.set_focusable(false);
-        let _ = window.set_ignore_cursor_events(true);
-
-        let panel = window.to_panel::<IndicatorPanel>()?;
+    pub fn init(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        let panel = window.to_panel::<IndicatorPanel>().unwrap();
         panel.set_level(PanelLevel::ScreenSaver.into());
         panel.set_has_shadow(false);
         panel.set_opaque(false);
@@ -105,13 +74,56 @@ impl ChorderIndicatorUi {
                 .ignores_cycle()
                 .into(),
         );
+        self.panel.store(Arc::new(Some(panel)));
+        Ok(())
+    }
 
-        Ok(Self {
-            handle,
-            is_visible: Arc::new(AtomicBool::new(false)),
-            window,
-            panel,
-        })
+    fn restore_frontmost_app(bundle_id: &str, pid: i32) {
+        let bundle_id = NSString::from_str(bundle_id);
+        let running_apps =
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&bundle_id);
+        let app = running_apps
+            .iter()
+            .find(|app| app.processIdentifier() == pid)
+            .or_else(|| running_apps.iter().next());
+
+        let Some(app) = app else {
+            return;
+        };
+
+        unsafe {
+            let _: bool = msg_send![&**app, activateWithOptions: 0usize];
+        }
+    }
+
+    pub fn get_or_create_window(&self) -> Result<WebviewWindow> {
+        if let Some(window) = self.handle.get_webview_window("chords") {
+            return Ok(window);
+        }
+
+        let window =
+            WebviewWindowBuilder::new(&self.handle, "chords", WebviewUrl::App("index.html".into()))
+                .title("Chords")
+                .inner_size(640.0, 180.0)
+                .visible(false)
+                .focused(false)
+                .focusable(false)
+                .transparent(true)
+                .decorations(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .maximizable(false)
+                .minimizable(false)
+                .visible_on_all_workspaces(true)
+                .shadow(false)
+                .accept_first_mouse(false)
+                .build()?;
+
+        let _ = window.set_focusable(false);
+        let _ = window.set_ignore_cursor_events(true);
+
+        Ok(window)
     }
 
     pub fn is_visible(&self) -> bool {
@@ -126,19 +138,26 @@ impl ChorderIndicatorUi {
         }
     }
 
-    pub fn open_inspector(&self) -> Result<()> {
-        let window = self.window.clone();
-        window.show()?;
-        window.unminimize()?;
-        window.set_focus()?;
-        #[cfg(debug_assertions)]
-        window.open_devtools();
-        Ok(())
+    pub fn toggle_inspector(&self) -> Result<bool> {
+        let window = self.get_or_create_window()?;
+        if window.is_visible()? {
+            window.hide()?;
+            #[cfg(debug_assertions)]
+            window.close_devtools();
+            Ok(false)
+        } else {
+            window.show()?;
+            window.unminimize()?;
+            window.set_focus()?;
+            #[cfg(debug_assertions)]
+            window.open_devtools();
+            Ok(true)
+        }
     }
 
     pub fn configure_window_surface(
         window: &WebviewWindow,
-        handle: SafeAppHandle,
+        handle: AppHandle,
         rect: NativeSurfaceRect,
     ) -> Result<()> {
         let ns_view = Self::webview_ns_view(window)?;
@@ -175,10 +194,14 @@ impl ChorderIndicatorUi {
 
     fn show(&self) -> Result<()> {
         log::debug!("Showing chorder panel");
-        let panel = self.panel.clone();
+        let panel = self.panel.load_full();
         let is_visible = self.is_visible.clone();
 
         self.handle.clone().run_on_main_thread(move || {
+            let Some(panel) = panel.as_ref() else {
+                return;
+            };
+
             let current_pid = std::process::id() as i32;
             let previous_frontmost = NSWorkspace::sharedWorkspace()
                 .frontmostApplication()
@@ -232,10 +255,11 @@ impl ChorderIndicatorUi {
     }
 
     pub fn reveal(&self) -> Result<()> {
-        let panel = self.panel.clone();
-
+        let panel = self.panel.load_full();
         self.handle.run_on_main_thread(move || {
-            panel.set_alpha_value(1.0);
+            if let Some(panel) = panel.as_ref() {
+                panel.set_alpha_value(1.0);
+            }
         })?;
 
         Ok(())
@@ -244,10 +268,12 @@ impl ChorderIndicatorUi {
     fn hide(&self) -> Result<()> {
         log::debug!("Hiding chorder panel");
         let is_visible = self.is_visible.clone();
-        let panel = self.panel.clone();
+        let panel = self.panel.load_full();
 
         self.handle.clone().run_on_main_thread(move || {
-            panel.hide();
+            if let Some(panel) = panel.as_ref() {
+                panel.hide();
+            }
             is_visible.store(false, Ordering::Relaxed);
         })?;
 
