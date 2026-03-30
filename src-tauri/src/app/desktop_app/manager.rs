@@ -23,14 +23,14 @@ pub struct DesktopAppManager {
 impl StateSingleton for DesktopAppManager {
     fn new(handle: AppHandle) -> Self {
         DesktopAppManager {
-            observable: DesktopAppManagerObservable::empty(),
+            observable: DesktopAppManagerObservable::placeholder(),
             _handle: handle,
         }
     }
 }
 
 impl DesktopAppManager {
-    pub fn init(&mut self, observable: DesktopAppManagerObservable) -> Result<()> {
+    pub fn init(&self, observable: DesktopAppManagerObservable) -> Result<()> {
         self.observable.init(observable);
         Ok(())
     }

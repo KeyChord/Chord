@@ -27,14 +27,14 @@ impl StateSingleton for ChordPackageManager {
         Self {
             packages: RwLock::new(HashMap::new()),
             registry: ChordPackageRegistry::new(handle.clone()),
-            observable: ChordPackageManagerObservable::empty(),
+            observable: ChordPackageManagerObservable::placeholder(),
             handle
         }
     }
 }
 
 impl ChordPackageManager {
-    pub fn init(&mut self, observable: ChordPackageManagerObservable) -> Result<()> {
+    pub fn init(&self, observable: ChordPackageManagerObservable) -> Result<()> {
         self.observable.init(observable);
         Ok(())
     }

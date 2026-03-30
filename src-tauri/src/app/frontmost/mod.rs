@@ -34,13 +34,13 @@ pub struct AppFrontmost {
 
 impl StateSingleton for AppFrontmost {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: FrontmostObservable::empty() }
+        Self { handle, observable: FrontmostObservable::placeholder() }
     }
 }
 
 impl AppFrontmost {
     pub fn init(&self, observable: FrontmostObservable) -> Result<()> {
-        self.observable.init(observable);
+        self.observable.init(observable.clone());
 
         let workspace = NSWorkspace::sharedWorkspace();
         if let Some(application) = workspace.frontmostApplication() {

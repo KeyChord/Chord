@@ -19,7 +19,7 @@ impl StateSingleton for AppPermissions {
         Self {
             input_monitoring: AppPermissionsInputMonitoring::new(handle.clone()),
             accessibility: AppPermissionsAccessibility::new(handle.clone()),
-            observable: AppPermissionsObservable::empty(),
+            observable: AppPermissionsObservable::placeholder(),
             handle,
         }
     }

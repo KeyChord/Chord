@@ -36,7 +36,7 @@ pub trait Observable: Sized + Send + Sync + 'static {
         observer: observable_property::Observer<std::sync::Arc<Self::State>>,
     ) -> anyhow::Result<observable_property::ObserverId>;
 
-    fn empty() -> Self;
+    fn placeholder() -> Self;
     fn new(handle: AppHandle) -> anyhow::Result<Self>;
     fn init(&self, observable: Self);
 }
@@ -75,7 +75,7 @@ macro_rules! define_observable {
             const ID: &'static str = $id;
             const EVENT: &'static str = ::std::concat!("state:", $id);
 
-            fn empty() -> Self {
+            fn placeholder() -> Self {
                 Self { state: ::std::sync::Arc::new(::arc_swap::ArcSwap::new(::std::sync::Arc::new(::std::option::Option::None))) }
             }
 

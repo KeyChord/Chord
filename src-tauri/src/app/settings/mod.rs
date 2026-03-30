@@ -19,7 +19,7 @@ impl StateSingleton for AppSettings {
     fn new(handle: AppHandle) -> Self {
         Self {
             ui: SettingsUi::new(handle.clone()),
-            observable: AppSettingsObservable::empty(),
+            observable: AppSettingsObservable::placeholder(),
             handle,
         }
     }

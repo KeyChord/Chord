@@ -1,4 +1,3 @@
-use std::borrow::BorrowMut;
 use crate::app::state::StateSingleton;
 use crate::app::chord_runner::{ChordActionTaskRunner};
 use crate::app::chorder::AppChorder;
@@ -15,7 +14,6 @@ use crate::app::{AppHandleExt, AppManaged};
 use crate::lock_file::AppLockFile;
 use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
 use crate::tauri_app;
-use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use crate::app::chord_package_manager::ChordPackageManager;
 
@@ -25,47 +23,45 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
     let app_lock_file = AppLockFile::acquire(app.handle())?;
     app.handle().manage(app_lock_file);
 
-    unsafe {
-        let s = (
-            singleton(handle.clone(), AppFrontmost::new(handle.clone())),
-            singleton(handle.clone(), AppChorder::new(handle.clone())),
-            singleton(handle.clone(), AppContext::new(handle.clone())),
-            singleton(handle.clone(), DevLockfileDetector::new()),
-            singleton(handle.clone(), AppPermissions::new(handle.clone())),
-            singleton(handle.clone(), AppSettings::new(handle.clone())),
-            singleton(handle.clone(), GlobalHotkeyStore::new(handle.clone())),
-            singleton(handle.clone(), PlaceholderChordStore::new(handle.clone())),
-            singleton(handle.clone(), GitReposStore::new(handle.clone())),
-            singleton(handle.clone(), ChordPackageManager::new(handle.clone())),
-            singleton(handle.clone(), ChordActionTaskRunner::new(handle.clone())),
-            singleton(handle.clone(), DesktopAppManager::new(handle.clone())),
-        );
+    let s = (
+        singleton(&handle, AppFrontmost::new(handle.clone())),
+        singleton(&handle, AppChorder::new(handle.clone())),
+        singleton(&handle, AppContext::new(handle.clone())),
+        singleton(&handle, DevLockfileDetector::new()),
+        singleton(&handle, AppPermissions::new(handle.clone())),
+        singleton(&handle, AppSettings::new(handle.clone())),
+        singleton(&handle, GlobalHotkeyStore::new(handle.clone())),
+        singleton(&handle, PlaceholderChordStore::new(handle.clone())),
+        singleton(&handle, GitReposStore::new(handle.clone())),
+        singleton(&handle, ChordPackageManager::new(handle.clone())),
+        singleton(&handle, ChordActionTaskRunner::new(handle.clone())),
+        singleton(&handle, DesktopAppManager::new(handle.clone())),
+    );
 
-        s.0.init(manage(app.handle(), FrontmostObservable::new(handle.clone())?))?;
-        s.1.init(manage(app.handle(), ChorderObservable::new(handle.clone())?))?;
-        // s.2.init()?;
-        // s.3.init()?;
-        s.4.init(manage(
-            app.handle(),
-            AppPermissionsObservable::new(handle.clone())?,
-        ))?;
-        s.5.init(manage(
-            app.handle(),
-            AppSettingsObservable::new(handle.clone())?,
-        ))?;
-        // s.6.init()?;
-        // s.7.init()?;
-        s.8.init(manage(app.handle(), GitReposObservable::new(handle.clone())?))?;
-        s.9.init(manage(
-            app.handle(),
-            ChordPackageManagerObservable::new(handle.clone())?,
-        ))?;
-        // s.10.init()?;
-        s.11.init(manage(
-            app.handle(),
-            DesktopAppManagerObservable::new(handle.clone())?,
-        ))?;
-    };
+    s.0.init(manage(app.handle(), FrontmostObservable::new(handle.clone())?))?;
+    s.1.init(manage(app.handle(), ChorderObservable::new(handle.clone())?))?;
+    // s.2.init()?;
+    // s.3.init()?;
+    s.4.init(manage(
+        app.handle(),
+        AppPermissionsObservable::new(handle.clone())?,
+    ))?;
+    s.5.init(manage(
+        app.handle(),
+        AppSettingsObservable::new(handle.clone())?,
+    ))?;
+    // s.6.init()?;
+    // s.7.init()?;
+    s.8.init(manage(app.handle(), GitReposObservable::new(handle.clone())?))?;
+    s.9.init(manage(
+        app.handle(),
+        ChordPackageManagerObservable::new(handle.clone())?,
+    ))?;
+    // s.10.init()?;
+    s.11.init(manage(
+        app.handle(),
+        DesktopAppManagerObservable::new(handle.clone())?,
+    ))?;
 
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
@@ -106,22 +102,10 @@ where
     value
 }
 
-unsafe fn singleton<T>(handle: AppHandle, value: T) -> &'static mut T
+fn singleton<T>(handle: &AppHandle, value: T) -> tauri::State<T>
 where
-    T: Send + Sync + 'static,
-{
-    // 1. Box the value to get a stable heap address
-    let mut boxed = Box::new(value);
-
-    // 2. Get a raw pointer to the data inside the box
-    let ptr: *mut T = &mut *boxed;
-
-    // 3. Move the box (and the value T) into Tauri.
-    // Since it's a Box, the data at `ptr` does NOT move in memory.
-    handle.manage(*boxed);
-
-    // 4. Return the pointer as a static mutable reference.
-    // SAFETY: This works because 'handle.manage' now owns the heap allocation.
-    // The memory will live as long as the AppHandle/State exists.
-    &mut *ptr
+    T: Send + Sync + 'static {
+    handle.manage(value);
+    let value = handle.state::<T>();
+    value
 }

@@ -16,7 +16,7 @@ pub struct GitReposStore {
 
 impl StateSingleton for GitReposStore {
     fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: GitReposObservable::empty() }
+        Self { handle, observable: GitReposObservable::placeholder() }
     }
 }
 
