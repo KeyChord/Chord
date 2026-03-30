@@ -5,7 +5,9 @@ use crate::input::Key;
 use std::str::FromStr;
 use anyhow::Context;
 use regex::Regex;
+use toml::Table;
 use typeshare::typeshare;
+use anyhow::Result;
 
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
@@ -43,15 +45,8 @@ pub struct ChordsFileImports {
     pub file: String,
 }
 
-
-impl FromStr for ChordsFile {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value: toml::Value = toml::from_str(s)?;
-        let table = value.as_table().context("root must be a table")?;
-        let name = table.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
-
+impl ChordsFile {
+    fn parse_meta(table: &Table) -> Result<HashMap<String, String>> {
         let mut meta = HashMap::new();
         if let Some(meta_val) = table.get("meta") {
             if let Some(t) = meta_val.as_table() {
@@ -63,8 +58,11 @@ impl FromStr for ChordsFile {
                     meta.insert(k.clone(), v_str);
                 }
             }
-        }
+        };
+        Ok(meta)
+    }
 
+    fn parse_handlers(table: &Table) -> Result<HashMap<String, ChordsFileHandler>> {
         let mut handlers = HashMap::new();
         if let Some(handlers_val) = table.get("handlers") {
             let handlers_table = handlers_val.as_table().context("handlers must be a table")?;
@@ -81,7 +79,10 @@ impl FromStr for ChordsFile {
                 handlers.insert(key.clone(), handler);
             }
         }
+        Ok(handlers)
+    }
 
+    fn parse_imports(table: &Table) -> Result<Vec<ChordsFileImports>> {
         let mut imports = Vec::new();
         if let Some(import_arr_val) = table.get("import") {
             let import_array = import_arr_val.as_array().context("import must be an array")?;
@@ -91,6 +92,50 @@ impl FromStr for ChordsFile {
                 imports.push(ChordsFileImports { file: file.to_string() });
             }
         }
+        Ok(imports)
+    }
+
+    fn parse_hint(key: &str, value: &Table) -> Result<ChordHint> {
+        let chord_name = value.get("name").and_then(|n| n.as_str());
+
+        let pattern_str = &key[1..];
+        let pattern = if pattern_str.contains('(') {
+            if let Ok(re) = Regex::new(pattern_str) {
+                ChordHintPattern::Regex(re)
+            } else {
+                if let Ok(keys) = Key::parse_sequence(pattern_str) {
+                    ChordHintPattern::Keys(keys)
+                } else {
+                    ChordHintPattern::Regex(Regex::new("")?)
+                }
+            }
+        } else {
+            if let Ok(keys) = Key::parse_sequence(pattern_str) {
+                ChordHintPattern::Keys(keys)
+            } else {
+                ChordHintPattern::Regex(Regex::new(pattern_str)?)
+            }
+
+        };
+
+        Ok(ChordHint {
+            pattern,
+            description: chord_name.unwrap_or_default().to_string(),
+        })
+    }
+
+}
+
+impl FromStr for ChordsFile {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let value: toml::Value = toml::from_str(s)?;
+        let table = value.as_table().context("root must be a table")?;
+        let name = table.get("name").and_then(|v| v.as_str()).context("the `name` property must be present")?;
+        let meta = Self::parse_meta(table)?;
+        let handlers = Self::parse_handlers(table)?;
+        let imports = Self::parse_imports(table)?;
 
         let mut chords = Vec::new();
         let mut chord_hints = Vec::new();
@@ -110,33 +155,10 @@ impl FromStr for ChordsFile {
                     }
                 };
 
-                let chord_name = table.get("name").and_then(|n| n.as_str());
-
                 // hint
                 if key.starts_with('?') {
-                    let pattern_str = &key[1..];
-                    let pattern = if pattern_str.contains('(') {
-                        if let Ok(re) = Regex::new(pattern_str) {
-                            ChordHintPattern::Regex(re)
-                        } else {
-                            if let Ok(keys) = Key::parse_sequence(pattern_str) {
-                                ChordHintPattern::Keys(keys)
-                            } else {
-                                ChordHintPattern::Regex(Regex::new("")?)
-                            }
-                        }
-                    } else {
-                        if let Ok(keys) = Key::parse_sequence(pattern_str) {
-                            ChordHintPattern::Keys(keys)
-                        } else {
-                            ChordHintPattern::Regex(Regex::new(pattern_str)?)
-                        }
-                    };
-
-                    chord_hints.push(ChordHint {
-                        pattern,
-                        description: chord_name.unwrap_or_default().to_string(),
-                    });
+                    let hint = Self::parse_hint(key, table)?;
+                    chord_hints.push(hint);
                 } else {
                     let mut actions = Vec::new();
 
@@ -168,6 +190,7 @@ impl FromStr for ChordsFile {
                         ChordTrigger::Keys(Key::parse_sequence(key)?)
                     };
 
+                    let chord_name = value.get("name").and_then(|n| n.as_str());
                     chords.push(Chord {
                         string_key: key.clone(),
                         trigger,
