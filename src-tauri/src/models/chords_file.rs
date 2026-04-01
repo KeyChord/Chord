@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use toml::Table;
 use typeshare::typeshare;
+use crate::models::path::FilePathslug;
+use crate::models::toml::TomlValue;
 
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
@@ -33,7 +35,7 @@ pub struct ParsedChordsFile {
     /// This is the object exposed to the JS handler. This maximizes compatibility so that even if
     /// our internal representation changes, a user's scripts will continue to work because it only
     /// depends on the actual TOML structure and not how we parse it.
-    #[typeshare(typescript = "ChordsFileRaw")]
+    #[typeshare(serialized_as = "RawChordsFile")]
     pub raw: serde_json::Value,
 }
 
@@ -43,7 +45,7 @@ pub struct ParsedChordsFile {
 #[serde(rename_all = "camelCase")]
 pub struct CompiledChordsFile {
     pub name: String,
-    pub path: PathBuf,
+    pub pathslug: FilePathslug,
     pub meta: HashMap<String, String>,
     pub handlers: Vec<CompiledChordsFileHandler>,
     pub chords: Vec<Chord>,
@@ -59,9 +61,8 @@ pub struct RawChordsFile {
     pub meta: HashMap<String, String>,
     #[serde(default)]
     pub handlers: HashMap<String, ChordsFileHandler>,
-    #[typeshare(typescript = "Record<string, any>")]
     #[serde(default)]
-    pub chords: HashMap<String, toml::Value>,
+    pub chords: HashMap<String, TomlValue>,
     #[serde(default)]
     pub imports: Vec<ChordsFileImport>,
 }
@@ -72,8 +73,8 @@ pub struct RawChordsFile {
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
     pub file: String,
-    #[typeshare(typescript = "any[]")]
     #[serde(default)]
+    #[typeshare(typescript(type = "any[]"))]
     pub args: Vec<toml::Value>,
 }
 
@@ -83,7 +84,7 @@ pub struct ChordsFileHandler {
 pub struct CompiledChordsFileHandler {
     pub event: String,
     pub file: String,
-    #[typeshare(typescript = "any[]")]
+    #[typeshare(typescript(type = "any[]"))]
     pub args: Vec<toml::Value>,
 }
 
@@ -255,7 +256,7 @@ impl ParsedChordsFile {
 
     pub fn compile(
         &self,
-        filepath: PathBuf,
+        pathslug: FilePathslug,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
     ) -> Result<CompiledChordsFile> {
         log::debug!("compiling chords file {}", self.name);
@@ -287,7 +288,7 @@ impl ParsedChordsFile {
 
         Ok(CompiledChordsFile {
             name: self.name.clone(),
-            path: filepath.clone(),
+            pathslug,
             meta: self.meta.clone(),
             handlers,
             chords,

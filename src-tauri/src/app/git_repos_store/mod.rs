@@ -41,22 +41,22 @@ impl GitReposStore {
                 name: repo.name.clone(),
             };
             let expected_path = repo_ref.local_path(&repos_root, repo.pinned_rev.as_deref());
-            if repo.local_path != expected_path {
-                if repo.local_path.exists() && !expected_path.exists() {
+            if repo.local_abspath != expected_path {
+                if repo.local_abspath.exists() && !expected_path.exists() {
                     log::info!(
                         "Moving repo {} from {} to {}",
                         repo.slug,
-                        repo.local_path.display(),
+                        repo.local_abspath.display(),
                         expected_path.display()
                     );
                     if let Some(parent) = expected_path.parent() {
                         let _ = fs::create_dir_all(parent);
                     }
-                    if let Err(e) = fs::rename(&repo.local_path, &expected_path) {
+                    if let Err(e) = fs::rename(&repo.local_abspath, &expected_path) {
                         log::error!("Failed to move repo {}: {}", repo.slug, e);
                     }
                 }
-                repo.local_path = expected_path;
+                repo.local_abspath = expected_path;
                 changed = true;
             }
         }
@@ -97,7 +97,7 @@ impl GitReposStore {
             .with_context(|| format!("Repository {id} has not been added yet"))?;
 
         self.replace_all(repos)?;
-        let repo_path = PathBuf::from(&removed_repo.local_path);
+        let repo_path = PathBuf::from(&removed_repo.local_abspath);
         remove_repo_cache(&repo_path)?;
         Ok(())
     }
@@ -172,7 +172,7 @@ impl GitReposStore {
 
         for repo in previous_repos.values() {
             if !desired_slugs.contains(&repo.slug) {
-                remove_repo_cache(&PathBuf::from(&repo.local_path))?;
+                remove_repo_cache(&PathBuf::from(&repo.local_abspath))?;
             }
         }
 

@@ -43,6 +43,7 @@ pub struct ShellChordAction {
 #[serde(rename_all = "camelCase")]
 pub struct EmitChordAction {
     pub event_key: String,
+    #[typeshare(typescript(type = "any"))]
     pub args: Vec<toml::Value>,
 }
 
@@ -52,6 +53,8 @@ pub struct EmitChordAction {
 #[serde(rename_all = "camelCase")]
 pub struct HandlerChordAction {
     pub file: String,
+    #[typeshare(typescript(type = "any[]"))]
     pub build_args: Vec<toml::Value>,
+    #[typeshare(typescript(type = "any[]"))]
     pub event_args: Vec<toml::Value>,
 }

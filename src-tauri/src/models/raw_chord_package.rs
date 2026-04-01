@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use typeshare::typeshare;
+use crate::models::FilePathslug;
 
 /// Mapping of all the relevant files for a chord package.
 ///
@@ -15,7 +16,7 @@ pub struct RawChordPackage {
     pub dirname: String,
     pub package_json_contents: Option<String>,
 
-    pub chords_files_contents: HashMap<PathBuf, String>,
-    pub js_files_contents: HashMap<PathBuf, String>,
-    pub bin_files_contents: HashMap<PathBuf, Vec<u8>>,
+    pub chords_files_contents: HashMap<FilePathslug, String>,
+    pub js_files_contents: HashMap<FilePathslug, String>,
+    pub bin_files_contents: HashMap<FilePathslug, Vec<u8>>,
 }

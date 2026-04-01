@@ -11,7 +11,7 @@ import { useState, useMemo } from 'react';
 import { useChordPackageManagerState } from '../../utils/state.ts';
 import { useDesktopAppManagerState } from '../../utils/state.ts';
 import { ActiveChordTree } from './active-chords-tree.tsx';
-import type { ChordPackage, ChordsFile, Chord, AppBundleId, DesktopAppMetadata } from '#/types/generated.ts';
+import type { ChordPackage, RawChordsFile, Chord, DesktopAppMetadata } from '#/types/generated.ts';
 
 // Helper function to normalize strings for case-insensitive comparison
 const normalizeString = (str: string): string => str.trim().toLowerCase();
@@ -48,7 +48,7 @@ export function ActiveChordsTab() {
 
 			// Process app-specific chords
 			Object.entries(pkg.compiledChordsFiles).forEach(([appBundleId, chordsFile]) => {
-				const appMetadata = appsMetadata[appBundleId as AppBundleId];
+				const appMetadata = appsMetadata[appBundleId];
 				const appLabel = appMetadata?.displayName?.trim() || appBundleId;
 
 				chordsFile.chords.forEach((chord: Chord) => {
@@ -124,15 +124,7 @@ export function ActiveChordsTab() {
         ) : activeChords.filteredActiveChords.length === 0 ? (
           <p className="text-sm text-muted-foreground">No chords match that filter.</p>
         ) : (
-          <ActiveChordTree
-            groups={activeChords.chordGroups}
-            forceExpandAll={activeChords.normalizedChordSearch.length > 0}
-            appMetadataByBundleId={appMetadataByBundleId}
-            openGroups={activeChords.openChordGroups}
-            onGroupOpenChange={(groupKey, open) => {
-              activeChords.setChordGroupOpen(groupKey, open);
-            }}
-          />
+          <ActiveChordTree />
         )}
 			</CardContent>
 		</Card>

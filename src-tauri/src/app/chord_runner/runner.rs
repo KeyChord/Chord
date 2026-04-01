@@ -1,7 +1,7 @@
 use crate::app::chord_runner::{HandlerChordActionTaskRun, HandlerChordActionTaskRunner};
 use crate::app::chord_runner::{ShellChordActionTaskRun, ShellChordActionTaskRunner};
 use crate::app::chord_runner::{ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
-use crate::models::ChordTaskAction;
+use crate::models::{ChordTaskAction, FilePathslug};
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -9,9 +9,10 @@ use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ChordActionTask {
     pub package_name: String,
-    pub initiator_file_relpath: PathBuf,
+    pub initiator_file_pathslug: FilePathslug,
     pub action: ChordTaskAction,
     pub num_times: u32,
 }

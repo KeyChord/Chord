@@ -1,21 +1,22 @@
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use typeshare::typeshare;
+use crate::models::FilePathslug;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordJsPackage {
-    /// The keys are just the file relpaths, e.g. `js/menu.js`
-    exported_files: HashMap<PathBuf, String>,
+    exported_files: HashMap<FilePathslug, String>,
 }
 
 impl ChordJsPackage {
-    pub fn new(exported_files: HashMap<PathBuf, String>) -> Self {
+    pub fn new(exported_files: HashMap<FilePathslug, String>) -> Self {
         Self { exported_files }
     }
 
     pub fn resolve_import(&self, import_specifier: &str) -> Option<&String> {
-        self.exported_files.get(&PathBuf::from(import_specifier))
+        self.exported_files.get(&FilePathslug::from(import_specifier))
     }
 }
 

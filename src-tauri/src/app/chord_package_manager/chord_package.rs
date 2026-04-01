@@ -1,9 +1,6 @@
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{
-    Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile,
-    HandlerChordAction, RawChordsFile,
-};
+use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile, FilePathslug, HandlerChordAction, RawChordsFile};
 use anyhow::Result;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -19,8 +16,8 @@ pub struct ChordPackage {
 
     pub js_package: Option<ChordJsPackage>,
 
-    pub raw_chords_files: HashMap<PathBuf, RawChordsFile>,
-    pub compiled_chords_files: HashMap<PathBuf, CompiledChordsFile>,
+    pub raw_chords_files: HashMap<FilePathslug, RawChordsFile>,
+    pub compiled_chords_files: HashMap<FilePathslug, CompiledChordsFile>,
     pub global_chords: Vec<ChordReference>,
 }
 
@@ -29,16 +26,16 @@ pub struct ChordPackage {
 #[serde(rename_all = "camelCase")]
 pub struct ChordReference {
     pub package_name: String,
-    pub chords_file_path: PathBuf,
+    pub chords_file_pathslug: FilePathslug,
     pub chord: Chord,
 }
 
 impl ChordPackage {
     pub fn resolve_chord_for_input(&self, input: &ChordInput) -> Option<ChordReference> {
         if let Some(app_id) = &input.application_id {
-            let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
-            let chords_file_path = Path::new(&path);
-            if let Some(chords_file) = self.compiled_chords_files.get(chords_file_path) {
+            let pathslug = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
+            let chords_file_pathslug = Path::new(&pathslug);
+            if let Some(chords_file) = self.compiled_chords_files.get(chords_file_pathslug) {
                 if let Some(chord) = chords_file
                     .chords
                     .iter()
@@ -47,7 +44,7 @@ impl ChordPackage {
                     return Some(ChordReference {
                         package_name: self.name.clone(),
                         chord: chord.clone(),
-                        chords_file_path: chords_file_path.to_path_buf(),
+                        chords_file_pathslug: chords_file_pathslug.to_path_buf(),
                     });
                 }
             }
@@ -58,7 +55,7 @@ impl ChordPackage {
             .find(|c| c.chord.trigger.matches(&input.keys))
             .map(|c| ChordReference {
                 package_name: self.name.clone(),
-                chords_file_path: c.chords_file_path.clone(),
+                chords_file_pathslug: c.chords_file_pathslug.clone(),
                 chord: c.chord.clone(),
             })
     }
@@ -77,11 +74,11 @@ impl ChordPackage {
             ChordAction::Emit(emit) => {
                 let Some(chords_file) = self
                     .compiled_chords_files
-                    .get(&chord_reference.chords_file_path)
+                    .get(&chord_reference.chords_file_pathslug)
                 else {
                     anyhow::bail!(
                         "referenced chords file not found: {:?}",
-                        chord_reference.chords_file_path
+                        chord_reference.chords_file_pathslug
                     );
                 };
 
@@ -139,7 +136,7 @@ impl ChordPackage {
                 if let Some(handler) = handler {
                     Some(ChordActionTask {
                         package_name: chord_reference.package_name,
-                        initiator_file_relpath: chord_reference.chords_file_path,
+                        initiator_file_pathslug: chord_reference.chords_file_pathslug,
                         action: ChordTaskAction::Handler(HandlerChordAction {
                             file: handler.file.clone(),
                             build_args: handler.args.clone(),
@@ -162,13 +159,13 @@ impl ChordPackage {
             }
             ChordAction::Shortcut(shortcut) => Some(ChordActionTask {
                 package_name: chord_reference.package_name,
-                initiator_file_relpath: chord_reference.chords_file_path,
+                initiator_file_pathslug: chord_reference.chords_file_pathslug,
                 action: ChordTaskAction::Shortcut(shortcut.clone()),
                 num_times,
             }),
             ChordAction::Shell(shell) => Some(ChordActionTask {
                 package_name: chord_reference.package_name,
-                initiator_file_relpath: chord_reference.chords_file_path,
+                initiator_file_pathslug: chord_reference.chords_file_pathslug,
                 action: ChordTaskAction::Shell(shell.clone()),
                 num_times,
             }),

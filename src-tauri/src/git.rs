@@ -77,7 +77,7 @@ impl GitHubRepoRef {
             name: self.name,
             slug,
             url,
-            local_path,
+            local_path: local_abspath,
             head_short_sha,
             pinned_rev: None,
         }
@@ -94,7 +94,7 @@ impl GitHubRepoRef {
             name: self.name,
             slug,
             url,
-            local_path,
+            local_path: local_abspath,
             head_short_sha,
             pinned_rev: Some(rev_str),
         }

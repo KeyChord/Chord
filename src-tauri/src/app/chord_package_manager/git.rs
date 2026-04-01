@@ -21,7 +21,7 @@ impl GitChordPackageRegistry {
         let mut packages = Vec::new();
         let state = self.handle.observable_state::<GitReposObservable>()?;
         for repo in state.repos.values() {
-            match LocalPackageRegistry::import_from_local_folder(repo.local_path.as_path()) {
+            match LocalPackageRegistry::import_from_local_folder(repo.local_abspath.as_path()) {
                 Ok(package) => packages.push(package),
                 Err(error) => log::warn!("Skipping repo {}: {error}", repo.slug),
             }
