@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use toml::Table;
+use toml::{Table, Value};
 use typeshare::typeshare;
 
 #[typeshare]
@@ -94,6 +94,15 @@ pub struct CompiledChordsFileHandler {
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileImport {
     pub file: String,
+    pub r#override: Option<ChordsFileImportOverride>
+}
+
+/// Currently, we only support overriding meta, but might support overriding chords in the future.
+#[typeshare]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ChordsFileImportOverride {
+    pub meta: HashMap<String, TomlValue>
 }
 
 impl ParsedChordsFile {
@@ -149,12 +158,19 @@ impl ParsedChordsFile {
                     .get("file")
                     .and_then(|f| f.as_str())
                     .context("import must have file key")?;
+                let r#override = import_table.get("override").map(|v| Self::parse_override(v).context("invalid override option")).transpose()?;
                 imports.push(ChordsFileImport {
                     file: file.to_string(),
+                    r#override
                 });
             }
         }
         Ok(imports)
+    }
+
+    fn parse_override(value: &Value) -> Result<ChordsFileImportOverride> {
+        let table = value.as_table().context("override must be a table if present")?;
+        Ok( ChordsFileImportOverride {meta: Self::parse_meta(table)?} )
     }
 
     fn parse_hint(key: &str, value: &Table) -> Result<ChordHint> {
