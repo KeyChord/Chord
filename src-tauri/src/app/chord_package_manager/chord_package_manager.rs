@@ -108,7 +108,7 @@ impl ChordPackageManager {
         }
 
         for (pathslug, parsed_chord_file) in &parsed_chords_files {
-            let Ok(chords_file) = parsed_chord_file.compile(pathslug.to_owned(), &parsed_chords_files).inspect_err(|e| {
+            let Ok(chords_file) = parsed_chord_file.compile(pathslug.to_owned(), &parsed_chords_files, &None).inspect_err(|e| {
                 log::error!("skipping chords file {:?} because of compilation error: {:?}", pathslug, e);
             }) else {
                 continue;

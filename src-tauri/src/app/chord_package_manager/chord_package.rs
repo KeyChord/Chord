@@ -138,24 +138,12 @@ impl ChordPackage {
                 };
 
                 if let Some(handler) = handler {
-                    let mut build_args = Vec::new();
-                    for arg in &handler.args {
-                        if let Some(arg) = arg.as_str() {
-                            if arg.starts_with('$') {
-                                let meta_value = chords_file.meta.get(arg).context("missing arg")?;
-                                build_args.push(meta_value.clone());
-                                continue;
-                            }
-                        }
-
-                        build_args.push(arg.clone());
-                    }
                     Some(ChordActionTask {
                         package_name: chord_reference.package_name,
                         initiator_file_pathslug: chord_reference.chords_file_pathslug,
                         action: ChordTaskAction::Handler(HandlerChordAction {
                             file: handler.file.clone(),
-                            build_args,
+                            build_args: handler.args.clone(),
                             event_args,
                         }),
                         num_times,

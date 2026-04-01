@@ -269,16 +269,32 @@ impl ParsedChordsFile {
         &self,
         pathslug: FilePathslug,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
+        r#override: &Option<ChordsFileImportOverride>
     ) -> Result<CompiledChordsFile> {
+
         log::debug!("compiling chords file {}", self.name);
 
         let mut chords = self.chords.clone();
         let mut chord_hints = self.chord_hints.clone();
         let mut handlers = Vec::new();
         for (event, handler) in &self.handlers {
+            let mut build_args = Vec::new();
+            for arg in &handler.args {
+                if let Some(arg) = arg.as_str() {
+                    if arg.starts_with('$') {
+                        let override_arg = r#override.as_ref().and_then(|v| v.meta.get(arg));
+                        let meta_value = override_arg.or(self.meta.get(arg)).context(format!("missing arg {}", arg))?;
+                        build_args.push(meta_value.clone());
+                        continue;
+                    }
+                }
+
+                build_args.push(arg.clone());
+            }
+
             handlers.push(CompiledChordsFileHandler {
                 event: event.clone(),
-                args: handler.args.clone(),
+                args: build_args,
                 file: handler.file.clone(),
             });
         }
@@ -293,7 +309,8 @@ impl ParsedChordsFile {
                 imported_file.name,
                 imported_file_path
             );
-            let compiled_file = imported_file.compile(imported_file_path, parsed_chords_files)?;
+
+            let compiled_file = imported_file.compile(imported_file_path, parsed_chords_files, &import.r#override)?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
             handlers.extend(compiled_file.handlers.clone());
