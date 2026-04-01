@@ -1,8 +1,8 @@
+use crate::models::FilePathslug;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use typeshare::typeshare;
-use crate::models::FilePathslug;
 
 /// Mapping of all the relevant files for a chord package.
 ///

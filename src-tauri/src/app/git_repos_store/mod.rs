@@ -40,7 +40,7 @@ impl GitReposStore {
                 owner: repo.owner.clone(),
                 name: repo.name.clone(),
             };
-            let expected_path = repo_ref.local_path(&repos_root, repo.pinned_rev.as_deref());
+            let expected_path = repo_ref.local_abspath(&repos_root, repo.pinned_rev.as_deref());
             if repo.local_abspath != expected_path {
                 if repo.local_abspath.exists() && !expected_path.exists() {
                     log::info!(
@@ -109,7 +109,7 @@ impl GitReposStore {
 
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
         let repos_root = self.github_repos_dir()?;
-        let repo_path = repo_ref.local_path(&repos_root, None);
+        let repo_path = repo_ref.local_abspath(&repos_root, None);
         let repo = if repo_path.join(".git").exists() {
             repo_ref.into_repo(&repos_root)
         } else {
@@ -126,7 +126,7 @@ impl GitReposStore {
         let current_repo = state.repos.get(&repo_ref.slug());
         let pinned_rev = current_repo.and_then(|r| r.pinned_rev.as_deref());
 
-        let repo_path = repo_ref.local_path(&repos_root, pinned_rev);
+        let repo_path = repo_ref.local_abspath(&repos_root, pinned_rev);
 
         if !repo_path.join(".git").exists() {
             anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
@@ -161,7 +161,7 @@ impl GitReposStore {
 
         let mut next_repos = HashMap::with_capacity(repos.len());
         for spec in repos {
-            let repo_path = spec.repo_ref.local_path(&repos_root, Some(&spec.rev));
+            let repo_path = spec.repo_ref.local_abspath(&repos_root, Some(&spec.rev));
             // Use the new function to handle both cloning if not exists, and fetching/updating if exists.
             update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
@@ -185,7 +185,7 @@ impl GitReposStore {
         let mut current_repos = state.repos.clone();
 
         for spec in repos {
-            let repo_path = spec.repo_ref.local_path(&repos_root, Some(&spec.rev));
+            let repo_path = spec.repo_ref.local_abspath(&repos_root, Some(&spec.rev));
             update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
             current_repos.insert(repo.slug.clone(), repo);

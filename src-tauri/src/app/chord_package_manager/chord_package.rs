@@ -1,6 +1,9 @@
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile, FilePathslug, HandlerChordAction, RawChordsFile};
+use crate::models::{
+    Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile,
+    FilePathslug, HandlerChordAction, RawChordsFile,
+};
 use anyhow::Result;
 use serde::Serialize;
 use std::collections::HashMap;

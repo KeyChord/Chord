@@ -1,4 +1,6 @@
 use crate::input::Key;
+use crate::models::path::FilePathslug;
+use crate::models::toml::TomlValue;
 use crate::models::{
     Chord, ChordAction, ChordHint, ChordHintPattern, ChordTrigger, EmitChordAction,
     ShellChordAction, ShortcutChordAction, SimulatedShortcut,
@@ -12,8 +14,6 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use toml::Table;
 use typeshare::typeshare;
-use crate::models::path::FilePathslug;
-use crate::models::toml::TomlValue;
 
 #[typeshare]
 #[derive(Debug, Serialize, Clone)]
@@ -87,7 +87,6 @@ pub struct CompiledChordsFileHandler {
     #[typeshare(typescript(type = "any[]"))]
     pub args: Vec<toml::Value>,
 }
-
 
 // New struct for imports
 #[typeshare]
@@ -265,7 +264,11 @@ impl ParsedChordsFile {
         let mut chord_hints = self.chord_hints.clone();
         let mut handlers = Vec::new();
         for (event, handler) in &self.handlers {
-            handlers.push(CompiledChordsFileHandler { event: event.clone(), args: handler.args.clone(), file: handler.file.clone() });
+            handlers.push(CompiledChordsFileHandler {
+                event: event.clone(),
+                args: handler.args.clone(),
+                file: handler.file.clone(),
+            });
         }
 
         for import in &self.imports {

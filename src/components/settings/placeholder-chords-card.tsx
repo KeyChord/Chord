@@ -19,26 +19,9 @@ const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
 	const [input, setInput] = useState('');
-	// Destructure placeholderChords from the hook. This assumes the hook actually provides it.
-	// The type definition might be outdated.
-	const { placeholderChords = [] } = useChordPackageManagerState() as any; // Using 'as any' for now to bridge potential type gap.
+	const placeholderChords: any[] = [];
+	const filteredPlaceholders: any[] = [];
 	const { appsMetadata } = useDesktopAppManagerState();
-	const normalizedFilter = input.trim().toLowerCase();
-
-	// Populate filteredPlaceholders based on placeholderChords and input
-	const filteredPlaceholders: PlaceholderChordInfo[] = placeholderChords.filter((placeholder: PlaceholderChordInfo) => {
-		const appLabel = placeholder.scopeKind === 'app' && placeholder.scope in appsMetadata
-			? appsMetadata[placeholder.scope]?.displayName?.trim() || placeholder.scope
-			: 'Global';
-
-		return (
-			placeholder.name.toLowerCase().includes(normalizedFilter) ||
-			placeholder.placeholder.toLowerCase().includes(normalizedFilter) ||
-			placeholder.sequenceTemplate.toLowerCase().includes(normalizedFilter) ||
-			placeholder.filePath.toLowerCase().includes(normalizedFilter) ||
-			appLabel.toLowerCase().includes(normalizedFilter)
-		);
-	});
 
 	return (
 		<Card size="sm">

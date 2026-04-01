@@ -23,3 +23,12 @@ On the Rust side, observable state can be accessed from anywhere via `handle.obs
 ## State singletons
 
 All the state singletons are defined inside of the [app/](./src-tauri/src/app) folder in `src-tauri/`. We use [a macro](./src-tauri/src/app/mod.rs) to make all of them exposed on the `handle` directly (e.g. `handle.chord_package_manager()` instead of handle.state::<ChordPackageManager>()`).
+
+## Terminology
+
+- **Pathslug:** A relative path from the package root to the file in the package, e.g. `js/file.js`. Called a path slug because it's similar to a URL slug, but as a "path" and for a package name instead of a URL (e.g. `@keychord/pkg/js/file.js`).
+- **Chords file:** A TOML file defining a set of chords.
+- **App Chords file:** A _chords file_ for a specific app (i.e. is only active when that app is focused).
+- **Raw Chords file:** The raw structure of a chords file, i.e. an unprocessed chords file that's only been passed to `toml::parse`
+- **Parsed Chords file:** A chords file that's been parsed and normalized, but the imports have not yet been resolved. A chords file can be parsed in isolation just via the contents.
+- **Compiled Chords file:** A chords file whose imports have been resolved and inlined. When compiling a chords file, the context of the containing package often needs to be provided (e.g. to resolve imports).

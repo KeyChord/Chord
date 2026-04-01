@@ -46,7 +46,7 @@ impl HandlerChordActionTaskRunner {
             .context("could not get package")?;
         let initiator_chords_file = package
             .raw_chords_files
-            .get(&task.initiator_file_relpath)
+            .get(&task.initiator_file_pathslug)
             .context("could not get chord file")?;
         let context_chords_file = serde_json::to_value(initiator_chords_file.clone())?;
 

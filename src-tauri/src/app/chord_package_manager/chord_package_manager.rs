@@ -107,11 +107,11 @@ impl ChordPackageManager {
             parsed_chords_files.insert(path, parsed_chords_file);
         }
 
-        for (path, parsed_chord_file) in &parsed_chords_files {
-            let chords_file = parsed_chord_file.compile(path.to_owned(), &parsed_chords_files)?;
+        for (pathslug, parsed_chord_file) in &parsed_chords_files {
+            let chords_file = parsed_chord_file.compile(pathslug.to_owned(), &parsed_chords_files)?;
             log::debug!(
                 "compiled chords file {:#?} with {} chords",
-                Path::new(&name).join(path),
+                Path::new(&name).join(pathslug),
                 chords_file.chords.len()
             );
 
@@ -122,13 +122,13 @@ impl ChordPackageManager {
                 if is_non_alphanumeric {
                     global_chords.push(ChordReference {
                         package_name: name.clone(),
-                        chords_file_path: path.clone(),
+                        chords_file_pathslug: pathslug.clone(),
                         chord: chord.clone(),
                     });
                 }
             }
 
-            compiled_chords_files.insert(path.to_owned(), chords_file);
+            compiled_chords_files.insert(pathslug.to_owned(), chords_file);
         }
 
         let js_package = self

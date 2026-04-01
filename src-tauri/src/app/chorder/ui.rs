@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
-use tauri_nspanel::{CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt};
+use tauri_nspanel::{CollectionBehavior, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
 const INDICATOR_WIDTH: u32 = 640;

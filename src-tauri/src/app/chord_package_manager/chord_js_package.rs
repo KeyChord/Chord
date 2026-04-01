@@ -1,7 +1,7 @@
+use crate::models::FilePathslug;
 use serde::Serialize;
 use std::collections::HashMap;
 use typeshare::typeshare;
-use crate::models::FilePathslug;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -16,7 +16,8 @@ impl ChordJsPackage {
     }
 
     pub fn resolve_import(&self, import_specifier: &str) -> Option<&String> {
-        self.exported_files.get(&FilePathslug::from(import_specifier))
+        self.exported_files
+            .get(&FilePathslug::from(import_specifier))
     }
 }
 
