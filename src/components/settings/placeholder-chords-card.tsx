@@ -1,4 +1,4 @@
-import type { PlaceholderChordInfo, DesktopAppMetadata } from '../../types/generated.ts';
+import type { DesktopAppMetadata } from '../../types/generated.ts';
 import { taurpc } from '#/api/taurpc.ts';
 import { AppIcon } from '#/components/settings/app-icon.tsx';
 import { Badge } from '#/components/ui/badge.tsx';

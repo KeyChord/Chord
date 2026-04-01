@@ -8,7 +8,7 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { taurpc } from '../../api/taurpc.ts';
+import { taurpc } from '#/api/taurpc.ts';
 
 export function LocalFoldersCard() {
 	const queryClient = useQueryClient();
@@ -62,12 +62,12 @@ export function LocalFoldersCard() {
 								<div className="space-y-2">
 									{folders.map(folder => (
 										<div
-											key={folder.path}
+											key={folder}
 											className="flex items-center justify-between gap-3 rounded-lg border bg-background/80 px-3 py-3"
 										>
 											<div className="min-w-0">
 												<p className="font-medium">Local Chord Folder</p>
-												<p className="truncate text-xs text-muted-foreground">{folder.path}</p>
+												<p className="truncate text-xs text-muted-foreground">{folder}</p>
 											</div>
 											<Badge variant="secondary">Local</Badge>
 										</div>

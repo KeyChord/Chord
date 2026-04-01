@@ -1,5 +1,4 @@
 import { Kbd } from '#/components/ui/kbd.tsx';
-import { useChordFile } from '#/utils/chord-files.ts';
 import { useChorderState, useChordPackageManagerState, useFrontmostState } from '#/utils/state.ts';
 import { cn } from '#/utils/style.ts';
 import { createFileRoute } from '@tanstack/react-router';

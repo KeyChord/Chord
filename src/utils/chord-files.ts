@@ -1,30 +1,9 @@
-import type { ChordPackage, PlaceholderChordInfo } from '#/types/generated.ts';
-import { useChordPackageManagerState } from './state.ts';
+import type { ChordPackage } from '#/types/generated.ts';
 
 interface RawChord {
 	index: number
 	name: string
 	shell?: string
-}
-
-export function useChordFile(bundleId: string | undefined): Record<string, RawChord> {
-	const chords = getGlobalChords(packages);
-
-  if (bundleId !== undefined) {
-    for (const pkg of packages) {
-      const chordsFile = pkg.appChordsFiles[bundleId];
-      if (chordsFile) {
-        for (const chord of chordsFile.chords) {
-          chords[chord.string_key] = chord
-        }
-        for (const hint of chordsFile.chordHints) {
-          chords[hint.pattern] = hint
-        }
-      }
-    }
-  }
-
-	return chords;
 }
 
 function getGlobalChords(packages: ChordPackage[]) {

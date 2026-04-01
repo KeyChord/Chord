@@ -95,12 +95,14 @@ export function ChordsTab() {
 									            <p className="font-medium">{pkg.name}</p>
 									        </div>
 									    </div>
-									    {pkg.chords && pkg.chords.length > 0 ? (
+									    {pkg.compiledChordsFiles && Object.values(pkg.compiledChordsFiles).length > 0 ? (
 									        <div className="ml-4 space-y-1">
-									            {pkg.chords.map((chord) => (
-									                <p key={chord} className="text-sm text-muted-foreground">
-									                    - {chord}
+									            {Object.values(pkg.compiledChordsFiles).flatMap((file) => (
+                                file.chords.map(chord =>
+									                <p key={chord.rawTrigger} className="text-sm text-muted-foreground">
+									                    - {chord.name}
 									                </p>
+                                )
 									            ))}
 									        </div>
 									    ) : (
