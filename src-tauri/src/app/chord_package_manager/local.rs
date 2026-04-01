@@ -208,6 +208,7 @@ impl LocalPackageRegistry {
     }
 }
 
+#[allow(dead_code)]
 fn is_supported_macos_chord_filename(path: &Path) -> bool {
     let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
         return false;

@@ -29,13 +29,13 @@ impl frontmost::app::FrontmostApp for FrontmostTracker {
 
 pub struct AppFrontmost {
     observable: FrontmostObservable,
-    handle: AppHandle,
+    _handle: AppHandle,
 }
 
 impl StateSingleton for AppFrontmost {
     fn new(handle: AppHandle) -> Self {
         Self {
-            handle,
+            _handle: handle,
             observable: FrontmostObservable::placeholder(),
         }
     }

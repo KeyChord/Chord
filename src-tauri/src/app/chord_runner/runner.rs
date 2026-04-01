@@ -66,6 +66,7 @@ impl ChordActionTaskRunner {
     }
 
     /// Called if the user explicitly presses `Esc` or reloads the config
+    #[allow(dead_code)]
     pub fn abort_task(&self, task_run: ChordActionTaskRun) -> anyhow::Result<()> {
         match task_run {
             ChordActionTaskRun::Handler(task_run) => self.handler.abort(task_run)?,

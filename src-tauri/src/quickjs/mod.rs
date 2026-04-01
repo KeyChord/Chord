@@ -279,6 +279,7 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
     Ok(out)
 }
 
+#[allow(dead_code)]
 pub async fn reset_js(handle: AppHandle) -> anyhow::Result<()> {
     JsWorker::global()
         .run(move |runtime| {

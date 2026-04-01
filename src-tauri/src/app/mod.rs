@@ -18,6 +18,7 @@ macro_rules! define_app_managed {
             $field:ident : $ty:ty => $getter:ident
         ),+ $(,)?
     ) => {
+        #[allow(dead_code)]
         pub struct AppManaged {
             $(
                 pub $field: $ty,
@@ -25,6 +26,7 @@ macro_rules! define_app_managed {
         }
 
         impl AppManaged {
+            #[allow(dead_code)]
             pub fn register<R: ::tauri::Runtime>(self, handle: &::tauri::AppHandle<R>) {
                 $(
                     let _ = ::tauri::Manager::manage(handle, self.$field);

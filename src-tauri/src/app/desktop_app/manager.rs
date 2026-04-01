@@ -212,6 +212,7 @@ fn unregister_app_terminate_handler(id: u64) {
     });
 }
 
+#[allow(dead_code)]
 pub fn clear_callbacks() {
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
         let mut callbacks = callbacks.borrow_mut();

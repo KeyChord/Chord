@@ -132,6 +132,7 @@ impl HandlerChordActionTaskRunner {
     }
 
     // TODO: implement deep aborting via AbortController
+    #[allow(dead_code)]
     pub fn abort(&self, task_run: HandlerChordActionTaskRun) -> Result<()> {
         task_run.join_handle.abort();
         Ok(())

@@ -42,6 +42,7 @@ impl ShellChordActionTaskRunner {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn abort(&self, task_run: ShellChordActionTaskRun) -> Result<()> {
         task_run.join_handle.abort();
         Ok(())

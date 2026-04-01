@@ -87,6 +87,7 @@ impl AppSettings {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn load_state(handle: &AppHandle) -> Result<AppSettingsState> {
         let defaults = AppSettingsState::default();
 
@@ -110,6 +111,7 @@ impl AppSettings {
         })
     }
 
+    #[allow(dead_code)]
     fn read_bool_setting(handle: &AppHandle, key: &str, default: bool) -> Result<bool> {
         let store = handle
             .store(APP_STATE_STORE_PATH)

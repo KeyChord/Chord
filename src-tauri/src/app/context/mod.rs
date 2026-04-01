@@ -15,7 +15,7 @@ pub struct AppContext {
 
     // Not a mutex since it uses Atomics
     app_mode_state_machine: Arc<AppModeStateMachine>,
-    handle: AppHandle,
+    _handle: AppHandle,
 }
 
 impl StateSingleton for AppContext {
@@ -29,7 +29,7 @@ impl StateSingleton for AppContext {
         let key_event_state = KeyEventState::new(app_mode_state_machine.clone());
 
         Self {
-            handle,
+            _handle: handle,
             key_event_state,
             app_mode_state_machine,
             device_state,

@@ -3,6 +3,7 @@ use crate::define_observable;
 use serde::Serialize;
 use typeshare::typeshare;
 
+#[allow(dead_code)]
 struct ChordPackageInfo {
     name: String,
 }

@@ -128,7 +128,7 @@ where
     value
 }
 
-fn singleton<T>(handle: &AppHandle, value: T) -> tauri::State<T>
+fn singleton<T>(handle: &AppHandle, value: T) -> tauri::State<'_, T>
 where
     T: Send + Sync + 'static,
 {

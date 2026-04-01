@@ -118,6 +118,7 @@ impl ShortcutChordActionTaskRunner {
     }
 
     // TODO
+    #[allow(dead_code)]
     pub fn abort(&self, _task_run: ShortcutChordActionTaskRun) -> Result<()> {
         Ok(())
     }

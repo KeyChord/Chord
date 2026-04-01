@@ -94,6 +94,7 @@ impl AppChorder {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn preload_ui(&self, ui: &ChorderIndicatorUi) -> Result<()> {
         log::debug!("Preloading chorder panel");
 
@@ -107,7 +108,7 @@ impl AppChorder {
 
     pub fn ensure_active(&self) -> Result<()> {
         if self.ui.ensure_visible()? {
-            self.prepare_surface_before_reveal();
+            let _ = self.prepare_surface_before_reveal();
             self.ui.reveal()?;
             self.emit_visibility_changed(true)?;
         }

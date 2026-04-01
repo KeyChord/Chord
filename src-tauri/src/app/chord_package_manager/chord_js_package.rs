@@ -22,6 +22,7 @@ impl ChordJsPackage {
 #[derive(Debug)]
 pub struct PackageSpecifier<'a> {
     pub package: &'a str,
+    #[allow(dead_code)]
     pub subpath: Option<&'a str>,
 }
 
