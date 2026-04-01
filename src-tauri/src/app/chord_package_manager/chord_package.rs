@@ -4,7 +4,7 @@ use crate::models::{
     Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile,
     FilePathslug, HandlerChordAction, RawChordsFile,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -136,7 +136,21 @@ impl ChordPackage {
                     }
                     ChordTrigger::Keys(_keys) => emit.args.clone(),
                 };
+
                 if let Some(handler) = handler {
+                    let mut build_args = Vec::new();
+                    for arg in handler.args {
+                        if let Some(arg) = arg.as_str() {
+                            if arg.starts_with('$') {
+                                let meta_value = chords_file.meta.get(arg).context("missing arg")?;
+                                build_args.push(meta_value.clone());
+                                continue;
+                            }
+                        }
+
+                        build_args.push(arg);
+                    }
+                    let build_args = .iter().map(|arg| )
                     Some(ChordActionTask {
                         package_name: chord_reference.package_name,
                         initiator_file_pathslug: chord_reference.chords_file_pathslug,

@@ -22,7 +22,7 @@ pub struct ParsedChordsFile {
     pub name: String,
 
     // User-defined metadata. Can be anything
-    pub meta: HashMap<String, String>,
+    pub meta: HashMap<String, TomlValue>,
 
     // We use a Vec because we need to encode priority
     pub handlers: HashMap<String, ChordsFileHandler>,
@@ -46,7 +46,7 @@ pub struct ParsedChordsFile {
 pub struct CompiledChordsFile {
     pub name: String,
     pub pathslug: FilePathslug,
-    pub meta: HashMap<String, String>,
+    pub meta: HashMap<String, TomlValue>,
     pub handlers: Vec<CompiledChordsFileHandler>,
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
@@ -58,7 +58,7 @@ pub struct CompiledChordsFile {
 pub struct RawChordsFile {
     pub name: String,
     #[serde(default)]
-    pub meta: HashMap<String, String>,
+    pub meta: HashMap<String, TomlValue>,
     #[serde(default)]
     pub handlers: HashMap<String, ChordsFileHandler>,
     #[serde(default)]
@@ -97,16 +97,12 @@ pub struct ChordsFileImport {
 }
 
 impl ParsedChordsFile {
-    fn parse_meta(table: &Table) -> Result<HashMap<String, String>> {
+    fn parse_meta(table: &Table) -> Result<HashMap<String, TomlValue>> {
         let mut meta = HashMap::new();
         if let Some(meta_val) = table.get("meta") {
             if let Some(t) = meta_val.as_table() {
                 for (k, v) in t {
-                    let v_str = match v {
-                        toml::Value::String(s) => s.clone(),
-                        _ => v.to_string().trim_matches('"').to_string(),
-                    };
-                    meta.insert(k.clone(), v_str);
+                    meta.insert(k.clone(), v.clone());
                 }
             }
         };
@@ -275,7 +271,7 @@ impl ParsedChordsFile {
             let imported_file_path = Path::new("chords").join(&import.file);
             let imported_file = parsed_chords_files
                 .get(&imported_file_path)
-                .context("import file not found")?;
+                .context(format!("import file {:?} not found", imported_file_path))?;
             log::debug!(
                 "resolved import file {:?} from path {:?}",
                 imported_file.name,
