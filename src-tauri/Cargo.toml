@@ -60,6 +60,7 @@ clap = { version = "4.5.60", features = [ "derive" ] }
 keycode = "1"
 device_query = "4"
 walkdir = "2.5.0"
+dirs = "5"
 gix = { version = "0.80.0", features = [ "blocking-http-transport-reqwest-rust-tls" ] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
 rquickjs = { version = "0.11.0", features = [ "full-async" ] }

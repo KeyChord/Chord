@@ -4,6 +4,7 @@ mod chord_js_package;
 pub use chord_js_package::*;
 mod chord_package_manager;
 pub use chord_package_manager::*;
+pub mod config;
 pub mod git;
 pub mod local;
 pub mod registry;
