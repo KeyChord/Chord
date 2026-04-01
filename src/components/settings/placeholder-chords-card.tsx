@@ -11,7 +11,7 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { Input } from '#/components/ui/input.tsx';
-import { useChordPackageManagerState, useDesktopAppManagerState } from '#/utils/state.ts';
+import { useDesktopAppManagerState } from '#/utils/state.ts';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 

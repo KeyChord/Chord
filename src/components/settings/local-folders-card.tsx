@@ -1,3 +1,4 @@
+import { taurpc } from '#/api/taurpc.ts';
 import { Badge } from '#/components/ui/badge.tsx';
 import { Button } from '#/components/ui/button.tsx';
 import {
@@ -8,7 +9,6 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { taurpc } from '#/api/taurpc.ts';
 
 export function LocalFoldersCard() {
 	const queryClient = useQueryClient();

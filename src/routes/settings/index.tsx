@@ -26,7 +26,7 @@ function Settings() {
 	});
 	const shouldShowOnboarding
 		= startupStatusQuery.data?.shouldShowOnboarding === true && !dismissedOnboarding;
-    console.log(useChordPackageManagerState())
+	console.log(useChordPackageManagerState());
 
 	return (
 		<>

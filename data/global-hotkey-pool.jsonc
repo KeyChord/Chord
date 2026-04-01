@@ -15,7 +15,7 @@
 	{ "key": "m", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },
 	{ "key": "n", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },
 	{ "key": "o", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },
-//{ "key": "p", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } }, -- used by Accessibility Inspector
+	// { "key": "p", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } }, -- used by Accessibility Inspector
 	{ "key": "q", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },
 	{ "key": "r", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },
 	{ "key": "s", "mod": { "m": 1, "c": 1, "a": 1, "s": 1 } },

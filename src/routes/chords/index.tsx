@@ -1,3 +1,4 @@
+import type { Chord, ChordHint, ChordReference } from '../../types/generated.ts';
 import { Kbd } from '#/components/ui/kbd.tsx';
 import { useChorderState, useChordPackageManagerState, useFrontmostState } from '#/utils/state.ts';
 import { cn } from '#/utils/style.ts';
@@ -5,8 +6,6 @@ import { createFileRoute } from '@tanstack/react-router';
 import { emit, listen } from '@tauri-apps/api/event';
 import getPrettyKey from 'pretty-key';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Chord, ChordHint, ChordReference } from '../../types/generated.ts';
-import path from 'pathe'
 
 export const Route = createFileRoute('/chords/')({
 	component: Chords,
@@ -154,7 +153,7 @@ function ChordKeyRow({
 	descriptionFontSize,
 }: {
 	token: string
-	description?: string,
+	description?: string
 	isSelected?: boolean
 	isDimmed?: boolean
 	keySize: number
@@ -191,7 +190,7 @@ function ChordKeyRow({
 export function Chords() {
 	const state = useChorderState();
 	const { frontmostAppBundleId } = useFrontmostState();
-  const { packages } = useChordPackageManagerState();
+	const { packages } = useChordPackageManagerState();
 
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
@@ -320,33 +319,33 @@ export function Chords() {
 
 	const activeAppChords: Chord[] = [];
 	const hintsByRawPattern: Record<string, ChordHint> = {};
-  const globalChords: ChordReference[] = []
+	const globalChords: ChordReference[] = [];
 
 	for (const chordPackage of packages) {
-    globalChords.push(...chordPackage.globalChords);
+		globalChords.push(...chordPackage.globalChords);
 
-    for (const [relpath, file] of Object.entries(chordPackage.compiledChordsFiles)) {
-      const bundleId = relpath.split('/').slice(1, -1).join('.')
-      for (const hint of file.chordHints) {
-        // bad check for global
-        if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
-          hintsByRawPattern[hint.rawPattern] = hint
-        }
-      }
+		for (const [relpath, file] of Object.entries(chordPackage.compiledChordsFiles)) {
+			const bundleId = relpath.split('/').slice(1, -1).join('.');
+			for (const hint of file.chordHints) {
+				// bad check for global
+				if (hint.rawPattern[0]?.toUpperCase() === hint.rawPattern[0]) {
+					hintsByRawPattern[hint.rawPattern] = hint;
+				}
+			}
 
-      if (bundleId === frontmostAppBundleId) {
-        for (const hint of file.chordHints) {
-          hintsByRawPattern[hint.rawPattern] = hint;
-        }
+			if (bundleId === frontmostAppBundleId) {
+				for (const hint of file.chordHints) {
+					hintsByRawPattern[hint.rawPattern] = hint;
+				}
 
-        for (const chord of file.chords) {
-          activeAppChords.push(chord)
-        }
-      }
-    }
+				for (const chord of file.chords) {
+					activeAppChords.push(chord);
+				}
+			}
+		}
 	}
 
-  const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)]
+	const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)];
 
 	const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
 	const normalizedActiveChordTokens = state.activeChordKeys?.map(normalizeToken) ?? [];
@@ -379,7 +378,7 @@ export function Chords() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
-      const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : []
+			const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : [];
 
 			const matchingChords = activeChords.filter(chord =>
 				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
@@ -391,7 +390,7 @@ export function Chords() {
 			);
 
 			const rows = sortTokens(activeTokens).map((token) => {
-				const sequenceKey = [...prefixTokens, token].join('').toLowerCase()
+				const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
 				const exactChord = matchingChords.find(
 					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 				);

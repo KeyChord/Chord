@@ -1,3 +1,4 @@
+import type { Chord, ChordPackage } from '#/types/generated.ts';
 import { Badge } from '#/components/ui/badge.tsx';
 import {
 	Card,
@@ -7,11 +8,9 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import { Input } from '#/components/ui/input.tsx';
-import { useState, useMemo } from 'react';
-import { useChordPackageManagerState } from '../../utils/state.ts';
-import { useDesktopAppManagerState } from '../../utils/state.ts';
+import { useMemo, useState } from 'react';
+import { useChordPackageManagerState, useDesktopAppManagerState } from '../../utils/state.ts';
 import { ActiveChordTree } from './active-chords-tree.tsx';
-import type { ChordPackage, RawChordsFile, Chord, DesktopAppMetadata } from '#/types/generated.ts';
 
 // Helper function to normalize strings for case-insensitive comparison
 const normalizeString = (str: string): string => str.trim().toLowerCase();
@@ -25,23 +24,23 @@ export function ActiveChordsTab() {
 
 	// Derive activeChords state from packages and searchInput
 	const activeChords = useMemo(() => {
-		let filteredActiveChords: any[] = []; // Placeholder type, ideally use a specific type
+		const filteredActiveChords: any[] = []; // Placeholder type, ideally use a specific type
 		let chordGroups: any[] = []; // Placeholder type
 
 		packages.forEach((pkg: ChordPackage) => {
 			// Process global chords
 			pkg.globalChords.forEach(({ chord }) => {
-				const matchesFilter =
-					normalizeString(chord.name).includes(normalizedFilter) ||
-					normalizeString(chord.rawTrigger).includes(normalizedFilter) ||
-					chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
+				const matchesFilter
+					= normalizeString(chord.name).includes(normalizedFilter)
+						|| normalizeString(chord.rawTrigger).includes(normalizedFilter)
+						|| chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
 
 				if (matchesFilter) {
 					filteredActiveChords.push({
 						pkgName: pkg.name,
 						scope: 'global',
 						scopeKind: 'global',
-						chord: chord,
+						chord,
 					});
 				}
 			});
@@ -52,18 +51,18 @@ export function ActiveChordsTab() {
 				const appLabel = appMetadata?.displayName?.trim() || appBundleId;
 
 				chordsFile.chords.forEach((chord: Chord) => {
-					const matchesFilter =
-						normalizeString(chord.name).includes(normalizedFilter) ||
-						normalizeString(chord.rawTrigger).includes(normalizedFilter) ||
-						normalizeString(appLabel).includes(normalizedFilter) ||
-						chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
+					const matchesFilter
+						= normalizeString(chord.name).includes(normalizedFilter)
+							|| normalizeString(chord.rawTrigger).includes(normalizedFilter)
+							|| normalizeString(appLabel).includes(normalizedFilter)
+							|| chord.actions.some(action => normalizeString(JSON.stringify(action)).includes(normalizedFilter)); // Basic check for actions
 
 					if (matchesFilter) {
 						filteredActiveChords.push({
 							pkgName: pkg.name,
 							scope: appBundleId,
 							scopeKind: 'app',
-							chord: chord,
+							chord,
 						});
 					}
 				});
@@ -80,9 +79,8 @@ export function ActiveChordsTab() {
 				pkgName: item.pkgName,
 				scope: item.scope,
 				scopeKind: item.scopeKind,
-			}))
+			})),
 		}];
-
 
 		return {
 			filteredActiveChords,
@@ -120,12 +118,14 @@ export function ActiveChordsTab() {
 				</div>
 
 				{packages.length === 0 ? ( // Check if packages are loaded
-          <p className="text-sm text-muted-foreground">No chord packages are currently loaded.</p>
-        ) : activeChords.filteredActiveChords.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No chords match that filter.</p>
-        ) : (
-          <ActiveChordTree />
-        )}
+					<p className="text-sm text-muted-foreground">No chord packages are currently loaded.</p>
+				) : activeChords.filteredActiveChords.length === 0
+					? (
+							<p className="text-sm text-muted-foreground">No chords match that filter.</p>
+						)
+					: (
+							<ActiveChordTree />
+						)}
 			</CardContent>
 		</Card>
 	);

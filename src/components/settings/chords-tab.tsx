@@ -9,6 +9,11 @@ import {
 	CardTitle,
 } from '#/components/ui/card.tsx';
 import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '#/components/ui/collapsible.tsx';
+import {
 	Empty,
 	EmptyDescription,
 	EmptyHeader,
@@ -16,7 +21,7 @@ import {
 	EmptyTitle,
 } from '#/components/ui/empty.tsx';
 import { useMutation } from '@tanstack/react-query';
-import { FolderPlus, Package } from 'lucide-react';
+import { ChevronDownIcon, FolderPlus, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { useChordPackageManagerState } from '../../utils/state.ts';
 
@@ -89,28 +94,39 @@ export function ChordsTab() {
 					: (
 							<div className="space-y-2">
 								{packages.map(pkg => (
-									<div key={pkg.name} className="rounded-lg border bg-background/80 px-3 py-3">
-									    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
-									        <div className="min-w-0">
-									            <p className="font-medium">{pkg.name}</p>
-									        </div>
-									    </div>
-									    {pkg.compiledChordsFiles && Object.values(pkg.compiledChordsFiles).length > 0 ? (
-									        <div className="ml-4 space-y-1">
-									            {Object.values(pkg.compiledChordsFiles).flatMap((file) => (
-                                file.chords.map(chord =>
-									                <p key={chord.rawTrigger} className="text-sm text-muted-foreground">
-									                    - {chord.name}
-									                </p>
-                                )
-									            ))}
-									        </div>
-									    ) : (
-									        <div className="ml-4">
-									            <p className="text-sm text-muted-foreground italic">No chords loaded for this package.</p>
-									        </div>
-									    )}
-									</div>								))}
+									<Collapsible key={pkg.name} className="group/collapsible rounded-lg border bg-background/80 overflow-hidden">
+										<CollapsibleTrigger asChild>
+											<Button
+												variant="ghost"
+												className="flex w-full items-center justify-between rounded-none border-0 p-3 h-auto hover:bg-muted/50"
+											>
+												<span className="font-medium">{pkg.name}</span>
+												<ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+											</Button>
+										</CollapsibleTrigger>
+										<CollapsibleContent className="px-3 pb-3">
+											{pkg.compiledChordsFiles && Object.values(pkg.compiledChordsFiles).length > 0
+												? (
+														<div className="ml-4 space-y-1">
+															{Object.values(pkg.compiledChordsFiles).flatMap(file => (
+																file.chords.map(chord => (
+																	<p key={chord.rawTrigger} className="text-sm text-muted-foreground">
+																		-
+																		{' '}
+																		{chord.name}
+																	</p>
+																))
+															))}
+														</div>
+													)
+												: (
+														<div className="ml-4">
+															<p className="text-sm text-muted-foreground italic">No chords loaded for this package.</p>
+														</div>
+													)}
+										</CollapsibleContent>
+									</Collapsible>
+								))}
 							</div>
 						)}
 			</CardContent>

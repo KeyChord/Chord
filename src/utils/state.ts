@@ -7,10 +7,10 @@ import type {
 	FrontmostState,
 	GitReposState,
 } from '#/types/generated.ts';
+import { taurpc } from '#/api/taurpc.ts';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
 import renameFunction from 'rename-fn';
-import { taurpc } from '#/api/taurpc.ts';
 
 async function createUseTauriState<T>(stateId: string) {
 	const initialStates = JSON.parse(await taurpc.getCurrentStates());

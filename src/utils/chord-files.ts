@@ -8,9 +8,9 @@ interface RawChord {
 
 function getGlobalChords(packages: ChordPackage[]) {
 	const globalChords: Record<string, RawChord> = {};
-  for (const pkg of packages) {
-    Object.assign(globalChords, pkg.globalChords);
-  }
+	for (const pkg of packages) {
+		Object.assign(globalChords, pkg.globalChords);
+	}
 
 	return globalChords;
 }

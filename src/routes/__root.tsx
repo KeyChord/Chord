@@ -9,7 +9,7 @@ export const Route = createRootRoute({
 });
 
 function getMutationErrorMessage(error: unknown) {
-  console.error(error);
+	console.error(error);
 
 	if (typeof error === 'string' && error.trim()) {
 		return error;
