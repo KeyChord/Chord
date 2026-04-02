@@ -7,7 +7,6 @@ use tauri_plugin_store::{Store, StoreExt};
 use crate::observables::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use typeshare::typeshare;
 
-#[typeshare]
 #[derive(Clone)]
 pub struct ChordPackageStore {
     handle: AppHandle,

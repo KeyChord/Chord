@@ -4,7 +4,6 @@
 		"jsx": "react-jsx",
 		"lib": ["ES2024", "DOM", "DOM.Iterable"],
 		"useDefineForClassFields": true,
-		"baseUrl": ".",
 		"module": "ESNext",
 
 		/* Bundler mode */

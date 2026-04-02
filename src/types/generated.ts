@@ -122,11 +122,6 @@ export interface ChordPackageManagerState {
 	packages: ChordPackage[];
 }
 
-export interface ChordPackageStore {
-	handle: AppHandle;
-	observable: ChordPackageStoreObservable;
-}
-
 export interface ChordPackageStoreEntry {
 	priority: number;
 }
