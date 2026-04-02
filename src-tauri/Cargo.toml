@@ -45,7 +45,7 @@ tauri-plugin-macos-permissions = "2.3.0"
 tauri-plugin-single-instance = "2.4.0"
 tauri-plugin-log = "2"
 log = "*"
-rdev = { version = "*", features = [
+rdev = { git = "https://github.com/KeyChord/rdev", features = [
 	"unstable_grab",
 	"x11"
 ] }
@@ -80,6 +80,7 @@ thiserror = "2.0.18"
 inventory = "0.3.22"
 arc-swap = "1.9"
 ordermap = "1.1.0"
+frontmost = { git = "https://github.com/KeyChord/frontmost" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
@@ -87,7 +88,6 @@ objc2 = "0.6.2"
 objc2-app-kit = { version = "0.3.1", features = [ "block2" ] }
 objc2-foundation = { version = "0.3.1", features = [ "block2" ] }
 macos-accessibility-client = "0.0.2"
-frontmost = "1.1.0"
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1", version = "2.1.0" }
 raw-window-handle = "0.6"
 window-vibrancy = "0.7"
@@ -95,7 +95,3 @@ osakit = "0.3.1"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.5.1"
-
-[patch.crates-io]
-rdev = { path = "./crates/rdev" }
-frontmost = { path = "./crates/frontmost" }
