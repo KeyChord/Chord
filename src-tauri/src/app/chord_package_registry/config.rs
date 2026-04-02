@@ -1,5 +1,6 @@
-use crate::app::chord_package_manager::local::LocalPackageRegistry;
+use crate::app::chord_package_registry::LocalPackageRegistry;
 use crate::models::RawChordPackage;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -10,8 +11,8 @@ impl ConfigPackageRegistry {
         Self
     }
 
-    pub fn import_all_packages(&self) -> anyhow::Result<Vec<RawChordPackage>> {
-        let mut packages = Vec::new();
+    pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
+        let mut packages = HashMap::new();
 
         let Some(packages_dir) = self.get_packages_dir() else {
             return Ok(packages);
@@ -29,14 +30,15 @@ impl ConfigPackageRegistry {
                 continue;
             }
 
-            match LocalPackageRegistry::import_from_local_folder(&path) {
-                Ok(package) => packages.push(package),
-                Err(error) => {
+            if let Ok(package) =
+                LocalPackageRegistry::import_from_local_folder(&path).inspect_err(|error| {
                     log::warn!(
                         "Error importing config package {}: {error}, skipping",
                         path.display()
                     );
-                }
+                })
+            {
+                packages.insert(package.package_name(), package);
             }
         }
 

@@ -866,8 +866,10 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "observable-property",
+ "ordermap",
  "osakit",
  "parking_lot",
+ "priority-queue",
  "raw-window-handle",
  "rdev",
  "regex",
@@ -5530,6 +5532,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordermap"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cfa78c92071bbd3628c22b1a964f7e0eb201dc1456555db072beb1662ecd6715"
+dependencies = [
+ "indexmap 2.13.0",
+]
+
+[[package]]
 name = "osakit"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6080,6 +6091,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "569d9ad6ef822bb0322c7e7d84e5e286244050bd5246cac4c013535ae91c2c90"
 dependencies = [
  "elliptic-curve",
+]
+
+[[package]]
+name = "priority-queue"
+version = "2.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93980406f12d9f8140ed5abe7155acb10bb1e69ea55c88960b9c2f117445ef96"
+dependencies = [
+ "equivalent",
+ "indexmap 2.13.0",
+ "serde",
 ]
 
 [[package]]

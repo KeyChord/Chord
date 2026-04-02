@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use tauri::AppHandle;
 mod chord_package_manager;
 pub use chord_package_manager::*;
+mod chord_package_registry;
+pub use chord_package_registry::*;
 mod chorder;
 pub use chorder::*;
 mod desktop_app_manager;

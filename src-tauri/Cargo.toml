@@ -84,6 +84,8 @@ taurpc = "0.7.1"
 thiserror = "2.0.18"
 inventory = "0.3.22"
 arc-swap = "1.9"
+priority-queue = "2.7.0"
+ordermap = "1.1.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

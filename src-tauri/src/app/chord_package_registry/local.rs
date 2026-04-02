@@ -83,18 +83,17 @@ impl LocalPackageRegistry {
         Ok(package)
     }
 
-    pub fn import_all_packages(&self) -> anyhow::Result<Vec<RawChordPackage>> {
-        let mut packages = Vec::new();
+    pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
+        let mut packages = HashMap::new();
 
         for local_package_path in self.list_package_paths()? {
-            match Self::import_from_local_folder(local_package_path.as_path()) {
-                Ok(package) => packages.push(package),
-                Err(error) => {
-                    log::warn!(
-                        "Error importing local folder {}: {error}, skipping",
+            if let Ok(package) = Self::import_from_local_folder(local_package_path.as_path()).inspect_err(|e| {
+                log::warn!(
+                        "Error importing local folder {}: {e}, skipping",
                         local_package_path.display()
                     );
-                }
+            }) {
+                packages.insert(package.package_name(), package);
             }
         }
 

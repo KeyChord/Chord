@@ -1,19 +1,21 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::app::chord_package_manager::registry::ChordPackageRegistry;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
+use crate::app::chord_package_registry::ChordPackageRegistry;
 use crate::app::state::StateSingleton;
 use crate::models::{ChordInput, ParsedChordsFile, RawChordPackage, RawChordsFile};
 use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use llrt_core::Module;
+use ordermap::OrderMap;
 use parking_lot::RwLock;
 use tauri::AppHandle;
 
 pub struct ChordPackageManager {
-    packages: RwLock<HashMap<String, ChordPackage>>,
+    // Packages is a OrderMap because we want to let the user prioritize certain packages
+    packages: RwLock<OrderMap<String, ChordPackage>>,
     pub registry: ChordPackageRegistry,
 
     observable: ChordPackageManagerObservable,
@@ -23,7 +25,7 @@ pub struct ChordPackageManager {
 impl StateSingleton for ChordPackageManager {
     fn new(handle: AppHandle) -> Self {
         Self {
-            packages: RwLock::new(HashMap::new()),
+            packages: RwLock::new(OrderMap::new()),
             registry: ChordPackageRegistry::new(handle.clone()),
             observable: ChordPackageManagerObservable::placeholder(),
             handle,
@@ -42,23 +44,22 @@ impl ChordPackageManager {
         self.packages.write().clear();
 
         let mut chord_packages = Vec::new();
-        for raw_chord_package in raw_chord_packages {
-            let package_name = self
-                .get_package_name(&raw_chord_package)
-                .unwrap_or(raw_chord_package.dirname.clone());
-            match self.load_package(raw_chord_package).await {
-                Ok(package) => {
-                    chord_packages.push(package);
-                }
-                Err(e) => {
+        for (package_name, raw_chord_package) in raw_chord_packages {
+            if let Ok(package) = self
+                .load_package(raw_chord_package)
+                .await
+                .inspect_err(|error| {
                     log::error!(
                         "skipping package {} because of loading error: {:?}",
                         package_name,
-                        e
+                        error
                     )
-                }
+                })
+            {
+                chord_packages.push(package);
             };
         }
+
         self.observable.set_state(ChordPackageManagerState {
             packages: chord_packages,
         })?;
@@ -71,7 +72,7 @@ impl ChordPackageManager {
     }
 
     pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
-        let name = self.get_package_name(&raw_chord_package)?;
+        let name = raw_chord_package.package_name();
         log::debug!("loading package {}", name);
 
         let mut raw_chords_files = HashMap::new();
@@ -217,29 +218,6 @@ impl ChordPackageManager {
         }
 
         Ok(Some(ChordJsPackage::new(exported_files)))
-    }
-
-    fn get_package_name_from_package_json(
-        &self,
-        raw_chord_package: &RawChordPackage,
-    ) -> anyhow::Result<Option<String>> {
-        if let Some(package_json_contents) = &raw_chord_package.package_json_contents {
-            let json: serde_json::Value = serde_json::from_str(package_json_contents)?;
-            Ok(json
-                .get("name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn get_package_name(&self, raw_chord_package: &RawChordPackage) -> Result<String> {
-        if let Some(name) = self.get_package_name_from_package_json(raw_chord_package)? {
-            Ok(name)
-        } else {
-            Ok(raw_chord_package.dirname.clone())
-        }
     }
 
     pub fn resolve_package_for_input(&self, input: &ChordInput) -> Option<ChordPackage> {

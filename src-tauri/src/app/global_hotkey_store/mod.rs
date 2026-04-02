@@ -60,7 +60,7 @@ impl GlobalHotkeyStore {
     }
 
     pub fn set(&self, shortcut: &str, entry: GlobalHotkeyStoreEntry) -> Result<()> {
-        let value = serde_json::to_value(entry).unwrap();
+        let value = serde_json::to_value(entry)?;
         self.store()?.set(shortcut, value);
         self.save()?;
         Ok(())
