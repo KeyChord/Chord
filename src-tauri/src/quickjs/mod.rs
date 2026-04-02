@@ -96,13 +96,11 @@ impl<'js> Trace<'js> for AppUserData {
 }
 
 #[derive(Debug, Default)]
-struct ModuleResolver {
-    llrt_resolver: llrt_modules::module::resolver::ModuleResolver,
-}
+struct ModuleResolver {}
 
 impl ModuleResolver {
-    pub fn new(llrt_resolver: llrt_modules::module::resolver::ModuleResolver) -> Self {
-        Self { llrt_resolver }
+    pub fn new() -> Self {
+      Self {}
     }
 }
 
@@ -143,33 +141,29 @@ impl Resolver for ModuleResolver {
             }
         }
 
-        self.llrt_resolver
-            .resolve(ctx, base_module_specifier, import_specifier)
-            .inspect_err(|e| log::error!("failed to resolve module: {:?}", e))
+        Err(rquickjs::Error::new_resolving(base_module_specifier, import_specifier))
     }
 }
 
 #[derive(Debug, Default)]
-struct ModuleLoader {
-    llrt_loader: llrt_modules::module::loader::ModuleLoader,
-}
+struct ModuleLoader {}
 
 impl ModuleLoader {
-    pub fn new(llrt_loader: llrt_modules::module::loader::ModuleLoader) -> Self {
-        Self { llrt_loader }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    fn get_module<'js>(
+    fn load_module<'js>(
         &self,
         ctx: &Ctx<'js>,
         name: &str,
-    ) -> rquickjs::Result<Option<Module<'js, Declared>>> {
+    ) -> rquickjs::Result<Module<'js, Declared>> {
         let module = match name {
-            "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
-            _ => return Ok(None),
+            "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord")?,
+            _ => return Err(rquickjs::Error::new_loading_message("chord", "unable to load"))
         };
 
-        Some(module).transpose()
+        Ok(module)
     }
 }
 
@@ -200,14 +194,8 @@ fn with_module_load_context(name: &str, error: Error) -> Error {
 
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
-        let module = self.get_module(ctx, name)?;
-        Ok(match module {
-            Some(module) => module,
-            None => self
-                .llrt_loader
-                .load(ctx, name)
-                .map_err(|error| with_module_load_context(name, error))?,
-        })
+        let module = self.load_module(ctx, name)?;
+        Ok(module)
     }
 }
 
@@ -217,17 +205,19 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
         .with_global(llrt_core::modules::embedded::init)
         .with_global(llrt_core::builtins_inspect::init);
     let (llrt_module_resolver, llrt_module_loader, global_attachment) = module_builder.build();
-    let module_resolver = ModuleResolver::new(llrt_module_resolver);
+    let chord_module_resolver = ModuleResolver::new();
     let resolver = (
-        module_resolver,
+        chord_module_resolver,
+        llrt_module_resolver,
         llrt_core::modules::embedded::resolver::EmbeddedResolver,
-        llrt_core::modules::package::resolver::PackageResolver,
+        // llrt_core::modules::package::resolver::PackageResolver,
     );
-    let module_loader = ModuleLoader::new(llrt_module_loader);
+    let chord_module_loader = ModuleLoader::new();
     let loader = (
-        module_loader,
+        chord_module_loader,
+        llrt_module_loader,
         llrt_core::modules::embedded::loader::EmbeddedLoader,
-        llrt_core::modules::package::loader::PackageLoader,
+        // llrt_core::modules::package::loader::PackageLoader,
     );
 
     rt.set_loader(resolver, loader).await;
