@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as ChordsIndexRouteImport } from './routes/chords/index'
@@ -19,15 +20,20 @@ import { Route as SettingsConfigureIndexRouteImport } from './routes/settings/co
 import { Route as SettingsChordsIndexRouteImport } from './routes/settings/chords/index'
 import { Route as SettingsBrowseIndexRouteImport } from './routes/settings/browse/index'
 
+const SettingsRouteRoute = SettingsRouteRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const ChordsIndexRoute = ChordsIndexRouteImport.update({
   id: '/chords/',
@@ -36,38 +42,39 @@ const ChordsIndexRoute = ChordsIndexRouteImport.update({
 } as any)
 const SettingsGlobalShortcutsIndexRoute =
   SettingsGlobalShortcutsIndexRouteImport.update({
-    id: '/settings/global-shortcuts/',
-    path: '/settings/global-shortcuts/',
-    getParentRoute: () => rootRouteImport,
+    id: '/global-shortcuts/',
+    path: '/global-shortcuts/',
+    getParentRoute: () => SettingsRouteRoute,
   } as any)
 const SettingsGeneralIndexRoute = SettingsGeneralIndexRouteImport.update({
-  id: '/settings/general/',
-  path: '/settings/general/',
-  getParentRoute: () => rootRouteImport,
+  id: '/general/',
+  path: '/general/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsDangerIndexRoute = SettingsDangerIndexRouteImport.update({
-  id: '/settings/danger/',
-  path: '/settings/danger/',
-  getParentRoute: () => rootRouteImport,
+  id: '/danger/',
+  path: '/danger/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsConfigureIndexRoute = SettingsConfigureIndexRouteImport.update({
-  id: '/settings/configure/',
-  path: '/settings/configure/',
-  getParentRoute: () => rootRouteImport,
+  id: '/configure/',
+  path: '/configure/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsChordsIndexRoute = SettingsChordsIndexRouteImport.update({
-  id: '/settings/chords/',
-  path: '/settings/chords/',
-  getParentRoute: () => rootRouteImport,
+  id: '/chords/',
+  path: '/chords/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsBrowseIndexRoute = SettingsBrowseIndexRouteImport.update({
-  id: '/settings/browse/',
-  path: '/settings/browse/',
-  getParentRoute: () => rootRouteImport,
+  id: '/browse/',
+  path: '/browse/',
+  getParentRoute: () => SettingsRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRouteRouteWithChildren
   '/chords/': typeof ChordsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/settings': typeof SettingsRouteRouteWithChildren
   '/chords/': typeof ChordsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
@@ -104,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/settings'
     | '/chords/'
     | '/settings/'
     | '/settings/browse/'
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/settings'
     | '/chords/'
     | '/settings/'
     | '/settings/browse/'
@@ -138,18 +148,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   ChordsIndexRoute: typeof ChordsIndexRoute
-  SettingsIndexRoute: typeof SettingsIndexRoute
-  SettingsBrowseIndexRoute: typeof SettingsBrowseIndexRoute
-  SettingsChordsIndexRoute: typeof SettingsChordsIndexRoute
-  SettingsConfigureIndexRoute: typeof SettingsConfigureIndexRoute
-  SettingsDangerIndexRoute: typeof SettingsDangerIndexRoute
-  SettingsGeneralIndexRoute: typeof SettingsGeneralIndexRoute
-  SettingsGlobalShortcutsIndexRoute: typeof SettingsGlobalShortcutsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -159,10 +170,10 @@ declare module '@tanstack/react-router' {
     }
     '/settings/': {
       id: '/settings/'
-      path: '/settings'
+      path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/chords/': {
       id: '/chords/'
@@ -173,52 +184,60 @@ declare module '@tanstack/react-router' {
     }
     '/settings/global-shortcuts/': {
       id: '/settings/global-shortcuts/'
-      path: '/settings/global-shortcuts'
+      path: '/global-shortcuts'
       fullPath: '/settings/global-shortcuts/'
       preLoaderRoute: typeof SettingsGlobalShortcutsIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/general/': {
       id: '/settings/general/'
-      path: '/settings/general'
+      path: '/general'
       fullPath: '/settings/general/'
       preLoaderRoute: typeof SettingsGeneralIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/danger/': {
       id: '/settings/danger/'
-      path: '/settings/danger'
+      path: '/danger'
       fullPath: '/settings/danger/'
       preLoaderRoute: typeof SettingsDangerIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/configure/': {
       id: '/settings/configure/'
-      path: '/settings/configure'
+      path: '/configure'
       fullPath: '/settings/configure/'
       preLoaderRoute: typeof SettingsConfigureIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/chords/': {
       id: '/settings/chords/'
-      path: '/settings/chords'
+      path: '/chords'
       fullPath: '/settings/chords/'
       preLoaderRoute: typeof SettingsChordsIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
     '/settings/browse/': {
       id: '/settings/browse/'
-      path: '/settings/browse'
+      path: '/browse'
       fullPath: '/settings/browse/'
       preLoaderRoute: typeof SettingsBrowseIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof SettingsRouteRoute
     }
   }
 }
 
-const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ChordsIndexRoute: ChordsIndexRoute,
+interface SettingsRouteRouteChildren {
+  SettingsIndexRoute: typeof SettingsIndexRoute
+  SettingsBrowseIndexRoute: typeof SettingsBrowseIndexRoute
+  SettingsChordsIndexRoute: typeof SettingsChordsIndexRoute
+  SettingsConfigureIndexRoute: typeof SettingsConfigureIndexRoute
+  SettingsDangerIndexRoute: typeof SettingsDangerIndexRoute
+  SettingsGeneralIndexRoute: typeof SettingsGeneralIndexRoute
+  SettingsGlobalShortcutsIndexRoute: typeof SettingsGlobalShortcutsIndexRoute
+}
+
+const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
   SettingsBrowseIndexRoute: SettingsBrowseIndexRoute,
   SettingsChordsIndexRoute: SettingsChordsIndexRoute,
@@ -226,6 +245,16 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsDangerIndexRoute: SettingsDangerIndexRoute,
   SettingsGeneralIndexRoute: SettingsGeneralIndexRoute,
   SettingsGlobalShortcutsIndexRoute: SettingsGlobalShortcutsIndexRoute,
+}
+
+const SettingsRouteRouteWithChildren = SettingsRouteRoute._addFileChildren(
+  SettingsRouteRouteChildren,
+)
+
+const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
+  SettingsRouteRoute: SettingsRouteRouteWithChildren,
+  ChordsIndexRoute: ChordsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
