@@ -14,5 +14,9 @@
 	{
 		"name": "Terminal Chords",
 		"url": "https://github.com/KeyChord/chords-terminal"
-	}
+	},
+  {
+    "name": "AeroSpace Chords",
+    "url": "https://github.com/KeyChord/chords-aerospace"
+  }
 ]
