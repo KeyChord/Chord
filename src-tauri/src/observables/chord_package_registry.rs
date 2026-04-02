@@ -6,7 +6,7 @@ use typeshare::typeshare;
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
-struct ChordPackageRegistryState {
+pub struct ChordPackageRegistryState {
     sorted_package_names_by_priority: Vec<String>
 }
 

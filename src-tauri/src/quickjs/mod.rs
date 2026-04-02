@@ -4,7 +4,6 @@ use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
 use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
-use llrt_readline::{ReadlineModule, ReadlinePromisesModule};
 use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
 use rquickjs::{
@@ -121,14 +120,6 @@ impl Resolver for ModuleResolver {
         base_module_specifier: &str,
         import_specifier: &str,
     ) -> rquickjs::Result<String> {
-        if import_specifier == "readline"
-            || import_specifier == "node:readline"
-            || import_specifier == "readline/promises"
-            || import_specifier == "node:readline/promises"
-        {
-            return Ok("readline".into());
-        }
-
         if import_specifier == "chord" {
             return Ok("chord".into());
         }
@@ -175,12 +166,6 @@ impl ModuleLoader {
     ) -> rquickjs::Result<Option<Module<'js, Declared>>> {
         let module = match name {
             "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord"),
-            "readline" | "node:readline" => {
-                Module::declare_def::<ReadlineModule, _>(ctx.clone(), "readline")
-            }
-            "readline/promises" | "node:readline/promises" => {
-                Module::declare_def::<ReadlinePromisesModule, _>(ctx.clone(), "readline/promises")
-            }
             _ => return Ok(None),
         };
 

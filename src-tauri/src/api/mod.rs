@@ -6,7 +6,7 @@ use taurpc_macros::taurpc_api;
 mod api;
 pub use api::*;
 mod error;
-use crate::app::chord_package_manager::local::LocalChordPackage;
+use crate::app::chord_package_registry::LocalChordPackage;
 pub use error::*;
 
 #[taurpc_api(export_to = "../src/api/bindings.gen.ts", mod = "resolvers")]
