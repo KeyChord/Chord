@@ -108,9 +108,17 @@ impl ChordPackageManager {
         }
 
         for (pathslug, parsed_chord_file) in &parsed_chords_files {
-            let Ok(chords_file) = parsed_chord_file.compile(pathslug.to_owned(), &parsed_chords_files, &None).inspect_err(|e| {
-                log::error!("skipping chords file {:?} because of compilation error: {:?}", pathslug, e);
-            }) else {
+            let Ok(chords_file) = parsed_chord_file
+                .compile(pathslug.to_owned(), &parsed_chords_files, &None)
+                .inspect_err(|e| {
+                    log::error!(
+                        "skipping chords file {:?} in {} because of compilation error: {:?}",
+                        pathslug,
+                        name,
+                        e
+                    );
+                })
+            else {
                 continue;
             };
 
@@ -120,13 +128,19 @@ impl ChordPackageManager {
                 chords_file.chords.len()
             );
 
-            let is_bundled_chords_file = pathslug.components().nth(1).and_then(|c| c.as_os_str().to_str()).map(|s| s.starts_with('@')).unwrap_or(false);
+            let is_bundled_chords_file = pathslug
+                .components()
+                .nth(1)
+                .and_then(|c| c.as_os_str().to_str())
+                .map(|s| s.starts_with('@'))
+                .unwrap_or(false);
             if !is_bundled_chords_file {
                 // We only want to add global chords from non-bundled chord files (i.e. pathslugs that
                 // don't start with `chords/@`
                 for chord in &chords_file.chords {
                     let first_char = chord.raw_trigger.chars().next();
-                    let is_non_alphanumeric = first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
+                    let is_non_alphanumeric =
+                        first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
 
                     if is_non_alphanumeric {
                         global_chords.push(ChordReference {

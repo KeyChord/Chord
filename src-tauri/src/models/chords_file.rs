@@ -94,7 +94,7 @@ pub struct CompiledChordsFileHandler {
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileImport {
     pub file: String,
-    pub r#override: Option<ChordsFileImportOverride>
+    pub r#override: Option<ChordsFileImportOverride>,
 }
 
 /// Currently, we only support overriding meta, but might support overriding chords in the future.
@@ -102,7 +102,7 @@ pub struct ChordsFileImport {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileImportOverride {
-    pub meta: HashMap<String, TomlValue>
+    pub meta: HashMap<String, TomlValue>,
 }
 
 impl ParsedChordsFile {
@@ -158,10 +158,13 @@ impl ParsedChordsFile {
                     .get("file")
                     .and_then(|f| f.as_str())
                     .context("import must have file key")?;
-                let r#override = import_table.get("override").map(|v| Self::parse_override(v).context("invalid override option")).transpose()?;
+                let r#override = import_table
+                    .get("override")
+                    .map(|v| Self::parse_override(v).context("invalid override option"))
+                    .transpose()?;
                 imports.push(ChordsFileImport {
                     file: file.to_string(),
-                    r#override
+                    r#override,
                 });
             }
         }
@@ -169,8 +172,12 @@ impl ParsedChordsFile {
     }
 
     fn parse_override(value: &Value) -> Result<ChordsFileImportOverride> {
-        let table = value.as_table().context("override must be a table if present")?;
-        Ok( ChordsFileImportOverride {meta: Self::parse_meta(table)?} )
+        let table = value
+            .as_table()
+            .context("override must be a table if present")?;
+        Ok(ChordsFileImportOverride {
+            meta: Self::parse_meta(table)?,
+        })
     }
 
     fn parse_hint(key: &str, value: &Table) -> Result<ChordHint> {
@@ -269,9 +276,8 @@ impl ParsedChordsFile {
         &self,
         pathslug: FilePathslug,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
-        r#override: &Option<ChordsFileImportOverride>
+        r#override: &Option<ChordsFileImportOverride>,
     ) -> Result<CompiledChordsFile> {
-
         log::debug!("compiling chords file {}", self.name);
 
         let mut chords = self.chords.clone();
@@ -283,7 +289,9 @@ impl ParsedChordsFile {
                 if let Some(arg) = arg.as_str() {
                     if arg.starts_with('$') {
                         let override_arg = r#override.as_ref().and_then(|v| v.meta.get(arg));
-                        let meta_value = override_arg.or(self.meta.get(arg)).context(format!("missing arg {}", arg))?;
+                        let meta_value = override_arg
+                            .or(self.meta.get(arg))
+                            .context(format!("missing arg {}", arg))?;
                         build_args.push(meta_value.clone());
                         continue;
                     }
@@ -299,8 +307,20 @@ impl ParsedChordsFile {
             });
         }
 
+        let is_bundled_chords_file = pathslug
+            .components()
+            .nth(1)
+            .and_then(|c| c.as_os_str().to_str())
+            .map(|s| s.starts_with('@'))
+            .unwrap_or(false);
         for import in &self.imports {
-            let imported_file_path = Path::new("chords").join(&import.file);
+            let imported_file_path = if is_bundled_chords_file {
+                let package_name = pathslug.components().take(3).collect::<PathBuf>();
+                package_name.join("chords").join(&import.file)
+            } else {
+                Path::new("chords").join(&import.file)
+            };
+
             let imported_file = parsed_chords_files
                 .get(&imported_file_path)
                 .context(format!("import file {:?} not found", imported_file_path))?;
@@ -310,7 +330,11 @@ impl ParsedChordsFile {
                 imported_file_path
             );
 
-            let compiled_file = imported_file.compile(imported_file_path, parsed_chords_files, &import.r#override)?;
+            let compiled_file = imported_file.compile(
+                imported_file_path,
+                parsed_chords_files,
+                &import.r#override,
+            )?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
             handlers.extend(compiled_file.handlers.clone());
