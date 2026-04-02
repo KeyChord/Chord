@@ -120,7 +120,7 @@ impl ParsedChordsFile {
 
     fn parse_handlers(table: &Table) -> Result<HashMap<String, ChordsFileHandler>> {
         let mut handlers = HashMap::new();
-        if let Some(handlers_val) = table.get("handlers") {
+        if let Some(handlers_val) = table.get("on") {
             let handlers_table = handlers_val
                 .as_table()
                 .context("handlers must be a table")?;
