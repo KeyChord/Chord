@@ -9,204 +9,224 @@ export type Key = string;
 export type TomlValue = any;
 
 export interface AppPermissionsState {
-	isAutostartEnabled?: boolean
-	isInputMonitoringEnabled?: boolean
-	isAccessibilityEnabled?: boolean
+	isAutostartEnabled?: boolean;
+	isInputMonitoringEnabled?: boolean;
+	isAccessibilityEnabled?: boolean;
 }
 
 export interface AppSettingsState {
-	bundleIdsNeedingRelaunch: string[]
-	showMenuBarIcon: boolean
-	showDockIcon: boolean
-	hideGuideByDefault: boolean
+	bundleIdsNeedingRelaunch: string[];
+	showMenuBarIcon: boolean;
+	showDockIcon: boolean;
+	hideGuideByDefault: boolean;
 }
 
 /** The action that a chord can define. */
-export type ChordAction
-	= | { type: 'shortcut', content: ShortcutChordAction }
-		| { type: 'shell', content: ShellChordAction }
-		| { type: 'emit', content: EmitChordAction };
+export type ChordAction = 
+	| { type: "shortcut", content: ShortcutChordAction }
+	| { type: "shell", content: ShellChordAction }
+	| { type: "emit", content: EmitChordAction };
 
 /** A regular chord entry composed of static characters */
 export interface Chord {
-	rawTrigger: string
+	rawTrigger: string;
 	/** The keys that make up the chord (extracted from the TOML key) */
-	trigger: { keys: string[] } | { regex: string }
+	trigger: { keys: string[] } | { regex: string };
 	/** A mandatory chord name */
-	name: string
+	name: string;
 	/** The relative index of the chord inside the TOML file */
-	index: number
+	index: number;
 	/** A list of actions (as fallbacks) to execute when the chord is triggered */
-	actions: ChordAction[]
+	actions: ChordAction[];
 }
 
 /** The action that a chord task is meant to execute. */
-export type ChordTaskAction
-	= | { type: 'shortcut', content: ShortcutChordAction }
-		| { type: 'shell', content: ShellChordAction }
-		| { type: 'handler', content: HandlerChordAction };
+export type ChordTaskAction = 
+	| { type: "shortcut", content: ShortcutChordAction }
+	| { type: "shell", content: ShellChordAction }
+	| { type: "handler", content: HandlerChordAction };
 
 export interface ChordActionTask {
-	packageName: string
-	initiatorFilePathslug: FilePathslug
-	action: ChordTaskAction
-	numTimes: number
+	packageName: string;
+	initiatorFilePathslug: FilePathslug;
+	action: ChordTaskAction;
+	numTimes: number;
 }
 
 export interface ChordHint {
-	pattern: { keys: string[] } | { regex: string }
-	rawPattern: string
-	description: string
+	pattern: { keys: string[] } | { regex: string };
+	rawPattern: string;
+	description: string;
 }
 
 export interface ChordJsPackage {
-	exportedFiles: Record<FilePathslug, string>
+	exportedFiles: Record<FilePathslug, string>;
 }
 
 /** Currently only supports JavaScript handlers */
 export interface ChordsFileHandler {
-	file: string
-	args?: any[]
+	file: string;
+	args?: any[];
+}
+
+/** Currently, we only support overriding meta, but might support overriding chords in the future. */
+export interface ChordsFileImportOverride {
+	meta: Record<string, TomlValue>;
 }
 
 export interface ChordsFileImport {
-	file: string
+	file: string;
+	override?: ChordsFileImportOverride;
 }
 
 export interface RawChordsFile {
-	name: string
-	meta?: Record<string, string>
-	handlers?: Record<string, ChordsFileHandler>
-	chords?: Record<string, TomlValue>
-	imports?: ChordsFileImport[]
+	name: string;
+	meta?: Record<string, TomlValue>;
+	handlers?: Record<string, ChordsFileHandler>;
+	chords?: Record<string, TomlValue>;
+	imports?: ChordsFileImport[];
 }
 
 export interface CompiledChordsFileHandler {
-	event: string
-	file: string
-	args: any[]
+	event: string;
+	file: string;
+	args: any[];
 }
 
 /** A chords file that has imports inlined. */
 export interface CompiledChordsFile {
-	name: string
-	pathslug: FilePathslug
-	meta: Record<string, string>
-	handlers: CompiledChordsFileHandler[]
-	chords: Chord[]
-	chordHints: ChordHint[]
+	name: string;
+	pathslug: FilePathslug;
+	meta: Record<string, TomlValue>;
+	handlers: CompiledChordsFileHandler[];
+	chords: Chord[];
+	chordHints: ChordHint[];
 }
 
 export interface ChordReference {
-	packageName: string
-	chordsFilePathslug: FilePathslug
-	chord: Chord
+	packageName: string;
+	chordsFilePathslug: FilePathslug;
+	chord: Chord;
 }
 
 export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
-	name: string
-	jsPackage?: ChordJsPackage
-	rawChordsFiles: Record<FilePathslug, RawChordsFile>
-	compiledChordsFiles: Record<FilePathslug, CompiledChordsFile>
-	globalChords: ChordReference[]
+	name: string;
+	jsPackage?: ChordJsPackage;
+	rawChordsFiles: Record<FilePathslug, RawChordsFile>;
+	compiledChordsFiles: Record<FilePathslug, CompiledChordsFile>;
+	globalChords: ChordReference[];
 }
 
 export interface ChordPackageManagerState {
-	packages: ChordPackage[]
+	packages: ChordPackage[];
+}
+
+export interface ChordPackageStore {
+	handle: AppHandle;
+	observable: ChordPackageStoreObservable;
+}
+
+export interface ChordPackageStoreEntry {
+	priority: number;
+}
+
+export interface ChordPackageStoreState {
+	entries: Record<string, ChordPackageStoreEntry>;
 }
 
 export interface ChorderState {
-	keyBuffer: Key[]
-	pressedChordKeys?: Key[]
-	activeChordKeys?: Key[]
-	isShiftPressed: boolean
-	isIndicatorVisible: boolean
+	keyBuffer: Key[];
+	pressedChordKeys?: Key[];
+	activeChordKeys?: Key[];
+	isShiftPressed: boolean;
+	isIndicatorVisible: boolean;
 }
 
 export interface DesktopAppMetadata {
-	bundleId: string
-	displayName?: string
-	iconDataUrl?: string
+	bundleId: string;
+	displayName?: string;
+	iconDataUrl?: string;
 }
 
 export interface DesktopAppManagerState {
-	appsNeedingRelaunch: string[]
-	appsMetadata: Record<string, DesktopAppMetadata>
+	appsNeedingRelaunch: string[];
+	appsMetadata: Record<string, DesktopAppMetadata>;
 }
 
 export interface EmitChordAction {
-	eventKey: string
-	args: any
+	eventKey: string;
+	args: any;
 }
 
 export interface FrontmostState {
-	frontmostAppBundleId?: string
+	frontmostAppBundleId?: string;
 }
 
 export interface GitRepo {
-	owner: string
-	name: string
-	slug: string
-	url: string
-	localAbspath: string
-	headShortSha?: string
-	pinnedRev?: string
+	owner: string;
+	name: string;
+	slug: string;
+	url: string;
+	localAbspath: string;
+	headShortSha?: string;
+	pinnedRev?: string;
 }
 
 export interface GitReposState {
-	repos: Record<string, GitRepo>
+	repos: Record<string, GitRepo>;
 }
 
 /** Currently, we only support JavaScript handlers */
 export interface HandlerChordAction {
-	file: string
-	buildArgs: any[]
-	eventArgs: any[]
+	file: string;
+	buildArgs: any[];
+	eventArgs: any[];
 }
 
 export interface ParsedChordsFile {
-	name: string
-	meta: Record<string, string>
-	handlers: Record<string, ChordsFileHandler>
-	imports: ChordsFileImport[]
-	chords: Chord[]
-	chordHints: ChordHint[]
+	name: string;
+	meta: Record<string, TomlValue>;
+	handlers: Record<string, ChordsFileHandler>;
+	imports: ChordsFileImport[];
+	chords: Chord[];
+	chordHints: ChordHint[];
 	/**
 	 * This is the object exposed to the JS handler. This maximizes compatibility so that even if
 	 * our internal representation changes, a user's scripts will continue to work because it only
 	 * depends on the actual TOML structure and not how we parse it.
 	 */
-	raw: RawChordsFile
+	raw: RawChordsFile;
 }
 
 /**
  * Mapping of all the relevant files for a chord package.
- *
+ * 
  * We intentionally don't include the path of the package here to avoid leaking implementation
  * details about where the package is located on the filesystem.
  */
 export interface RawChordPackage {
 	/** The dirname is needed for inferring the chord package name when package.json isn't present */
-	dirname: string
-	packageJsonContents?: string
-	chordsFilesContents: Record<FilePathslug, string>
-	jsFilesContents: Record<FilePathslug, string>
-	binFilesContents: Record<FilePathslug, number[]>
+	dirname: string;
+	packageJsonContents?: string;
+	chordsFilesContents: Record<FilePathslug, string>;
+	jsFilesContents: Record<FilePathslug, string>;
+	binFilesContents: Record<FilePathslug, number[]>;
 }
 
 export interface ShellChordAction {
-	command: string
+	command: string;
 }
 
 export interface SimulatedShortcutChord {
-	keys: Key[]
+	keys: Key[];
 }
 
 export interface SimulatedShortcut {
-	chords: SimulatedShortcutChord[]
+	chords: SimulatedShortcutChord[];
 }
 
 export interface ShortcutChordAction {
-	simulatedShortcut: SimulatedShortcut
+	simulatedShortcut: SimulatedShortcut;
 }
+

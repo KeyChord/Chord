@@ -3,6 +3,7 @@ import type {
 	AppSettingsState,
 	ChorderState,
 	ChordPackageManagerState,
+	ChordPackageStoreState,
 	DesktopAppManagerState,
 	FrontmostState,
 	GitReposState,
@@ -32,10 +33,22 @@ async function createUseTauriState<T>(stateId: string) {
 	return renameFunction(useTauriState, stateId);
 }
 
-export const useChorderState = await createUseTauriState<ChorderState>('chorder');
-export const useSettingsState = await createUseTauriState<AppSettingsState>('settings');
-export const usePermissionsState = await createUseTauriState<AppPermissionsState>('permissions');
-export const useGitRepoStoreState = await createUseTauriState<GitReposState>('git-repos');
-export const useFrontmostState = await createUseTauriState<FrontmostState>('frontmost');
-export const useChordPackageManagerState = await createUseTauriState<ChordPackageManagerState>('chord-package-manager');
-export const useDesktopAppManagerState = await createUseTauriState<DesktopAppManagerState>('desktop-app-manager');
+export const [
+  useChorderState,
+  useSettingsState,
+  usePermissionsState,
+  useGitRepoStoreState,
+  useFrontmostState,
+  useChordPackageManagerState,
+  useDesktopAppManagerState,
+  useChordPackageStoreState
+] = await Promise.all([
+  createUseTauriState<ChorderState>('chorder'),
+  createUseTauriState<AppSettingsState>('settings'),
+  createUseTauriState<AppPermissionsState>('permissions'),
+  createUseTauriState<GitReposState>('git-repos'),
+  createUseTauriState<FrontmostState>('frontmost'),
+  createUseTauriState<ChordPackageManagerState>('chord-package-manager'),
+  createUseTauriState<DesktopAppManagerState>('desktop-app-manager'),
+  createUseTauriState<ChordPackageStoreState>('chord-package-store'),
+]);

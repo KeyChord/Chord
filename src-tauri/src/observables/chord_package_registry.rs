@@ -14,5 +14,5 @@ pub struct ChordPackageStoreState {
 
 define_observable! {
     pub struct ChordPackageStoreObservable(ChordPackageStoreState);
-    id: "chord-package-manager";
+    id: "chord-package-store";
 }

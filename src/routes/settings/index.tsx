@@ -5,11 +5,10 @@ import { ConfigureTab } from '#/components/settings/configure-tab.tsx';
 import { DangerTab } from '#/components/settings/danger-tab.tsx';
 import { FirstRunOnboarding } from '#/components/settings/first-run-onboarding.tsx';
 import { GlobalShortcutsTab } from '#/components/settings/global-shortcuts-tab.tsx';
-import { SettingsTab } from '#/components/settings/settings-tab.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs.tsx';
 import { TanStackDevtools } from '@tanstack/react-devtools';
 import { useQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { useState } from 'react';
 import { useChordPackageManagerState } from '../../utils/state.ts';
@@ -62,67 +61,43 @@ function Settings() {
 
 									<Tabs defaultValue="general" className="gap-4">
 										<TabsList className="h-auto w-full flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
-											<TabsTrigger
-												value="general"
+											<Link
+												to="/settings/general"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												General
-											</TabsTrigger>
-											<TabsTrigger
-												value="chords"
+											</Link>
+											<Link
+												to="/settings/chords"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Chords
-											</TabsTrigger>
-											<TabsTrigger
-												value="browse"
+											</Link>
+											<Link
+												to="/settings/browse"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Browse
-											</TabsTrigger>
-											<TabsTrigger
-												value="configure"
+											</Link>
+											<Link
+												to="/settings/configure"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Configure
-											</TabsTrigger>
-											<TabsTrigger
-												value="shortcuts"
+											</Link>
+											<Link
+												to="/settings/global-shortcuts"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Shortcuts
-											</TabsTrigger>
-											<TabsTrigger
-												value="danger"
+											</Link>
+											<Link
+												to="/settings/danger"
 												className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
 											>
 												Danger
-											</TabsTrigger>
+											</Link>
 										</TabsList>
-
-										<TabsContent value="general">
-											<SettingsTab />
-										</TabsContent>
-
-										<TabsContent value="chords">
-											<ChordsTab />
-										</TabsContent>
-
-										<TabsContent value="browse">
-											<BrowseTab />
-										</TabsContent>
-
-										<TabsContent value="configure">
-											<ConfigureTab />
-										</TabsContent>
-
-										<TabsContent value="shortcuts">
-											<GlobalShortcutsTab />
-										</TabsContent>
-
-										<TabsContent value="danger">
-											<DangerTab />
-										</TabsContent>
 									</Tabs>
 								</div>
 							</div>

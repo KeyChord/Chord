@@ -23,9 +23,14 @@ import {
 import { useMutation } from '@tanstack/react-query';
 import { ChevronDownIcon, FolderPlus, Package } from 'lucide-react';
 import { toast } from 'sonner';
-import { useChordPackageManagerState } from '../../utils/state.ts';
+import { useChordPackageManagerState } from '#/utils/state.ts';
+import { createFileRoute } from '@tanstack/react-router';
 
-export function ChordsTab() {
+export const Route = createFileRoute('/settings/chords/')({
+  component: SettingsChordsPage,
+});
+
+function SettingsChordsPage() {
 	const { packages } = useChordPackageManagerState();
 	const addLocalChordFolderMutation = useMutation({
 		mutationFn: taurpc.addLocalChordFolder,

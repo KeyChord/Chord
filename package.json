@@ -4,7 +4,8 @@
   "version": "0.1.0-alpha.3",
   "private": true,
   "imports": {
-    "#/*": "./src/*"
+    "#/*": "./src/*",
+    "#data/*": "./data/*"
   },
   "scripts": {
     "dev": "RUST_BACKTRACE=full tauri dev --no-watch --config src-tauri/tauri.dev.conf.json",
@@ -85,7 +86,7 @@
     "eslint-plugin-format": "^2.0.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "typescript": "5.9.3",
+    "typescript": "^6.0.2",
     "vite": "^8.0.2",
     "vite-plus": "^0.1.13"
   },
