@@ -1,5 +1,6 @@
 pub mod chord_package_manager;
 pub mod chord_package_registry;
+pub mod chord_package_store;
 pub mod chord_runner;
 pub mod chorder;
 pub mod context;

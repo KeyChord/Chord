@@ -4,24 +4,31 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::observables::{ChordPackageRegistryObservable, Observable};
+use crate::observables::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Clone)]
-pub struct ChordPackageRegistryStore {
+pub struct ChordPackageStore {
     handle: AppHandle,
-    observable: ChordPackageRegistryObservable,
+    observable: ChordPackageStoreObservable,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChordPackageRegistryEntry {
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ChordPackageStoreEntry {
     pub priority: u32,
 }
 
-impl ChordPackageRegistryStore {
+impl ChordPackageStore {
     pub fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: ChordPackageRegistryObservable::placeholder() }
+        Self { handle, observable: ChordPackageStoreObservable::placeholder() }
+    }
+
+    pub fn init(&self, observable: ChordPackageStoreObservable) -> Result<()> {
+        self.observable.init(observable);
+        Ok(())
     }
 
     pub fn store(&self) -> Result<Arc<Store<Wry>>> {
@@ -29,29 +36,31 @@ impl ChordPackageRegistryStore {
         Ok(store)
     }
 
-    pub fn entries(&self) -> Result<HashMap<String, ChordPackageRegistryEntry>> {
+
+    pub fn entries(&self) -> Result<HashMap<String, ChordPackageStoreEntry>> {
         Ok(self
             .store()?
             .entries()
             .into_iter()
             .filter_map(|(k, v)| {
-                serde_json::from_value::<ChordPackageRegistryEntry>(v.clone())
+                serde_json::from_value::<ChordPackageStoreEntry>(v.clone())
                     .ok()
                     .map(|entry| (k.to_string(), entry))
             })
             .collect())
     }
 
-    pub fn entry(&self, shortcut: &str) -> Result<Option<ChordPackageRegistryEntry>> {
+    pub fn entry(&self, shortcut: &str) -> Result<Option<ChordPackageStoreEntry>> {
         Ok(self.entries()?.get(shortcut).cloned())
     }
 
     fn save(&self) -> Result<()> {
         self.store()?.save()?;
+        self.observable.set_state(ChordPackageStoreState { entries: self.entries()? })?;
         Ok(())
     }
 
-    pub fn set(&self, shortcut: &str, entry: ChordPackageRegistryEntry) -> Result<()> {
+    pub fn set(&self, shortcut: &str, entry: ChordPackageStoreEntry) -> Result<()> {
         let value = serde_json::to_value(entry)?;
         self.store()?.set(shortcut, value);
         self.save()?;

@@ -3,13 +3,12 @@ use crate::app::chord_package_registry::config::ConfigPackageRegistry;
 use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
 use tauri::AppHandle;
-use crate::app::chord_package_registry::{ChordPackageRegistryStore, GitChordPackageRegistry, LocalPackageRegistry};
+use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
 
 pub struct ChordPackageRegistry {
     pub config: ConfigPackageRegistry,
     pub git: GitChordPackageRegistry,
     pub local: LocalPackageRegistry,
-    pub store: ChordPackageRegistryStore
 }
 
 impl ChordPackageRegistry {
@@ -18,7 +17,6 @@ impl ChordPackageRegistry {
             config: ConfigPackageRegistry::new(),
             git: GitChordPackageRegistry::new(handle.clone()),
             local: LocalPackageRegistry::new(handle.clone()),
-            store: ChordPackageRegistryStore::new(handle.clone())
         }
     }
 

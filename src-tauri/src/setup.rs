@@ -14,13 +14,11 @@ use crate::app::settings::AppSettings;
 use crate::app::state::StateSingleton;
 use crate::chordpack::load_default_chordpack;
 use crate::lock_file::AppLockFile;
-use crate::observables::{
-    AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable,
-    ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable,
-    Observable,
-};
+use crate::observables::{AppPermissionsObservable, AppSettingsObservable, ChordPackageManagerObservable, ChordPackageStoreObservable, ChorderObservable, DesktopAppManagerObservable, FrontmostObservable, GitReposObservable, Observable};
 use crate::tauri_app;
 use tauri::{AppHandle, Manager};
+use crate::app::chord_package_registry::ChordPackageRegistry;
+use crate::app::chord_package_store::ChordPackageStore;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
@@ -41,6 +39,8 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         singleton(&handle, ChordPackageManager::new(handle.clone())),
         singleton(&handle, ChordActionTaskRunner::new(handle.clone())),
         singleton(&handle, DesktopAppManager::new(handle.clone())),
+        singleton(&handle, ChordPackageStore::new(handle.clone())),
+        singleton(&handle, ChordPackageRegistry::new(handle.clone())),
     );
 
     s.0.init(manage(
@@ -76,6 +76,11 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         app.handle(),
         DesktopAppManagerObservable::new(handle.clone())?,
     ))?;
+    s.12.init(manage(
+        app.handle(),
+        ChordPackageStoreObservable::new(handle.clone())?
+    ))?;
+    // s.13.init()?;
 
     log::debug!("initialized all singletons");
 
