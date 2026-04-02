@@ -8,7 +8,7 @@ export default antfu(
 		ignores: [
 			'**/target',
 			'**/src-tauri',
-			'**/src/routeTree.gen.ts',
+			'**/*.gen.ts',
 		],
 		stylistic: {
 			indent: 'tab',
