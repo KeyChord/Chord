@@ -28,7 +28,7 @@ pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
             chorder.ensure_inactive()?;
 
             if should_emit_caps_lock {
-                emit_caps_lock()?;
+                // emit_caps_lock()?;
             }
         }
     }

@@ -33,7 +33,6 @@ pub fn register_caps_lock_input_handler(handle: AppHandle) -> Result<()> {
 
     TX.set(tx)
         .map_err(|_| anyhow::anyhow!("failed to set tx"))?;
-    remap_caps_to_no_action()?;
 
     std::thread::spawn(|| unsafe {
         start_caps_lock_listener(caps_lock_changed);
@@ -81,62 +80,4 @@ pub fn emit_caps_lock() -> Result<()> {
             "failed to toggle caps lock state via native layer: {rc}"
         ))
     }
-}
-
-fn run_hidutil(args: &[&str]) -> Result<String> {
-    let output = Command::new("/usr/bin/hidutil")
-        .args(args)
-        .output()
-        .map_err(|e| anyhow::anyhow!("failed to launch hidutil: {e}"))?;
-
-    if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-    } else {
-        Err(anyhow::anyhow!(
-            "hidutil failed (status: {:?}): {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
-    }
-}
-
-extern "C" fn cleanup_c() {
-    let json = r#"{"UserKeyMapping":[]}"#;
-
-    match Command::new("/usr/bin/hidutil")
-        .args(["property", "--set", json])
-        .status()
-    {
-        Ok(status) if status.success() => {
-            eprintln!("restored hidutil mapping");
-        }
-        Ok(status) => {
-            eprintln!("hidutil restore failed with status: {status}");
-        }
-        Err(err) => {
-            eprintln!("failed to launch hidutil: {err}");
-        }
-    }
-}
-
-pub fn remap_caps_to_no_action() -> Result<()> {
-    unsafe {
-        let rc = libc::atexit(cleanup_c);
-        if rc != 0 {
-            eprintln!("failed to register atexit handler: {rc}");
-        }
-    }
-
-    // Caps Lock source usage: 0x700000039
-    // Keeping the same destination value you were using for "No Action".
-    let json = r#"{
-        "UserKeyMapping": [
-            {
-                "HIDKeyboardModifierMappingSrc": 0x700000039,
-                "HIDKeyboardModifierMappingDst": 0x0
-            }
-        ]
-    }"#;
-
-    run_hidutil(&["property", "--set", json]).map(|_| ())
 }

@@ -18,8 +18,8 @@ rev = "d17435f29fbcae83fcc372fccbbbb3189011f72d"
 
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
-rev = "96fb79cdb77eb903876a2872c0941264fb2512c2"
+rev = "16a9abe5a236a12fc63aba6c7c16eb6f0ee8aaab"
 
 [packages."@keychord/chords-tray"]
 git = "https://github.com/KeyChord/chords-tray"
-rev = "f10834192772c47a5a743036283966529f44759f"
+rev = "5fa55b3f047ba2f22966731148d588b8d3e6bd9a"
