@@ -1,3 +1,4 @@
+use std::str::FromStr;
 use crate::api::{Api, ApiImpl};
 use crate::app::AppHandleExt;
 use crate::setup::setup;
@@ -44,6 +45,7 @@ pub fn run() {
 }
 
 pub fn run_app() {
+
     std::panic::set_hook(Box::new(|info| {
         let bt = std::backtrace::Backtrace::force_capture();
 
@@ -77,9 +79,12 @@ pub fn run_app() {
         }
     });
 
+    let env_log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
+    let parsed_level = log::LevelFilter::from_str(&env_log_level).unwrap_or(log::LevelFilter::Info);
+
     let log_plugin = tauri_plugin_log::Builder::new()
         .clear_targets()
-        .level(log::LevelFilter::Debug)
+        .level(parsed_level)
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}] {}:{} - {}",

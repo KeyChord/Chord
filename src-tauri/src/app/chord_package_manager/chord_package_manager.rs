@@ -195,26 +195,18 @@ impl ChordPackageManager {
             let module_specifier = path.to_str().context("invalid path")?.to_string();
             with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
-                    log::debug!("declaring module {}", module_specifier);
-                    let module =
-                        Module::declare(ctx.clone(), module_specifier.clone(), js_string.clone())
-                            .map_err(|e| {
-                            anyhow::format_err!(
-                                "error declaring module {:?}\nerror:{}\nfile:\n{}",
-                                module_specifier,
-                                format_js_error(&ctx, e),
-                                format!("{}...", js_string.chars().take(100).collect::<String>())
-                            )
-                        })?;
-                    let meta = module.meta()?;
-                    meta.set("url", file_relpath.to_str())?;
-                    let (_evaluated, promise) = module.eval()?;
-                    promise.into_future::<()>().await?;
-                    Ok(())
+                    async {
+                        log::debug!("declaring module {}", module_specifier);
+                        let module = Module::declare(ctx.clone(), module_specifier.clone(), js_string.clone())?;
+                        let meta = module.meta()?;
+                        meta.set("url", file_relpath.to_str())?;
+                        let (_evaluated, promise) = module.eval()?;
+                        promise.into_future::<()>().await?;
+                        Ok(())
+                    }.await.map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
                 })
             })
-            .await
-            .map_err(|e| anyhow::anyhow!(e))?;
+            .await?;
         }
 
         Ok(Some(ChordJsPackage::new(exported_files)))

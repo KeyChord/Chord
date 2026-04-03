@@ -242,7 +242,7 @@ impl AppChorder {
                 if key_buffer.is_empty() {
                     // If there isn't an active chord, then do nothing
                     let Some(active_chord_keys) = &state.active_chord_keys else {
-                        log::error!("Key buffer is empty and no chord is active");
+                        log::debug!("Key buffer is empty and no chord is active");
                         return Ok(());
                     };
                     if let Some(task) = self.resolve_task_from_keys(active_chord_keys, 1)? {

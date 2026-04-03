@@ -81,6 +81,7 @@ inventory = "0.3.22"
 arc-swap = "1.9"
 ordermap = "1.1.0"
 frontmost = { git = "https://github.com/KeyChord/frontmost" }
+elevated-command = "1.1.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

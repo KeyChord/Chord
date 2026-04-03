@@ -16,6 +16,7 @@ use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
 use std::collections::HashSet;
+use rquickjs::function::Async;
 
 pub struct ChordModule;
 
@@ -315,6 +316,49 @@ fn set_app_needs_relaunch(
     Ok(())
 }
 
+async fn run_sudo_command<'js>(
+    ctx: Ctx<'js>,
+    program: String,
+    args: Array<'js>,
+) -> rquickjs::Result<()> {
+    let mut rust_args: Vec<String> = Vec::new();
+    for item in args.into_iter() {
+        let arg_string: String = item?.get()?;
+        rust_args.push(arg_string);
+    }
+
+    let thread_result = tauri::async_runtime::spawn_blocking(move || {
+        let mut cmd = std::process::Command::new(program);
+        for arg in rust_args {
+            cmd.arg(arg);
+        }
+
+        // Execute and return a standard `std::io::Result` from the closure
+        if elevated_command::Command::is_elevated() {
+            cmd.output().map_err(|e| e.to_string())
+        } else {
+            elevated_command::Command::new(cmd).output().map_err(|e| e.to_string())
+        }
+    })
+        .await;
+
+    // 3. Handle the thread result back on the JS context thread.
+    match thread_result {
+        // Thread succeeded, command executed successfully
+        Ok(Ok(_output)) => Ok(()),
+
+        // Command failed to run (e.g., UAC cancelled, binary not found)
+        Ok(Err(e)) => {
+            // Throw a JS exception using the context
+            Err(Exception::throw_message(&ctx, &format!("failed to run command: {}", e)))
+        }
+
+        // Tokio `spawn_blocking` failed (the background thread panicked)
+        Err(e) => {
+            Err(Exception::throw_message(&ctx, &format!("background thread failed: {}", e)))
+        }
+    }
+}
 impl ModuleDef for ChordModule {
     fn declare(declare: &Declarations) -> rquickjs::Result<()> {
         declare.declare("Applescript")?;
@@ -326,6 +370,7 @@ impl ModuleDef for ChordModule {
         declare.declare("setAppNeedsRelaunch")?;
         declare.declare("onAppLaunch")?;
         declare.declare("onAppTerminate")?;
+        declare.declare("runSudoCommand")?;
         Ok(())
     }
 
@@ -346,6 +391,7 @@ impl ModuleDef for ChordModule {
         exports.export("setAppNeedsRelaunch", Func::from(set_app_needs_relaunch))?;
         exports.export("onAppLaunch", Func::from(on_app_launch))?;
         exports.export("onAppTerminate", Func::from(on_app_terminate))?;
+        exports.export("runSudoCommand", Func::from(Async(run_sudo_command)))?;
 
         Ok(())
     }

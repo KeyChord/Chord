@@ -77,7 +77,7 @@ impl AppModeStateMachine {
         let new_mode = self.get_app_mode();
 
         if previous_mode != new_mode {
-            log::info!("Mode changed from {:?} to {:?}", previous_mode, new_mode);
+            log::debug!("Mode changed from {:?} to {:?}", previous_mode, new_mode);
         }
 
         consumed
