@@ -134,8 +134,8 @@ impl Resolver for ModuleResolver {
                 let chord_pm = handle.chord_package_manager();
                 let chord_package = chord_pm.get_package_by_name(specifier.package);
                 if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
-                    if js_package.resolve_import(&import_specifier).is_some() {
-                        return Ok(format!("{}/{}", specifier.package, import_specifier));
+                    if let Some(import) = js_package.resolve_import(&import_specifier) {
+                        return Ok(import.clone())
                     }
                 }
             }

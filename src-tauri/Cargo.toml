@@ -56,7 +56,7 @@ regex = "1.12.2"
 libc = "0.2"
 bitflags = "2.11"
 parking_lot = { version = "0.12", features = [ "deadlock_detection" ] }
-clap = { version = "4.5.60", features = [ "derive" ] }
+clap = { version = "4.6", features = [ "derive" ] }
 keycode = "1"
 device_query = "4"
 walkdir = "2.5.0"
@@ -79,11 +79,12 @@ typeshare = "1"
 specta = { version = "=2.0.0-rc.22", features = [ "derive" ] }
 taurpc = "0.7.1"
 thiserror = "2.0.18"
-inventory = "0.3.22"
+inventory = "0.3"
 arc-swap = "1.9"
-ordermap = "1.1.0"
+ordermap = "1.1"
 frontmost = { git = "https://github.com/KeyChord/frontmost" }
 elevated-command = "1.1.2"
+uuid = { version = "1", features = ["v4", "fast-rng"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

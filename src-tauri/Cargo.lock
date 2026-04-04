@@ -895,6 +895,7 @@ dependencies = [
  "tokio",
  "toml 1.1.2+spec-1.1.0",
  "typeshare",
+ "uuid",
  "walkdir",
  "window-vibrancy 0.7.1",
 ]
@@ -8885,6 +8886,7 @@ checksum = "5ac8b6f42ead25368cf5b098aeb3dc8a1a2c05a3eee8a9a1a68c640edbfc79d9"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
+ "rand 0.10.0",
  "serde_core",
  "wasm-bindgen",
 ]

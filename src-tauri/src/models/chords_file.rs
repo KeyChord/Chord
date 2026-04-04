@@ -10,8 +10,9 @@ use anyhow::Result;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{PathBuf};
 use std::str::FromStr;
+use llrt_core::{Object};
 use toml::{Table, Value};
 use typeshare::typeshare;
 
@@ -79,13 +80,11 @@ pub struct ChordsFileHandler {
 }
 
 #[typeshare]
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompiledChordsFileHandler {
     pub event: String,
-    pub file: String,
-    #[typeshare(typescript(type = "any[]"))]
-    pub args: Vec<toml::Value>,
+    pub handler_id: String
 }
 
 // New struct for imports
@@ -272,85 +271,6 @@ impl ParsedChordsFile {
         })
     }
 
-    pub fn compile(
-        &self,
-        pathslug: FilePathslug,
-        parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
-        r#override: &Option<ChordsFileImportOverride>,
-    ) -> Result<CompiledChordsFile> {
-        log::debug!("compiling chords file {}", self.name);
-
-        let mut chords = self.chords.clone();
-        let mut chord_hints = self.chord_hints.clone();
-        let mut handlers = Vec::new();
-        for (event, handler) in &self.handlers {
-            let mut build_args = Vec::new();
-            for arg in &handler.args {
-                if let Some(arg) = arg.as_str() {
-                    if arg.starts_with('$') {
-                        let override_arg = r#override.as_ref().and_then(|v| v.meta.get(arg));
-                        let meta_value = override_arg
-                            .or(self.meta.get(arg))
-                            .context(format!("missing arg {}", arg))?;
-                        build_args.push(meta_value.clone());
-                        continue;
-                    }
-                }
-
-                build_args.push(arg.clone());
-            }
-
-            handlers.push(CompiledChordsFileHandler {
-                event: event.clone(),
-                args: build_args,
-                file: handler.file.clone(),
-            });
-        }
-
-        let is_bundled_chords_file = pathslug
-            .components()
-            .nth(1)
-            .and_then(|c| c.as_os_str().to_str())
-            .map(|s| s.starts_with('@'))
-            .unwrap_or(false);
-        for import in &self.imports {
-            let imported_file_path = if is_bundled_chords_file {
-                let package_name = pathslug.components().take(3).collect::<PathBuf>();
-                package_name.join("chords").join(&import.file)
-            } else {
-                Path::new("chords").join(&import.file)
-            };
-
-            let imported_file = parsed_chords_files
-                .get(&imported_file_path)
-                .context(format!("import file {:?} not found", imported_file_path))?;
-            log::debug!(
-                "resolved import file {:?} from path {:?}",
-                imported_file.name,
-                imported_file_path
-            );
-
-            let compiled_file = imported_file.compile(
-                imported_file_path,
-                parsed_chords_files,
-                &import.r#override,
-            )?;
-            chords.extend(compiled_file.chords.clone());
-            chord_hints.extend(compiled_file.chord_hints.clone());
-            handlers.extend(compiled_file.handlers.clone());
-        }
-
-        log::debug!("finished compiling chords file {}", self.name);
-
-        Ok(CompiledChordsFile {
-            name: self.name.clone(),
-            pathslug,
-            meta: self.meta.clone(),
-            handlers,
-            chords,
-            chord_hints,
-        })
-    }
 }
 
 impl FromStr for ParsedChordsFile {
