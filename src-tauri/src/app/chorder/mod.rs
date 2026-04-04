@@ -94,13 +94,12 @@ impl AppChorder {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn preload_ui(&self, ui: &ChorderIndicatorUi) -> Result<()> {
-        log::debug!("Preloading chorder panel");
+    pub fn preload_ui(&self) -> Result<()> {
+        log::info!("Preloading chorder panel");
 
-        if ui.ensure_visible()? {
+        if self.ui.ensure_visible()? {
             self.prepare_surface_before_reveal()?;
-            ui.ensure_hidden()?;
+            self.ui.ensure_hidden()?;
         }
 
         Ok(())

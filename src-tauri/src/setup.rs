@@ -96,6 +96,11 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
         log::error!("Failed to load permissions: {e}");
     }
 
+    log::info!("Pre-warming chorder UI");
+    if let Err(e) = handle.app_chorder().preload_ui() {
+        log::error!("Failed to preload chorder UI: {e}");
+    }
+
     tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
 
     // Create tray
