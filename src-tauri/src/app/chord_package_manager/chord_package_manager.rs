@@ -8,11 +8,10 @@ use crate::models::{ChordInput, ChordsFileImportOverride, CompiledChordsFile, Co
 use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
-use llrt_core::{Module, Object};
-use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
 use ordermap::OrderMap;
 use parking_lot::RwLock;
+use rquickjs::{Value, Module, Object, function::Args};
 use tauri::AppHandle;
 
 pub struct ChordPackageManager {
@@ -226,77 +225,82 @@ impl ChordPackageManager {
                 build_args.push(arg.clone());
             }
 
-            let file = handler.file.clone();
+            let import_specifier = handler.file.clone();
             let raw = chords_file.raw.clone();
             let Some(js_package) = js_package else {
                 anyhow::bail!("A JS Package must be present when defining a handler")
             };
+            let Some(module_specifier) = js_package.resolve_import(&import_specifier) else {
+                anyhow::bail!("file {} not found in js package {}", import_specifier, js_package.name);
+            };
 
             let handler_id = with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
-                    let module_promise = Module::import(&ctx, file.to_string())?;
-                    let module = module_promise.into_future::<Object>().await?;
-                    let mut export: llrt_core::Value = module.get("default")?;
+                    async {
+                        let module_promise = Module::import(&ctx, module_specifier)?;
+                        let module = module_promise.into_future::<Object>().await?;
+                        let mut export: Value = module.get("default")?;
 
-                    if let Some(promise) = export.as_promise().cloned() {
-                        export = promise.into_future::<llrt_core::Value>().await?;
-                    }
-
-                    let build_handler_function = export.as_function().cloned().or_throw_msg(
-                        &ctx,
-                        &format!(
-                            "JS default export did not resolve to a function: {:?}",
-                            export
-                        ),
-                    )?;
-
-                    let build_context = Object::new(ctx.clone())?;
-                    build_context.set(
-                        "chordsFile",
-                        rquickjs_serde::to_value(ctx.clone(), raw)
-                            .or_throw_msg(&ctx, "failed to parse chords file")?,
-                    )?;
-
-                    let mut args = Args::new(ctx.clone(), build_args.len());
-                    args.this(build_context)?;
-                    log::debug!("calling build_handler with args {:?}", build_args);
-
-                    let js_args = build_args
-                        .into_iter()
-                        .map(|value| {
-                            rquickjs_serde::to_value(ctx.clone(), value)
-                                .or_throw_msg(&ctx, "failed to convert event TOML arguments")
-                        })
-                        .collect::<rquickjs::Result<Vec<_>>>()?;
-
-                    for value in js_args {
-                        args.push_arg(value)?;
-                    }
-
-                    let mut handler: llrt_core::Value = build_handler_function.call_arg(args)?;
-                    if let Some(promise) = handler.as_promise().cloned() {
-                        handler = promise.into_future::<llrt_core::Value>().await?;
-                    }
-
-                    let handler_function = handler.as_function().cloned().or_throw_msg(
-                        &ctx,
-                        "the default export function must return a function",
-                    )?;
-                    let globals = ctx.globals();
-                    let registry_key = "__RUST_HANDLER_REGISTRY";
-
-                    // Fetch the global registry object, or create it if it doesn't exist
-                    let registry: llrt_core::Object = match globals.get(registry_key) {
-                        Ok(obj) => obj,
-                        Err(_) => {
-                            let obj = llrt_core::Object::new(ctx.clone())?;
-                            globals.set(registry_key, obj.clone())?;
-                            obj
+                        if let Some(promise) = export.as_promise().cloned() {
+                            export = promise.into_future::<Value>().await?;
                         }
-                    };
-                    let id = uuid::Uuid::new_v4().to_string();
-                    registry.set(&id, handler_function)?;
-                    Ok(id)
+
+                        let build_handler_function = export.as_function().cloned().or_throw_msg(
+                            &ctx,
+                            &format!(
+                                "JS default export did not resolve to a function: {:?}",
+                                export
+                            ),
+                        )?;
+
+                        let build_context = Object::new(ctx.clone())?;
+                        build_context.set(
+                            "chordsFile",
+                            rquickjs_serde::to_value(ctx.clone(), raw)
+                                .or_throw_msg(&ctx, "failed to parse chords file")?,
+                        )?;
+
+                        let mut args = Args::new(ctx.clone(), build_args.len());
+                        args.this(build_context)?;
+                        log::debug!("calling build_handler with args {:?}", build_args);
+
+                        let js_args = build_args
+                            .into_iter()
+                            .map(|value| {
+                                rquickjs_serde::to_value(ctx.clone(), value)
+                                    .or_throw_msg(&ctx, "failed to convert event TOML arguments")
+                            })
+                            .collect::<rquickjs::Result<Vec<_>>>()?;
+
+                        for value in js_args {
+                            args.push_arg(value)?;
+                        }
+
+                        let mut handler: llrt_core::Value = build_handler_function.call_arg(args)?;
+                        if let Some(promise) = handler.as_promise().cloned() {
+                            handler = promise.into_future::<llrt_core::Value>().await?;
+                        }
+
+                        let handler_function = handler.as_function().cloned().or_throw_msg(
+                            &ctx,
+                            "the default export function must return a function",
+                        )?;
+                        let globals = ctx.globals();
+                        let registry_key = "__RUST_HANDLER_REGISTRY";
+
+                        // Fetch the global registry object, or create it if it doesn't exist
+                        let registry: Object = match globals.get(registry_key) {
+                            Ok(obj) => obj,
+                            Err(_) => {
+                                let obj = Object::new(ctx.clone())?;
+                                globals.set(registry_key, obj.clone())?;
+                                obj
+                            }
+                        };
+                        let id = uuid::Uuid::new_v4().to_string();
+                        registry.set(&id, handler_function)?;
+                        Ok(id)
+                    }.await.map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
                 })
             }).await?;
 

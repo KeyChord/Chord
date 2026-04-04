@@ -14,7 +14,7 @@ type FullImportSpecifier = String;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordJsPackage {
-    name: String,
+    pub name: String,
     files: HashMap<FilePathslug, String>,
 }
 
