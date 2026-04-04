@@ -86,14 +86,14 @@ As an example, say you wanted to quickly toggle the tabs view, the sidebar view,
   <summary>tt⇪ts⇪tp⇪</summary>
 
 1. Tap(T)
-1. Tap(T)
-1. Tap(Caps)
-1. Tap(T)
-1. Tap(S)
-1. Tap(Caps)
-1. Tap(T)
-1. Tap(P)
-1. Tap(Caps)
+2. Tap(T)
+3. Tap(Caps)
+4. Tap(T)
+5. Tap(S)
+6. Tap(Caps)
+7. Tap(T)
+8. Tap(P)
+9. Tap(Caps)
 </details>
 
 You can just type `T` once and keep `Shift` held down for the other three keys:
@@ -102,11 +102,11 @@ You can just type `T` once and keep `Shift` held down for the other three keys:
   <summary>tTSP</summary>
 
 1. Tap(T)
-1. Press(Shift)
-1. Tap(T)
-1. Tap(S)
-1. Tap(P)
-1. Release(Shift)
+2. Press(Shift)
+3. Tap(T)
+4. Tap(S)
+5. Tap(P)
+6. Release(Shift)
 </details>
 
 In addition, because chords don't use modifier keys, you're able to use any existing shortcuts while _Chord Mode_ is active. The following sequence of keys will move all the contents of your Downloads folder into a new folder:
@@ -151,26 +151,22 @@ In addition to running shortcuts and shell commands, chords can also run arbitra
 
 ```toml
 # chords/com/microsoft/VSCode/macos.toml
-[js]
-default = "dist/vscode.runtime.js"
-menu = "dist/menu.runtime.js"
+[on.command]
+file = "vscode.js"
+args = ["/Application/Visual Studio Code.app"]
+
+[on.menu]
+file = "@keychord/chords-menu/js/menu.js"
 
 [chords]
-# `explorer.newFile` doesn't have a default shortcut in VSCode
-fh = { name = "File: Here", 'js:default' = [ "explorer.newFile" ] }
-# `js:menu` calls the named `menu` target instead of `default`
-mc = { name = "Menu: Columns", 'js:menu' = [
+fh = { name = "File: Here", 'emit:command' = [ "explorer.newFile" ] }
+mc = { name = "Menu: Columns", 'emit:menu' = [
 	"View",
 	"Columns"
 ] }
-# String JS invocations are evaluated as JavaScript and must return an array
-df = { name = "Dynamic File", 'js:default' = '["explorer.newFile", Date.now().toString()]' }
-# ...
 ```
 
-The top-level `js` table maps invocation targets to JavaScript filenames. Chords must reference those targets with `js:<name>`, most commonly `js:default`.
-
-`js:<name>` accepts either a TOML array of literal values or a raw JavaScript string. When you use the string form, Chords evaluates it in the embedded JS runtime and expects the result to be an array, which is then spread into the target function call.
+The top-level `on` table maps invocation targets to JavaScript filenames. Chords must reference those targets with `js:<name>`, most commonly `js:default`.
 
 Chord embeds the [LLRT runtime](https://github.com/awslabs/llrt), a QuickJS-based JavaScript environment which provides partial compatibility with the Node.js APIs. For more information, see [scripting.md](./scripting.md).
 
@@ -182,6 +178,16 @@ Many macOS apps can only be activated through a global hotkey. We thus use a syn
 - `cmd+ctrl+alt+shift+{0..9}`
 - `cmd+ctrl+alt+shift+f{1..12}`
 - `cmd+ctrl+alt+f{1..12}`
+
+## Regex
+
+Chord triggers can also come in the form of regexes. To define a regex trigger, you just need to use parentheses (which
+must come AFTER the first character):
+
+<!-- TODO: get the right command -->
+```toml
+'/l(\d+)' = { name = "Lungo: $1 Minutes", shell = "open lungo://activate?minutes=$1" }
+```
 
 ## Web Mode
 
