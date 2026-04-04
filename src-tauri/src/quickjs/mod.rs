@@ -201,6 +201,7 @@ impl Loader for ModuleLoader {
 
 async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
     let rt = AsyncRuntime::new()?;
+    rt.set_max_stack_size(1024 * 1024).await;
     let module_builder = llrt_modules::module_builder::ModuleBuilder::default()
         .with_global(llrt_core::modules::embedded::init)
         .with_global(llrt_core::builtins_inspect::init);
@@ -404,17 +405,26 @@ pub async fn run_standalone_export(
 
 pub fn format_js_error<'js>(ctx: &Ctx<'js>, error: Error) -> String {
     match CaughtError::from_error(ctx, error) {
-        CaughtError::Error(error) => error.to_string(),
-        CaughtError::Exception(exception) => format_js_exception(&exception),
-        CaughtError::Value(value) => format!("JavaScript threw a non-Error value: {:?}", value),
+        CaughtError::Error(error) => format!("Internal Engine Error: {error}"),
+        CaughtError::Exception(exception) => format_js_exception(ctx, &exception),
+        CaughtError::Value(value) => {
+            // Force stringification of thrown primitives/objects
+            let stringified = ctx.json_stringify(&value)
+                .ok()
+                .flatten()
+                .and_then(|v| v.to_string().ok())
+                .unwrap_or_else(|| format!("{:?}", value));
+            format!("JavaScript threw a non-Error value: {}", stringified)
+        },
     }
 }
 
-fn format_js_exception<'js>(exception: &rquickjs::Exception<'js>) -> String {
+fn format_js_exception<'js>(ctx: &Ctx<'js>, exception: &rquickjs::Exception<'js>) -> String {
     let message = exception
         .message()
-        .map(|message| message.trim().to_string())
-        .filter(|message| !message.is_empty());
+        .map(|msg| msg.trim().to_string())
+        .filter(|msg| !msg.is_empty());
+
     let stack = exception
         .stack()
         .map(|stack| stack.trim().to_string())
@@ -423,8 +433,21 @@ fn format_js_exception<'js>(exception: &rquickjs::Exception<'js>) -> String {
     match (message, stack) {
         (Some(message), Some(stack)) if stack.contains(&message) => stack,
         (Some(message), Some(stack)) => format!("{message}\n{stack}"),
-        (Some(message), None) => message,
+        (Some(message), None) => {
+            // No JS stack exists (Promise rejected with primitive, or reqwest error).
+            // Dump the raw exception object.
+            let obj = exception.as_value();
+            let stringified = ctx.json_stringify(obj)
+                .ok()
+                .flatten()
+                .and_then(|v| v.to_string().ok())
+                .unwrap_or_else(|| format!("{:?}", obj));
+            format!("{message}\n[No JS stack trace available] Raw object: {stringified}")
+        },
         (None, Some(stack)) => stack,
-        (None, None) => "JavaScript exception with no message or stack".to_string(),
+        (None, None) => {
+            let obj = exception.as_value();
+            format!("Unknown exception without message or stack. Raw object: {:?}", obj)
+        },
     }
 }

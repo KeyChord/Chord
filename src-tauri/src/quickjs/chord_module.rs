@@ -332,12 +332,16 @@ async fn run_sudo_command<'js>(
         for arg in rust_args {
             cmd.arg(arg);
         }
+        cmd.stderr(std::process::Stdio::piped());
 
         // Execute and return a standard `std::io::Result` from the closure
         if elevated_command::Command::is_elevated() {
             cmd.output().map_err(|e| e.to_string())
         } else {
-            elevated_command::Command::new(cmd).output().map_err(|e| e.to_string())
+            let mut elevated_cmd = elevated_command::Command::new(cmd);
+            // TODO: make it more obvious that a specific package wants access
+            elevated_cmd.name("Chord".to_string());
+            elevated_cmd.output().map_err(|e| e.to_string())
         }
     })
         .await;

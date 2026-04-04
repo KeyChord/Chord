@@ -70,6 +70,8 @@ llrt_core = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06
 	'no-sdk',
 	'uncompressed',
 ] }
+# We need to manually enable all features
+llrt_os = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb", package = "llrt_os", default-features = true }
 rquickjs-serde = "0.5.0"
 tauri-plugin-store = "2"
 jsonc-parser = "0.32.1"

@@ -26,6 +26,7 @@
 		"targets": "all",
 		"createUpdaterArtifacts": true,
 		"macOS": {
+			"entitlements": "Entitlements.plist",
 			"signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
 			"infoPlist": "Info.plist"
 		},

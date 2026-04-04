@@ -158,3 +158,4 @@ async fn get_default_export<'js>(
     )?;
     Ok(function)
 }
+
