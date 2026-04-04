@@ -1,9 +1,9 @@
-use std::str::FromStr;
 use crate::api::{Api, ApiImpl};
 use crate::app::AppHandleExt;
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
 use parking_lot::deadlock;
+use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
@@ -45,7 +45,6 @@ pub fn run() {
 }
 
 pub fn run_app() {
-
     std::panic::set_hook(Box::new(|info| {
         let bt = std::backtrace::Backtrace::force_capture();
 

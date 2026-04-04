@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use crate::app::chord_package_registry::config::ConfigPackageRegistry;
+use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
 use crate::app::state::StateSingleton;
 use crate::models::RawChordPackage;
+use std::collections::HashMap;
 use tauri::AppHandle;
-use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
 
 pub struct ChordPackageRegistry {
     pub config: ConfigPackageRegistry,

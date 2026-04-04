@@ -15,7 +15,7 @@ struct FrontmostTracker {
 impl frontmost::app::FrontmostApp for FrontmostTracker {
     fn set_frontmost(&mut self, new_value: Option<String>) {
         let _ = self.observable.set_state(FrontmostState {
-            frontmost_app_bundle_id: new_value
+            frontmost_app_bundle_id: new_value,
         });
     }
 

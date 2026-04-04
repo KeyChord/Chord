@@ -87,12 +87,14 @@ impl LocalPackageRegistry {
         let mut packages = HashMap::new();
 
         for local_package_path in self.list_package_paths()? {
-            if let Ok(package) = Self::import_from_local_folder(local_package_path.as_path()).inspect_err(|e| {
-                log::warn!(
+            if let Ok(package) = Self::import_from_local_folder(local_package_path.as_path())
+                .inspect_err(|e| {
+                    log::warn!(
                         "Error importing local folder {}: {e}, skipping",
                         local_package_path.display()
                     );
-            }) {
+                })
+            {
                 packages.insert(package.package_name(), package);
             }
         }

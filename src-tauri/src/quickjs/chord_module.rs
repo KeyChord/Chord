@@ -12,11 +12,12 @@ use llrt_core::libs::utils::result::ResultExt;
 use osakit::{Language as OsaLanguage, Script as OsaScript};
 use rquickjs::Class;
 use rquickjs::class::{JsClass, Trace, Tracer};
+use rquickjs::function::Async;
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
 use std::collections::HashSet;
-use rquickjs::function::Async;
+use tokio::task::JoinSet;
 
 pub struct ChordModule;
 
@@ -336,14 +337,17 @@ async fn run_sudo_command<'js>(
 
         // Execute and return a standard `std::io::Result` from the closure
         if elevated_command::Command::is_elevated() {
-            cmd.output().map_err(|e| format!("elevated output failed: {}", e.to_string()))
+            cmd.output()
+                .map_err(|e| format!("elevated output failed: {}", e.to_string()))
         } else {
             let mut elevated_cmd = elevated_command::Command::new(cmd);
             elevated_cmd.name("Chord".to_string());
-            elevated_cmd.output().map_err(|e| format!("elevated output failed: {}", e.to_string()))
+            elevated_cmd
+                .output()
+                .map_err(|e| format!("elevated output failed: {}", e.to_string()))
         }
     })
-        .await;
+    .await;
 
     // 3. Handle the thread result back on the JS context thread.
     match thread_result {
@@ -353,13 +357,17 @@ async fn run_sudo_command<'js>(
         // Command failed to run (e.g., UAC cancelled, binary not found)
         Ok(Err(e)) => {
             // Throw a JS exception using the context
-            Err(Exception::throw_message(&ctx, &format!("failed to run command: {}", e)))
+            Err(Exception::throw_message(
+                &ctx,
+                &format!("failed to run command: {}", e),
+            ))
         }
 
         // Tokio `spawn_blocking` failed (the background thread panicked)
-        Err(e) => {
-            Err(Exception::throw_message(&ctx, &format!("background thread failed: {}", e)))
-        }
+        Err(e) => Err(Exception::throw_message(
+            &ctx,
+            &format!("background thread failed: {}", e),
+        )),
     }
 }
 impl ModuleDef for ChordModule {

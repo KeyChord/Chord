@@ -1,10 +1,10 @@
+use crate::observables::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
-use crate::observables::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use typeshare::typeshare;
 
 #[derive(Clone)]
@@ -22,7 +22,10 @@ pub struct ChordPackageStoreEntry {
 
 impl ChordPackageStore {
     pub fn new(handle: AppHandle) -> Self {
-        Self { handle, observable: ChordPackageStoreObservable::placeholder() }
+        Self {
+            handle,
+            observable: ChordPackageStoreObservable::placeholder(),
+        }
     }
 
     pub fn init(&self, observable: ChordPackageStoreObservable) -> Result<()> {
@@ -34,7 +37,6 @@ impl ChordPackageStore {
         let store = self.handle.store("chord-package-registry.json")?;
         Ok(store)
     }
-
 
     pub fn entries(&self) -> Result<HashMap<String, ChordPackageStoreEntry>> {
         Ok(self
@@ -55,7 +57,9 @@ impl ChordPackageStore {
 
     fn save(&self) -> Result<()> {
         self.store()?.save()?;
-        self.observable.set_state(ChordPackageStoreState { entries: self.entries()? })?;
+        self.observable.set_state(ChordPackageStoreState {
+            entries: self.entries()?,
+        })?;
         Ok(())
     }
 

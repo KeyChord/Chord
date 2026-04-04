@@ -8,9 +8,9 @@ use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
 use crate::app::AppHandleExt;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
+use crate::observables::{FrontmostObservable, FrontmostState};
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
-use crate::observables::{FrontmostObservable, FrontmostState};
 
 #[derive(Clone)]
 pub struct HandlerChordActionTaskRunner {
@@ -58,9 +58,10 @@ impl HandlerChordActionTaskRunner {
                             .get("__RUST_HANDLER_REGISTRY")
                             .or_throw_msg(&ctx, "Global handler registry not found")?;
 
-                        let handler_function: Function = registry
-                            .get(&handler_id)
-                            .or_throw_msg(&ctx, &format!("Handler ID '{}' not found in registry", handler_id))?;
+                        let handler_function: Function = registry.get(&handler_id).or_throw_msg(
+                            &ctx,
+                            &format!("Handler ID '{}' not found in registry", handler_id),
+                        )?;
 
                         for _ in 0..num_times {
                             let mut args = Args::new(ctx.clone(), event_args.len());
@@ -123,4 +124,3 @@ async fn get_default_export<'js>(
     )?;
     Ok(function)
 }
-

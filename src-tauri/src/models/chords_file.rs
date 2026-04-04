@@ -7,12 +7,12 @@ use crate::models::{
 };
 use anyhow::Context;
 use anyhow::Result;
+use llrt_core::Object;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
-use llrt_core::{Object};
 use toml::{Table, Value};
 use typeshare::typeshare;
 
@@ -84,7 +84,7 @@ pub struct ChordsFileHandler {
 #[serde(rename_all = "camelCase")]
 pub struct CompiledChordsFileHandler {
     pub event: String,
-    pub handler_id: String
+    pub handler_id: String,
 }
 
 // New struct for imports
@@ -270,7 +270,6 @@ impl ParsedChordsFile {
             actions,
         })
     }
-
 }
 
 impl FromStr for ParsedChordsFile {
@@ -310,15 +309,15 @@ impl FromStr for ParsedChordsFile {
                 };
 
                 if key.starts_with('?') {
-                    if let Ok(hint) = Self::parse_hint(key, chord_value)
-                        .inspect_err(|e| log::warn!("skipping hint {} because of parse error: {}", key, e))
-                    {
+                    if let Ok(hint) = Self::parse_hint(key, chord_value).inspect_err(|e| {
+                        log::warn!("skipping hint {} because of parse error: {}", key, e)
+                    }) {
                         chord_hints.push(hint);
                     }
                 } else {
-                    if let Ok(chord) = Self::parse_chord(key, chord_value, index)
-                        .inspect_err(|e| log::warn!("skipping chord {} because of parse error: {}", key, e))
-                    {
+                    if let Ok(chord) = Self::parse_chord(key, chord_value, index).inspect_err(|e| {
+                        log::warn!("skipping chord {} because of parse error: {}", key, e)
+                    }) {
                         chords.push(chord);
                     }
                     index += 1

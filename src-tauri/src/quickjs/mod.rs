@@ -100,7 +100,7 @@ struct ModuleResolver {}
 
 impl ModuleResolver {
     pub fn new() -> Self {
-      Self {}
+        Self {}
     }
 }
 
@@ -135,13 +135,16 @@ impl Resolver for ModuleResolver {
                 let chord_package = chord_pm.get_package_by_name(specifier.package);
                 if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
                     if let Some(import) = js_package.resolve_import(&import_specifier) {
-                        return Ok(import.clone())
+                        return Ok(import.clone());
                     }
                 }
             }
         }
 
-        Err(rquickjs::Error::new_resolving(base_module_specifier, import_specifier))
+        Err(rquickjs::Error::new_resolving(
+            base_module_specifier,
+            import_specifier,
+        ))
     }
 }
 
@@ -160,7 +163,12 @@ impl ModuleLoader {
     ) -> rquickjs::Result<Module<'js, Declared>> {
         let module = match name {
             "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord")?,
-            _ => return Err(rquickjs::Error::new_loading_message("chord", "unable to load"))
+            _ => {
+                return Err(rquickjs::Error::new_loading_message(
+                    "chord",
+                    "unable to load",
+                ));
+            }
         };
 
         Ok(module)
@@ -409,13 +417,14 @@ pub fn format_js_error<'js>(ctx: &Ctx<'js>, error: Error) -> String {
         CaughtError::Exception(exception) => format_js_exception(ctx, &exception),
         CaughtError::Value(value) => {
             // Force stringification of thrown primitives/objects
-            let stringified = ctx.json_stringify(&value)
+            let stringified = ctx
+                .json_stringify(&value)
                 .ok()
                 .flatten()
                 .and_then(|v| v.to_string().ok())
                 .unwrap_or_else(|| format!("{:?}", value));
             format!("JavaScript threw a non-Error value: {}", stringified)
-        },
+        }
     }
 }
 
@@ -437,17 +446,21 @@ fn format_js_exception<'js>(ctx: &Ctx<'js>, exception: &rquickjs::Exception<'js>
             // No JS stack exists (Promise rejected with primitive, or reqwest error).
             // Dump the raw exception object.
             let obj = exception.as_value();
-            let stringified = ctx.json_stringify(obj)
+            let stringified = ctx
+                .json_stringify(obj)
                 .ok()
                 .flatten()
                 .and_then(|v| v.to_string().ok())
                 .unwrap_or_else(|| format!("{:?}", obj));
             format!("{message}\n[No JS stack trace available] Raw object: {stringified}")
-        },
+        }
         (None, Some(stack)) => stack,
         (None, None) => {
             let obj = exception.as_value();
-            format!("Unknown exception without message or stack. Raw object: {:?}", obj)
-        },
+            format!(
+                "Unknown exception without message or stack. Raw object: {:?}",
+                obj
+            )
+        }
     }
 }

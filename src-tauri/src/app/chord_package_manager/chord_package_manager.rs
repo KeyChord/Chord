@@ -1,18 +1,22 @@
-use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
-
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
 use crate::app::chord_package_registry::ChordPackageRegistry;
 use crate::app::state::StateSingleton;
-use crate::models::{ChordInput, ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile};
+use crate::models::{
+    ChordInput, ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler,
+    FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
+};
 use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use llrt_core::libs::utils::result::ResultExt;
 use ordermap::OrderMap;
 use parking_lot::RwLock;
-use rquickjs::{Value, Module, Object, function::Args};
+use rquickjs::{Module, Object, Value, function::Args};
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tauri::AppHandle;
+use tokio::task::JoinSet;
 
 pub struct ChordPackageManager {
     // Packages is a OrderMap because we want to let the user prioritize certain packages
@@ -113,57 +117,86 @@ impl ChordPackageManager {
             .load_js_package(&name, raw_chord_package.js_files_contents.clone())
             .await?;
 
-        for (pathslug, parsed_chord_file) in &parsed_chords_files {
-            let Ok(chords_file) = self.compile_chords_file(
-                parsed_chord_file,
-                pathslug.to_owned(),
-                &js_package,
-                &parsed_chords_files,
-                &None
-            ).await
-                .inspect_err(|e| {
+        // 1. Wrap shared data in Arc if compile_chords_file needs 'self'
+        // If 'self' is just a helper struct, you might need to wrap it.
+        let shared_self = Arc::new(self);
+        let shared_files = Arc::new(parsed_chords_files.clone());
+        let shared_pkg = Arc::new(js_package.clone());
+
+        let mut set = JoinSet::new();
+
+        for (pathslug, parsed_chord_file) in parsed_chords_files {
+            // Clone pointers for the move
+            let handle = self.handle.clone();
+            let s_files = Arc::clone(&shared_files);
+            let s_pkg = Arc::clone(&shared_pkg);
+            let name = name.clone();
+            let p_slug = pathslug.clone();
+            let p_file = parsed_chord_file.clone();
+
+            set.spawn(async move {
+                let result = Self::compile_chords_file(
+                    handle,
+                    &p_file,
+                    p_slug.clone(),
+                    &s_pkg,
+                    &s_files,
+                    &None,
+                )
+                .await;
+
+                // Return the data back to the main thread
+                (p_slug, name, result)
+            });
+        }
+
+        // 2. Collect results as they finish (Promise.all style)
+        while let Some(res) = set.join_next().await {
+            let (pathslug, name, compile_result) = res?;
+
+            match compile_result {
+                Ok(chords_file) => {
+                    log::debug!(
+                        "compiled chords file {:#?} with {} chords",
+                        Path::new(&name).join(&pathslug),
+                        chords_file.chords.len()
+                    );
+
+                    let is_bundled_chords_file = pathslug
+                        .components()
+                        .nth(1)
+                        .and_then(|c| c.as_os_str().to_str())
+                        .map(|s| s.starts_with('@'))
+                        .unwrap_or(false);
+                    if !is_bundled_chords_file {
+                        // We only want to add global chords from non-bundled chord files (i.e. pathslugs that
+                        // don't start with `chords/@`
+                        for chord in &chords_file.chords {
+                            let first_char = chord.raw_trigger.chars().next();
+                            let is_non_alphanumeric =
+                                first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
+
+                            if is_non_alphanumeric {
+                                global_chords.push(ChordReference {
+                                    package_name: name.clone(),
+                                    chords_file_pathslug: pathslug.clone(),
+                                    chord: chord.clone(),
+                                });
+                            }
+                        }
+                    }
+
+                    compiled_chords_files.insert(pathslug.to_owned(), chords_file);
+                }
+                Err(e) => {
                     log::error!(
                         "skipping chords file {:?} in {} because of compilation error: {:?}",
                         pathslug,
                         name,
                         e
                     );
-                })
-            else {
-                continue;
-            };
-
-            log::debug!(
-                "compiled chords file {:#?} with {} chords",
-                Path::new(&name).join(pathslug),
-                chords_file.chords.len()
-            );
-
-            let is_bundled_chords_file = pathslug
-                .components()
-                .nth(1)
-                .and_then(|c| c.as_os_str().to_str())
-                .map(|s| s.starts_with('@'))
-                .unwrap_or(false);
-            if !is_bundled_chords_file {
-                // We only want to add global chords from non-bundled chord files (i.e. pathslugs that
-                // don't start with `chords/@`
-                for chord in &chords_file.chords {
-                    let first_char = chord.raw_trigger.chars().next();
-                    let is_non_alphanumeric =
-                        first_char.map(|c| !c.is_alphanumeric()).unwrap_or(false);
-
-                    if is_non_alphanumeric {
-                        global_chords.push(ChordReference {
-                            package_name: name.clone(),
-                            chords_file_pathslug: pathslug.clone(),
-                            chord: chord.clone(),
-                        });
-                    }
                 }
             }
-
-            compiled_chords_files.insert(pathslug.to_owned(), chords_file);
         }
 
         let chord_package = ChordPackage {
@@ -191,12 +224,14 @@ impl ChordPackageManager {
             return Ok(None);
         }
 
-        let package = ChordJsPackage::builder(self.handle.clone(), package_name).load(files).await?;
+        let package = ChordJsPackage::builder(self.handle.clone(), package_name)
+            .load(files)
+            .await?;
         Ok(Some(package))
     }
 
     pub async fn compile_chords_file(
-        &self,
+        handle: AppHandle,
         chords_file: &ParsedChordsFile,
         pathslug: FilePathslug,
         js_package: &Option<ChordJsPackage>,
@@ -217,8 +252,8 @@ impl ChordPackageManager {
                         let meta_value = override_arg
                             .or(chords_file.meta.get(arg))
                             .context(format!("missing arg {}", arg))?;
-                        // build_args.push(meta_value.clone());
-                        // continue;
+                        build_args.push(meta_value.clone());
+                        continue;
                     }
                 }
 
@@ -227,8 +262,16 @@ impl ChordPackageManager {
 
             let file = handler.file.clone();
             let raw = chords_file.raw.clone();
-            let pathslug_string = pathslug.to_str().context("failed to get pathslug as str")?.to_string();
-            let bundle_id = pathslug.parent().and_then(|p| p.strip_prefix("chords").ok()).map(|p| p.to_str()).context("failed to get pathslug as str")?.map(|p| p.to_string().replace("/", "."));
+            let pathslug_string = pathslug
+                .to_str()
+                .context("failed to get pathslug as str")?
+                .to_string();
+            let bundle_id = pathslug
+                .parent()
+                .and_then(|p| p.strip_prefix("chords").ok())
+                .map(|p| p.to_str())
+                .context("failed to get pathslug as str")?
+                .map(|p| p.to_string().replace("/", "."));
             let Some(js_package) = js_package else {
                 anyhow::bail!("A JS Package must be present when defining a handler")
             };
@@ -236,7 +279,7 @@ impl ChordPackageManager {
                 anyhow::bail!("file {} not found in js package {}", file, js_package.name);
             };
 
-            let handler_id = with_js(self.handle.clone(), move |ctx| {
+            let handler_id = with_js(handle.clone(), move |ctx| {
                 Box::pin(async move {
                     async {
                         let module_promise = Module::import(&ctx, module_specifier)?;
@@ -312,9 +355,12 @@ impl ChordPackageManager {
                         let id = uuid::Uuid::new_v4().to_string();
                         registry.set(&id, handler_function)?;
                         Ok(id)
-                    }.await.map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
+                    }
+                    .await
+                    .map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
                 })
-            }).await?;
+            })
+            .await?;
 
             handlers.push(CompiledChordsFileHandler {
                 event: event.clone(),
@@ -345,13 +391,15 @@ impl ChordPackageManager {
                 imported_file_path
             );
 
-            let compiled_file = Box::pin(self.compile_chords_file(
+            let compiled_file = Box::pin(Self::compile_chords_file(
+                handle.clone(),
                 imported_file,
                 imported_file_path,
                 js_package,
                 parsed_chords_files,
                 &import.r#override,
-            )).await?;
+            ))
+            .await?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
             handlers.extend(compiled_file.handlers.clone());
