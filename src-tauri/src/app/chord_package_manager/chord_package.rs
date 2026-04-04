@@ -142,8 +142,7 @@ impl ChordPackage {
                         package_name: chord_reference.package_name,
                         initiator_file_pathslug: chord_reference.chords_file_pathslug,
                         action: ChordTaskAction::Handler(HandlerChordAction {
-                            file: handler.file.clone(),
-                            build_args: handler.args.clone(),
+                            handler_id: handler.handler_id.clone(),
                             event_args,
                         }),
                         num_times,

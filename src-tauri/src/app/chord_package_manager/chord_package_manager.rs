@@ -226,7 +226,7 @@ impl ChordPackageManager {
                 build_args.push(arg.clone());
             }
 
-            let file = handler.file;
+            let file = handler.file.clone();
             let raw = chords_file.raw.clone();
             let Some(js_package) = js_package else {
                 anyhow::bail!("A JS Package must be present when defining a handler")
@@ -329,13 +329,13 @@ impl ChordPackageManager {
                 imported_file_path
             );
 
-            let compiled_file = self.compile_chords_file(
+            let compiled_file = Box::pin(self.compile_chords_file(
                 imported_file,
                 imported_file_path,
                 &None,
                 parsed_chords_files,
                 &import.r#override,
-            ).await?;
+            )).await?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
             handlers.extend(compiled_file.handlers.clone());

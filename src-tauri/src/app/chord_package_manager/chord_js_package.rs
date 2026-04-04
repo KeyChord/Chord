@@ -18,7 +18,7 @@ pub struct ChordJsPackage {
     files: HashMap<FilePathslug, String>,
 }
 
-struct ChordJsPackageBuilder {
+pub struct ChordJsPackageBuilder {
     name: String,
     handle: AppHandle
 }
