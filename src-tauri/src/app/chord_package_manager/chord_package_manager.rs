@@ -191,7 +191,7 @@ impl ChordPackageManager {
             return Ok(None);
         }
 
-        let package = ChordJsPackage::new(self.handle.clone(), package_name).load(files).await?;
+        let package = ChordJsPackage::builder(self.handle.clone(), package_name).load(files).await?;
         Ok(Some(package))
     }
 
@@ -217,21 +217,23 @@ impl ChordPackageManager {
                         let meta_value = override_arg
                             .or(chords_file.meta.get(arg))
                             .context(format!("missing arg {}", arg))?;
-                        build_args.push(meta_value.clone());
-                        continue;
+                        // build_args.push(meta_value.clone());
+                        // continue;
                     }
                 }
 
                 build_args.push(arg.clone());
             }
 
-            let import_specifier = handler.file.clone();
+            let file = handler.file.clone();
             let raw = chords_file.raw.clone();
+            let pathslug_string = pathslug.to_str().context("failed to get pathslug as str")?.to_string();
+            let bundle_id = pathslug.parent().and_then(|p| p.strip_prefix("chords").ok()).map(|p| p.to_str()).context("failed to get pathslug as str")?.map(|p| p.to_string().replace("/", "."));
             let Some(js_package) = js_package else {
                 anyhow::bail!("A JS Package must be present when defining a handler")
             };
-            let Some(module_specifier) = js_package.resolve_import(&import_specifier) else {
-                anyhow::bail!("file {} not found in js package {}", import_specifier, js_package.name);
+            let Some(module_specifier) = js_package.resolve_file(&pathslug, &file)? else {
+                anyhow::bail!("file {} not found in js package {}", file, js_package.name);
             };
 
             let handler_id = with_js(self.handle.clone(), move |ctx| {
@@ -259,6 +261,16 @@ impl ChordPackageManager {
                             rquickjs_serde::to_value(ctx.clone(), raw)
                                 .or_throw_msg(&ctx, "failed to parse chords file")?,
                         )?;
+                        build_context.set(
+                            "chordsFilePath",
+                            rquickjs_serde::to_value(ctx.clone(), pathslug_string)
+                                .or_throw_msg(&ctx, "failed to parse chords file pathslug")?,
+                        )?;
+                        build_context.set(
+                            "chordsFileAppId",
+                            rquickjs_serde::to_value(ctx.clone(), bundle_id)
+                                .or_throw_msg(&ctx, "failed to parse chords file app ID")?,
+                        )?;
 
                         let mut args = Args::new(ctx.clone(), build_args.len());
                         args.this(build_context)?;
@@ -276,9 +288,9 @@ impl ChordPackageManager {
                             args.push_arg(value)?;
                         }
 
-                        let mut handler: llrt_core::Value = build_handler_function.call_arg(args)?;
+                        let mut handler: Value = build_handler_function.call_arg(args)?;
                         if let Some(promise) = handler.as_promise().cloned() {
-                            handler = promise.into_future::<llrt_core::Value>().await?;
+                            handler = promise.into_future::<Value>().await?;
                         }
 
                         let handler_function = handler.as_function().cloned().or_throw_msg(
@@ -336,7 +348,7 @@ impl ChordPackageManager {
             let compiled_file = Box::pin(self.compile_chords_file(
                 imported_file,
                 imported_file_path,
-                &None,
+                js_package,
                 parsed_chords_files,
                 &import.r#override,
             )).await?;

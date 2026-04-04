@@ -1,7 +1,7 @@
 use crate::models::FilePathslug;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use llrt_core::Module;
 use typeshare::typeshare;
 use crate::quickjs::{format_js_error, with_js};
@@ -24,25 +24,66 @@ pub struct ChordJsPackageBuilder {
 }
 
 impl ChordJsPackage {
-    pub fn new(handle: AppHandle, name: &str) -> ChordJsPackageBuilder {
+    pub fn builder(handle: AppHandle, name: &str) -> ChordJsPackageBuilder {
         ChordJsPackageBuilder {
             name: name.to_string(),
             handle,
         }
     }
 
+    /// Gets the module specifier for a file, supporting nested (bundled) packages.
+    /// The pathslug is used to detect nested packages.
+    /// "file.js" from chords/com/app/macos.toml -> "js/file.js"
+    /// "file.js" from chords/@pkg/name/chords/com/app/macos.toml -> "js/@pkg/name/js/file.js"
+    pub fn resolve_file(&self, chords_file_pathslug: &FilePathslug, file: &str) -> Result<Option<String>> {
+        let path = Path::new(chords_file_pathslug.as_os_str());
+        let components: Vec<_> = path.components().collect();
+
+        // 1. Determine the JS root based on the directory structure
+        let js_root = if components.len() >= 4
+            && components[0].as_os_str() == "chords"
+            && components[1].as_os_str().to_str().unwrap_or("").starts_with('@')
+            && components[3].as_os_str() == "chords"
+        {
+            // Scoped case: chords/@pkg/name/chords/... -> js/@pkg/name/js
+            let pkg_scope = components[1].as_os_str();
+            let pkg_name = components[2].as_os_str();
+
+            Path::new("js")
+                .join(pkg_scope)
+                .join(pkg_name)
+                .join("js")
+        } else if components.first().map(|c| c.as_os_str()) == Some(std::ffi::OsStr::new("chords")) {
+            // Standard case: chords/... -> js
+            PathBuf::from("js")
+        } else {
+            anyhow::bail!("Path does not match a recognized chords directory structure");
+        };
+
+        // 2. Join the target file (e.g., "file.js") to our resolved root
+        let final_js_path = js_root.join(file);
+
+        // 3. Convert to string and resolve through the package registry
+        let import_specifier = final_js_path
+            .to_str()
+            .context("Failed to convert path to UTF-8")?;
+
+        Ok(self.resolve_import(import_specifier))
+    }
+
+    /// Gets the module specifier for a pathslug import, e.g. "js/tray.js"
     pub fn resolve_import(&self, import_specifier: &str) -> Option<String> {
         self.files
-            .get(&FilePathslug::from(import_specifier)).map(|s| format!("{}/{}", self.name, s))
+            .get(&FilePathslug::from(import_specifier)).map(|_| format!("{}/{}", self.name, import_specifier))
     }
 }
 
 impl ChordJsPackageBuilder {
     pub async fn load(self, files: HashMap<FilePathslug, String>) -> Result<ChordJsPackage> {
         for (file_pathslug, js) in &files {
-            let file_relpath = file_pathslug.to_owned();
+            let file_pathslug = file_pathslug.to_owned();
             let js_string = js.clone();
-            let path = PathBuf::from(self.name.clone()).join(file_relpath.clone());
+            let path = PathBuf::from(self.name.clone()).join(file_pathslug.clone());
             let module_specifier = path.to_str().context("invalid path")?.to_string();
             with_js(self.handle.clone(), move |ctx| {
                 Box::pin(async move {
@@ -50,7 +91,7 @@ impl ChordJsPackageBuilder {
                         log::debug!("declaring module {}", module_specifier);
                         let module = Module::declare(ctx.clone(), module_specifier.clone(), js_string.clone())?;
                         let meta = module.meta()?;
-                        meta.set("url", file_relpath.to_str())?;
+                        meta.set("url", module_specifier)?;
                         let (_evaluated, promise) = module.eval()?;
                         promise.into_future::<()>().await?;
                         Ok(())

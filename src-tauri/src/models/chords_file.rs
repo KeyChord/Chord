@@ -311,13 +311,13 @@ impl FromStr for ParsedChordsFile {
 
                 if key.starts_with('?') {
                     if let Ok(hint) = Self::parse_hint(key, chord_value)
-                        .inspect_err(|e| log::warn!("skipping hint because of parse error: {}", e))
+                        .inspect_err(|e| log::warn!("skipping hint {} because of parse error: {}", key, e))
                     {
                         chord_hints.push(hint);
                     }
                 } else {
                     if let Ok(chord) = Self::parse_chord(key, chord_value, index)
-                        .inspect_err(|e| log::warn!("skipping chord because of parse error: {}", e))
+                        .inspect_err(|e| log::warn!("skipping chord {} because of parse error: {}", key, e))
                     {
                         chords.push(chord);
                     }
