@@ -85,6 +85,9 @@ ordermap = "1.1"
 frontmost = { git = "https://github.com/KeyChord/frontmost" }
 elevated-command = "1.1.2"
 uuid = { version = "1", features = ["v4", "fast-rng"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tracing-log = "0.2" # This is the bridge
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

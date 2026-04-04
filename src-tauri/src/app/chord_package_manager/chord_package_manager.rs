@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::task::JoinSet;
+use tracing::{info, info_span, Instrument};
 
 pub struct ChordPackageManager {
     // Packages is a OrderMap because we want to let the user prioritize certain packages
@@ -117,36 +118,31 @@ impl ChordPackageManager {
             .load_js_package(&name, raw_chord_package.js_files_contents.clone())
             .await?;
 
-        // 1. Wrap shared data in Arc if compile_chords_file needs 'self'
-        // If 'self' is just a helper struct, you might need to wrap it.
-        let shared_self = Arc::new(self);
-        let shared_files = Arc::new(parsed_chords_files.clone());
-        let shared_pkg = Arc::new(js_package.clone());
+        let shared_parsed_chords_files = Arc::new(parsed_chords_files.clone());
+        let shared_js_package = Arc::new(js_package.clone());
 
         let mut set = JoinSet::new();
 
         for (pathslug, parsed_chord_file) in parsed_chords_files {
-            // Clone pointers for the move
             let handle = self.handle.clone();
-            let s_files = Arc::clone(&shared_files);
-            let s_pkg = Arc::clone(&shared_pkg);
+            let parsed_chords_files = Arc::clone(&shared_parsed_chords_files);
+            let js_package = Arc::clone(&shared_js_package);
             let name = name.clone();
-            let p_slug = pathslug.clone();
-            let p_file = parsed_chord_file.clone();
 
+            // let span = info_span!("compiling_file", file = %pathslug.to_string_lossy());
             set.spawn(async move {
                 let result = Self::compile_chords_file(
                     handle,
-                    &p_file,
-                    p_slug.clone(),
-                    &s_pkg,
-                    &s_files,
+                    &parsed_chord_file,
+                    pathslug.clone(),
+                    &js_package,
+                    &parsed_chords_files,
                     &None,
                 )
                 .await;
 
                 // Return the data back to the main thread
-                (p_slug, name, result)
+                (pathslug, name, result)
             });
         }
 
@@ -252,8 +248,8 @@ impl ChordPackageManager {
                         let meta_value = override_arg
                             .or(chords_file.meta.get(arg))
                             .context(format!("missing arg {}", arg))?;
-                        build_args.push(meta_value.clone());
-                        continue;
+                        // build_args.push(meta_value.clone());
+                        // continue;
                     }
                 }
 
