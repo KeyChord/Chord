@@ -90,8 +90,13 @@ pub fn setup(app: &mut tauri::App) -> anyhow::Result<()> {
 
     let handle = app.handle();
     tauri_app::scripting::init(handle.clone());
+
+    log::info!("Loading permissions synchronously to register input handlers immediately");
+    if let Err(e) = tauri::async_runtime::block_on(handle.app_permissions().load()) {
+        log::error!("Failed to load permissions: {e}");
+    }
+
     tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
-    tauri::async_runtime::spawn(load_permissions(handle.clone()));
 
     // Create tray
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
@@ -122,11 +127,6 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
     let chord_pm = handle.chord_package_manager();
     chord_pm.reload_all().await?;
     Ok(())
-}
-
-async fn load_permissions(handle: AppHandle) -> anyhow::Result<()> {
-    let permissions = handle.app_permissions();
-    Ok(permissions.load().await?)
 }
 
 fn manage<T>(handle: &AppHandle, value: T) -> T
