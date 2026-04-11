@@ -46,7 +46,7 @@ pub struct AppKeyboard {
     handle: AppHandle,
 }
 
-fn handle_key_event(handle: AppHandle, event: KeyEvent) {
+fn handle_key_event(handle: AppHandle, event: KeyEvent) -> Result<()> {
     todo!();
 }
 
@@ -75,7 +75,7 @@ impl AppKeyboard {
                 }
 
                 if !handle
-                    .state()
+                    .app_state()
                     .dev_lockfile_detector()
                     .should_intercept_input_events()
                 {
@@ -98,7 +98,8 @@ impl AppKeyboard {
                     _ => return Some(event),
                 };
 
-                let action = self.process_event(&key_event);
+                let keyboard = handle.app_state().keyboard();
+                let action = keyboard.process_event(&key_event);
 
                 if let Err(e) = tx.send(key_event) {
                     log::error!("Failed to send key event: {e}");

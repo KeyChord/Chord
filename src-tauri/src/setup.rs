@@ -135,7 +135,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     tauri_app::scripting::init(handle.clone());
 
     log::info!("Loading permissions synchronously to register input handlers immediately");
-    let state = AppHandleExt::state(app.handle());
+    let state = handle.app_state();
     if let Err(e) = tauri::async_runtime::block_on(state.permissions().load()) {
         log::error!("Failed to load permissions: {e}");
     }
@@ -165,7 +165,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
 }
 
 async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
-    let state = AppHandleExt::state(&handle);
+    let state = handle.app_state();
 
     #[cfg(debug_assertions)]
     {

@@ -120,7 +120,7 @@ pub fn run_app() {
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
-            let settings = handle.app_settings();
+            let settings = handle.app_state().settings();
             if let Err(error) = settings.ui.open() {
                 log::error!("Failed to show settings window for existing instance: {error}");
             }
@@ -172,7 +172,7 @@ pub fn run_app() {
 
         #[cfg(target_os = "macos")]
         if let RunEvent::Reopen { .. } = event {
-            let settings = handle.app_settings();
+            let settings = handle.app_state().settings();
             if let Err(error) = settings.ui.open() {
                 log::error!("Failed to show settings window after dock reopen: {error}");
             }

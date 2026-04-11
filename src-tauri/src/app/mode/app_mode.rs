@@ -11,7 +11,7 @@ use tauri::AppHandle;
 
 #[derive(PartialEq)]
 #[atomic_enum(AtomicAppModeState)]
-pub(super) enum AppMode {
+pub enum AppMode {
     Idle,
     Chord,
 }
