@@ -5,11 +5,11 @@ use crate::state::GitRepo;
 
 pub async fn sync_git_repo(api: ApiImpl, repo: String) -> AppResult<GitRepo> {
     let handle = api.handle()?;
-    let store = handle.state().git_repos_store();
+    let store = &handle.app_state().chord_package_manager().registry.git.git_repos_store;
     let repo_ref = GitHubRepoRef::parse(&repo)?;
     store.sync_repo(repo_ref.clone())?;
 
-    let chord_package_manager = handle.state().chord_package_manager();
+    let chord_package_manager = handle.app_state().chord_package_manager();
     chord_package_manager.reload_all().await?;
     Ok(repo_ref.into_repo(store.github_repos_dir()?.as_path()))
 }

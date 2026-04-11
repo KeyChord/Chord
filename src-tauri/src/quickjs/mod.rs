@@ -131,7 +131,7 @@ impl Resolver for ModuleResolver {
         let userdata = ctx.userdata::<AppUserData>();
         if let Some(userdata) = userdata {
             if let Some(handle) = &userdata.handle {
-                let app = handle.state();
+                let app = handle.app_state();
                 let chord_pm = app.chord_package_manager();
                 let chord_package = chord_pm.get_package_by_name(specifier.package);
                 if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {

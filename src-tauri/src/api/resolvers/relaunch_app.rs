@@ -3,6 +3,6 @@ use crate::app::AppHandleExt;
 
 pub async fn relaunch_app(api: ApiImpl, bundle_id: String) -> AppResult<()> {
     let handle = api.handle()?;
-    let desktop_app_manager = handle.state().desktop_app_manager();
+    let desktop_app_manager = handle.app_state().desktop_app_manager();
     Ok(desktop_app_manager.relaunch_app(&bundle_id)?)
 }

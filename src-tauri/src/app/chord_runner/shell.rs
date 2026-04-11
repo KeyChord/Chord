@@ -17,12 +17,6 @@ pub struct ShellChordActionTaskRun {
 }
 
 impl ShellChordActionTaskRunner {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { _handle: handle }
-    }
-}
-
-impl ShellChordActionTaskRunner {
     pub fn start(
         &self,
         task: &ChordActionTask,

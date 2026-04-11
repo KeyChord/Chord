@@ -8,7 +8,7 @@ pub async fn update_global_shortcut_mapping(
     new_shortcut: String,
 ) -> AppResult<()> {
     let handle = api.handle()?;
-    let store = handle.state().global_hotkey_store();
+    let store = handle.app_state().global_hotkey_store();
     let old_shortcut = old_shortcut.trim();
     let new_shortcut = new_shortcut.trim();
 

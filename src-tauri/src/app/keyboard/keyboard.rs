@@ -46,6 +46,10 @@ pub struct AppKeyboard {
     handle: AppHandle,
 }
 
+fn handle_key_event(handle: AppHandle, event: KeyEvent) {
+    todo!();
+}
+
 impl AppKeyboard {
     pub fn register_input_handler(&self) -> Result<()> {
         let handle = self.handle.clone();
@@ -129,7 +133,7 @@ impl AppKeyboard {
         std::thread::spawn(move || {
             while let Ok(pressed) = rx.recv() {
                 if pressed {
-                    let keyboard = handle.state().keyboard();
+                    let keyboard = handle.app_state().keyboard();
                     keyboard.process_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
 
                     if let Err(e) = handle_key_event(
@@ -139,7 +143,7 @@ impl AppKeyboard {
                         log::error!("Failed to handle Caps Lock Press: {e}");
                     }
                 } else {
-                    let keyboard = handle.state().keyboard();
+                    let keyboard = handle.app_state().keyboard();
                     keyboard.process_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
 
                     if let Err(e) = handle_key_event(
@@ -171,7 +175,7 @@ impl AppKeyboard {
             return KeyEventAction::Forward;
         };
 
-        let mode = self.handle.state().mode_manager().mode();
+        let mode = self.handle.app_state().mode_manager().mode();
         // We consume all events in chord mode
         if mode.is_chord() {
             return KeyEventAction::Consume;

@@ -11,7 +11,7 @@ pub async fn set_placeholder_chord_binding(
     sequence: String,
 ) -> AppResult<()> {
     let handle = api.handle()?;
-    let store = handle.state().placeholder_chord_store();
+    let store = handle.app_state().placeholder_chord_store();
     let key = PlaceholderChordStoreKey {
         file_path,
         sequence_template,
@@ -21,7 +21,7 @@ pub async fn set_placeholder_chord_binding(
     };
 
     store.set(key, entry)?;
-    let chord_pm = handle.state().chord_package_manager();
+    let chord_pm = handle.app_state().chord_package_manager();
     chord_pm.reload_all().await?;
     
     Ok(())

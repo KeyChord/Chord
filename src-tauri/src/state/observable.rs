@@ -158,8 +158,9 @@ macro_rules! define_observable {
             pub fn get_json(
                 handle: &::tauri::AppHandle,
             ) -> ::anyhow::Result<::serde_json::Value> {
-                let state = handle.observable_state::<$name>()?;
-                Ok(::serde_json::to_value(state)?)
+                todo!();
+                // let state = handle.observable_state::<$name>()?;
+                // Ok(::serde_json::to_value(state)?)
             }
         }
 

@@ -70,8 +70,8 @@ impl AppPermissionsInputMonitoring {
         let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_input_monitoring_enabled.is_some_and(|s| s) {
-                let app = handle.state();
-                let keyboard = handle.state().keyboard();
+                let app = handle.app_state();
+                let keyboard = handle.app_state().keyboard();
                 if let Err(e) = keyboard.register_caps_lock_input_handler() {
                     log::error!("Failed to handle caps lock input: {e}");
                 }
@@ -92,7 +92,7 @@ impl AppPermissionsAccessibility {
         let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
             if state.is_accessibility_enabled.is_some_and(|s| s) {
-                let keyboard = handle.state().keyboard();
+                let keyboard = handle.app_state().keyboard();
                 keyboard.register_input_handler();
             }
         }))?;

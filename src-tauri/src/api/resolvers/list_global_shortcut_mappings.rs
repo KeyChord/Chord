@@ -5,7 +5,7 @@ pub async fn list_global_shortcut_mappings(
     api: ApiImpl,
 ) -> AppResult<Vec<GlobalShortcutMappingInfo>> {
     let handle = api.handle()?;
-    let store = handle.state().global_hotkey_store();
+    let store = handle.app_state().global_hotkey_store();
     let mut mappings = store
         .entries()?
         .into_iter()

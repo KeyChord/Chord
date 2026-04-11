@@ -8,12 +8,12 @@ pub async fn remove_placeholder_chord_binding(
     sequence_template: String,
 ) -> AppResult<()> {
     let handle = api.handle()?;
-    let store = handle.state().placeholder_chord_store();
+    let store = handle.app_state().placeholder_chord_store();
     store.remove(&PlaceholderChordStoreKey {
         file_path,
         sequence_template,
     })?;
-    handle.state().chord_package_manager().reload_all().await?;
+    handle.app_state().chord_package_manager().reload_all().await?;
 
     Ok(())
 }

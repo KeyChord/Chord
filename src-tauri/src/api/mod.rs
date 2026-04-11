@@ -1,9 +1,10 @@
-use crate::api::ApiImpl;
-use crate::app::chord_package_manager::chord_package_registry::LocalChordPackage;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::startup::StartupStatusInfo;
 use crate::state::GitRepo;
 use taurpc_macros::taurpc_api;
+use crate::app::chord_package_manager::LocalChordPackage;
+
+pub use crate::api::ApiImpl;
 
 mod api;
 pub use api::*;

@@ -27,7 +27,7 @@ pub fn handle_url(url: &str) -> Result<()> {
 
     match command {
         ScriptCommand::OpenSettings => {
-            let settings = handle.app_settings();
+            let settings = handle.app_state().settings();
             settings.ui.open()?
         }
         ScriptCommand::ReloadConfigs => reload_configs(handle),
@@ -38,7 +38,7 @@ pub fn handle_url(url: &str) -> Result<()> {
 
 pub fn reload_configs(handle: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let chord_pm = handle.chord_package_manager();
+        let chord_pm = handle.app_state().chord_package_manager();
         if let Err(e) = chord_pm.reload_all().await {
             log::error!("Failed to reload packages: {}", e);
         }

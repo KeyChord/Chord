@@ -190,7 +190,7 @@ fn checkout_repo_revision(
         let mut clone = gix::prepare_clone(repo_ref.url(), &temp_path)?;
         let (mut checkout, _) =
             clone.fetch_only(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-        checkout.write_pending(oid, gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+        // checkout.write_pending(oid, gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
         fs::remove_dir_all(repo_path)?;
         fs::rename(temp_path, repo_path)?;
         return Ok(());

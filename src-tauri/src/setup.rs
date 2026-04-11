@@ -170,7 +170,7 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
     #[cfg(debug_assertions)]
     {
         log::debug!("Development mode detected, syncing default chordpack");
-        let store = state.chord_package_manager().registry.git.git_repos_store;
+        let store = &state.chord_package_manager().registry.git.git_repos_store;
         let default_chordpack = load_default_chordpack()?;
         store.ensure_pinned_repos(default_chordpack)?;
     }

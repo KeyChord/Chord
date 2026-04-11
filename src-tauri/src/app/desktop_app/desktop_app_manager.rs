@@ -86,9 +86,9 @@ impl DesktopAppManager {
     }
 
     pub fn set_app_needs_relaunch(&self, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
-        self.observable.set_state(|state| {
+        self.observable.set_state(|prev| {
             let bundle_id = bundle_id.to_string();
-            let mut apps_needing_relaunch = state.apps_needing_relaunch.clone();
+            let mut apps_needing_relaunch = prev.apps_needing_relaunch.clone();
 
             if needs_relaunch {
                 if !apps_needing_relaunch.contains(&bundle_id) {
@@ -99,7 +99,7 @@ impl DesktopAppManager {
             }
             DesktopAppManagerState {
                 apps_needing_relaunch,
-                ..state
+                ..prev
             }
         })?;
         Ok(())

@@ -11,22 +11,6 @@ macro_rules! define_app_state {
             $field:ident : $ty:ty
         ),+ $(,)?
     ) => {
-        #[allow(dead_code)]
-        pub struct AppManaged {
-            $(
-                pub $field: $ty,
-            )+
-        }
-
-        impl AppManaged {
-            #[allow(dead_code)]
-            pub fn register<R: ::tauri::Runtime>(self, handle: &::tauri::AppHandle<R>) {
-                $(
-                    let _ = ::tauri::Manager::manage(handle, self.$field);
-                )+
-            }
-        }
-
         /// A proxy struct to namespace the app-managed state getters.
         #[allow(dead_code)]
         pub struct AppAccessor<'a, R: ::tauri::Runtime> {
@@ -48,24 +32,14 @@ macro_rules! define_app_state {
             type Runtime: ::tauri::Runtime;
 
             /// Returns an accessor to retrieve app-managed states.
-            fn state(&self) -> AppAccessor<'_, Self::Runtime>;
-
-            fn observable_state<T: $crate::state::Observable>(
-                &self,
-            ) -> ::anyhow::Result<::std::sync::Arc<T::State>>;
+            fn app_state(&self) -> AppAccessor<'_, Self::Runtime>;
         }
 
         impl<R: ::tauri::Runtime> AppHandleExt for ::tauri::AppHandle<R> {
             type Runtime = R;
 
-            fn state(&self) -> AppAccessor<'_, R> {
+            fn app_state(&self) -> AppAccessor<'_, R> {
                 AppAccessor { handle: self }
-            }
-
-            fn observable_state<T: $crate::state::Observable>(
-                &self,
-            ) -> ::anyhow::Result<::std::sync::Arc<T::State>> {
-                Ok(::tauri::Manager::state::<T>(self).get_state()?)
             }
         }
     };

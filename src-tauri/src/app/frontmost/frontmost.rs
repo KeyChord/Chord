@@ -18,12 +18,12 @@ pub(super) struct FrontmostTracker {
 #[cfg(target_os = "macos")]
 impl frontmost::app::FrontmostApp for FrontmostTracker {
     fn set_frontmost(&mut self, new_value: Option<String>) {
-        let frontmost = self.handle.state().frontmost();
+        let frontmost = self.handle.app_state().frontmost();
         frontmost.set_frontmost(new_value);
     }
 
     fn update(&mut self) {
-        let frontmost = self.handle.state().frontmost();
+        let frontmost = self.handle.app_state().frontmost();
         println!(
             "Application activated: {:?}",
             frontmost.frontmost().unwrap()

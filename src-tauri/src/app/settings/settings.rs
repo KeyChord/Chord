@@ -17,7 +17,7 @@ pub struct AppSettings {
 impl AppSettings {
     pub fn apply_all(&self) -> anyhow::Result<()> {
         let state = self.observable.get_state()?;
-        self.apply_state(state.as_ref())
+        self.apply_state(&state)
     }
 
     pub fn toggle_menu_bar_icon(&self) -> anyhow::Result<()> {
@@ -42,7 +42,8 @@ impl AppSettings {
     where
         F: FnOnce(&mut AppSettingsState),
     {
-        self.observable.try_set_state(|mut state| {
+        self.observable.try_set_state(|prev| {
+            let mut state = prev;
             update(&mut state);
             self.save_state(&state)?;
             self.apply_state(&state)?;

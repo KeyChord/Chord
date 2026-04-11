@@ -47,9 +47,9 @@ impl ChordPackageStore {
 
     fn save(&self) -> Result<()> {
         self.store()?.save()?;
-        self.observable.set_state(|| ChordPackageStoreState {
+        self.observable.try_set_state(|state| Ok(ChordPackageStoreState {
             entries: self.entries()?,
-        })?;
+        }))?;
         Ok(())
     }
 

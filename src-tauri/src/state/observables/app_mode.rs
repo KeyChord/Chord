@@ -16,9 +16,3 @@ define_observable!(
     pub struct AppModeObservable(AppModeState);
     id: "app-mode";
 );
-
-impl AppModeObservable {
-    pub fn get(handle: AppHandle) {
-        handle.state().mode_manager();
-    }
-}
