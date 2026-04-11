@@ -21,13 +21,16 @@ use crate::state::{
 };
 use crate::tauri_app;
 use anyhow::Result;
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> Result<()> {
     let handle = app.handle().clone();
     let app_lock_file = AppLockFile::acquire(app.handle())?;
-    app.handle().manage(app_lock_file);
+    {
+        use tauri::Manager;
+        app.handle().manage(app_lock_file);
+    }
 
     let app_mode_observable = AppModeObservable::new(handle.clone())?;
     let app_permissions_observable = AppPermissionsObservable::new(handle.clone())?;
@@ -39,90 +42,95 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let git_repos_observable = GitReposObservable::new(handle.clone())?;
     let frontmost_observable = FrontmostObservable::new(handle.clone())?;
 
-    let mut app_state: Vec<Box<dyn AppSingleton>> = vec![
-        Box::new(
+    let managed = Managed {
+        handle: handle.clone(),
+        init_fns: Vec::new()
+    };
+
+    managed
+        .add(
             ChordModeManagerProvider {
                 handle: handle.clone(),
                 chord_input_observable,
                 chord_mode_observable,
             }
             .provide::<ChordModeManager>(),
-        ),
-        Box::new(
+        )
+        .add(
             ChordPackageManagerProvider {
                 handle: handle.clone(),
                 chord_package_manager_observable,
                 git_repos_observable,
             }
             .provide::<ChordPackageManager>(),
-        ),
-        Box::new(
+        )
+        .add(
             ChordPackageStoreProvider {
                 handle: handle.clone(),
             }
             .provide::<ChordPackageStore>(),
-        ),
-        Box::new(
+        )
+        .add(
             ChordActionTaskRunnerProvider {
                 handle: handle.clone(),
             }
             .provide::<ChordActionTaskRunner>(),
-        ),
-        Box::new(
+        )
+        .add(
             DesktopAppManagerProvider {
                 handle: handle.clone(),
                 desktop_app_manager_observable,
             }
             .provide::<DesktopAppManager>(),
-        ),
-        Box::new(DevLockfileDetectorProvider.provide::<DevLockfileDetector>()),
-        Box::new(
+        )
+        .add(DevLockfileDetectorProvider.provide::<DevLockfileDetector>())
+        .add(
             AppFrontmostProvider {
                 handle: handle.clone(),
                 frontmost_observable,
             }
             .provide::<AppFrontmost>(),
-        ),
-        Box::new(
+        )
+        .add(
             GlobalHotkeyStoreProvider {
                 handle: handle.clone(),
             }
             .provide::<GlobalHotkeyStore>(),
-        ),
-        Box::new(
+        )
+        .add(
             AppKeyboardProvider {
                 handle: handle.clone(),
             }
             .provide::<AppKeyboard>(),
-        ),
-        Box::new(
+        )
+        .add(
             AppModeManagerProvider {
                 handle: handle.clone(),
                 app_mode_observable,
             }
             .provide::<AppModeManager>(),
-        ),
-        Box::new(
+        )
+        .add(
             AppPermissionsProvider {
                 handle: handle.clone(),
                 app_permissions_observable,
             }
             .provide::<AppPermissions>(),
-        ),
-        Box::new(
+        )
+        .add(
             PlaceholderChordStoreProvider {
                 handle: handle.clone(),
             }
             .provide::<PlaceholderChordStore>(),
-        ),
-        Box::new(
+        )
+        .add(
             AppSettingsProvider {
                 handle: handle.clone(),
                 app_settings_observable,
             }
             .provide::<AppSettings>(),
-        ),
-    ];
+        )
+        .init()?;
 
     tauri_app::scripting::init(handle.clone());
 
@@ -170,4 +178,31 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
     let chord_pm = state.chord_package_manager();
     chord_pm.reload_all().await?;
     Ok(())
+}
+
+struct Managed {
+    pub handle: AppHandle,
+    init_fns: Vec<Box<dyn FnOnce() -> Result<()>>>
+}
+
+impl Managed {
+    fn add<T: AppSingleton>(mut self, value: T) -> Self {
+        use tauri::Manager;
+        self.handle.manage(value);
+
+        let handle = self.handle.clone();
+        self.init_fns.push(Box::new(move || {
+            let state = Manager::state::<T>(&handle);
+            state.init()
+        }));
+
+        self
+    }
+
+    fn init(self) -> Result<()> {
+        for init_fn in self.init_fns {
+            init_fn()?;
+        }
+        Ok(())
+    }
 }
