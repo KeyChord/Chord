@@ -1,15 +1,16 @@
+use crate::app::chord_runner::ChordActionTask;
+use crate::models::HandlerChordAction;
 use crate::quickjs::{format_js_error, with_js};
+use crate::state::{FrontmostObservable, FrontmostState};
 use anyhow::{Context, Result};
 use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
-use crate::app::chord_runner::ChordActionTask;
-use crate::models::HandlerChordAction;
-use crate::state::{FrontmostObservable, FrontmostState};
+use nject::injectable;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
-use crate::app::app::AppHandleExt;
 
+#[injectable]
 #[derive(Clone)]
 pub struct HandlerChordActionTaskRunner {
     handle: AppHandle,
@@ -18,12 +19,6 @@ pub struct HandlerChordActionTaskRunner {
 #[derive(Debug)]
 pub struct HandlerChordActionTaskRun {
     join_handle: JoinHandle<Result<()>>,
-}
-
-impl HandlerChordActionTaskRunner {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
 }
 
 impl HandlerChordActionTaskRunner {
@@ -36,8 +31,7 @@ impl HandlerChordActionTaskRunner {
         let handler_id = action.handler_id.clone();
         let event_args = action.event_args.clone();
         let num_times = task.num_times;
-        let frontmost = self.handle.observable_state::<FrontmostObservable>()?;
-        let frontmost_id = frontmost.frontmost_app_bundle_id.clone();
+        let frontmost_id = task.event.application_id.clone();
 
         let join_handle = tauri::async_runtime::spawn(async move {
             with_js(handle, move |ctx| {

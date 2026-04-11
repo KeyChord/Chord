@@ -1,15 +1,13 @@
 use anyhow::Result;
+use nject::injectable;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
+#[injectable]
 pub struct SettingsUi {
     pub handle: AppHandle,
 }
 
 impl SettingsUi {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
-
     pub fn get_or_create_window(&self) -> Result<WebviewWindow> {
         if let Some(window) = self.handle.get_webview_window("settings") {
             return Ok(window);

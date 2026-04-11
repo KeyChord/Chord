@@ -1,18 +1,17 @@
-use tauri::AppHandle;
 use crate::app::chord_package_store::ChordPackageStore;
 use crate::app::state::AppSingleton;
 use crate::state::{ChordPackageStoreObservable, Observable};
+use nject::provider;
+use tauri::AppHandle;
 
-impl AppSingleton<ChordPackageStoreObservable> for ChordPackageStore {
-    fn new(handle: AppHandle) -> Self {
-        Self {
-            handle,
-            observable: ChordPackageStoreObservable::uninitialized(),
-        }
-    }
+#[provider]
+pub struct ChordPackageStoreProvider {
+    #[provide(AppHandle, |v| v.clone())]
+    pub handle: AppHandle,
+}
 
-    fn init(&self, observable: ChordPackageStoreObservable) -> anyhow::Result<()> {
-        self.observable.init(observable);
+impl AppSingleton for ChordPackageStore {
+    fn init(&self) -> anyhow::Result<()> {
         Ok(())
     }
 }

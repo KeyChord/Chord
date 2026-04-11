@@ -1,6 +1,7 @@
 use crate::IndicatorPanel;
 use anyhow::Result;
 use arc_swap::ArcSwap;
+use nject::injectable;
 use objc2::msg_send;
 use objc2_app_kit::{
     NSRunningApplication, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
@@ -9,10 +10,12 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize, NSString};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
+use tauri::{
+    AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry,
+};
 use tauri_nspanel::{CollectionBehavior, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
@@ -29,22 +32,17 @@ pub struct NativeSurfaceRect {
     pub radius: f64,
 }
 
+#[injectable]
 pub struct ChordModeIndicatorUi {
+    #[inject(Arc::new(AtomicBool::new(false)))]
     pub is_visible: Arc<AtomicBool>,
+    #[inject(ArcSwap::new(Arc::new(None)))]
     pub panel: ArcSwap<Option<PanelHandle<Wry>>>,
 
     handle: AppHandle,
 }
 
 impl ChordModeIndicatorUi {
-    pub fn new(handle: AppHandle) -> Self {
-        Self {
-            handle,
-            is_visible: Arc::new(AtomicBool::new(false)),
-            panel: ArcSwap::new(Arc::new(None)),
-        }
-    }
-
     pub fn init(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         let panel = window.to_panel::<IndicatorPanel>().unwrap();
@@ -84,7 +82,7 @@ impl ChordModeIndicatorUi {
         Ok(())
     }
 
-    fn prepare_surface_before_reveal(&self) -> Result<()> {
+    pub fn prepare_surface_before_reveal(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         let (tx, rx) = mpsc::sync_channel(1);
         window.once("chorder-surface-ready", move |_| {

@@ -1,7 +1,7 @@
 use crate::define_observable;
+use crate::models::{ChordInput, ChordInputEvent};
 use serde::Serialize;
 use typeshare::typeshare;
-use crate::models::{ChordInput, ChordInputEvent};
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, PartialEq, Default)]
@@ -15,7 +15,7 @@ pub struct ChordInputState {
     pub pressed_input_event: Option<ChordInputEvent>,
 
     /// The chord that is "active"
-    pub loaded_input_event: Option<ChordInputEvent>,
+    pub selected_input_event: Option<ChordInputEvent>,
 
     // Whether Shift is still held down for the current chord-mode interaction.
     pub is_shift_pressed: bool,

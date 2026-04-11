@@ -1,4 +1,4 @@
-use crate::app::git_repos_store::PinnedGitRepoSpec;
+use crate::app::chord_package_manager::chord_package_registry::git::PinnedGitRepoSpec;
 use crate::git::GitHubRepoRef;
 use anyhow::Context;
 use serde::Deserialize;

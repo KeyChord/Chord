@@ -1,17 +1,16 @@
+use super::DevLockfileDetector;
+use crate::app::AppSingleton;
+use crate::state::DesktopAppManagerObservable;
+use anyhow::Result;
+use nject::provider;
 use std::path::PathBuf;
 use tauri::AppHandle;
-use crate::app::AppSingleton;
-use crate::app::dev_lockfile_detector::DevLockfileDetector;
 
-impl AppSingleton<()> for DevLockfileDetector {
-    fn new(_: AppHandle) -> Self {
-        Self {
-            enforce_lockfile_check: !cfg!(debug_assertions),
-            lockfile_path: PathBuf::from("/tmp/com.leonsilicon.chord-dev.lock"),
-        }
-    }
+#[provider]
+pub struct DevLockfileDetectorProvider;
 
-    fn init(&self, _: ()) -> anyhow::Result<()> {
+impl AppSingleton for DevLockfileDetector {
+    fn init(&self) -> Result<()> {
         Ok(())
     }
 }

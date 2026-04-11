@@ -1,17 +1,18 @@
 use crate::app::AppHandleExt;
-use keycode::KeyMappingCode;
-use std::os::raw::c_int;
-use std::process::Command;
-use std::sync::{OnceLock, mpsc::Sender};
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::mpsc::channel;
+use crate::app::mode::AppModeManager;
+use crate::app::state::AppSingleton;
+use crate::models::{Key, KeyEvent, KeyEventAction};
+use anyhow::Result;
 use bitflags::bitflags;
 use device_query::{DeviceQuery, DeviceState};
+use keycode::KeyMappingCode;
+use nject::injectable;
+use std::os::raw::c_int;
+use std::process::Command;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::mpsc::channel;
+use std::sync::{OnceLock, mpsc::Sender};
 use tauri::AppHandle;
-use crate::app::state::AppSingleton;
-use anyhow::Result;
-use crate::app::mode::AppModeManager;
-use crate::models::{Key, KeyEvent, KeyEventAction};
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
@@ -29,11 +30,20 @@ bitflags! {
   }
 }
 
+#[injectable]
 pub struct AppKeyboard {
+    #[inject(
+        if macos_accessibility_client::accessibility::application_is_trusted() {
+            Some(DeviceState {})
+        } else {
+            None
+        })
+    ]
     pub device_state: Option<DeviceState>,
+    #[inject(AtomicU16::new(0))]
     pub modifier_flags: AtomicU16,
 
-    pub(super) handle: AppHandle
+    handle: AppHandle,
 }
 
 impl AppKeyboard {
@@ -119,7 +129,8 @@ impl AppKeyboard {
         std::thread::spawn(move || {
             while let Ok(pressed) = rx.recv() {
                 if pressed {
-                    process_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
+                    let keyboard = handle.state().keyboard();
+                    keyboard.process_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
 
                     if let Err(e) = handle_key_event(
                         handle.clone(),
@@ -128,7 +139,8 @@ impl AppKeyboard {
                         log::error!("Failed to handle Caps Lock Press: {e}");
                     }
                 } else {
-                    process_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
+                    let keyboard = handle.state().keyboard();
+                    keyboard.process_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
 
                     if let Err(e) = handle_key_event(
                         handle.clone(),
@@ -156,18 +168,20 @@ impl AppKeyboard {
         self.update_modifier_flags(&event);
 
         let Some(ref device_state) = self.device_state else {
-            return KeyEventAction::Forward
+            return KeyEventAction::Forward;
         };
 
         let mode = self.handle.state().mode_manager().mode();
         // We consume all events in chord mode
         if mode.is_chord() {
-            return KeyEventAction::Consume
+            return KeyEventAction::Consume;
         }
         // We only consume the space bar in idle mode if it's pressed while Caps is pressed
         else {
             let keys = device_state.get_keys();
-            let is_caps_pressed = keys.iter().any(|&k| Key::from(k) == Key(KeyMappingCode::CapsLock));
+            let is_caps_pressed = keys
+                .iter()
+                .any(|&k| Key::from(k) == Key(KeyMappingCode::CapsLock));
         }
 
         KeyEventAction::Forward
@@ -212,7 +226,6 @@ impl AppKeyboard {
     }
 }
 
-
 unsafe extern "C" {
     fn start_caps_lock_listener(cb: extern "C" fn(c_int));
     fn toggle_caps() -> c_int;
@@ -227,35 +240,4 @@ extern "C" fn caps_lock_changed(pressed: c_int) {
     } else {
         log::error!("No tx found");
     }
-}
-
-
-
-pub fn handle_key_event(handle: AppHandle, key_event: KeyEvent) -> Result<()> {
-    let app_mode = handle.state().mode();
-
-    match app_mode {
-        AppModeManager::Chord => {
-            chorder.handle_key_event(&key_event)?;
-        }
-        AppModeManager::None => {
-            let should_emit_caps_lock = handle
-                .app_context()
-                .take_caps_lock_passthrough_on_release(&key_event);
-            let state = handle.observable_state::<ChorderObservable>()?;
-            let should_finalize_chord_mode = should_finalize_chord_mode(&key_event, &state);
-
-            if should_finalize_chord_mode {
-                chorder.handle_key_event(&key_event)?;
-            }
-
-            chorder.ensure_inactive()?;
-
-            if should_emit_caps_lock {
-                // emit_caps_lock()?;
-            }
-        }
-    }
-
-    Ok(())
 }

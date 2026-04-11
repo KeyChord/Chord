@@ -1,5 +1,6 @@
 use crate::state::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use anyhow::Result;
+use nject::injectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -7,10 +8,11 @@ use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 use typeshare::typeshare;
 
+#[injectable]
 #[derive(Clone)]
 pub struct ChordPackageStore {
-    pub(super) handle: AppHandle,
-    pub(super) observable: ChordPackageStoreObservable,
+    handle: AppHandle,
+    observable: ChordPackageStoreObservable,
 }
 
 #[typeshare]
@@ -21,7 +23,6 @@ pub struct ChordPackageStoreEntry {
 }
 
 impl ChordPackageStore {
-
     pub fn store(&self) -> Result<Arc<Store<Wry>>> {
         let store = self.handle.store("chord-package-registry.json")?;
         Ok(store)

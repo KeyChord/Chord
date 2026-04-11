@@ -1,6 +1,6 @@
+use observable_property::ObservableProperty;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use observable_property::ObservableProperty;
 use tauri::AppHandle;
 
 pub struct ObservableRegistration {
@@ -28,9 +28,7 @@ pub trait Observable: Sized + Send + Sync + 'static {
         observer: observable_property::Observer<Self::State>,
     ) -> anyhow::Result<observable_property::ObserverId>;
 
-    fn uninitialized() -> Self;
     fn new(handle: AppHandle) -> anyhow::Result<Self>;
-    fn init(&self, observable: Self);
 }
 
 pub fn get_all_observable_states(
@@ -51,26 +49,31 @@ macro_rules! define_observable {
     ) => {
         use tauri::Emitter;
         use crate::app::AppHandleExt;
+        use nject::{injectable, inject};
 
+        #[injectable]
         #[derive(Clone)]
         $(#[$meta])*
         $vis struct $name {
+            #[inject(
+                ::std::sync::Arc::new(
+                    // The RwLock is needed for a thread-safe callback-style `set_state`
+                    ::std::sync::RwLock::new(
+                        ::observable_property::ObservableProperty::new(
+                            $state::default()
+                        )
+                    )
+                )
+            )]
             state:
                 // Allows an observable to have many owners, though I'm not entirely sure whether
                 // this is best practice (ideally, we should split observables up if they otherwise
                 // need multiple owners)
                 ::std::sync::Arc<
-                    // The ArcSwap is needed to safely switch from an uninitialized observable to an
-                    // initialized one
-                    ::arc_swap::ArcSwap<
-                        // None for uninitialized observables
-                        ::std::option::Option<
-                            // The RwLock is needed for a thread-safe callback-style `set_state`
-                            ::std::sync::RwLock<
-                                ::observable_property::ObservableProperty<
-                                    $state
-                                >
-                            >
+                    // The RwLock is needed for a thread-safe callback-style `set_state`
+                    ::std::sync::RwLock<
+                        ::observable_property::ObservableProperty<
+                            $state
                         >
                     >
                 >
@@ -85,57 +88,29 @@ macro_rules! define_observable {
             const ID: &'static str = $id;
             const EVENT: &'static str = ::std::concat!("state:", $id);
 
-            fn uninitialized() -> Self {
-                Self {
-                    state: ::std::sync::Arc::new(
-                        ::arc_swap::ArcSwap::new(
-                            ::std::sync::Arc::new(
-                                ::std::option::Option::None
-                            )
-                        )
-                    )
-                }
-            }
-
-            fn init(&self, observable: Self) {
-                self.state.store(observable.state.load_full())
-            }
-
             fn get_state(&self) -> ::anyhow::Result<Self::State> {
-                if let Some(lock) = self.state.load().as_ref() {
-                    let observable = lock.read().unwrap();
-                    Ok(observable.get()?)
-                } else {
-                    anyhow::bail!("uninitialized state")
-                }
+                let observable = self.state.read().unwrap();
+                Ok(observable.get()?)
             }
 
             fn set_state<T>(&self, callback: T) -> ::anyhow::Result<()>
             where
                 T: ::core::ops::FnOnce(Self::State) -> Self::State
             {
-                if let Some(lock) = self.state.load().as_ref() {
-                    let observable = lock.read().unwrap();
-                    let prev_state = observable.get()?;
-                    let next_state = callback(prev_state);
-                    Ok(observable.set(next_state)?)
-                } else {
-                    anyhow::bail!("uninitialized state")
-                }
+                let observable = self.state.read().unwrap();
+                let prev_state = observable.get()?;
+                let next_state = callback(prev_state);
+                Ok(observable.set(next_state)?)
             }
 
             fn try_set_state<T>(&self, callback: T) -> ::anyhow::Result<()>
             where
                 T: ::core::ops::FnOnce(Self::State) -> ::anyhow::Result<Self::State>
             {
-                if let Some(lock) = self.state.load().as_ref() {
-                    let observable = lock.read().unwrap();
-                    let prev_state = observable.get()?;
-                    let next_state = callback(prev_state)?;
-                    Ok(observable.set(next_state)?)
-                } else {
-                    anyhow::bail!("uninitialized state")
-                }
+                let observable = self.state.read().unwrap();
+                let prev_state = observable.get()?;
+                let next_state = callback(prev_state)?;
+                Ok(observable.set(next_state)?)
             }
 
             fn new(handle: ::tauri::AppHandle) -> ::anyhow::Result<Self> {
@@ -156,14 +131,8 @@ macro_rules! define_observable {
 
                 Ok(Self {
                     state: ::std::sync::Arc::new(
-                        ::arc_swap::ArcSwap::new(
-                            ::std::sync::Arc::new(
-                                ::std::option::Option::Some(
-                                    ::std::sync::RwLock::new(
-                                        observable_property
-                                    )
-                                )
-                            )
+                        ::std::sync::RwLock::new(
+                            observable_property
                         )
                     )
                 })
@@ -173,12 +142,8 @@ macro_rules! define_observable {
                 &self,
                 observer: ::observable_property::Observer<Self::State>,
             ) -> ::anyhow::Result<observable_property::ObserverId> {
-                if let Some(lock) = self.state.load().as_ref() {
-                    let observable = lock.read().unwrap();
-                    Ok(observable.subscribe(observer)?)
-                } else {
-                    anyhow::bail!("no state")
-                }
+                let observable = self.state.read().unwrap();
+                Ok(observable.subscribe(observer)?)
             }
         }
 

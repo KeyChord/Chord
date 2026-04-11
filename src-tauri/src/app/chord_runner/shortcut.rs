@@ -1,17 +1,15 @@
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 use anyhow::Result;
+use nject::injectable;
 use tauri::AppHandle;
 
+#[injectable]
 pub struct ShortcutChordActionTaskRunner {
     handle: AppHandle,
 }
 
 impl ShortcutChordActionTaskRunner {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
-
     // We use `rdev` for simulate instead of Enigo because rdev sends actual keypresses
     // instead of enigo's input injection (this works better in some apps, e.g. cmd+1 in IntelliJ)
     pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {

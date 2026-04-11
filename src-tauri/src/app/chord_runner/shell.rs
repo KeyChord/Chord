@@ -1,12 +1,14 @@
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::ShellChordAction;
 use anyhow::Result;
+use nject::injectable;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 use tokio::process::Command;
 
+#[injectable]
 pub struct ShellChordActionTaskRunner {
-    _handle: AppHandle,
+    handle: AppHandle,
 }
 
 #[derive(Debug)]

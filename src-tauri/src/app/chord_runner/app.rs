@@ -1,13 +1,20 @@
-use tauri::AppHandle;
-use crate::app::chord_runner::{ChordActionTaskRunner, HandlerChordActionTaskRunner, ShellChordActionTaskRunner, ShortcutChordActionTaskRunner};
+use crate::app::chord_runner::{
+    ChordActionTaskRunner, HandlerChordActionTaskRunner, ShellChordActionTaskRunner,
+    ShortcutChordActionTaskRunner,
+};
 use crate::app::state::AppSingleton;
+use anyhow::Result;
+use nject::provider;
+use tauri::AppHandle;
 
-impl<T> AppSingleton<T> for ChordActionTaskRunner {
-    fn new(handle: AppHandle) -> Self {
-        Self {
-            handler: HandlerChordActionTaskRunner::new(handle.clone()),
-            shell: ShellChordActionTaskRunner::new(handle.clone()),
-            shortcut: ShortcutChordActionTaskRunner::new(handle.clone()),
-        }
+#[provider]
+pub struct ChordActionTaskRunnerProvider {
+    #[provide(AppHandle, |v| v.clone())]
+    pub handle: AppHandle,
+}
+
+impl AppSingleton for ChordActionTaskRunner {
+    fn init(&self) -> Result<()> {
+        Ok(())
     }
 }

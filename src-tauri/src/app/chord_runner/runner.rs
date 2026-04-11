@@ -1,5 +1,9 @@
-use super::{HandlerChordActionTaskRun, HandlerChordActionTaskRunner, ShellChordActionTaskRun, ShellChordActionTaskRunner, ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
-use crate::models::{ChordTaskAction, FilePathslug};
+use super::{
+    HandlerChordActionTaskRun, HandlerChordActionTaskRunner, ShellChordActionTaskRun,
+    ShellChordActionTaskRunner, ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner,
+};
+use crate::models::{ChordInputEvent, ChordTaskAction, FilePathslug};
+use nject::injectable;
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -11,6 +15,10 @@ use typeshare::typeshare;
 pub struct ChordActionTask {
     pub package_name: String,
     pub initiator_file_pathslug: FilePathslug,
+
+    /// The event that triggered the task.
+    pub event: ChordInputEvent,
+
     pub action: ChordTaskAction,
     pub num_times: u32,
 }
@@ -22,9 +30,10 @@ pub enum ChordActionTaskRun {
     Handler(HandlerChordActionTaskRun),
 }
 
+#[injectable]
 pub struct ChordActionTaskRunner {
-    pub(super) handler: HandlerChordActionTaskRunner,
-    pub(super) shell: ShellChordActionTaskRunner,
+    handler: HandlerChordActionTaskRunner,
+    shell: ShellChordActionTaskRunner,
     pub shortcut: ShortcutChordActionTaskRunner,
 }
 

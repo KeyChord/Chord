@@ -1,24 +1,34 @@
+use crate::app::AppHandleExt;
 use crate::app::state::AppSingleton;
 use crate::state::{AppPermissionsObservable, AppPermissionsState, Observable};
 use anyhow::{Context, Result};
+use nject::injectable;
 use std::sync::Arc;
 use std::sync::mpsc;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_autostart::ManagerExt;
-use crate::app::AppHandleExt;
 
+#[injectable]
 pub struct AppPermissions {
-    pub(super) input_monitoring: AppPermissionsInputMonitoring,
-    pub(super) accessibility: AppPermissionsAccessibility,
+    input_monitoring: AppPermissionsInputMonitoring,
+    accessibility: AppPermissionsAccessibility,
 
-    pub(super) observable: AppPermissionsObservable,
-    pub(super) handle: AppHandle,
+    observable: AppPermissionsObservable,
+    handle: AppHandle,
 }
 
 impl AppPermissions {
+    pub(super) fn init(&self) -> Result<()> {
+        self.input_monitoring.init(&self.observable)?;
+        self.accessibility.init(&self.observable)?;
+        Ok(())
+    }
+
     pub async fn load(&self) -> Result<()> {
-        let is_input_monitoring_enabled = tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
-        let is_accessibility_enabled = tauri_plugin_macos_permissions::check_accessibility_permission().await;
+        let is_input_monitoring_enabled =
+            tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
+        let is_accessibility_enabled =
+            tauri_plugin_macos_permissions::check_accessibility_permission().await;
         self.observable.set_state(|prev| AppPermissionsState {
             is_input_monitoring_enabled: Some(is_input_monitoring_enabled),
             is_accessibility_enabled: Some(is_accessibility_enabled),
@@ -49,15 +59,13 @@ impl AppPermissions {
     }
 }
 
+#[injectable]
 pub struct AppPermissionsInputMonitoring {
     handle: AppHandle,
+    app_permissions_observable: AppPermissionsObservable,
 }
 
 impl AppPermissionsInputMonitoring {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
-
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {
@@ -73,15 +81,13 @@ impl AppPermissionsInputMonitoring {
     }
 }
 
+#[injectable]
 pub struct AppPermissionsAccessibility {
     handle: AppHandle,
+    app_permissions_observable: AppPermissionsObservable,
 }
 
 impl AppPermissionsAccessibility {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
-
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
         observable.subscribe(Arc::new(move |_, state| {

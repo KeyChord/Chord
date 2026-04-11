@@ -1,49 +1,35 @@
 use crate::app::AppHandleExt;
+use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
+use crate::app::state::AppSingleton;
+use crate::models::{ChordInput, ChordInputEvent, Key, KeyEvent};
 use crate::state::{ChordInputObservable, ChordInputState, FrontmostObservable, Observable};
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
+use nject::injectable;
 use parking_lot::Mutex;
 use std::collections::HashSet;
-use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
-use crate::app::state::AppSingleton;
-use crate::models::{ChordInput, ChordInputEvent, Key, KeyEvent};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Listener};
 use tauri_plugin_user_input::InputEvent;
 
-pub struct AppChordInputManager {
-    pub(super) active_task_run: Mutex<Option<ChordActionTaskRun>>,
+#[injectable]
+pub struct ChordInputManager {
+    #[inject(Mutex::new(None))]
+    active_task_run: Mutex<Option<ChordActionTaskRun>>,
 
     /// Prevents double-pressing keys when a key is held for a while
-    pub(super) held_keys: Mutex<HashSet<Key>>,
+    #[inject(Mutex::new(HashSet::new()))]
+    held_keys: Mutex<HashSet<Key>>,
 
-    pub(super) handle: AppHandle,
-    pub(super) observable: ChordInputObservable
+    handle: AppHandle,
+    observable: ChordInputObservable,
 }
 
-impl AppChordInputManager {
-    pub fn ensure_active(&self) -> Result<()> {
-        if self.ui.ensure_visible()? {
-            let _ = self.ui.prepare_surface_before_reveal();
-            self.ui.reveal()?;
-        }
-        Ok(())
-    }
-
-    pub fn ensure_inactive(&self) -> Result<()> {
-        self.ui.ensure_hidden()?;
-        self.observable.set_state(|_| ChordInputState::default())?;
-        Ok(())
-    }
-
-    fn toggle_indicator_visibility(&self) -> Result<()> {
-        self.observable.set_state(|prev| ChordInputState {
-            is_indicator_visible: true,
-            ..prev
-        })?;
-        Ok(())
+impl ChordInputManager {
+    pub fn reset(&self) -> Result<()> {
+        self.observable.set_state(|_| ChordInputState::default())
     }
 
     fn spawn_end_task(&self, task_run: ChordActionTaskRun) -> Result<()> {
@@ -69,10 +55,11 @@ impl AppChordInputManager {
             return Ok(());
         }
 
-        let state = self.observable.get_state()?;
-        if Self::should_toggle_indicator_for_tab_event(key_event, state.is_shift_pressed) {
+        let is_shift_pressed = self.observable.get_state()?.is_shift_pressed;
+        if Self::should_toggle_indicator_for_tab_event(key_event, is_shift_pressed) {
             if matches!(key_event, KeyEvent::Press(_)) {
-                self.toggle_indicator_visibility()?;
+                let chord_mode_manager = self.handle.state().chord_mode_manager();
+                chord_mode_manager.toggle_indicator_visibility();
             }
             return Ok(());
         }
@@ -132,18 +119,17 @@ impl AppChordInputManager {
             // If the caps lock key is pressed, it means we should execute (and clear) the chord
             // currently in `key_buffer`, or if empty, execute the last chord
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
-                self.ensure_active()?;
                 let state = self.observable.get_state()?;
-                let key_buffer = state.key_buffer.clone();
+                let key_buffer = state.input.clone();
 
                 // An empty `key_buffer` means we should execute the last executed chord
                 if key_buffer.is_empty() {
                     // If there isn't an active chord, then do nothing
-                    let Some(active_chord_keys) = &state.active_chord_keys else {
+                    let Some(selected_chord_keys) = &state.selected_input_event else {
                         log::debug!("Key buffer is empty and no chord is active");
                         return Ok(());
                     };
-                    if let Some(task) = self.resolve_task_from_keys(active_chord_keys, 1)? {
+                    if let Some(task) = self.resolve_task_from_keys(selected_chord_keys, 1)? {
                         self.run_task(task)?;
                         self.observable.set_state(state.with_session(
                             vec![],
@@ -204,14 +190,14 @@ impl AppChordInputManager {
         keys: &[Key],
         num_times: u32,
     ) -> Result<Option<ChordActionTask>> {
-        let frontmost = self.handle.observable_state::<FrontmostObservable>()?;
-        let application_id = frontmost.frontmost_app_bundle_id.clone();
+        let frontmost = self.handle.state().frontmost();
+        let application_id = frontmost.frontmost()?;
         let chord_package_manager = self.handle.state().chord_package_manager();
         let event = ChordInputEvent {
             input: keys.to_vec(),
-            application_id
+            application_id,
         };
-        let Some(chord_package) = chord_package_manager.resolve_package_for_input_event(&event) else {
+        let Some(chord_package) = chord_package_manager.create_event_context(&event) else {
             log::debug!("package for input {:?} not found", event);
             return Ok(None);
         };

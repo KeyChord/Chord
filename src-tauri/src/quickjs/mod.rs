@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::app::chord_package_manager::PackageSpecifier;
 use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
@@ -17,7 +18,6 @@ use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
-use crate::app::AppHandleExt;
 
 mod chord_module;
 

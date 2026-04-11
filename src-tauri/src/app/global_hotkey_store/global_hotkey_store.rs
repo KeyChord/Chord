@@ -1,4 +1,5 @@
 use anyhow::Result;
+use nject::injectable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ pub struct GlobalHotkeyStoreEntry {
     pub hotkey_id: String,
 }
 
+#[injectable]
 #[derive(Clone)]
 pub struct GlobalHotkeyStore {
     pub handle: AppHandle,

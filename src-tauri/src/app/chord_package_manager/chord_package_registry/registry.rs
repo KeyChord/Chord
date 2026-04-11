@@ -1,10 +1,15 @@
-use crate::app::chord_package_registry::config::ConfigPackageRegistry;
-use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
+use super::ConfigPackageRegistry;
+use super::LocalPackageRegistry;
+use super::git::GitChordPackageRegistry;
 use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
+use crate::state::GitReposObservable;
+use anyhow::Result;
+use nject::injectable;
 use std::collections::HashMap;
 use tauri::AppHandle;
 
+#[injectable]
 pub struct ChordPackageRegistry {
     pub config: ConfigPackageRegistry,
     pub git: GitChordPackageRegistry,
@@ -12,7 +17,7 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    /// Returns sorted by priority
+    /// TODO: return sorted by priority
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
 

@@ -7,6 +7,8 @@ mod chord_package_manager;
 pub use chord_package_manager::*;
 mod chord_package_registry;
 pub use chord_package_registry::*;
+mod chord_mode;
+pub use chord_mode::*;
 mod desktop_app_manager;
 pub use desktop_app_manager::*;
 mod frontmost;
@@ -16,5 +18,5 @@ pub use git_repos::*;
 mod permissions;
 pub use permissions::*;
 mod settings;
-pub use settings::*;
 
+pub use settings::*;

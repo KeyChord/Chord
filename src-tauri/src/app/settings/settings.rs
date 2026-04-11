@@ -1,19 +1,20 @@
+use crate::app::settings::settings_ui::SettingsUi;
+use crate::startup::APP_STATE_STORE_PATH;
+use crate::state::{AppSettingsObservable, AppSettingsState, Observable};
+use crate::tray::TRAY_ID;
 use anyhow::Context;
+use nject::injectable;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
-use crate::app::settings::settings_ui::SettingsUi;
-use crate::state::{AppSettingsObservable, AppSettingsState, Observable};
-use crate::startup::APP_STATE_STORE_PATH;
-use crate::tray::TRAY_ID;
 
+#[injectable]
 pub struct AppSettings {
     pub ui: SettingsUi,
-    pub(super) observable: AppSettingsObservable,
-    pub(super) handle: AppHandle,
+    observable: AppSettingsObservable,
+    handle: AppHandle,
 }
 
 impl AppSettings {
-
     pub fn apply_all(&self) -> anyhow::Result<()> {
         let state = self.observable.get_state()?;
         self.apply_state(state.as_ref())

@@ -1,6 +1,7 @@
 use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
 use anyhow::Context;
+use nject::injectable;
 use serde::Serialize;
 use specta::Type;
 use std::collections::HashMap;
@@ -30,15 +31,12 @@ impl LocalChordPackage {
     }
 }
 
+#[injectable]
 pub struct LocalPackageRegistry {
     handle: AppHandle,
 }
 
 impl LocalPackageRegistry {
-    pub fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
-
     pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
             .read_paths()?

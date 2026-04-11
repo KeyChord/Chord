@@ -874,6 +874,7 @@ dependencies = [
  "log",
  "mac-keycode",
  "macos-accessibility-client 0.0.2",
+ "nject",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -5215,6 +5216,26 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nject"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9e286093bc6929661494d211e22808d0631787455ea9c1477de5e15c966a087"
+dependencies = [
+ "nject-macro",
+]
+
+[[package]]
+name = "nject-macro"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eddf94cd95cba33854c2dfd5faee0fc115984e777a86cdbb8388a132c3529326"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "nodrop"

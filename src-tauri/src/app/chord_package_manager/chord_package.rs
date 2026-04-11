@@ -1,6 +1,9 @@
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{Chord, ChordAction, ChordInput, ChordInputEvent, ChordTaskAction, ChordTrigger, CompiledChordsFile, FilePathslug, HandlerChordAction, RawChordsFile};
+use crate::models::{
+    Chord, ChordAction, ChordInput, ChordInputEvent, ChordTaskAction, ChordTrigger,
+    CompiledChordsFile, FilePathslug, HandlerChordAction, RawChordsFile,
+};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -31,7 +34,10 @@ pub struct ChordReference {
 }
 
 impl ChordPackage {
-    pub fn resolve_chord_from_input_event(&self, event: &ChordInputEvent) -> Option<ChordReference> {
+    pub fn resolve_chord_from_input_event(
+        &self,
+        event: &ChordInputEvent,
+    ) -> Option<ChordReference> {
         if let Some(app_id) = &event.application_id {
             let pathslug = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
             let chords_file_pathslug = Path::new(&pathslug);
@@ -62,7 +68,7 @@ impl ChordPackage {
 
     pub fn resolve_task(
         &self,
-        input: &ChordInput,
+        event: ChordInputEvent,
         chord_reference: ChordReference,
         num_times: u32,
     ) -> Result<Option<ChordActionTask>> {
@@ -98,7 +104,8 @@ impl ChordPackage {
                     ChordTrigger::Pattern(regex) => {
                         // Replace all $1, $2, ... with the captured match from the regex
                         let mut args = Vec::new();
-                        let input_string = input
+                        let input_string = event
+                            .input
                             .iter()
                             .map(|k| k.to_char(false).unwrap_or_default())
                             .collect::<String>();
@@ -136,6 +143,7 @@ impl ChordPackage {
                 if let Some(handler) = handler {
                     Some(ChordActionTask {
                         package_name: chord_reference.package_name,
+                        event,
                         initiator_file_pathslug: chord_reference.chords_file_pathslug,
                         action: ChordTaskAction::Handler(HandlerChordAction {
                             handler_id: handler.handler_id.clone(),
@@ -158,12 +166,14 @@ impl ChordPackage {
             }
             ChordAction::Shortcut(shortcut) => Some(ChordActionTask {
                 package_name: chord_reference.package_name,
+                event,
                 initiator_file_pathslug: chord_reference.chords_file_pathslug,
                 action: ChordTaskAction::Shortcut(shortcut.clone()),
                 num_times,
             }),
             ChordAction::Shell(shell) => Some(ChordActionTask {
                 package_name: chord_reference.package_name,
+                event,
                 initiator_file_pathslug: chord_reference.chords_file_pathslug,
                 action: ChordTaskAction::Shell(shell.clone()),
                 num_times,

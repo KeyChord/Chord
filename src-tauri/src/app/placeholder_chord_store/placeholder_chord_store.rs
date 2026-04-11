@@ -1,6 +1,7 @@
+use nject::injectable;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
@@ -17,6 +18,7 @@ pub struct PlaceholderChordStoreEntry {
     pub sequence: String,
 }
 
+#[injectable]
 #[derive(Clone)]
 pub struct PlaceholderChordStore {
     pub handle: AppHandle,
@@ -26,7 +28,10 @@ impl PlaceholderChordStore {
     pub fn store(&self) -> anyhow::Result<Arc<Store<Wry>>> {
         Ok(self.handle.store(PLACEHOLDER_CHORDS_STORE_PATH)?)
     }
-    pub fn entries(&self) -> anyhow::Result<HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>> {
+
+    pub fn entries(
+        &self,
+    ) -> anyhow::Result<HashMap<PlaceholderChordStoreKey, PlaceholderChordStoreEntry>> {
         Ok(self
             .store()?
             .entries()

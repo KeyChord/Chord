@@ -1,39 +1,25 @@
-use std::thread;
-use frontmost::{start_nsrunloop, Detector};
-use objc2_app_kit::NSWorkspace;
-use tauri::AppHandle;
+use super::AppFrontmost;
 use crate::app::AppSingleton;
-use super::{AppFrontmost, FrontmostTracker};
-use crate::state::{FrontmostObservable, FrontmostState};
+use crate::app::frontmost::frontmost::FrontmostTracker;
+use crate::state::{FrontmostObservable, FrontmostState, Observable};
+use anyhow::Result;
+use frontmost::{Detector, start_nsrunloop};
+use nject::provider;
+use objc2_app_kit::NSWorkspace;
+use observable_property::ObservableProperty;
+use std::sync::Arc;
+use std::thread;
+use tauri::AppHandle;
 
-impl AppSingleton<FrontmostObservable> for AppFrontmost {
-    fn new(handle: AppHandle) -> Self {
-        Self {
-            observable: FrontmostObservable::uninitialized(),
-            handle,
-        }
-    }
-
-    fn init(&self, observable: FrontmostObservable) -> anyhow::Result<()> {
-        self.observable.init(observable.clone());
-
-        let workspace = NSWorkspace::sharedWorkspace();
-        if let Some(application) = workspace.frontmostApplication() {
-            if let Some(bundle_id) = application.bundleIdentifier() {
-                self.observable.set_state(FrontmostState {
-                    frontmost_app_bundle_id: Some(bundle_id.to_string()),
-                })?;
-            }
-        }
-
-        thread::spawn(|| {
-            start_nsrunloop!();
-        });
-        Detector::init(Box::new(FrontmostTracker {
-            observable: observable.clone(),
-        }));
-
-        Ok(())
-    }
+#[provider]
+pub struct AppFrontmostProvider {
+    pub frontmost_observable: FrontmostObservable,
+    #[provide(AppHandle, |h| h.clone())]
+    pub handle: AppHandle,
 }
 
+impl AppSingleton for AppFrontmost {
+    fn init(&self) -> Result<()> {
+        self.init()
+    }
+}

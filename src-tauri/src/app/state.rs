@@ -1,9 +1,8 @@
-use tauri::AppHandle;
 use anyhow::Result;
+use tauri::AppHandle;
 
-pub trait AppSingleton<T>: Send + Sync + 'static {
-    fn new(handle: AppHandle) -> Self;
-    fn init(&self, init: T) -> Result<()>;
+pub trait AppSingleton: Send + Sync + 'static {
+    fn init(&self) -> Result<()>;
 }
 
 macro_rules! define_app_state {
@@ -73,15 +72,13 @@ macro_rules! define_app_state {
 }
 
 define_app_state! {
-    chord_input_manager: super::chord_input_manager::AppChordInputManager,
+    chord_mode_manager: super::chord_mode_manager::ChordModeManager,
     chord_package_manager: super::chord_package_manager::ChordPackageManager,
-    chord_package_registry: super::chord_package_registry::ChordPackageRegistry,
     chord_package_store: super::chord_package_store::ChordPackageStore,
     chord_action_task_runner: super::chord_runner::ChordActionTaskRunner,
     desktop_app_manager: super::desktop_app::DesktopAppManager,
     dev_lockfile_detector: super::dev_lockfile_detector::DevLockfileDetector,
     frontmost: super::frontmost::AppFrontmost,
-    git_repos_store: super::git_repos_store::GitReposStore,
     global_hotkey_store: super::global_hotkey_store::GlobalHotkeyStore,
     keyboard: super::keyboard::AppKeyboard,
     mode_manager: super::mode::AppModeManager,

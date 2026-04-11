@@ -1,6 +1,5 @@
 #![allow(unused)]
-mod permissions;
 mod app;
-
+pub use app::*;
+mod permissions;
 pub use permissions::*;
-

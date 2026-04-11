@@ -1,4 +1,4 @@
-use super::{Key, ChordAction, ChordTrigger};
+use super::{ChordAction, ChordTrigger, Key};
 use serde::Serialize;
 use typeshare::typeshare;
 

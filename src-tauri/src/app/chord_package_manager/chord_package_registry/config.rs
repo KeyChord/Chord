@@ -1,16 +1,14 @@
-use crate::app::chord_package_registry::LocalPackageRegistry;
+use crate::app::chord_package_manager::chord_package_registry::LocalPackageRegistry;
 use crate::models::RawChordPackage;
+use nject::injectable;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+#[injectable]
 pub struct ConfigPackageRegistry;
 
 impl ConfigPackageRegistry {
-    pub fn new() -> Self {
-        Self
-    }
-
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
 
@@ -47,11 +45,5 @@ impl ConfigPackageRegistry {
 
     fn get_packages_dir(&self) -> Option<PathBuf> {
         dirs::config_dir().map(|p| p.join("chord").join("packages"))
-    }
-}
-
-impl Default for ConfigPackageRegistry {
-    fn default() -> Self {
-        Self::new()
     }
 }

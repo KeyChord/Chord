@@ -1,8 +1,8 @@
-use std::str::FromStr;
+use crate::models::{Key, KeyCombination, KeyCombinationModifiers};
 use anyhow::{Context, bail};
 use jsonc_parser::{JsonValue, ParseOptions};
+use std::str::FromStr;
 use std::sync::LazyLock;
-use crate::models::{Key, KeyCombination, KeyCombinationModifiers};
 
 pub const SETTINGS_MENU_ID: &str = "settings";
 pub const SHOW_SETTINGS_WINDOW_MENU_ID: &str = "show-settings-window";

@@ -1,14 +1,18 @@
-use tauri::AppHandle;
 use crate::app::AppSingleton;
 use crate::app::global_hotkey_store::global_hotkey_store::GlobalHotkeyStore;
+use crate::state::FrontmostObservable;
 use anyhow::Result;
+use nject::provider;
+use tauri::AppHandle;
 
-impl<T> AppSingleton<T> for GlobalHotkeyStore {
-    fn new(handle: AppHandle) -> Self {
-        Self { handle }
-    }
+#[provider]
+pub struct GlobalHotkeyStoreProvider {
+    #[provide(AppHandle, |h| h.clone())]
+    pub handle: AppHandle,
+}
 
-    fn init(&self, _: ()) -> Result<()> {
+impl AppSingleton for GlobalHotkeyStore {
+    fn init(&self) -> Result<()> {
         Ok(())
     }
 }

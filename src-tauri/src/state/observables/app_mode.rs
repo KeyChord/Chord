@@ -1,5 +1,6 @@
 use crate::define_observable;
 use serde::Serialize;
+use tauri::AppHandle;
 use typeshare::typeshare;
 
 #[typeshare]
@@ -8,10 +9,16 @@ use typeshare::typeshare;
 pub enum AppModeState {
     #[default]
     Idle,
-    Chord
+    Chord,
 }
 
 define_observable!(
     pub struct AppModeObservable(AppModeState);
     id: "app-mode";
 );
+
+impl AppModeObservable {
+    pub fn get(handle: AppHandle) {
+        handle.state().mode_manager();
+    }
+}

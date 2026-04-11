@@ -1,40 +1,41 @@
+use crate::app::desktop_app::DesktopApp;
+use crate::app::state::AppSingleton;
+use crate::quickjs::with_js;
+use crate::state::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
 use log::kv::ToValue;
+#[cfg(target_os = "macos")]
+use macos::init_macos_observers;
+use nject::injectable;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
 use objc2_foundation::NSString;
 #[allow(unused_imports)]
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
-use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
-use crate::app::desktop_app::DesktopApp;
-use crate::app::state::AppSingleton;
-use crate::quickjs::with_js;
-use crate::state::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
-#[cfg(target_os = "macos")]
-use macos::init_macos_observers;
 
+#[injectable]
 pub struct DesktopAppManager {
-    pub(super) observable: DesktopAppManagerObservable,
-    pub(super) handle: AppHandle,
+    observable: DesktopAppManagerObservable,
+    handle: AppHandle,
 }
 
 impl DesktopAppManager {
     #[allow(dead_code)]
     pub fn load_apps_metadata(&self, bundle_ids: &[&str]) -> Result<()> {
         self.observable.try_set_state(|prev| {
-            let mut next = prev.clone();
-            let mut state = Arc::make_mut(&mut next);
+            let mut next = prev;
 
             for bundle_id in bundle_ids {
                 let app = DesktopApp::new(&bundle_id)?;
                 if let Ok(metadata) = app.get_metadata() {
-                    state.apps_metadata.insert(bundle_id.to_string(), metadata);
+                    next.apps_metadata.insert(bundle_id.to_string(), metadata);
                 }
             }
 
@@ -85,23 +86,21 @@ impl DesktopAppManager {
     }
 
     pub fn set_app_needs_relaunch(&self, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
-        let bundle_id = bundle_id.to_string();
-        let state = self.observable.get_state()?;
-        let apps_needing_relaunch = state.apps_needing_relaunch.clone();
-        let apps_metadata = state.apps_metadata.clone();
-        let mut apps_needing_relaunch = apps_needing_relaunch.clone();
+        self.observable.set_state(|state| {
+            let bundle_id = bundle_id.to_string();
+            let mut apps_needing_relaunch = state.apps_needing_relaunch.clone();
 
-        if needs_relaunch {
-            if !apps_needing_relaunch.contains(&bundle_id) {
-                apps_needing_relaunch.push(bundle_id);
+            if needs_relaunch {
+                if !apps_needing_relaunch.contains(&bundle_id) {
+                    apps_needing_relaunch.push(bundle_id);
+                }
+            } else {
+                apps_needing_relaunch.retain(|id| id != &bundle_id);
             }
-        } else {
-            apps_needing_relaunch.retain(|id| id != &bundle_id);
-        }
-
-        self.observable.set_state(DesktopAppManagerState {
-            apps_needing_relaunch,
-            apps_metadata,
+            DesktopAppManagerState {
+                apps_needing_relaunch,
+                ..state
+            }
         })?;
         Ok(())
     }
@@ -386,4 +385,3 @@ mod macos {
         })
     }
 }
-

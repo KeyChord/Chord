@@ -1,11 +1,17 @@
+use crate::app::chord_package_manager::chord_package_registry::ChordPackageRegistry;
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
-use crate::app::chord_package_registry::ChordPackageRegistry;
 use crate::app::state::AppSingleton;
-use crate::models::{ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile};
-use crate::state::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
+use crate::models::{
+    ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile,
+    CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
+};
 use crate::quickjs::{format_js_error, with_js};
+use crate::state::{
+    ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable, Observable,
+};
 use anyhow::{Context, Result};
 use llrt_core::libs::utils::result::ResultExt;
+use nject::{inject, injectable};
 use ordermap::OrderMap;
 use parking_lot::RwLock;
 use rquickjs::{Module, Object, Value, function::Args};
@@ -14,27 +20,27 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::AppHandle;
 use tokio::task::JoinSet;
-use tracing::{info, info_span, Instrument};
+use tracing::{Instrument, info, info_span};
 
+#[injectable]
 pub struct ChordPackageManager {
     pub registry: ChordPackageRegistry,
 
     /// An ordered mapping from package name to package. Uses an OrderMap to allow the user to
     /// prioritize certain packages
-    pub(super) packages: RwLock<OrderMap<String, ChordPackage>>,
+    #[inject(RwLock::new(OrderMap::new()))]
+    packages: RwLock<OrderMap<String, ChordPackage>>,
 
-    pub(super) observable: ChordPackageManagerObservable,
-    pub(super) handle: AppHandle,
+    observable: ChordPackageManagerObservable,
+    handle: AppHandle,
 }
 
 struct ChordInputEventContext {
     chord_package: ChordPackage,
-    event: ChordInputEvent
+    event: ChordInputEvent,
 }
 
-
 impl ChordPackageManager {
-
     pub async fn reload_all(&self) -> Result<()> {
         let raw_chord_packages = self.registry.import_all_packages()?;
         self.packages.write().clear();

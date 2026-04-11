@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::app::desktop_app::{
     init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
@@ -15,9 +16,8 @@ use rquickjs::function::Async;
 use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
-use std::collections::HashSet;
 use serde::Serialize;
-use crate::app::AppHandleExt;
+use std::collections::HashSet;
 
 pub struct ChordModule;
 

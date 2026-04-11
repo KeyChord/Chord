@@ -2,6 +2,7 @@ use crate::app::state::AppSingleton;
 use crate::git::{GitHubRepoRef, clone_repo, update_or_clone_repo_at_revision};
 use crate::state::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
+use nject::injectable;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
@@ -9,16 +10,61 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
+/// TODO: This should not be a generic "git repos store", but instead should be tailored to the
+/// specific use cases of the Git package registry
+#[injectable]
 pub struct GitReposStore {
-    pub(super) observable: GitReposObservable,
-    pub(super) handle: AppHandle,
+    observable: GitReposObservable,
+    handle: AppHandle,
 }
 
 impl GitReposStore {
+    pub(in super::super) fn init(&self) -> Result<()> {
+        let mut repos = load_repos(self.store()?.as_ref())?;
+        let repos_root = self.github_repos_dir()?;
+
+        let mut changed = false;
+        for repo in repos.values_mut() {
+            let repo_ref = GitHubRepoRef {
+                owner: repo.owner.clone(),
+                name: repo.name.clone(),
+            };
+            let expected_path = repo_ref.local_abspath(&repos_root, repo.pinned_rev.as_deref());
+            if repo.local_abspath != expected_path {
+                if repo.local_abspath.exists() && !expected_path.exists() {
+                    log::info!(
+                        "Moving repo {} from {} to {}",
+                        repo.slug,
+                        repo.local_abspath.display(),
+                        expected_path.display()
+                    );
+                    if let Some(parent) = expected_path.parent() {
+                        let _ = fs::create_dir_all(parent);
+                    }
+                    if let Err(e) = fs::rename(&repo.local_abspath, &expected_path) {
+                        log::error!("Failed to move repo {}: {}", repo.slug, e);
+                    }
+                }
+                repo.local_abspath = expected_path;
+                changed = true;
+            }
+        }
+
+        if changed {
+            rewrite_repos(self.store()?.as_ref(), &repos)?;
+        }
+
+        self.observable.set_state(|_| GitReposState { repos })?;
+        Ok(())
+    }
+
+    pub fn app_cache_dir(&self) -> Result<PathBuf> {
+        Ok(self.handle.path().app_cache_dir()?)
+    }
+
     pub fn store(&self) -> Result<Arc<Store<Wry>>> {
         Ok(self.handle.store("repos.json")?)
     }
-
 
     fn save(&self) -> Result<()> {
         self.store()?.save()?;
@@ -33,7 +79,7 @@ impl GitReposStore {
 
     fn replace_all(&self, repos: HashMap<String, GitRepo>) -> Result<()> {
         rewrite_repos(self.store()?.as_ref(), &repos)?;
-        self.observable.set_state(GitReposState { repos })?;
+        self.observable.set_state(|_| GitReposState { repos })?;
         Ok(())
     }
 
@@ -54,8 +100,7 @@ impl GitReposStore {
     }
 
     pub fn github_repos_dir(&self) -> Result<PathBuf> {
-        let dir = self.handle.path().app_cache_dir()?;
-        Ok(dir.join("repos/github.com"))
+        Ok(self.app_cache_dir()?.join("repos/github.com"))
     }
 
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
@@ -95,9 +140,11 @@ impl GitReposStore {
         self.store()?.set(key.clone(), value);
         self.save()?;
 
-        let mut repos = state.repos.clone();
-        repos.insert(key, repo);
-        self.observable.set_state(GitReposState { repos })?;
+        self.observable.set_state(|prev| {
+            let mut next = prev;
+            next.repos.insert(key, repo);
+            next
+        })?;
 
         Ok(())
     }
