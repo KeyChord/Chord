@@ -54,7 +54,7 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
             }
             #[cfg(debug_assertions)]
             OPEN_INSPECTOR_MENU_ID => {
-                let chorder = handle.app_chorder();
+                let chorder = handle.app_chord_mode();
                 match chorder.ui.toggle_inspector() {
                     Ok(is_open) => {
                         let menu = handle.menu().unwrap();

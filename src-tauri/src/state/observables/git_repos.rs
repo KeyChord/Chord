@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use typeshare::typeshare;
 
 #[typeshare]
-#[derive(Serialize, Default)]
+#[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GitReposState {
     pub repos: HashMap<String, GitRepo>,

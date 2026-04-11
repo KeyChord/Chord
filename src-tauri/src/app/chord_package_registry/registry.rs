@@ -1,6 +1,6 @@
 use crate::app::chord_package_registry::config::ConfigPackageRegistry;
 use crate::app::chord_package_registry::{GitChordPackageRegistry, LocalPackageRegistry};
-use crate::app::state::StateSingleton;
+use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
 use std::collections::HashMap;
 use tauri::AppHandle;
@@ -12,14 +12,6 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    pub fn new(handle: AppHandle) -> Self {
-        Self {
-            config: ConfigPackageRegistry::new(),
-            git: GitChordPackageRegistry::new(handle.clone()),
-            local: LocalPackageRegistry::new(handle.clone()),
-        }
-    }
-
     /// Returns sorted by priority
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();

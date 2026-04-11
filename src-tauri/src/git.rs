@@ -1,8 +1,6 @@
-use crate::observables::GitRepo;
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 #[derive(Debug, Clone)]
 pub struct GitHubRepoRef {
@@ -155,119 +153,51 @@ pub fn clone_repo_at_revision(
     rev: &str,
 ) -> anyhow::Result<()> {
     clone_repo(repo_ref, destination)?;
-    checkout_repo_revision(destination, rev)?;
+    checkout_repo_revision(repo_ref, destination, rev)?;
     Ok(())
 }
 
-fn checkout_repo_revision(repo_path: &Path, rev: &str) -> anyhow::Result<()> {
+fn checkout_repo_revision(
+    repo_ref: &GitHubRepoRef,
+    repo_path: &Path,
+    rev: &str,
+) -> anyhow::Result<()> {
     let trimmed_rev = rev.trim();
     anyhow::ensure!(!trimmed_rev.is_empty(), "Revision cannot be empty");
 
-    let checkout_output = Command::new("git")
-        .arg("-C")
-        .arg(repo_path)
-        .arg("checkout")
-        .arg("--detach")
-        .arg(trimmed_rev)
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to run git checkout for revision {trimmed_rev} in {}",
-                repo_path.display()
-            )
-        })?;
+    let repo = gix::open(repo_path)
+        .with_context(|| format!("Failed to open repo at {}", repo_path.display()))?;
 
-    if checkout_output.status.success() {
-        // Successfully checked out directly
-    } else {
-        let fetch_output = Command::new("git")
-            .arg("-C")
-            .arg(repo_path)
-            .arg("fetch")
-            .arg("--depth")
-            .arg("1")
-            .arg("origin")
-            .arg(trimmed_rev)
-            .output()
-            .with_context(|| {
-                format!(
-                    "Failed to fetch revision {trimmed_rev} for {}",
-                    repo_path.display()
-                )
-            })?;
+    let mut head = repo.head()?;
+    let head_id = head.try_peel_to_id().ok().flatten();
 
-        anyhow::ensure!(
-            fetch_output.status.success(),
-            "Failed to fetch revision {trimmed_rev} for {}: {}",
-            repo_path.display(),
-            String::from_utf8_lossy(&fetch_output.stderr).trim()
-        );
+    if let Some(id) = head_id {
+        let id_str = id.to_string();
+        if id_str.starts_with(trimmed_rev) || id_str == trimmed_rev {
+            return Ok(());
+        }
+    }
 
-        let final_checkout_output = Command::new("git")
-            .arg("-C")
-            .arg(repo_path)
-            .arg("checkout")
-            .arg("--detach")
-            .arg("FETCH_HEAD")
-            .output()
-            .with_context(|| {
-                format!(
-                    "Failed to check out fetched revision {trimmed_rev} in {}",
-                    repo_path.display()
-                )
-            })?;
+    if let Ok(oid) = gix::ObjectId::from_hex(trimmed_rev.as_bytes()) {
+        drop(repo);
+        let temp_path = repo_path.with_extension("checkout");
+        if temp_path.exists() {
+            fs::remove_dir_all(&temp_path)?;
+        }
+        fs::create_dir_all(&temp_path)?;
 
-        anyhow::ensure!(
-            final_checkout_output.status.success(),
-            "Failed to check out revision {trimmed_rev} in {}: {}",
-            repo_path.display(),
-            String::from_utf8_lossy(&final_checkout_output.stderr).trim()
-        );
-
-        // --- Added verification step ---
-        let current_head_output = Command::new("git")
-            .arg("-C")
-            .arg(repo_path)
-            .arg("rev-parse")
-            .arg("HEAD")
-            .output()
-            .with_context(|| {
-                format!(
-                    "Failed to run git rev-parse HEAD for verification in {}",
-                    repo_path.display()
-                )
-            })?;
-
-        anyhow::ensure!(
-            current_head_output.status.success(),
-            "Failed to get current HEAD for verification in {}: {}",
-            repo_path.display(),
-            String::from_utf8_lossy(&current_head_output.stderr).trim()
-        );
-
-        let current_sha = String::from_utf8_lossy(&current_head_output.stdout)
-            .trim()
-            .to_string();
-        // Ensure the rev from chordpack.toml is also trimmed for comparison
-        let target_rev_trimmed = trimmed_rev.trim();
-
-        anyhow::ensure!(
-            current_sha == target_rev_trimmed,
-            "Verified HEAD commit {} does not match target revision {} for repository at {}",
-            current_sha,
-            target_rev_trimmed,
-            repo_path.display()
-        );
-        // --- End of added verification step ---
+        let mut clone = gix::prepare_clone(repo_ref.url(), &temp_path)?;
+        let (mut checkout, _) =
+            clone.fetch_only(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+        checkout.write_pending(oid, gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
+        fs::remove_dir_all(repo_path)?;
+        fs::rename(temp_path, repo_path)?;
+        return Ok(());
     }
 
     Ok(())
 }
 
-// --- NEW FUNCTION TO ADD ---
-
-/// Updates an existing repository by fetching origin and checking out a revision,
-/// or clones a new repository if it doesn't exist.
 pub fn update_or_clone_repo_at_revision(
     repo_ref: &GitHubRepoRef,
     destination: &Path,
@@ -276,7 +206,6 @@ pub fn update_or_clone_repo_at_revision(
     let trimmed_rev = rev.trim();
     anyhow::ensure!(!trimmed_rev.is_empty(), "Revision cannot be empty");
 
-    // Check if the repository directory exists and is a git repository.
     let repo_is_git = destination.exists() && destination.join(".git").exists();
 
     if repo_is_git {
@@ -286,42 +215,7 @@ pub fn update_or_clone_repo_at_revision(
             destination.display(),
             trimmed_rev
         );
-
-        // Fetch from origin
-        let fetch_output = Command::new("git")
-            .current_dir(destination) // Run command in the repo's directory
-            .arg("fetch")
-            .arg("origin")
-            .output()
-            .with_context(|| format!("Failed to fetch origin for {}", destination.display()))?;
-
-        anyhow::ensure!(
-            fetch_output.status.success(),
-            "Failed to fetch origin for {}: {}",
-            destination.display(),
-            String::from_utf8_lossy(&fetch_output.stderr).trim()
-        );
-
-        // Checkout the specific revision
-        let checkout_output = Command::new("git")
-            .current_dir(destination) // Ensure command is run in the repo's directory
-            .arg("checkout")
-            .arg("--detach")
-            .arg(trimmed_rev)
-            .output()
-            .with_context(|| {
-                format!(
-                    "Failed to run git checkout for revision {trimmed_rev} in {}",
-                    destination.display()
-                )
-            })?;
-
-        anyhow::ensure!(
-            checkout_output.status.success(),
-            "Failed to checkout revision {trimmed_rev} in {}: {}",
-            destination.display(),
-            String::from_utf8_lossy(&checkout_output.stderr).trim()
-        );
+        checkout_repo_revision(repo_ref, destination, trimmed_rev)?;
     } else {
         log::info!(
             "Repository {} does not exist at {}. Cloning from {} at revision {}.",
@@ -330,72 +224,22 @@ pub fn update_or_clone_repo_at_revision(
             repo_ref.url(),
             trimmed_rev
         );
-        // If it does not exist, clone it and then checkout the revision
-        // `clone_repo_at_revision` calls `clone_repo` and then `checkout_repo_revision`.
-        // The `checkout_repo_revision` part handles checking out the specific revision.
         clone_repo_at_revision(repo_ref, destination, trimmed_rev)?;
     }
 
-    // --- Verification step ---
-    // This verification step ensures the correct revision is checked out.
-    let current_head_output = Command::new("git")
-        .current_dir(destination)
-        .arg("rev-parse")
-        .arg("HEAD")
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to run git rev-parse HEAD for verification in {}",
-                destination.display()
-            )
-        })?;
+    let repo = gix::open(destination)?;
+    let mut head = repo.head()?;
+    let head_id = head.try_peel_to_id().ok().flatten();
 
-    anyhow::ensure!(
-        current_head_output.status.success(),
-        "Failed to get current HEAD for verification in {}: {}",
-        destination.display(),
-        String::from_utf8_lossy(&current_head_output.stderr).trim()
-    );
-
-    let current_sha = String::from_utf8_lossy(&current_head_output.stdout)
-        .trim()
-        .to_string();
-
-    // Resolve the input revision string to a commit SHA for robust comparison.
-    let git_rev_parse_output = Command::new("git")
-        .current_dir(destination)
-        .arg("rev-parse")
-        .arg(trimmed_rev) // Use the trimmed input revision string
-        .output()
-        .with_context(|| {
-            format!(
-                "Failed to rev-parse revision {} in {}",
-                trimmed_rev,
-                destination.display()
-            )
-        })?;
-
-    let resolved_sha = if git_rev_parse_output.status.success() {
-        String::from_utf8_lossy(&git_rev_parse_output.stdout)
-            .trim()
-            .to_string()
-    } else {
-        log::warn!(
-            "Could not resolve revision {} for {}. Verification will rely on HEAD commit match.",
-            trimmed_rev,
-            destination.display()
+    if let Some(id) = head_id {
+        let current_sha = id.to_string();
+        anyhow::ensure!(
+            current_sha.starts_with(trimmed_rev) || current_sha == trimmed_rev,
+            "Verified HEAD commit {} does not match revision {}",
+            current_sha,
+            trimmed_rev
         );
-        String::new() // Indicates no resolvable SHA from the input revision string
-    };
-
-    // Ensure the current HEAD commit matches the resolved revision.
-    anyhow::ensure!(
-        resolved_sha.is_empty() || current_sha == resolved_sha,
-        "Verified HEAD commit {} does not match the resolved revision {} for repository at {}",
-        current_sha,
-        resolved_sha,
-        destination.display()
-    );
+    }
 
     Ok(())
 }

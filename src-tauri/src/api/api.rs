@@ -20,3 +20,4 @@ impl ApiImpl {
             .ok_or_else(|| AppError::Message("app handle is not initialized".to_string()))
     }
 }
+

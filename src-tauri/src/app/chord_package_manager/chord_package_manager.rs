@@ -1,11 +1,8 @@
 use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
 use crate::app::chord_package_registry::ChordPackageRegistry;
-use crate::app::state::StateSingleton;
-use crate::models::{
-    ChordInput, ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler,
-    FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
-};
-use crate::observables::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
+use crate::app::state::AppSingleton;
+use crate::models::{ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile};
+use crate::state::{ChordPackageManagerObservable, ChordPackageManagerState, Observable};
 use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use llrt_core::libs::utils::result::ResultExt;
@@ -20,30 +17,23 @@ use tokio::task::JoinSet;
 use tracing::{info, info_span, Instrument};
 
 pub struct ChordPackageManager {
-    // Packages is a OrderMap because we want to let the user prioritize certain packages
-    packages: RwLock<OrderMap<String, ChordPackage>>,
     pub registry: ChordPackageRegistry,
 
-    observable: ChordPackageManagerObservable,
-    handle: AppHandle,
+    /// An ordered mapping from package name to package. Uses an OrderMap to allow the user to
+    /// prioritize certain packages
+    pub(super) packages: RwLock<OrderMap<String, ChordPackage>>,
+
+    pub(super) observable: ChordPackageManagerObservable,
+    pub(super) handle: AppHandle,
 }
 
-impl StateSingleton for ChordPackageManager {
-    fn new(handle: AppHandle) -> Self {
-        Self {
-            packages: RwLock::new(OrderMap::new()),
-            registry: ChordPackageRegistry::new(handle.clone()),
-            observable: ChordPackageManagerObservable::placeholder(),
-            handle,
-        }
-    }
+struct ChordInputEventContext {
+    chord_package: ChordPackage,
+    event: ChordInputEvent
 }
+
 
 impl ChordPackageManager {
-    pub fn init(&self, observable: ChordPackageManagerObservable) -> Result<()> {
-        self.observable.init(observable);
-        Ok(())
-    }
 
     pub async fn reload_all(&self) -> Result<()> {
         let raw_chord_packages = self.registry.import_all_packages()?;
@@ -66,7 +56,7 @@ impl ChordPackageManager {
             };
         }
 
-        self.observable.set_state(ChordPackageManagerState {
+        self.observable.set_state(|_| ChordPackageManagerState {
             packages: chord_packages,
         })?;
 
@@ -413,10 +403,11 @@ impl ChordPackageManager {
         })
     }
 
-    pub fn resolve_package_for_input(&self, input: &ChordInput) -> Option<ChordPackage> {
+    /// Gets the chord package that is responsible for handling a specific chord input event
+    pub fn create_event_context(&self, event: &ChordInputEvent) -> Option<ChordPackage> {
         let packages = self.packages.read();
 
-        if let Some(app_id) = &input.application_id {
+        if let Some(app_id) = &event.application_id {
             let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
             let path = PathBuf::from(path);
             for package in packages.values() {
@@ -424,7 +415,7 @@ impl ChordPackageManager {
                     if chords_file
                         .chords
                         .iter()
-                        .find(|c| c.trigger.matches(&input.keys))
+                        .find(|c| c.trigger.matches(&event.input))
                         .is_some()
                     {
                         return Some(package.clone());
@@ -437,7 +428,7 @@ impl ChordPackageManager {
             if package
                 .global_chords
                 .iter()
-                .find(|c| c.chord.trigger.matches(&input.keys))
+                .find(|c| c.chord.trigger.matches(&event.input))
                 .is_some()
             {
                 return Some(package.clone());

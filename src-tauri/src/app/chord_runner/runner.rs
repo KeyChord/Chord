@@ -1,6 +1,4 @@
-use crate::app::chord_runner::{HandlerChordActionTaskRun, HandlerChordActionTaskRunner};
-use crate::app::chord_runner::{ShellChordActionTaskRun, ShellChordActionTaskRunner};
-use crate::app::chord_runner::{ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
+use super::{HandlerChordActionTaskRun, HandlerChordActionTaskRunner, ShellChordActionTaskRun, ShellChordActionTaskRunner, ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner};
 use crate::models::{ChordTaskAction, FilePathslug};
 use serde::Serialize;
 use std::path::PathBuf;
@@ -25,20 +23,12 @@ pub enum ChordActionTaskRun {
 }
 
 pub struct ChordActionTaskRunner {
-    handler: HandlerChordActionTaskRunner,
-    shell: ShellChordActionTaskRunner,
+    pub(super) handler: HandlerChordActionTaskRunner,
+    pub(super) shell: ShellChordActionTaskRunner,
     pub shortcut: ShortcutChordActionTaskRunner,
 }
 
 impl ChordActionTaskRunner {
-    pub fn new(handle: AppHandle) -> Self {
-        Self {
-            handler: HandlerChordActionTaskRunner::new(handle.clone()),
-            shell: ShellChordActionTaskRunner::new(handle.clone()),
-            shortcut: ShortcutChordActionTaskRunner::new(handle.clone()),
-        }
-    }
-
     /// Called when the chord keys are pressed down.
     pub fn start_task(&self, task: &ChordActionTask) -> anyhow::Result<ChordActionTaskRun> {
         log::debug!("Starting task: {:?}", task);

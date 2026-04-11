@@ -1,4 +1,4 @@
-use crate::input::Key;
+use super::Key;
 use regex::Regex;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 

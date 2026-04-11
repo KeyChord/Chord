@@ -1,4 +1,4 @@
-use crate::input::Key;
+use super::Key;
 use crate::models::path::FilePathslug;
 use crate::models::toml::TomlValue;
 use crate::models::{

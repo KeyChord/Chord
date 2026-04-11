@@ -1,5 +1,5 @@
 use crate::api::{ApiImpl, AppError, AppResult};
-use crate::observables::get_all_observable_states;
+use crate::state::get_all_observable_states;
 
 pub async fn get_current_states(api: ApiImpl) -> AppResult<String> {
     let handle = api.handle()?;

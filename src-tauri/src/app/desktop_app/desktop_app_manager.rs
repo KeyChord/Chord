@@ -1,4 +1,3 @@
-use crate::observables::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
 use llrt_core::libs::utils::result::ResultExt;
 #[allow(unused_imports)]
@@ -9,46 +8,37 @@ use objc2_foundation::NSString;
 use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
 use std::cell::RefCell;
-
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
+use crate::app::desktop_app::DesktopApp;
+use crate::app::state::AppSingleton;
+use crate::quickjs::with_js;
+use crate::state::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
+#[cfg(target_os = "macos")]
+use macos::init_macos_observers;
 
 pub struct DesktopAppManager {
-    observable: DesktopAppManagerObservable,
-    _handle: AppHandle,
-}
-
-impl StateSingleton for DesktopAppManager {
-    fn new(handle: AppHandle) -> Self {
-        DesktopAppManager {
-            observable: DesktopAppManagerObservable::placeholder(),
-            _handle: handle,
-        }
-    }
+    pub(super) observable: DesktopAppManagerObservable,
+    pub(super) handle: AppHandle,
 }
 
 impl DesktopAppManager {
-    pub fn init(&self, observable: DesktopAppManagerObservable) -> Result<()> {
-        self.observable.init(observable);
-        Ok(())
-    }
-
     #[allow(dead_code)]
     pub fn load_apps_metadata(&self, bundle_ids: &[&str]) -> Result<()> {
-        let state = self.observable.get_state()?;
-        let mut apps_metadata = state.apps_metadata.clone();
-        let apps_needing_relaunch = state.apps_needing_relaunch.clone();
-        for bundle_id in bundle_ids {
-            let app = DesktopApp::new(&bundle_id)?;
-            if let Ok(metadata) = app.get_metadata() {
-                apps_metadata.insert(bundle_id.to_string(), metadata);
+        self.observable.try_set_state(|prev| {
+            let mut next = prev.clone();
+            let mut state = Arc::make_mut(&mut next);
+
+            for bundle_id in bundle_ids {
+                let app = DesktopApp::new(&bundle_id)?;
+                if let Ok(metadata) = app.get_metadata() {
+                    state.apps_metadata.insert(bundle_id.to_string(), metadata);
+                }
             }
-        }
-        self.observable.set_state(DesktopAppManagerState {
-            apps_metadata,
-            apps_needing_relaunch,
+
+            Ok(next)
         })?;
         Ok(())
     }
@@ -397,8 +387,3 @@ mod macos {
     }
 }
 
-use crate::app::desktop_app::DesktopApp;
-use crate::app::state::StateSingleton;
-use crate::quickjs::with_js;
-#[cfg(target_os = "macos")]
-use macos::init_macos_observers;

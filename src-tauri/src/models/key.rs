@@ -4,6 +4,18 @@ use keycode::KeyMappingCode::*;
 use std::str::FromStr;
 use typeshare::typeshare;
 
+#[derive(Debug)]
+pub enum KeyEvent {
+    Press(Key),
+    Release(Key),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum KeyEventAction {
+    Consume,
+    Forward,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct KeyCombination {
     pub key: Key,

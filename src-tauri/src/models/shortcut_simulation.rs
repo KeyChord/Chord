@@ -1,4 +1,4 @@
-use crate::input::Key;
+use super::Key;
 use keycode::KeyMappingCode;
 use serde::Serialize;
 use std::str::FromStr;

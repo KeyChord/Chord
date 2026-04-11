@@ -1,4 +1,4 @@
-use crate::models::shortcut_simulation::SimulatedShortcut;
+use super::SimulatedShortcut;
 use serde::Serialize;
 use typeshare::typeshare;
 

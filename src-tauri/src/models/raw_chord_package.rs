@@ -1,4 +1,4 @@
-use crate::models::FilePathslug;
+use super::FilePathslug;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::PathBuf;

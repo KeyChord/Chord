@@ -1,4 +1,3 @@
-use crate::app::AppHandleExt;
 use crate::app::desktop_app::{
     init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
@@ -17,7 +16,8 @@ use rquickjs::module::{Declarations, Exports, ModuleDef};
 use rquickjs::prelude::{Func, Rest, This};
 use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Value};
 use std::collections::HashSet;
-use tokio::task::JoinSet;
+use serde::Serialize;
+use crate::app::AppHandleExt;
 
 pub struct ChordModule;
 
@@ -204,7 +204,7 @@ fn on_app_terminate<'js>(
 
 fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
-    let runner = handle.chord_action_task_runner();
+    let runner = handle.state().chord_action_task_runner();
     let simulated_shortcut = key
         .parse::<SimulatedShortcut>()
         .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
@@ -222,7 +222,7 @@ fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
 
 fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
-    let runner = handle.chord_action_task_runner();
+    let runner = handle.state().chord_action_task_runner();
     let simulated_shortcut = key
         .parse::<SimulatedShortcut>()
         .or_throw_msg(&ctx, &format!("Invalid shortcut {}", key))?;
@@ -249,7 +249,7 @@ fn get_global_hotkey(
     hotkey_id: String,
 ) -> rquickjs::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
-    let global_hotkey_store = handle.app_global_hotkey_store();
+    let global_hotkey_store = handle.state().global_hotkey_store();
     let shortcut = global_hotkey_store
         .entries()
         .or_throw_msg(&ctx, "bad entries")?
@@ -267,7 +267,7 @@ fn register_global_hotkey(
     hotkey_id: String,
 ) -> rquickjs::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
-    let global_hotkey_store = handle.app_global_hotkey_store();
+    let global_hotkey_store = handle.state().global_hotkey_store();
     let all = global_hotkey_store
         .entries()
         .or_throw_msg(&ctx, "bad store")?;
@@ -310,7 +310,7 @@ fn set_app_needs_relaunch(
     needs_relaunch: bool,
 ) -> rquickjs::Result<()> {
     let handle = app_handle(&ctx)?;
-    let desktop_app_manager = handle.desktop_app_manager();
+    let desktop_app_manager = handle.state().desktop_app_manager();
     desktop_app_manager
         .set_app_needs_relaunch(&bundle_id, needs_relaunch)
         .or_throw_msg(&ctx, "failed to set app relaunch flag")?;

@@ -1,4 +1,4 @@
-use crate::app::state::StateSingleton;
+use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
 use anyhow::Context;
 use serde::Serialize;
@@ -34,13 +34,11 @@ pub struct LocalPackageRegistry {
     handle: AppHandle,
 }
 
-impl StateSingleton for LocalPackageRegistry {
-    fn new(handle: AppHandle) -> Self {
+impl LocalPackageRegistry {
+    pub fn new(handle: AppHandle) -> Self {
         Self { handle }
     }
-}
 
-impl LocalPackageRegistry {
     pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
             .read_paths()?

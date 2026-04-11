@@ -1,23 +1,21 @@
-use crate::app::AppHandleExt;
 use crate::app::chord_package_registry::LocalPackageRegistry;
-use crate::app::state::StateSingleton;
+use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
-use crate::observables::GitReposObservable;
+use crate::state::GitReposObservable;
 use anyhow::Result;
 use std::collections::HashMap;
 use tauri::AppHandle;
+use crate::app::AppHandleExt;
 
 pub struct GitChordPackageRegistry {
     handle: AppHandle,
 }
 
-impl StateSingleton for GitChordPackageRegistry {
-    fn new(handle: AppHandle) -> Self {
+impl GitChordPackageRegistry {
+    pub fn new(handle: AppHandle) -> Self {
         Self { handle }
     }
-}
 
-impl GitChordPackageRegistry {
     pub fn import_all_packages(&self) -> Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
         let state = self.handle.observable_state::<GitReposObservable>()?;

@@ -1,9 +1,6 @@
 use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
-use crate::models::{
-    Chord, ChordAction, ChordInput, ChordTaskAction, ChordTrigger, CompiledChordsFile,
-    FilePathslug, HandlerChordAction, RawChordsFile,
-};
+use crate::models::{Chord, ChordAction, ChordInput, ChordInputEvent, ChordTaskAction, ChordTrigger, CompiledChordsFile, FilePathslug, HandlerChordAction, RawChordsFile};
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -34,15 +31,15 @@ pub struct ChordReference {
 }
 
 impl ChordPackage {
-    pub fn resolve_chord_for_input(&self, input: &ChordInput) -> Option<ChordReference> {
-        if let Some(app_id) = &input.application_id {
+    pub fn resolve_chord_from_input_event(&self, event: &ChordInputEvent) -> Option<ChordReference> {
+        if let Some(app_id) = &event.application_id {
             let pathslug = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
             let chords_file_pathslug = Path::new(&pathslug);
             if let Some(chords_file) = self.compiled_chords_files.get(chords_file_pathslug) {
                 if let Some(chord) = chords_file
                     .chords
                     .iter()
-                    .find(|c| c.trigger.matches(&input.keys))
+                    .find(|c| c.trigger.matches(&event.input))
                 {
                     return Some(ChordReference {
                         package_name: self.name.clone(),
@@ -55,7 +52,7 @@ impl ChordPackage {
 
         self.global_chords
             .iter()
-            .find(|c| c.chord.trigger.matches(&input.keys))
+            .find(|c| c.chord.trigger.matches(&event.input))
             .map(|c| ChordReference {
                 package_name: self.name.clone(),
                 chords_file_pathslug: c.chords_file_pathslug.clone(),
@@ -102,7 +99,6 @@ impl ChordPackage {
                         // Replace all $1, $2, ... with the captured match from the regex
                         let mut args = Vec::new();
                         let input_string = input
-                            .keys
                             .iter()
                             .map(|k| k.to_char(false).unwrap_or_default())
                             .collect::<String>();

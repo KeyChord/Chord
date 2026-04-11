@@ -1,4 +1,3 @@
-use crate::app::AppHandleExt;
 use crate::app::chord_package_manager::PackageSpecifier;
 use crate::app::desktop_app::clear_callbacks;
 use crate::quickjs::chord_module::ChordModule;
@@ -18,6 +17,7 @@ use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::AppHandle;
 use tokio::runtime::Runtime;
 use tokio::sync::oneshot;
+use crate::app::AppHandleExt;
 
 mod chord_module;
 
@@ -131,7 +131,8 @@ impl Resolver for ModuleResolver {
         let userdata = ctx.userdata::<AppUserData>();
         if let Some(userdata) = userdata {
             if let Some(handle) = &userdata.handle {
-                let chord_pm = handle.chord_package_manager();
+                let app = handle.state();
+                let chord_pm = app.chord_package_manager();
                 let chord_package = chord_pm.get_package_by_name(specifier.package);
                 if let Some(Some(js_package)) = chord_package.map(|p| p.js_package) {
                     if let Some(import) = js_package.resolve_import(&import_specifier) {

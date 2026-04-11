@@ -1,8 +1,8 @@
-use crate::input::Key;
 use regex::Regex;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use typeshare::typeshare;
+use super::Key;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]

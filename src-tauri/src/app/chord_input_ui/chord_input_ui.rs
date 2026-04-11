@@ -9,9 +9,10 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize, NSString};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::Arc;
+use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
+use std::time::Duration;
+use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
 use tauri_nspanel::{CollectionBehavior, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
 
@@ -28,13 +29,14 @@ pub struct NativeSurfaceRect {
     pub radius: f64,
 }
 
-pub struct ChorderIndicatorUi {
-    pub handle: AppHandle,
+pub struct ChordModeIndicatorUi {
     pub is_visible: Arc<AtomicBool>,
     pub panel: ArcSwap<Option<PanelHandle<Wry>>>,
+
+    handle: AppHandle,
 }
 
-impl ChorderIndicatorUi {
+impl ChordModeIndicatorUi {
     pub fn new(handle: AppHandle) -> Self {
         Self {
             handle,
@@ -73,6 +75,34 @@ impl ChorderIndicatorUi {
                 .into(),
         );
         self.panel.store(Arc::new(Some(panel)));
+        Ok(())
+    }
+
+    fn emit_will_show(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        window.emit("chorder-will-show", ())?;
+        Ok(())
+    }
+
+    fn prepare_surface_before_reveal(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        let (tx, rx) = mpsc::sync_channel(1);
+        window.once("chorder-surface-ready", move |_| {
+            let _ = tx.send(());
+        });
+        self.emit_will_show()?;
+        rx.recv_timeout(Duration::from_millis(160))?;
+        Ok(())
+    }
+
+    pub fn preload(&self) -> Result<()> {
+        log::info!("Preloading chorder panel");
+
+        if self.ensure_visible()? {
+            self.prepare_surface_before_reveal()?;
+            self.ensure_hidden()?;
+        }
+
         Ok(())
     }
 

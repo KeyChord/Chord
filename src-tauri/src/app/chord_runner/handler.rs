@@ -2,15 +2,13 @@ use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
 use llrt_core::function::Args;
 use llrt_core::libs::utils::result::ResultExt;
-#[allow(unused_imports)]
 use llrt_core::{Ctx, Function, Module, Object, Promise, Value};
-
-use crate::app::AppHandleExt;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::HandlerChordAction;
-use crate::observables::{FrontmostObservable, FrontmostState};
+use crate::state::{FrontmostObservable, FrontmostState};
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
+use crate::app::app::AppHandleExt;
 
 #[derive(Clone)]
 pub struct HandlerChordActionTaskRunner {

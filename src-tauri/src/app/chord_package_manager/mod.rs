@@ -1,3 +1,6 @@
+#![allow(unused)]
+mod app;
+
 mod chord_package;
 pub use chord_package::*;
 mod chord_js_package;

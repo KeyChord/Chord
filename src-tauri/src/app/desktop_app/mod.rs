@@ -1,5 +1,8 @@
+#![allow(unused)]
 mod app;
-mod manager;
 
-pub use app::*;
-pub use manager::*;
+mod desktop_app;
+pub use desktop_app::*;
+
+mod desktop_app_manager;
+pub use desktop_app_manager::*;
