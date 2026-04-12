@@ -1,13 +1,12 @@
 use std::collections::HashMap;
-use tauri::{AppHandle, Manager};
-use anyhow::Result;
+use std::sync::{Arc, Mutex};
+use anyhow::{Context, Result};
+use std::sync::LazyLock;
 
-pub struct ObservableRegistration {
-    pub id: &'static str,
-    pub get_json: fn(&AppHandle) -> Result<serde_json::Value>,
-}
+type JsonProducer = Box<dyn Fn() -> Result<serde_json::Value> + Send + Sync>;
 
-inventory::collect!(ObservableRegistration);
+pub static OBSERVABLES: LazyLock<Mutex<Vec<(&'static str, JsonProducer)>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
 
 pub trait Observable: Sized + Send + Sync + 'static {
     type State: Clone + Default + serde::Serialize + Send + Sync + 'static;
@@ -15,9 +14,10 @@ pub trait Observable: Sized + Send + Sync + 'static {
     const ID: &'static str;
     const EVENT: &'static str;
 
-    fn new(handle: AppHandle) -> Result<Self>;
+    fn new(app: &mut tauri::App) -> Result<Self>;
 
     fn get_state(&self) -> Result<Self::State>;
+
     fn set_state<T>(&self, state: T) -> Result<()>
     where
         T: FnOnce(Self::State) -> Self::State;
@@ -30,12 +30,13 @@ pub trait Observable: Sized + Send + Sync + 'static {
     ) -> Result<observable_property::ObserverId>;
 }
 
-pub fn get_all_observable_states(
-    handle: AppHandle,
-) -> Result<HashMap<&'static str, serde_json::Value>> {
-    inventory::iter::<ObservableRegistration>
-        .into_iter()
-        .map(|reg| Ok((reg.id, (reg.get_json)(&handle)?)))
+pub fn get_all_observable_states() -> Result<HashMap<String, serde_json::Value>> {
+    let observables = OBSERVABLES.lock().expect("poisoned");
+
+    observables.iter()
+        .map(|(id, produce_json)| {
+            produce_json().map(|json| (id.to_string(), json))
+        })
         .collect()
 }
 
@@ -77,13 +78,26 @@ macro_rules! define_observable {
             const ID: &'static str = $id;
             const EVENT: &'static str = ::std::concat!("state:", $id);
 
-            fn new(handle: ::tauri::AppHandle) -> ::anyhow::Result<Self> {
+            /// We intentionally take &mut tauri::App so that Observables can only be initialized
+            /// in app setup.
+            fn new(app: &mut ::tauri::App) -> ::anyhow::Result<Self> {
                 use tauri::Manager;
+
+                let handle = app.handle().clone();
                 let state = <Self::State as ::std::default::Default>::default();
                 let observable_property =
                     ::observable_property::ObservableProperty::new(state);
 
-                handle.manage(observable_property.clone());
+                handle.manage::<::observable_property::ObservableProperty<$state>>(observable_property.clone());
+                {
+                    use ::anyhow::Context;
+                    let observable_property = observable_property.clone();
+                    let mut observables = $crate::state::OBSERVABLES.lock().expect("poisoned");
+                    observables.push(($id, Box::new(move || {
+                        let state = observable_property.get()?;
+                        Ok(serde_json::to_value(state)?)
+                    })));
+                }
 
                 observable_property.subscribe(::std::sync::Arc::new(move |_, new_state| {
                     if let Err(e) = handle.emit(Self::EVENT, new_state) {
@@ -147,20 +161,6 @@ macro_rules! define_observable {
 
             pub const EVENT: &'static str =
                 <$name as $crate::state::Observable>::EVENT;
-
-            fn get_json(handle: &::tauri::AppHandle) -> ::anyhow::Result<serde_json::Value> {
-                use tauri::Manager;
-                let observable = handle.state::<::observable_property::ObservableProperty<$state>>();
-                let state = observable.get()?;
-                Ok(serde_json::to_value(&state)?)
-            }
-        }
-
-        ::inventory::submit! {
-            $crate::state::ObservableRegistration {
-                id: <$name as $crate::state::Observable>::ID,
-                get_json: <$name>::get_json,
-            }
         }
     };
 }

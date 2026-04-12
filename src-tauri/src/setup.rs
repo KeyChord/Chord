@@ -32,15 +32,15 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
         app.handle().manage(app_lock_file);
     }
 
-    let app_mode_observable = AppModeObservable::new(handle.clone())?;
-    let app_permissions_observable = AppPermissionsObservable::new(handle.clone())?;
-    let app_settings_observable = AppSettingsObservable::new(handle.clone())?;
-    let chord_input_observable = ChordInputObservable::new(handle.clone())?;
-    let chord_mode_observable = ChordModeObservable::new(handle.clone())?;
-    let desktop_app_manager_observable = DesktopAppManagerObservable::new(handle.clone())?;
-    let chord_package_manager_observable = ChordPackageManagerObservable::new(handle.clone())?;
-    let git_repos_observable = GitReposObservable::new(handle.clone())?;
-    let frontmost_observable = FrontmostObservable::new(handle.clone())?;
+    let app_mode_observable = AppModeObservable::new(app)?;
+    let app_permissions_observable = AppPermissionsObservable::new(app)?;
+    let app_settings_observable = AppSettingsObservable::new(app)?;
+    let chord_input_observable = ChordInputObservable::new(app)?;
+    let chord_mode_observable = ChordModeObservable::new(app)?;
+    let desktop_app_manager_observable = DesktopAppManagerObservable::new(app)?;
+    let chord_package_manager_observable = ChordPackageManagerObservable::new(app)?;
+    let git_repos_observable = GitReposObservable::new(app)?;
+    let frontmost_observable = FrontmostObservable::new(app)?;
 
     let managed = Managed {
         handle: handle.clone(),

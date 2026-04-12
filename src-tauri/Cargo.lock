@@ -879,6 +879,7 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "observable-property",
+ "once_cell",
  "ordermap",
  "osakit",
  "parking_lot",

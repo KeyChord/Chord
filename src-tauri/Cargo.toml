@@ -90,6 +90,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tracing-log = "0.2" # This is the bridge
 atomic_enum = "0.3"
 nject = "0.4.5"
+once_cell = "1.21.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"
