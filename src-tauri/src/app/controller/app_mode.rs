@@ -56,10 +56,7 @@ impl AppController {
                 }
             }
             AppMode::Idle => {
-                let Some(keyboard_state) = self.handle.app_state().keyboard().state() else {
-                    return Ok(())
-                };
-
+                let keyboard_state = self.handle.app_state().keyboard().state();
                 if key_event == &KeyEvent::Press(Key(KeyMappingCode::Space)) &&
                     keyboard_state.is_caps_pressed() {
                     self.set_chord_mode();
@@ -73,12 +70,16 @@ impl AppController {
     pub fn set_idle_mode(&self) -> Result<()> {
         self.mode.store(AppMode::Idle, Ordering::SeqCst);
         self.observable.set_state(|_| AppModeState::Idle)?;
+        let chord_mode_manager = self.handle.app_state().chord_mode_manager();
+        chord_mode_manager.ensure_inactive()?;
         Ok(())
     }
 
     pub fn set_chord_mode(&self) -> Result<()> {
         self.mode.store(AppMode::Chord, Ordering::SeqCst);
         self.observable.set_state(|_| AppModeState::Chord)?;
+        let chord_mode_manager = self.handle.app_state().chord_mode_manager();
+        chord_mode_manager.ensure_active()?;
         Ok(())
     }
 }

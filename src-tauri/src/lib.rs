@@ -10,7 +10,6 @@ use tauri::{Manager, RunEvent};
 use tauri_nspanel::tauri_panel;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 mod api;
 mod app;

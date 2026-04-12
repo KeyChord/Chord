@@ -13,8 +13,10 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct AppFrontmostProvider {
+    #[provide(FrontmostObservable, |v| v.provide())]
     pub frontmost_observable: FrontmostObservable,
-    #[provide(AppHandle, |h| h.clone())]
+    
+    #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }
 

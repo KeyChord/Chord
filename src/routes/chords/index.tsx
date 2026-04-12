@@ -1,6 +1,6 @@
 import type { Chord, ChordHint, ChordReference } from '../../types/generated.ts';
 import { Kbd } from '#/components/ui/kbd.tsx';
-import { useChorderState, useChordPackageManagerState, useFrontmostState } from '#/utils/state.ts';
+import { useChordInputState, useChordModeState, useChordPackageManagerState, useFrontmostState, useKeyboardState } from '#/utils/state.ts';
 import { cn } from '#/utils/style.ts';
 import { createFileRoute } from '@tanstack/react-router';
 import { emit, listen } from '@tauri-apps/api/event';
@@ -188,14 +188,16 @@ function ChordKeyRow({
 }
 
 export function Chords() {
-	const state = useChorderState();
+	const chordInputState = useChordInputState();
+	const chordModeState = useChordModeState();
+  const keyboardState = useKeyboardState();
 	const { frontmostAppBundleId } = useFrontmostState();
 	const { packages } = useChordPackageManagerState();
 
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
 	const [indicatorProgress, setIndicatorProgress] = useState(() =>
-		state.isIndicatorVisible ? 1 : 0,
+		chordModeState.isIndicatorVisible ? 1 : 0,
 	);
 	const surfaceRef = useRef<HTMLDivElement>(null);
 	const animationFrameRef = useRef<number | null>(null);
@@ -253,7 +255,7 @@ export function Chords() {
 		}
 
 		const startProgress = indicatorProgressRef.current;
-		const targetProgress = state.isIndicatorVisible ? 1 : 0;
+		const targetProgress = chordModeState.isIndicatorVisible ? 1 : 0;
 		if (Math.abs(targetProgress - startProgress) < 0.001) {
 			animationFrameRef.current = window.requestAnimationFrame(() => {
 				indicatorProgressRef.current = targetProgress;
@@ -290,7 +292,7 @@ export function Chords() {
 				animationFrameRef.current = null;
 			}
 		};
-	}, [state.isIndicatorVisible]);
+	}, [chordModeState.isIndicatorVisible]);
 
 	useLayoutEffect(() => {
 		if (surfaceVersion === 0) {
@@ -347,11 +349,11 @@ export function Chords() {
 
 	const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)];
 
-	const normalizedBufferTokens = state.keyBuffer.map(normalizeToken);
-	const normalizedActiveChordTokens = state.activeChordKeys?.map(normalizeToken) ?? [];
+	const normalizedBufferTokens = chordInputState.input.map(normalizeToken);
+	const normalizedActiveChordTokens = chordInputState.selectedInputEvent?.input.map(normalizeToken) ?? [];
 
 	const shouldHighlightActiveChord
-		= state.isShiftPressed
+		= keyboardState.isShiftPressed
 			&& normalizedBufferTokens.length === 0
 			&& normalizedActiveChordTokens.length > 0;
 	const selectedTokens = shouldHighlightActiveChord

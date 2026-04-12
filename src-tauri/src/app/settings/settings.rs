@@ -34,7 +34,7 @@ impl AppSettings {
 
     pub fn toggle_hide_guide_by_default(&self) -> anyhow::Result<()> {
         self.update_state(|state| {
-            state.hide_guide_by_default = !state.hide_guide_by_default;
+            state.is_chord_panel_hidden_by_default = !state.is_chord_panel_hidden_by_default;
         })
     }
 
@@ -90,10 +90,10 @@ impl AppSettings {
                 SHOW_DOCK_ICON_KEY,
                 defaults.show_dock_icon,
             )?,
-            hide_guide_by_default: Self::read_bool_setting(
+            is_chord_panel_hidden_by_default: Self::read_bool_setting(
                 handle,
                 HIDE_GUIDE_BY_DEFAULT_KEY,
-                defaults.hide_guide_by_default,
+                defaults.is_chord_panel_hidden_by_default,
             )?,
         })
     }
@@ -119,7 +119,7 @@ impl AppSettings {
 
         store.set(SHOW_MENU_BAR_ICON_KEY, state.show_menu_bar_icon);
         store.set(SHOW_DOCK_ICON_KEY, state.show_dock_icon);
-        store.set(HIDE_GUIDE_BY_DEFAULT_KEY, state.hide_guide_by_default);
+        store.set(HIDE_GUIDE_BY_DEFAULT_KEY, state.is_chord_panel_hidden_by_default);
         store.save().context("failed to save app state store")?;
 
         Ok(())

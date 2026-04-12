@@ -12,8 +12,12 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct ChordPackageManagerProvider {
+    #[provide(ChordPackageManagerObservable, |v| v.provide())]
     pub chord_package_manager_observable: ChordPackageManagerObservable,
+
+    #[provide(GitReposObservable, |v| v.provide())]
     pub git_repos_observable: GitReposObservable,
+
     #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }

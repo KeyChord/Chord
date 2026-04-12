@@ -176,17 +176,6 @@ impl ModuleLoader {
     }
 }
 
-fn attempted_module_path(name: &str) -> String {
-    let path = Path::new(name);
-    if path.is_absolute() {
-        return path.display().to_string();
-    }
-
-    std::env::current_dir()
-        .map(|cwd| cwd.join(path).display().to_string())
-        .unwrap_or_else(|_| path.display().to_string())
-}
-
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
         let module = self.load_module(ctx, name)?;

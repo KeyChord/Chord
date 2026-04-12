@@ -6,6 +6,9 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct ChordPackageStoreProvider {
+    #[provide(ChordPackageStoreObservable, |v| v.provide())]
+    pub chord_package_store_observable: ChordPackageStoreObservable,
+
     #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }

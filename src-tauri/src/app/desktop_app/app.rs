@@ -7,7 +7,9 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct DesktopAppManagerProvider {
+    #[provide(DesktopAppManagerObservable, |v| v.provide())]
     pub desktop_app_manager_observable: DesktopAppManagerObservable,
+    
     #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }

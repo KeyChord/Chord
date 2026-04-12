@@ -10,10 +10,11 @@ use tauri_plugin_autostart::ManagerExt;
 
 #[provider]
 pub struct AppPermissionsProvider {
+    #[provide(AppPermissionsObservable, |v| v.provide())]
+    pub app_permissions_observable: AppPermissionsObservable,
+
     #[provide(AppHandle, |h| h.clone())]
     pub handle: AppHandle,
-
-    pub app_permissions_observable: AppPermissionsObservable,
 }
 
 impl AppSingleton for AppPermissions {

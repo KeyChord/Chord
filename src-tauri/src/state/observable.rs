@@ -49,27 +49,27 @@ macro_rules! define_observable {
     ) => {
         use tauri::Emitter;
         use crate::app::AppHandleExt;
-        use nject::{injectable, inject};
 
         /// We intentionally don't implement Clone so that observables always have one owner
         /// to make code easier to reason about.
-        #[injectable]
         $(#[$meta])*
         $vis struct $name {
-            #[inject(::observable_property::ObservableProperty::new(
-                $state::default()
-            ))]
             state: ::observable_property::ObservableProperty<
                 $state
             >,
 
             /// Used to implement a thread-safe callback-style `set_state`. Doesn't own the data so
             /// $state stays Clone
-            #[inject(::std::sync::RwLock::new(()))]
-            mutex: ::std::sync::RwLock<()>
+            mutex: ::std::sync::Arc<::std::sync::RwLock<()>>
         }
 
         impl $name {
+            pub fn provide(&self) -> Self {
+                Self {
+                    state: self.state.clone(),
+                    mutex: ::std::sync::Arc::clone(&self.mutex)
+                }
+            }
         }
 
         impl $crate::state::Observable for $name {
@@ -112,7 +112,7 @@ macro_rules! define_observable {
 
                 Ok(Self {
                     state: observable_property,
-                    mutex: ::std::sync::RwLock::new(())
+                    mutex: ::std::sync::Arc::new(::std::sync::RwLock::new(()))
                 })
             }
 

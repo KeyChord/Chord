@@ -2,7 +2,7 @@ use crate::app::AppHandleExt;
 use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
 use crate::app::state::AppSingleton;
 use crate::models::{ChordInput, ChordInputEvent, Key, KeyEvent};
-use crate::state::{ChordInputObservable, ChordInputState, ChordModeState, FrontmostObservable, Observable};
+use crate::state::{ChordInputObservable, ChordInputState, ChordPanelState, FrontmostObservable, Observable};
 use anyhow::Result;
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
@@ -55,11 +55,11 @@ impl ChordInputManager {
             return Ok(());
         }
 
-        let is_shift_pressed = self.observable.get_state()?.is_shift_pressed;
+        let is_shift_pressed = self.handle.app_state().keyboard().state().is_shift_pressed();
         if Self::should_toggle_indicator_for_tab_event(key_event, is_shift_pressed) {
             if matches!(key_event, KeyEvent::Press(_)) {
                 let chord_mode_manager = self.handle.app_state().chord_mode_manager();
-                chord_mode_manager.toggle_indicator_visibility();
+                chord_mode_manager.panel.toggle()?;
             }
             return Ok(());
         }
@@ -73,11 +73,10 @@ impl ChordInputManager {
 
         let non_shift_modifiers = Key::non_shift_modifiers();
         let keyboard_state = self.handle.app_state().keyboard().state();
-        let Some(keyboard_state) = keyboard_state else {
+        let Some(device_keys) = keyboard_state.keys() else {
             log::debug!("no accessibility permissions");
             return Ok(());
         };
-        let device_keys = keyboard_state.keys();
 
         // If any non-Shift modifier keys are held down, do not handle the event, because it's
         // likely the user just wants to execute a regular shortcut
@@ -171,7 +170,7 @@ impl ChordInputManager {
                     return Ok(());
                 }
 
-                let is_shift_pressed = self.observable.get_state()?.is_shift_pressed;
+                let is_shift_pressed = self.handle.app_state().keyboard().state().is_shift_pressed();
                 if is_shift_pressed {
                     if Self::should_clear_key_buffer_on_shifted_press(key) {
                         self.handle_shift_backspace_press()?;

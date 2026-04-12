@@ -1,5 +1,4 @@
 use anyhow::Result;
-use tauri::AppHandle;
 
 pub trait AppSingleton: Send + Sync + 'static {
     fn init(&self) -> Result<()>;

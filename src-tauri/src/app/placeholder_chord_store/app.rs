@@ -6,7 +6,7 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct PlaceholderChordStoreProvider {
-    #[provide(AppHandle, |h| h.clone())]
+    #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }
 

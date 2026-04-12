@@ -1,6 +1,6 @@
-use crate::app::chord_mode_manager::{ChordInputManager, ChordModeIndicatorUi, NativeSurfaceRect};
+use crate::app::chord_mode_manager::{ChordInputManager, ChordModePanel, NativeSurfaceRect};
 use crate::state::{
-    ChordInputObservable, ChordInputState, ChordModeObservable, ChordModeState, Observable,
+    ChordInputObservable, ChordInputState, ChordPanelObservable, ChordPanelState, Observable,
 };
 use anyhow::Result;
 use nject::injectable;
@@ -12,18 +12,18 @@ use crate::models::{Key, KeyEvent};
 
 #[injectable]
 pub struct ChordModeManager {
-    pub ui: ChordModeIndicatorUi,
+    pub panel: ChordModePanel,
     input_manager: ChordInputManager,
 
-    observable: ChordModeObservable,
+    observable: ChordPanelObservable,
     handle: AppHandle,
 }
 
 impl ChordModeManager {
     pub(super) fn init(&self) -> Result<()> {
-        self.ui.init();
+        self.panel.init();
 
-        let surface_window = self.ui.get_or_create_window()?;
+        let surface_window = self.panel.get_or_create_window()?;
         let surface_handle = self.handle.clone();
         let listener_window = surface_window.clone();
         let listener_window2 = surface_window.clone();
@@ -31,7 +31,7 @@ impl ChordModeManager {
             "chorder-surface-rect",
             move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
                 Ok(rect) => {
-                    if let Err(error) = ChordModeIndicatorUi::configure_window_surface(
+                    if let Err(error) = ChordModePanel::configure_window_surface(
                         &listener_window2,
                         surface_handle.clone(),
                         rect,
@@ -52,24 +52,22 @@ impl ChordModeManager {
     }
 
     pub fn ensure_active(&self) -> Result<()> {
-        if self.ui.ensure_visible()? {
-            let _ = self.ui.prepare_surface_before_reveal();
-            self.ui.reveal()?;
+        log::debug!("Activating Chord Mode");
+        if self.panel.ensure_visible()? {
+            let _ = self.panel.prepare_surface_before_reveal();
+            self.panel.reveal()?;
         }
         Ok(())
     }
 
     pub fn ensure_inactive(&self) -> Result<()> {
-        self.ui.ensure_hidden()?;
+        self.panel.ensure_hidden()?;
         self.input_manager.reset();
         Ok(())
     }
 
-    pub fn toggle_indicator_visibility(&self) -> Result<()> {
-        self.observable.set_state(|prev| ChordModeState {
-            is_indicator_visible: true,
-            ..prev
-        })?;
+    fn toggle_panel(&self) -> Result<()> {
+        self.panel.toggle()?;
         Ok(())
     }
 }

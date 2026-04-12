@@ -1,12 +1,14 @@
 import type {
 	AppPermissionsState,
 	AppSettingsState,
-	ChorderState,
+	ChordInputState,
+	ChordModeState,
 	ChordPackageManagerState,
 	ChordPackageStoreState,
 	DesktopAppManagerState,
 	FrontmostState,
 	GitReposState,
+  KeyboardState,
 } from '#/types/generated.ts';
 import { taurpc } from '#/api/taurpc.ts';
 import { listen } from '@tauri-apps/api/event';
@@ -34,7 +36,9 @@ async function createUseTauriState<T>(stateId: string) {
 }
 
 export const [
-  useChorderState,
+  useKeyboardState,
+  useChordModeState,
+  useChordInputState,
   useSettingsState,
   usePermissionsState,
   useGitRepoStoreState,
@@ -43,7 +47,9 @@ export const [
   useDesktopAppManagerState,
   useChordPackageStoreState
 ] = await Promise.all([
-  createUseTauriState<ChorderState>('chorder'),
+  createUseTauriState<KeyboardState>('keyboard'),
+  createUseTauriState<ChordModeState>('chord-mode'),
+  createUseTauriState<ChordInputState>('chord-input'),
   createUseTauriState<AppSettingsState>('settings'),
   createUseTauriState<AppPermissionsState>('permissions'),
   createUseTauriState<GitReposState>('git-repos'),

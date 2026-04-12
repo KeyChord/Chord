@@ -7,8 +7,10 @@ use crate::app::controller::AppController;
 
 #[provider]
 pub struct AppControllerProvider {
+    #[provide(AppModeObservable, |v| v.provide())]
     pub app_mode_observable: AppModeObservable,
-    #[provide(AppHandle, |h| h.clone())]
+    
+    #[provide(AppHandle, |v| v.clone())]
     pub handle: AppHandle,
 }
 

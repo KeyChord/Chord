@@ -13,6 +13,7 @@ use std::sync::mpsc::channel;
 use std::sync::{OnceLock, mpsc::Sender};
 use rdev::Key::KeyE;
 use tauri::{AppHandle, Manager};
+use crate::state::KeyboardObservable;
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
@@ -32,8 +33,8 @@ bitflags! {
 
 #[injectable]
 pub struct AppKeyboard {
-    #[inject(AppKeyboardState::new())]
-    keyboard_state: Option<AppKeyboardState>,
+    keyboard_state: AppKeyboardState,
+
     #[inject(AtomicU16::new(0))]
     pub modifier_flags: AtomicU16,
 
@@ -41,8 +42,8 @@ pub struct AppKeyboard {
 }
 
 impl AppKeyboard {
-    pub fn state(&self) -> Option<&AppKeyboardState> {
-        self.keyboard_state.as_ref()
+    pub fn state(&self) -> &AppKeyboardState {
+        &self.keyboard_state
     }
 
     pub fn register_input_handler(&self) -> Result<()> {
@@ -175,26 +176,20 @@ impl AppKeyboard {
 
     fn handle_key_event(&self, event: &KeyEvent) -> KeyEventAction {
         log::debug!("Processing event {event:?}");
-        if let Some(keyboard_state) = &self.keyboard_state {
-            keyboard_state.handle_key_event(event);
-        }
+        self.keyboard_state.handle_key_event(event);
 
         self.update_modifier_flags(&event);
 
         let app_mode = self.handle.app_state().app_controller().app_mode();
 
         // We only consume the space bar in idle mode if it's pressed while Caps is pressed
-        let Some(keyboard_state) = &self.keyboard_state else {
-            return KeyEventAction::Forward;
-        };
-
         // TODO: Only disable if Chord mode was activated. Naive approach doesn't work.
         if event == &KeyEvent::Press(Key(KeyMappingCode::CapsLock)) {
             log::debug!("Ensuring Caps is off");
             Self::set_caps_lock_off();
         }
 
-        if event == &KeyEvent::Press(Key(KeyMappingCode::Space)) && keyboard_state.is_caps_pressed() {
+        if event == &KeyEvent::Press(Key(KeyMappingCode::Space)) && self.keyboard_state.is_caps_pressed() {
             return KeyEventAction::Consume;
         }
 

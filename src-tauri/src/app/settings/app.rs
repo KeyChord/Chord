@@ -8,10 +8,11 @@ use tauri::AppHandle;
 
 #[provider]
 pub struct AppSettingsProvider {
-    #[provide(AppHandle, |h| h.clone())]
-    pub handle: AppHandle,
-
+    #[provide(AppSettingsObservable, |v| v.provide())]
     pub app_settings_observable: AppSettingsObservable,
+
+    #[provide(AppHandle, |v| v.clone())]
+    pub handle: AppHandle,
 }
 
 impl AppSingleton for AppSettings {

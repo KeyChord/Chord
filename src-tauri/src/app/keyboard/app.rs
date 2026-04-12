@@ -5,9 +5,13 @@ use device_query::DeviceState;
 use nject::provider;
 use std::sync::atomic::AtomicU16;
 use tauri::AppHandle;
+use crate::state::KeyboardObservable;
 
 #[provider]
 pub struct AppKeyboardProvider {
+    #[provide(KeyboardObservable, |v| v.provide())]
+    pub keyboard_observable: KeyboardObservable,
+    
     #[provide(AppHandle, |h| h.clone())]
     pub handle: AppHandle,
 }

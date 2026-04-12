@@ -13,17 +13,12 @@ use crate::app::settings::{AppSettings, AppSettingsProvider};
 use crate::app::{AppHandleExt, AppSingleton};
 use crate::chordpack::load_default_chordpack;
 use crate::lock_file::AppLockFile;
-use crate::state::{
-    AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordInputObservable,
-    ChordModeObservable, ChordPackageManagerObservable, ChordPackageStoreObservable,
-    DesktopAppManagerObservable, FrontmostObservable, GitRepo, GitReposObservable, Observable,
-};
+use crate::state::{AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordInputObservable, ChordPanelObservable, ChordPackageManagerObservable, ChordPackageStoreObservable, DesktopAppManagerObservable, FrontmostObservable, GitRepo, GitReposObservable, KeyboardObservable, Observable};
 use crate::tauri_app;
 use anyhow::Result;
 use tauri::AppHandle;
 use crate::app::controller::{AppController, AppControllerProvider};
 
-// https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> Result<()> {
     let handle = app.handle().clone();
     let app_lock_file = AppLockFile::acquire(app.handle())?;
@@ -36,11 +31,13 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let app_permissions_observable = AppPermissionsObservable::new(app)?;
     let app_settings_observable = AppSettingsObservable::new(app)?;
     let chord_input_observable = ChordInputObservable::new(app)?;
-    let chord_mode_observable = ChordModeObservable::new(app)?;
+    let chord_panel_observable = ChordPanelObservable::new(app)?;
+    let chord_package_store_observable = ChordPackageStoreObservable::new(app)?;
     let desktop_app_manager_observable = DesktopAppManagerObservable::new(app)?;
     let chord_package_manager_observable = ChordPackageManagerObservable::new(app)?;
     let git_repos_observable = GitReposObservable::new(app)?;
     let frontmost_observable = FrontmostObservable::new(app)?;
+    let keyboard_observable = KeyboardObservable::new(app)?;
 
     let managed = Managed {
         handle: handle.clone(),
@@ -52,7 +49,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
             ChordModeManagerProvider {
                 handle: handle.clone(),
                 chord_input_observable,
-                chord_mode_observable,
+                chord_panel_observable,
             }
             .provide::<ChordModeManager>(),
         )
@@ -67,6 +64,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
         .add(
             ChordPackageStoreProvider {
                 handle: handle.clone(),
+                chord_package_store_observable
             }
             .provide::<ChordPackageStore>(),
         )
@@ -100,6 +98,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
         .add(
             AppKeyboardProvider {
                 handle: handle.clone(),
+                keyboard_observable,
             }
             .provide::<AppKeyboard>(),
         )
@@ -141,7 +140,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     }
 
     log::info!("Pre-warming chorder UI");
-    if let Err(e) = state.chord_mode_manager().ui.preload() {
+    if let Err(e) = state.chord_mode_manager().panel.preload() {
         log::error!("Failed to preload chorder UI: {e}");
     }
 

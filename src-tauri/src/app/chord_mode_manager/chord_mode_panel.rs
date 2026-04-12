@@ -18,6 +18,7 @@ use tauri::{
 };
 use tauri_nspanel::{CollectionBehavior, PanelHandle, PanelLevel, StyleMask, WebviewWindowExt};
 use window_vibrancy::NSVisualEffectViewTagged;
+use crate::state::{ChordPanelObservable, ChordPanelState, Observable};
 
 const INDICATOR_WIDTH: u32 = 640;
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -33,16 +34,15 @@ pub struct NativeSurfaceRect {
 }
 
 #[injectable]
-pub struct ChordModeIndicatorUi {
-    #[inject(Arc::new(AtomicBool::new(false)))]
-    pub is_visible: Arc<AtomicBool>,
+pub struct ChordModePanel {
     #[inject(ArcSwap::new(Arc::new(None)))]
-    pub panel: ArcSwap<Option<PanelHandle<Wry>>>,
+    panel: ArcSwap<Option<PanelHandle<Wry>>>,
 
     handle: AppHandle,
+    observable: ChordPanelObservable,
 }
 
-impl ChordModeIndicatorUi {
+impl ChordModePanel {
     pub fn init(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
         let panel = window.to_panel::<IndicatorPanel>().unwrap();
@@ -152,10 +152,6 @@ impl ChordModeIndicatorUi {
         Ok(window)
     }
 
-    pub fn is_visible(&self) -> bool {
-        self.is_visible.load(Ordering::Relaxed)
-    }
-
     fn webview_ns_view(window: &WebviewWindow) -> Result<usize> {
         let handle = window.window_handle()?;
         match handle.as_raw() {
@@ -219,9 +215,7 @@ impl ChordModeIndicatorUi {
     }
 
     fn show(&self) -> Result<()> {
-        log::debug!("Showing chorder panel");
         let panel = self.panel.load_full();
-        let is_visible = self.is_visible.clone();
 
         self.handle.clone().run_on_main_thread(move || {
             let Some(panel) = panel.as_ref() else {
@@ -274,7 +268,6 @@ impl ChordModeIndicatorUi {
                     Self::restore_frontmost_app(&bundle_id, pid);
                 }
             }
-            is_visible.store(true, Ordering::Relaxed);
         })?;
 
         Ok(())
@@ -292,35 +285,41 @@ impl ChordModeIndicatorUi {
     }
 
     fn hide(&self) -> Result<()> {
-        log::debug!("Hiding chorder panel");
-        let is_visible = self.is_visible.clone();
         let panel = self.panel.load_full();
 
         self.handle.clone().run_on_main_thread(move || {
             if let Some(panel) = panel.as_ref() {
                 panel.hide();
             }
-            is_visible.store(false, Ordering::Relaxed);
         })?;
 
         Ok(())
     }
 
     pub fn ensure_hidden(&self) -> Result<bool> {
-        if self.is_visible() {
-            self.hide()?;
-            return Ok(true);
-        }
-
-        Ok(false)
+        self.observable.set_state(|prev| ChordPanelState {
+            is_visible: false,
+            ..prev
+        })?;
+        self.hide()?;
+        Ok(true)
     }
 
     pub fn ensure_visible(&self) -> Result<bool> {
-        if !self.is_visible() {
-            self.show()?;
-            return Ok(true);
-        }
+        self.observable.set_state(|prev| ChordPanelState {
+            is_visible: true,
+            ..prev
+        })?;
+        self.show()?;
+        Ok(true)
+    }
 
-        Ok(false)
+    /// This only changes the state so the frontend gets a chance to animate it.
+    pub fn toggle(&self) -> Result<()> {
+        self.observable.set_state(|prev| ChordPanelState {
+            is_visible: !prev.is_visible,
+            ..prev
+        })?;
+        Ok(())
     }
 }
