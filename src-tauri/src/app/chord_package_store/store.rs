@@ -9,7 +9,6 @@ use tauri_plugin_store::{Store, StoreExt};
 use typeshare::typeshare;
 
 #[injectable]
-#[derive(Clone)]
 pub struct ChordPackageStore {
     handle: AppHandle,
     observable: ChordPackageStoreObservable,

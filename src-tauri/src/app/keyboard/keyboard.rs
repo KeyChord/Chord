@@ -47,7 +47,7 @@ pub struct AppKeyboard {
 }
 
 fn handle_key_event(handle: AppHandle, event: KeyEvent) -> Result<()> {
-    todo!();
+    Ok(())
 }
 
 impl AppKeyboard {
