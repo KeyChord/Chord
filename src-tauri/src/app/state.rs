@@ -55,7 +55,7 @@ define_app_state! {
     frontmost: super::frontmost::AppFrontmost,
     global_hotkey_store: super::global_hotkey_store::GlobalHotkeyStore,
     keyboard: super::keyboard::AppKeyboard,
-    mode_manager: super::mode::AppModeManager,
+    app_controller: super::controller::AppController,
     permissions: super::permissions::AppPermissions,
     placeholder_chord_store: super::placeholder_chord_store::PlaceholderChordStore,
     settings: super::settings::AppSettings,

@@ -6,7 +6,9 @@ use anyhow::Result;
 use nject::injectable;
 use parking_lot::Mutex;
 use std::collections::HashSet;
+use keycode::KeyMappingCode;
 use tauri::{AppHandle, Listener};
+use crate::models::{Key, KeyEvent};
 
 #[injectable]
 pub struct ChordModeManager {
@@ -43,6 +45,10 @@ impl ChordModeManager {
             },
         );
         Ok(())
+    }
+
+    pub fn handle_key_event(&self, key_event: &KeyEvent) -> Result<()> {
+        self.input_manager.handle_key_event(key_event)
     }
 
     pub fn ensure_active(&self) -> Result<()> {

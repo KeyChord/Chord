@@ -7,10 +7,11 @@ use device_query::{DeviceQuery, DeviceState};
 use keycode::KeyMappingCode;
 use nject::{inject, injectable};
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
+use derive_more::Display;
 
-#[derive(PartialEq)]
 #[atomic_enum(AtomicAppModeState)]
+#[derive(PartialEq, Display)]
 pub enum AppMode {
     Idle,
     Chord,
@@ -27,7 +28,7 @@ impl AppMode {
 }
 
 #[injectable]
-pub struct AppModeManager {
+pub struct AppController {
     #[inject(AtomicAppModeState::new(AppMode::Idle))]
     mode: AtomicAppModeState,
 
@@ -35,9 +36,38 @@ pub struct AppModeManager {
     observable: AppModeObservable,
 }
 
-impl AppModeManager {
-    pub fn mode(&self) -> AppMode {
+impl AppController {
+    pub fn app_mode(&self) -> AppMode {
         self.mode.load(Ordering::SeqCst)
+    }
+
+
+    pub fn handle_key_event(&self, key_event: &KeyEvent) -> Result<()> {
+        let app_mode = self.app_mode();
+        log::debug!("handling key event in {app_mode} mode");
+
+        match app_mode {
+            AppMode::Chord => {
+                let chord_mode_manager = self.handle.app_state().chord_mode_manager();
+                chord_mode_manager.handle_key_event(&key_event);
+
+                if key_event == &KeyEvent::Release(Key(KeyMappingCode::Space)) {
+                    self.set_idle_mode();
+                }
+            }
+            AppMode::Idle => {
+                let Some(keyboard_state) = self.handle.app_state().keyboard().state() else {
+                    return Ok(())
+                };
+
+                if key_event == &KeyEvent::Press(Key(KeyMappingCode::Space)) &&
+                    keyboard_state.is_caps_pressed() {
+                    self.set_chord_mode();
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn set_idle_mode(&self) -> Result<()> {

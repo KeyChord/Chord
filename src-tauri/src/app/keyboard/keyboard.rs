@@ -1,18 +1,18 @@
 use crate::app::AppHandleExt;
-use crate::app::mode::AppModeManager;
 use crate::app::state::AppSingleton;
-use crate::models::{Key, KeyEvent, KeyEventAction};
+use crate::models::{AppKeyboardState, Key, KeyEvent, KeyEventAction};
 use anyhow::Result;
 use bitflags::bitflags;
 use device_query::{DeviceQuery, DeviceState};
-use keycode::KeyMappingCode;
+use keycode::{KeyMappingCode};
 use nject::injectable;
 use std::os::raw::c_int;
 use std::process::Command;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::mpsc::channel;
 use std::sync::{OnceLock, mpsc::Sender};
-use tauri::AppHandle;
+use rdev::Key::KeyE;
+use tauri::{AppHandle, Manager};
 
 static TX: OnceLock<Sender<bool>> = OnceLock::new();
 
@@ -32,25 +32,19 @@ bitflags! {
 
 #[injectable]
 pub struct AppKeyboard {
-    #[inject(
-        if macos_accessibility_client::accessibility::application_is_trusted() {
-            Some(DeviceState {})
-        } else {
-            None
-        })
-    ]
-    pub device_state: Option<DeviceState>,
+    #[inject(AppKeyboardState::new())]
+    keyboard_state: Option<AppKeyboardState>,
     #[inject(AtomicU16::new(0))]
     pub modifier_flags: AtomicU16,
 
     handle: AppHandle,
 }
 
-fn handle_key_event(handle: AppHandle, event: KeyEvent) -> Result<()> {
-    Ok(())
-}
-
 impl AppKeyboard {
+    pub fn state(&self) -> Option<&AppKeyboardState> {
+        self.keyboard_state.as_ref()
+    }
+
     pub fn register_input_handler(&self) -> Result<()> {
         let handle = self.handle.clone();
         let (tx, rx) = channel::<KeyEvent>();
@@ -60,7 +54,8 @@ impl AppKeyboard {
             // Spawning the handler in a separate thread to keep the key grabber callback as fast as possible
             std::thread::spawn(move || {
                 while let Ok(event) = rx.recv() {
-                    if let Err(e) = handle_key_event(handle.clone(), event) {
+                    let app_controller = handle.app_state().app_controller();
+                    if let Err(e) = app_controller.handle_key_event(&event) {
                         log::error!("Failed to handle key event: {e}");
                     }
                 }
@@ -99,7 +94,7 @@ impl AppKeyboard {
                 };
 
                 let keyboard = handle.app_state().keyboard();
-                let action = keyboard.process_event(&key_event);
+                let action = keyboard.handle_key_event(&key_event);
 
                 if let Err(e) = tx.send(key_event) {
                     log::error!("Failed to send key event: {e}");
@@ -135,21 +130,21 @@ impl AppKeyboard {
             while let Ok(pressed) = rx.recv() {
                 if pressed {
                     let keyboard = handle.app_state().keyboard();
-                    keyboard.process_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
+                    keyboard.handle_key_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
 
-                    if let Err(e) = handle_key_event(
-                        handle.clone(),
-                        KeyEvent::Press(Key(KeyMappingCode::CapsLock)),
+                    let app_controller = handle.app_state().app_controller();
+                    if let Err(e) = app_controller.handle_key_event(
+                        &KeyEvent::Press(Key(KeyMappingCode::CapsLock)),
                     ) {
                         log::error!("Failed to handle Caps Lock Press: {e}");
                     }
                 } else {
                     let keyboard = handle.app_state().keyboard();
-                    keyboard.process_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
+                    keyboard.handle_key_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
 
-                    if let Err(e) = handle_key_event(
-                        handle.clone(),
-                        KeyEvent::Release(Key(KeyMappingCode::CapsLock)),
+                    let app_controller = handle.app_state().app_controller();
+                    if let Err(e) = app_controller.handle_key_event(
+                        &KeyEvent::Release(Key(KeyMappingCode::CapsLock)),
                     ) {
                         log::error!("Failed to handle Caps Lock Release: {e}");
                     }
@@ -169,24 +164,42 @@ impl AppKeyboard {
         }
     }
 
-    fn process_event(&self, event: &KeyEvent) -> KeyEventAction {
+    pub fn set_caps_lock_off() -> Result<()> {
+        let rc = unsafe { set_caps_off() };
+        if rc == 0 {
+            Ok(())
+        } else {
+            anyhow::bail!("failed to toggle caps lock state via native layer: {rc}")
+        }
+    }
+
+    fn handle_key_event(&self, event: &KeyEvent) -> KeyEventAction {
+        log::debug!("Processing event {event:?}");
+        if let Some(keyboard_state) = &self.keyboard_state {
+            keyboard_state.handle_key_event(event);
+        }
+
         self.update_modifier_flags(&event);
 
-        let Some(ref device_state) = self.device_state else {
+        let app_mode = self.handle.app_state().app_controller().app_mode();
+
+        // We only consume the space bar in idle mode if it's pressed while Caps is pressed
+        let Some(keyboard_state) = &self.keyboard_state else {
             return KeyEventAction::Forward;
         };
 
-        let mode = self.handle.app_state().mode_manager().mode();
-        // We consume all events in chord mode
-        if mode.is_chord() {
+        // TODO: Only disable if Chord mode was activated. Naive approach doesn't work.
+        if event == &KeyEvent::Press(Key(KeyMappingCode::CapsLock)) {
+            log::debug!("Ensuring Caps is off");
+            Self::set_caps_lock_off();
+        }
+
+        if event == &KeyEvent::Press(Key(KeyMappingCode::Space)) && keyboard_state.is_caps_pressed() {
             return KeyEventAction::Consume;
         }
-        // We only consume the space bar in idle mode if it's pressed while Caps is pressed
-        else {
-            let keys = device_state.get_keys();
-            let is_caps_pressed = keys
-                .iter()
-                .any(|&k| Key::from(k) == Key(KeyMappingCode::CapsLock));
+
+        if app_mode.is_chord() {
+            return KeyEventAction::Consume;
         }
 
         KeyEventAction::Forward
@@ -234,6 +247,7 @@ impl AppKeyboard {
 unsafe extern "C" {
     fn start_caps_lock_listener(cb: extern "C" fn(c_int));
     fn toggle_caps() -> c_int;
+    fn set_caps_off() -> c_int;
 }
 
 extern "C" fn caps_lock_changed(pressed: c_int) {

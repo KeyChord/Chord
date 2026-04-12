@@ -72,19 +72,19 @@ impl ChordInputManager {
         }
 
         let non_shift_modifiers = Key::non_shift_modifiers();
-        let keyboard = self.handle.app_state().keyboard();
-        let Some(device_state) = &keyboard.device_state else {
+        let keyboard_state = self.handle.app_state().keyboard().state();
+        let Some(keyboard_state) = keyboard_state else {
             log::debug!("no accessibility permissions");
             return Ok(());
         };
-        let device_keys = device_state.get_keys();
+        let device_keys = keyboard_state.keys();
 
         // If any non-Shift modifier keys are held down, do not handle the event, because it's
         // likely the user just wants to execute a regular shortcut
         if device_keys
             .iter()
             .copied()
-            .any(|key: Keycode| non_shift_modifiers.contains(&key.into()))
+            .any(|key| non_shift_modifiers.contains(&key))
         {
             log::debug!(
                 "Ignoring event because the following modifiers were held down: {:?}",

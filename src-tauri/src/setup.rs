@@ -7,7 +7,6 @@ use crate::app::dev_lockfile_detector::{DevLockfileDetector, DevLockfileDetector
 use crate::app::frontmost::{AppFrontmost, AppFrontmostProvider};
 use crate::app::global_hotkey_store::{GlobalHotkeyStore, GlobalHotkeyStoreProvider};
 use crate::app::keyboard::{AppKeyboard, AppKeyboardProvider};
-use crate::app::mode::{AppModeManager, AppModeManagerProvider};
 use crate::app::permissions::{AppPermissions, AppPermissionsProvider};
 use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChordStoreProvider};
 use crate::app::settings::{AppSettings, AppSettingsProvider};
@@ -22,6 +21,7 @@ use crate::state::{
 use crate::tauri_app;
 use anyhow::Result;
 use tauri::AppHandle;
+use crate::app::controller::{AppController, AppControllerProvider};
 
 // https://github.com/orgs/tauri-apps/discussions/7596#discussioncomment-6718895
 pub fn setup(app: &mut tauri::App) -> Result<()> {
@@ -104,11 +104,11 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
             .provide::<AppKeyboard>(),
         )
         .add(
-            AppModeManagerProvider {
+            AppControllerProvider {
                 handle: handle.clone(),
                 app_mode_observable,
             }
-            .provide::<AppModeManager>(),
+            .provide::<AppController>(),
         )
         .add(
             AppPermissionsProvider {

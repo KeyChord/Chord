@@ -858,13 +858,13 @@ dependencies = [
  "block2",
  "cc",
  "clap",
+ "derive_more 2.1.1",
  "device_query",
  "dirs 6.0.0",
  "elevated-command",
  "fix-path-env",
  "frontmost",
  "gix",
- "inventory",
  "jsonc-parser",
  "keycode",
  "libc",
@@ -879,7 +879,6 @@ dependencies = [
  "objc2-app-kit",
  "objc2-foundation",
  "observable-property",
- "once_cell",
  "ordermap",
  "osakit",
  "parking_lot",
@@ -1430,10 +1429,12 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "799a97264921d8623a957f6c3b9011f3b5492f557bbb7a5a19b7fa6d06ba8dcb"
 dependencies = [
+ "convert_case 0.10.0",
  "proc-macro2",
  "quote",
  "rustc_version",
  "syn 2.0.117",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -3936,15 +3937,6 @@ checksum = "4250ce6452e92010fdf7268ccc5d14faa80bb12fc741938534c58f16804e03c7"
 dependencies = [
  "block-padding",
  "hybrid-array",
-]
-
-[[package]]
-name = "inventory"
-version = "0.3.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4f0c30c76f2f4ccee3fe55a2435f691ca00c0e4bd87abe4f4a851b1d4dac39b"
-dependencies = [
- "rustversion",
 ]
 
 [[package]]

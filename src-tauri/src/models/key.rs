@@ -2,9 +2,10 @@ use anyhow::Result;
 use keycode::KeyMappingCode;
 use keycode::KeyMappingCode::*;
 use std::str::FromStr;
+use derive_more::Display;
 use typeshare::typeshare;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum KeyEvent {
     Press(Key),
     Release(Key),
@@ -56,7 +57,7 @@ impl KeyCombination {
 }
 
 #[typeshare(serialized_as = "String")]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display)]
 pub struct Key(pub KeyMappingCode);
 
 impl serde::Serialize for Key {

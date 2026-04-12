@@ -187,20 +187,6 @@ fn attempted_module_path(name: &str) -> String {
         .unwrap_or_else(|_| path.display().to_string())
 }
 
-fn with_module_load_context(name: &str, error: Error) -> Error {
-    match error {
-        Error::Io(io_error) => Error::new_loading_message(
-            name,
-            format!(
-                "tried to read {}: {}",
-                attempted_module_path(name),
-                io_error
-            ),
-        ),
-        other => other,
-    }
-}
-
 impl Loader for ModuleLoader {
     fn load<'js>(&mut self, ctx: &Ctx<'js>, name: &str) -> rquickjs::Result<Module<'js, Declared>> {
         let module = self.load_module(ctx, name)?;
