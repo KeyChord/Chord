@@ -1,0 +1,8 @@
+{
+  "name": "@keychord/com.npmjs.recharts",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "recharts": "3.8.0"
+  }
+}

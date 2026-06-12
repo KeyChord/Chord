@@ -1,0 +1,8 @@
+{
+  "name": "@keychord/com.npmjs.tanstack__react-router",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "@tanstack/react-router-original": "npm:@tanstack/react-router@^1.168.2"
+  }
+}

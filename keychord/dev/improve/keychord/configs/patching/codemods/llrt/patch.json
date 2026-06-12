@@ -1,0 +1,13 @@
+{
+  "gitDependency": {
+    "repo": "https://github.com/KeyChord/llrt",
+    "rev": "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb",
+    "package": "llrt_core"
+  },
+  "bundles": [
+    {
+      "path": "llrt_core/build.rs",
+      "language": "rust"
+    }
+  ]
+}

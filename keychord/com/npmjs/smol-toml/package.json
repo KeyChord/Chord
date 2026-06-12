@@ -1,0 +1,8 @@
+{
+  "name": "@keychord/com.npmjs.smol-toml",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "smol-toml": "^1.6.0"
+  }
+}

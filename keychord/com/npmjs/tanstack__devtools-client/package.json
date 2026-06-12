@@ -1,0 +1,8 @@
+{
+  "name": "@keychord/com.npmjs.tanstack__devtools-client",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "@tanstack/devtools-client-original": "npm:@tanstack/devtools-client@^0.0.6"
+  }
+}

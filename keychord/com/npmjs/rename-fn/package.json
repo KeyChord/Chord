@@ -1,0 +1,8 @@
+{
+  "name": "@keychord/com.npmjs.rename-fn",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "rename-fn": "^2.1.0"
+  }
+}

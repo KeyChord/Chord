@@ -1,0 +1,12 @@
+{
+  "name": "@keychord/dev.improve.keychord.configs.patching.codemods.llrt",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "npx --yes codemod@latest jssg test -l rust ./codemod.ts ./@fixtures --strictness loose"
+  },
+  "devDependencies": {
+    "@codemod.com/jssg-types": "^1.6.2"
+  }
+}
