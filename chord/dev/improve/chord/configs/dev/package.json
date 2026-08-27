@@ -1,0 +1,16 @@
+{
+	"name": "@chord/dev.improve.chord.configs.dev",
+	"type": "module",
+	"version": "0.0.0",
+	"private": true,
+	"bin": {
+		"_dev": "./_dev.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.0",
+		"mprocs": "^0.9.6"
+	}
+}

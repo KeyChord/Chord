@@ -25,6 +25,7 @@
 		"active": true,
 		"targets": "all",
 		"createUpdaterArtifacts": true,
+		"externalBin": ["binaries/chord-native-host"],
 		"macOS": {
 			"entitlements": "Entitlements.plist",
 			"signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",

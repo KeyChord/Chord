@@ -47,6 +47,10 @@ On the Rust side, observable state can be accessed from anywhere via `handle.obs
 
 All the state singletons are defined inside of the [app/](./apps/chord-tauri/src-tauri/src/app) folder in `src-tauri/`. We use [a macro](./apps/chord-tauri/src-tauri/src/app/mod.rs) to make all of them exposed on the `handle` directly (e.g. `handle.chord_package_manager()` instead of handle.state::<ChordPackageManager>()`).
 
+## Native handlers
+
+Handlers with `kind = "native"` are prebuilt dynamic libraries from a package's top-level `target/<triple>/swift/<name>/` directory (the triple comes from `build.rs` as `CHORD_TARGET_TRIPLE`; vendored packages nest as `target/@scope/name/target/...`). They never run inside the Chord process: `app/native_host/` supervises a single `chord-native-host` sidecar (`src-tauri/crates/chord-native-host`, protocol + client in `crates/chord-native-protocol`) that loads every referenced library once per package generation and invokes `chord_native_run_v1` on request over an inherited Unix socketpair. `ChordNativePackage` mirrors `ChordJsPackage` for artifact resolution and materializes each package's whole `target/` subtree into the app cache so `@rpath` links between vendored modules keep working. The sidecar is built by `apps/chord-tauri/scripts/build-native-host.ts` (run automatically by `bun run dev`) and needs its own entitlements in release builds (`scripts/release-macos.ts`). See `scripting.md` for the author-facing contract.
+
 ## Terminology
 
 - **Pathslug:** A relative path from the package root to the file in the package, e.g. `js/file.js`. Called a path slug because it's similar to a URL slug, but as a "path" and for a package name instead of a URL (e.g. `@keychord/pkg/js/file.js`).

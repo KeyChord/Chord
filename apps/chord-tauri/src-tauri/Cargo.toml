@@ -7,6 +7,13 @@ autobins = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[workspace]
+members = [
+	"crates/taurpc_macros",
+	"crates/chord-native-protocol",
+	"crates/chord-native-host",
+]
+
 [lib]
 # The `_lib` suffix may seem redundant, but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
@@ -33,6 +40,10 @@ tauri = { version = "2", features = [
 	"image-png"
 ] }
 taurpc-macros = { path = "./crates/taurpc_macros" }
+chord-native-protocol = { path = "./crates/chord-native-protocol" }
+rmp-serde = "1"
+sha2 = "0.10"
+hex = "0.4"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.7"
 tauri-plugin-fs = "2.5.1"

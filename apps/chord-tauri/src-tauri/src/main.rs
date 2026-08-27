@@ -26,6 +26,26 @@ enum Commands {
         #[arg(value_name = "ARG", allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Invoke a prebuilt native handler library through a throwaway native host.
+    NativeRun {
+        #[arg(value_name = "LIBRARY", value_hint = ValueHint::FilePath)]
+        library: PathBuf,
+        /// Static handler argument (repeatable).
+        #[arg(long = "handler-arg", value_name = "ARG", allow_hyphen_values = true)]
+        handler_args: Vec<String>,
+        /// Event argument (repeatable).
+        #[arg(long = "event-arg", value_name = "ARG", allow_hyphen_values = true)]
+        event_args: Vec<String>,
+        #[arg(long, default_value_t = 1)]
+        repeat: u32,
+    },
+    /// Measure hot-path round-trip latency of a native handler.
+    NativeBench {
+        #[arg(value_name = "LIBRARY", value_hint = ValueHint::FilePath)]
+        library: PathBuf,
+        #[arg(long, default_value_t = 10_000)]
+        iterations: u32,
+    },
 }
 
 fn main() {
@@ -41,6 +61,33 @@ fn main() {
         }
         Some(Commands::RunExport { file, export, args }) => {
             if let Err(error) = run_export_cli(file, export, args) {
+                eprintln!("{error:#}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::NativeRun {
+            library,
+            handler_args,
+            event_args,
+            repeat,
+        }) => {
+            if let Err(error) = block_on_multi_thread(chords_lib::native_run(
+                library,
+                handler_args,
+                event_args,
+                repeat,
+            )) {
+                eprintln!("{error:#}");
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::NativeBench {
+            library,
+            iterations,
+        }) => {
+            if let Err(error) =
+                block_on_multi_thread(chords_lib::native_bench(library, iterations))
+            {
                 eprintln!("{error:#}");
                 std::process::exit(1);
             }
@@ -70,6 +117,21 @@ fn run_export_cli(file: PathBuf, export: String, args: Vec<String>) -> anyhow::R
             .unwrap();
 
         rt.block_on(chords_lib::run_script_export(file, export, args))
+    })
+    .join()
+    .unwrap()
+}
+
+fn block_on_multi_thread<F>(future: F) -> anyhow::Result<()>
+where
+    F: std::future::Future<Output = anyhow::Result<()>> + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(future)
     })
     .join()
     .unwrap()

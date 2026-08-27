@@ -10,7 +10,7 @@
     ]
   },
   "scripts": {
-    "dev": "bun --filter chord-tauri dev",
+    "dev": "vp exec _dev",
     "build": "bun --filter chord-tauri build",
     "build-dmg": "bun --filter chord-tauri build-dmg",
     "lint": "vp lint --fix apps/chord-tauri chord/dev/improve/chord",
@@ -93,6 +93,7 @@
     "@chord/dev.improve.chord.components.ui.toggle": "workspace:*",
     "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
     "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
+    "@chord/dev.improve.chord.configs.dev": "workspace:*",
     "@chord/dev.improve.chord.configs.patching.codemods.llrt": "workspace:*",
     "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": "workspace:*",
     "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",

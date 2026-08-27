@@ -18,6 +18,8 @@ mod constants;
 pub mod git;
 mod mode;
 mod models;
+mod native_cli;
+pub use native_cli::*;
 mod quickjs;
 mod setup;
 mod state;
@@ -177,6 +179,12 @@ pub fn run_app() {
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
+            let supervisor = handle.app_state().native_host_supervisor();
+            supervisor.abort_active();
+            let _ = tauri::async_runtime::block_on(tokio::time::timeout(
+                Duration::from_secs(3),
+                supervisor.shutdown(),
+            ));
             if let Err(error) = handle.state::<AppLockFile>().cleanup() {
                 log::error!("Failed to remove app lock file on exit: {error}");
             }

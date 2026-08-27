@@ -88,8 +88,41 @@ export interface ChordJsPackage {
 	files: Record<FilePathslug, string>;
 }
 
-/** Currently only supports JavaScript handlers */
+export interface NativeLibraryArtifact {
+	sha256: string;
+	size: number;
+}
+
+/**
+ * The validated, materialized native artifacts of one package. Mirrors `ChordJsPackage`:
+ * libraries are keyed by pathslug (`target/<triple>/swift/menu/menu.dylib`) and resolved
+ * relative to the chords file that references them so bundled (nested) packages resolve to
+ * their own libraries. The whole `target/` subtree is materialized together so libraries can
+ * reference vendored sibling libraries via `@loader_path`.
+ */
+export interface ChordNativePackage {
+	name: string;
+	/** Hash of the materialized artifact tree. */
+	treeSha256: string;
+	libraries: Record<FilePathslug, NativeLibraryArtifact>;
+}
+
+/** Which backend executes a handler. Omitted in TOML means JavaScript for backward compatibility. */
+export enum ChordsFileHandlerKind {
+	Js = "js",
+	/**
+	 * A prebuilt library at `target/<triple>/swift/<name>/<name>.<dylib|dll|so>` exporting
+	 * `chord_native_run_v1`, executed inside the isolated `chord-native-host` process.
+	 */
+	Native = "native",
+}
+
 export interface ChordsFileHandler {
+	kind?: ChordsFileHandlerKind;
+	/**
+	 * JS: a path inside `js/` (e.g. `menu.js`). Native: a logical module name without
+	 * extension (e.g. `menu` -> `target/<triple>/swift/menu/menu.dylib`).
+	 */
 	file: string;
 	args?: any[];
 }
@@ -115,6 +148,7 @@ export interface RawChordsFile {
 export interface CompiledChordsFileHandler {
 	event: string;
 	handlerId: string;
+	kind: ChordsFileHandlerKind;
 }
 
 /** A chords file that has imports inlined. */
@@ -137,6 +171,7 @@ export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
 	name: string;
 	jsPackage?: ChordJsPackage;
+	nativePackage?: ChordNativePackage;
 	rawChordsFiles: Record<FilePathslug, RawChordsFile>;
 	compiledChordsFiles: Record<FilePathslug, CompiledChordsFile>;
 	globalChords: ChordReference[];
@@ -192,9 +227,13 @@ export interface GitReposState {
 	repos: Record<string, GitRepo>;
 }
 
-/** Currently, we only support JavaScript handlers */
 export interface HandlerChordAction {
+	/**
+	 * JS: key in the QuickJS `__RUST_HANDLER_REGISTRY`. Native: registration id in the
+	 * native host's active generation.
+	 */
 	handlerId: string;
+	kind: ChordsFileHandlerKind;
 	eventArgs: any[];
 }
 
@@ -231,6 +270,11 @@ export interface RawChordPackage {
 	chordsFilesContents: Record<FilePathslug, string>;
 	jsFilesContents: Record<FilePathslug, string>;
 	binFilesContents: Record<FilePathslug, number[]>;
+	/**
+	 * Prebuilt native build artifacts for the current target triple from the package's
+	 * top-level `target/` directory (`target/<triple>/swift/<name>/...`), keyed by pathslug.
+	 */
+	nativeFilesContents: Record<FilePathslug, number[]>;
 }
 
 export interface ShellChordAction {

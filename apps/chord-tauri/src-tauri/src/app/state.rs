@@ -54,6 +54,7 @@ define_app_state! {
     frontmost: super::frontmost::AppFrontmost,
     global_hotkey_store: super::global_hotkey_store::GlobalHotkeyStore,
     keyboard: super::keyboard::AppKeyboard,
+    native_host_supervisor: super::native_host::NativeHostSupervisor,
     app_controller: super::controller::AppController,
     permissions: super::permissions::AppPermissions,
     placeholder_chord_store: super::placeholder_chord_store::PlaceholderChordStore,

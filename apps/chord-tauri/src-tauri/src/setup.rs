@@ -7,6 +7,7 @@ use crate::app::dev_lockfile_detector::{DevLockfileDetector, DevLockfileDetector
 use crate::app::frontmost::{AppFrontmost, AppFrontmostProvider};
 use crate::app::global_hotkey_store::{GlobalHotkeyStore, GlobalHotkeyStoreProvider};
 use crate::app::keyboard::{AppKeyboard, AppKeyboardProvider};
+use crate::app::native_host::{NativeHostSupervisor, NativeHostSupervisorProvider};
 use crate::app::permissions::{AppPermissions, AppPermissionsProvider};
 use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChordStoreProvider};
 use crate::app::settings::{AppSettings, AppSettingsProvider};
@@ -101,6 +102,12 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
                 keyboard_observable,
             }
             .provide::<AppKeyboard>(),
+        )
+        .add(
+            NativeHostSupervisorProvider {
+                handle: handle.clone(),
+            }
+            .provide::<NativeHostSupervisor>(),
         )
         .add(
             AppControllerProvider {

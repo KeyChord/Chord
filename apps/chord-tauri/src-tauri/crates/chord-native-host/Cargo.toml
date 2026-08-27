@@ -1,0 +1,19 @@
+[package]
+name = "chord-native-host"
+version = "0.1.0"
+edition = "2024"
+description = "Isolated helper process that loads and invokes Chord native handler libraries"
+
+[[bin]]
+name = "chord-native-host"
+path = "src/main.rs"
+
+[dependencies]
+chord-native-protocol = { path = "../chord-native-protocol" }
+anyhow = "1"
+libc = "0.2"
+libloading = "0.8"
+tokio = { version = "1", features = ["rt", "net", "io-util", "macros", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "net", "io-util", "macros", "time", "process"] }

@@ -1,0 +1,7 @@
+{
+	"bundle": {
+		"macOS": {
+			"entitlements": "Entitlements.sandbox.plist"
+		}
+	}
+}

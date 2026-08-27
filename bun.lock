@@ -81,6 +81,7 @@
         "@chord/dev.improve.chord.components.ui.toggle": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
         "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
+        "@chord/dev.improve.chord.configs.dev": "workspace:*",
         "@chord/dev.improve.chord.configs.patching.codemods.llrt": "workspace:*",
         "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
@@ -1013,6 +1014,17 @@
         "@types/react-dom": "^19.2.5",
       },
     },
+    "chord/dev/improve/chord/configs/dev": {
+      "name": "@chord/dev.improve.chord.configs.dev",
+      "version": "0.0.0",
+      "bin": {
+        "_dev": "./_dev.ts",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.0",
+        "mprocs": "^0.9.6",
+      },
+    },
     "chord/dev/improve/chord/configs/patching/codemods/llrt": {
       "name": "@chord/dev.improve.chord.configs.patching.codemods.llrt",
       "version": "0.0.0",
@@ -1711,6 +1723,8 @@
     "@chord/dev.improve.chord.components.ui.toggle-group": ["@chord/dev.improve.chord.components.ui.toggle-group@workspace:chord/dev/improve/chord/components/ui/toggle-group"],
 
     "@chord/dev.improve.chord.components.ui.tooltip": ["@chord/dev.improve.chord.components.ui.tooltip@workspace:chord/dev/improve/chord/components/ui/tooltip"],
+
+    "@chord/dev.improve.chord.configs.dev": ["@chord/dev.improve.chord.configs.dev@workspace:chord/dev/improve/chord/configs/dev"],
 
     "@chord/dev.improve.chord.configs.patching.codemods.llrt": ["@chord/dev.improve.chord.configs.patching.codemods.llrt@workspace:chord/dev/improve/chord/configs/patching/codemods/llrt"],
 
@@ -2885,6 +2899,8 @@
     "minimatch": ["minimatch@10.2.6", "", { "dependencies": { "brace-expansion": "^5.0.8" } }, "sha512-vpLQEs+VLCr1nU0BXS07maYoFwlDAH0gngQuuttxIwutDFEMHq2blX+8vpgxDdK3J1PwjCJiep77OitTZ4Ll1A=="],
 
     "minimist": ["minimist@1.2.8", "", {}, "sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA=="],
+
+    "mprocs": ["mprocs@0.9.6", "", { "bin": { "mprocs": "cli.js" } }, "sha512-sEwB5XD3/rReB47h0YbN2L5fXOLcMjF8sOEDTMr/daCLyVZfU4CegbanxO0ybiaFx0MQ/nV7yzOHmprmy2Wq9w=="],
 
     "mrmime": ["mrmime@2.0.1", "", {}, "sha512-Y3wQdFg2Va6etvQ5I82yUhGdsKrcYox6p7FfL1LbK2J4V01F9TGlepTIhnK24t7koZibmg82KGglhA1XK5IsLQ=="],
 

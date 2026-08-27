@@ -2,13 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>com.apple.security.app-sandbox</key>
-    <true/>
-
-    <key>com.apple.security.network.client</key>
-    <true/>
-
-    <key>com.apple.security.network.server</key>
+    <!--
+        Full-power profile: no App Sandbox, so native handlers (and shell/JS handlers) have the
+        same authority as any other process of the user. Library validation stays enabled for the
+        main process; only the chord-native-host sidecar disables it (see NativeHost.entitlements
+        and scripts/release-macos.ts). For a sandboxed distribution use Entitlements.sandbox.plist
+        via tauri.sandbox.conf.json; native handlers are unavailable there.
+    -->
+    <key>com.apple.security.automation.apple-events</key>
     <true/>
 </dict>
 </plist>
