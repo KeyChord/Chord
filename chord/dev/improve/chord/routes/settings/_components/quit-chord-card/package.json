@@ -1,0 +1,22 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.quit-chord-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#quit-chord-card": "./quit-chord-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

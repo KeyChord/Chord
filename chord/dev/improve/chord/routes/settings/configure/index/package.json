@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings.configure.index",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#settings-configure-page": "./settings-configure-page.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

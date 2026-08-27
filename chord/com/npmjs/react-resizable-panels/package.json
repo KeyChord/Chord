@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.react-resizable-panels",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "react-resizable-panels": "^4.12.3"
+  }
+}

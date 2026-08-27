@@ -1,0 +1,25 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#first-run-onboarding": "./first-run-onboarding.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-app-permissions-state": "workspace:*",
+		"lucide-react": "^1.34.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

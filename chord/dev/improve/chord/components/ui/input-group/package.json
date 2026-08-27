@@ -1,0 +1,23 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.input-group",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#input-group": "./input-group.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.textarea": "workspace:*",
+		"class-variance-authority": "^0.7.1",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

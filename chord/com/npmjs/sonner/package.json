@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.sonner",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "sonner": "^2.0.8"
+  }
+}

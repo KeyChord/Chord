@@ -1,0 +1,23 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.add-repo-button",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#add-repo-button": "./add-repo-button.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.sonner": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

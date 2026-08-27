@@ -1,0 +1,22 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings.general.index",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#settings-general-page": "./settings-general-page.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

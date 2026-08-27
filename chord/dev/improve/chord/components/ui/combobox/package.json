@@ -1,0 +1,23 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.combobox",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#combobox": "./combobox.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@base-ui/react": "^1.7.0",
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input-group": "workspace:*",
+		"lucide-react": "^1.34.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.lib.permissions",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#permissions": "./permissions.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+		"@tauri-apps/api": "^2.11.1",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.5"
+	}
+}

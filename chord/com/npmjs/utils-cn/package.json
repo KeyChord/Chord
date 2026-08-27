@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.utils-cn",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "utils-cn": "^1.0.2"
+  }
+}

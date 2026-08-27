@@ -1,0 +1,29 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.sidebar",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#sidebar": "./sidebar.tsx",
+		"#use-is-mobile": "./use-is-mobile.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.separator": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.sheet": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.skeleton": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
+		"class-variance-authority": "^0.7.1",
+		"lucide-react": "^1.34.0",
+		"radix-ui": "^1.6.7",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

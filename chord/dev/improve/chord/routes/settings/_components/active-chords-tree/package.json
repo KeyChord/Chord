@@ -1,0 +1,18 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tree",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#active-chords-tree": "./active-chords-tree.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

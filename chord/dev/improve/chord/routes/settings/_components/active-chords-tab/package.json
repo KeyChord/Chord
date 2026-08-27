@@ -1,0 +1,24 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tab",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#active-chords-tab": "./active-chords-tab.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.active-chords-tree": "workspace:*",
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

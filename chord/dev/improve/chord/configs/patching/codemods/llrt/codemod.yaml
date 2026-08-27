@@ -1,0 +1,18 @@
+schema_version: '1.0'
+
+name: keychord/llrt-disable-sdk-client-endpoint-map
+version: 0.1.0
+description: "Patch llrt_core's build.rs to comment out generate_sdk_client_endpoint_map so Chord's embedded LLRT build skips AWS SDK endpoint map generation that requires sdk.cfg"
+author: KeyChord
+license: MIT
+workflow: workflow.yaml
+category: patches
+
+targets:
+  languages: [rust]
+
+keywords: [patches, llrt, rust, build-script, aws-sdk]
+
+registry:
+  access: private
+  visibility: private

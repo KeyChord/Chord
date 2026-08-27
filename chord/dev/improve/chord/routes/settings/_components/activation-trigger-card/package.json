@@ -1,0 +1,20 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#activation-trigger-card": "./activation-trigger-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

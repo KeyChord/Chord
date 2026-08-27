@@ -1,0 +1,22 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.shortcut-keys",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#shortcut-keys": "./shortcut-keys.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@bradleyhodges/sfsymbols": "^7.0.4",
+		"@bradleyhodges/sfsymbols-react": "^7.0.4",
+		"@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
+		"pretty-key": "^0.2.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

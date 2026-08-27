@@ -1,0 +1,10 @@
+{
+  "name": "@chord/com.npmjs.tanstack__devtools-utils",
+  "type": "module",
+  "exports": {
+    "./react": "./+react.ts"
+  },
+  "dependencies": {
+    "@tanstack/devtools-utils-original": "npm:@tanstack/devtools-utils@^0.7.0"
+  }
+}

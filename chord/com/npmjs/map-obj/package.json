@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.map-obj",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "map-obj": "^6.0.0"
+  }
+}

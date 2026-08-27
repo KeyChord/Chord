@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.smol-toml",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "smol-toml": "^1.8.0"
+  }
+}

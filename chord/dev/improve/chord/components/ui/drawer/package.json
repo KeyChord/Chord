@@ -1,0 +1,20 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.drawer",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#drawer": "./drawer.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"react": "^19.2.8",
+		"vaul": "^1.1.2"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

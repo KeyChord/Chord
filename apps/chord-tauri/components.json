@@ -1,0 +1,25 @@
+{
+	"$schema": "https://ui.shadcn.com/schema.json",
+	"style": "radix-nova",
+	"rsc": false,
+	"tsx": true,
+	"tailwind": {
+		"config": "tailwind.config.js",
+		"css": "src/global.css",
+		"baseColor": "neutral",
+		"cssVariables": true,
+		"prefix": ""
+	},
+	"iconLibrary": "lucide",
+	"rtl": false,
+	"aliases": {
+		"components": "../../chord/dev/improve/chord/components",
+		"utils": "@chord/com.npmjs.utils-cn",
+		"ui": "../../chord/dev/improve/chord/components/ui",
+		"lib": "../../chord/dev/improve/chord/lib",
+		"hooks": "../../chord/dev/improve/chord/hooks"
+	},
+	"menuColor": "default",
+	"menuAccent": "subtle",
+	"registries": {}
+}

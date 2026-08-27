@@ -1,8 +1,0 @@
-{
-  "name": "@keychord/com.npmjs.date-fns",
-  "type": "module",
-  "exports": "./+.ts",
-  "dependencies": {
-    "date-fns": "^4.4.0"
-  }
-}

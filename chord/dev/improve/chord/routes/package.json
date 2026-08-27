@@ -1,0 +1,22 @@
+{
+	"name": "@chord/dev.improve.chord.routes",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#root-layout": "./root-layout.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.sonner": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.sonner": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

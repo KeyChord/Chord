@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.pathe",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "pathe": "^2.0.3"
+  }
+}

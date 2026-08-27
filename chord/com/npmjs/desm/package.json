@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.desm",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "desm": "^1.3.1"
+  }
+}

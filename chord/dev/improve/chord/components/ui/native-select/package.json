@@ -1,0 +1,20 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.native-select",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#native-select": "./native-select.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"lucide-react": "^1.34.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

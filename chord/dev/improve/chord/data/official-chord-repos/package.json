@@ -1,0 +1,13 @@
+{
+	"name": "@chord/dev.improve.chord.data.official-chord-repos",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#official-chord-repos": "./official-chord-repos.ts",
+		"#official-chord-repos.json": "./@assets/official-chord-repos.json"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {}
+}

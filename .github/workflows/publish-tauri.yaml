@@ -41,18 +41,16 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: setup bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+      - name: setup proto toolchain
+        uses: moonrepo/setup-toolchain@v0
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          proto-version: 0.61.1
+          auto-install: true
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: apps/keychord-tauri/src-tauri -> target
+          workspaces: apps/chord-tauri/src-tauri -> target
 
       - name: install frontend dependencies
         run: bun install --frozen-lockfile
@@ -86,7 +84,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
           APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
         with:
-          projectPath: apps/keychord-tauri
+          projectPath: apps/chord-tauri
           tagName: app-v__VERSION__
           releaseName: App v__VERSION__
           releaseBody: See the assets to download this version and install.
@@ -103,7 +101,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PATH }}
         with:
-          projectPath: apps/keychord-tauri
+          projectPath: apps/chord-tauri
           tagName: app-v__VERSION__
           releaseName: App v__VERSION__
           releaseBody: See the assets to download this version and install.

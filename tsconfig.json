@@ -3,6 +3,6 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["apps/**/*", "keychord/**/*"],
+  "include": ["apps/**/*", "chord/**/*"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

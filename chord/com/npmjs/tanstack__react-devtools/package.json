@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.tanstack__react-devtools",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "@tanstack/react-devtools-original": "npm:@tanstack/react-devtools@^0.10.12"
+  }
+}

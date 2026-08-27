@@ -1,0 +1,24 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#launch-on-login-card": "./launch-on-login-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.label": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

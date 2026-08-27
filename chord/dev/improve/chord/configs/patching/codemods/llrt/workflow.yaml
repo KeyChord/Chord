@@ -1,0 +1,21 @@
+version: '1'
+
+# LLRT is a git Cargo dependency rather than an npm package, so this workflow is
+# applied manually against a checkout of https://github.com/KeyChord/llrt:
+#
+#   codemod jssg run --target llrt_core/build.rs -l rust --allow-fs ./codemod.ts
+#
+# Or against this package's test fixtures via:
+#
+#   bun run test
+nodes:
+  - id: disable-sdk-client-endpoint-map
+    name: Comment out generate_sdk_client_endpoint_map in llrt_core build.rs
+    type: automatic
+    steps:
+      - name: Run JSSG codemod
+        js-ast-grep:
+          js_file: codemod.ts
+          language: rust
+          include:
+            - llrt_core/build.rs

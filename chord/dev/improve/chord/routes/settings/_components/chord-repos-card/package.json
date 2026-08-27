@@ -1,0 +1,30 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.chord-repos-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#chord-repos-card": "./chord-repos-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.sonner": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
+		"lucide-react": "^1.34.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

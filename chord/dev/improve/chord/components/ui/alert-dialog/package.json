@@ -1,0 +1,21 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.alert-dialog",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#alert-dialog": "./alert-dialog.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"radix-ui": "^1.6.7",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

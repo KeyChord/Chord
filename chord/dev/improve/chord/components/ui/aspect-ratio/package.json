@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.aspect-ratio",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#aspect-ratio": "./aspect-ratio.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"radix-ui": "^1.6.7",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

@@ -1,0 +1,27 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#placeholder-chords-card": "./placeholder-chords-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

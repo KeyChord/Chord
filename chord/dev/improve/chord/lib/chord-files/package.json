@@ -1,0 +1,14 @@
+{
+	"name": "@chord/dev.improve.chord.lib.chord-files",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#chord-files": "./chord-files.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*"
+	}
+}

@@ -1,0 +1,12 @@
+{
+	"name": "@chord/dev.improve.chord.lib.typeshare",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#types-gen": "./types.gen.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {}
+}

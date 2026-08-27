@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.kbd",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#kbd": "./kbd.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

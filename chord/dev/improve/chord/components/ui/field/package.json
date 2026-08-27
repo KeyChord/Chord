@@ -1,0 +1,22 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.field",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#field": "./field.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.label": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.separator": "workspace:*",
+		"class-variance-authority": "^0.7.1",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings.danger.index",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#settings-danger-page": "./settings-danger-page.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/dev.improve.chord.routes.settings._components.reset-chords-card": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

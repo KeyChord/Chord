@@ -1,0 +1,24 @@
+{
+	"name": "@chord/dev.improve.chord.routes.chords.index",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#chords-page": "./chords-page.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
+		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+		"@tauri-apps/api": "^2.11.1",
+		"pretty-key": "^0.2.0",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

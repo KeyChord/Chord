@@ -1,0 +1,21 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.badge",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#badge": "./badge.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"class-variance-authority": "^0.7.1",
+		"radix-ui": "^1.6.7",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

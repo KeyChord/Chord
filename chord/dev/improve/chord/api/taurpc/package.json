@@ -1,0 +1,15 @@
+{
+	"name": "@chord/dev.improve.chord.api.taurpc",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#bindings": "./bindings.gen.ts",
+		"#taurpc": "./taurpc.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"taurpc": "^2.0.0"
+	}
+}

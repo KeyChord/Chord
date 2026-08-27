@@ -1,0 +1,11 @@
+{
+  "name": "@chord/com.npmjs.tanstack__router-plugin",
+  "type": "module",
+  "exports": {
+    ".": "./+.ts",
+    "./vite": "./+vite.ts"
+  },
+  "dependencies": {
+    "@tanstack/router-plugin-original": "npm:@tanstack/router-plugin@^1.168.35"
+  }
+}

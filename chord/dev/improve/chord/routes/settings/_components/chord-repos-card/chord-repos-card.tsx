@@ -1,0 +1,125 @@
+import { toast } from '@chord/com.npmjs.sonner';
+import { useMutation } from '@chord/com.npmjs.tanstack__react-query';
+import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
+import { Badge } from '@chord/dev.improve.chord.components.ui.badge';
+import { Button } from '@chord/dev.improve.chord.components.ui.button';
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from '@chord/dev.improve.chord.components.ui.card';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '@chord/dev.improve.chord.components.ui.dropdown-menu';
+import { useGitRepoStoreState } from '@chord/dev.improve.chord.lib.state';
+import { AddRepoButton } from '@chord/dev.improve.chord.routes.settings._components.add-repo-button';
+import { OpenRepoButton } from '@chord/dev.improve.chord.routes.settings._components.open-repo-button';
+import { SyncRepoButton } from '@chord/dev.improve.chord.routes.settings._components.sync-repo-button';
+import { Ellipsis, Trash2 } from 'lucide-react';
+
+export function ChordReposCard() {
+	const { repos } = useGitRepoStoreState();
+	return (
+		<Card size="sm">
+			<CardHeader>
+				<div className="flex items-center justify-between gap-3">
+					<div>
+						<CardTitle>Chord Repos</CardTitle>
+						<CardDescription>
+							Added GitHub repos are cloned into the app cache and loaded alongside local chord folders.
+						</CardDescription>
+					</div>
+				</div>
+			</CardHeader>
+			<CardContent className="space-y-4 pt-0">
+				<AddRepoButton />
+				<div className="space-y-3">
+					{Object.values(repos).length === 0
+						? (
+								<p className="text-sm text-muted-foreground">
+									No external repos added yet.
+								</p>
+							)
+						: (
+								Object.values(repos).map(repo => <GitRepoRow key={repo.slug} repo={repo} />)
+							)}
+				</div>
+			</CardContent>
+		</Card>
+	);
+}
+
+function GitRepoRow({ repo }: { repo: { slug: string, headShortSha?: string, pinnedRev?: string | null, url: string } }) {
+	return (
+		<div key={repo.slug} className="rounded-lg border bg-background/80 px-3 py-3">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+				<div className="min-w-0 space-y-1">
+					<div className="flex items-center gap-2">
+						<p className="truncate font-medium">{repo.slug}</p>
+						<Badge variant="secondary">GitHub</Badge>
+						{repo.pinnedRev
+							? (
+									<Badge variant="outline">Pinned</Badge>
+								)
+							: null}
+						{repo.headShortSha
+							? (
+									<Badge variant="outline" className="font-mono text-[11px]">
+										{repo.headShortSha}
+									</Badge>
+								)
+							: null}
+					</div>
+				</div>
+				<div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+					<OpenRepoButton repo={repo} />
+					{repo.pinnedRev ? null : <SyncRepoButton repo={repo} />}
+					<RepoActionsMenuButton repo={repo} />
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
+	const removeGitRepoMutation = useMutation({
+		mutationFn: taurpc.removeGitRepo,
+		onSuccess: () => {
+			toast.success(`Removed ${repo.slug}.`);
+		},
+	});
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					aria-label={`More actions for ${repo.slug}`}
+					title="More actions"
+					disabled={removeGitRepoMutation.isPending}
+				>
+					<Ellipsis />
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-40">
+				<DropdownMenuItem
+					variant="destructive"
+					disabled={removeGitRepoMutation.isPending}
+					onSelect={() => {
+						removeGitRepoMutation.mutate(repo.slug);
+					}}
+				>
+					<Trash2 />
+					{removeGitRepoMutation.isPending ? 'Removing...' : 'Remove Repo'}
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
