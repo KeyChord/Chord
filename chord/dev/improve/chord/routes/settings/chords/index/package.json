@@ -17,7 +17,7 @@
 		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.empty": "workspace:*",
-		"@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
+		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"lucide-react": "^1.34.0",
 		"react": "^19.2.8"
 	},

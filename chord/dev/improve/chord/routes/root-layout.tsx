@@ -4,8 +4,6 @@ import { Outlet } from '@chord/com.npmjs.tanstack__react-router';
 import { Toaster } from '@chord/dev.improve.chord.components.ui.sonner';
 
 function getMutationErrorMessage(error: unknown) {
-	console.error(error);
-
 	if (typeof error === 'string' && error.trim()) {
 		return error;
 	}

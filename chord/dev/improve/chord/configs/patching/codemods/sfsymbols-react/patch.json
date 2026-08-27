@@ -1,0 +1,12 @@
+{
+	"npmDependency": {
+		"name": "@bradleyhodges/sfsymbols-react",
+		"version": "7.0.4"
+	},
+	"bundles": [
+		{
+			"path": "package.json",
+			"language": "json"
+		}
+	]
+}

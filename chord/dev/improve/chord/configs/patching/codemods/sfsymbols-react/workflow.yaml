@@ -1,0 +1,23 @@
+version: '1'
+
+# Applied automatically via bun patchedDependencies (see patches/ and root
+# package.json). To regenerate the patch file after upstream changes:
+#
+#   bun patch @bradleyhodges/sfsymbols-react@7.0.4
+#   codemod jssg run --target package.json -l json --allow-fs ./codemod.ts
+#   bun patch --commit 'node_modules/@bradleyhodges/sfsymbols-react'
+#
+# Or run fixture tests:
+#
+#   bun run --filter @chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react test
+nodes:
+  - id: remove-next-dependency
+    name: Remove unused next dependency from sfsymbols-react package.json
+    type: automatic
+    steps:
+      - name: Run JSSG codemod
+        js-ast-grep:
+          js_file: codemod.ts
+          language: json
+          include:
+            - package.json

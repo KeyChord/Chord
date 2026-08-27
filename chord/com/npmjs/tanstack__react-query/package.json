@@ -3,6 +3,6 @@
   "type": "module",
   "exports": "./+.ts",
   "dependencies": {
-    "@tanstack/react-query-original": "npm:@tanstack/react-query@^5.102.3"
+    "@tanstack/react-query-original": "npm:@tanstack/react-query@^5.102.8"
   }
 }

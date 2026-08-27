@@ -94,10 +94,11 @@
     "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
     "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
     "@chord/dev.improve.chord.configs.patching.codemods.llrt": "workspace:*",
+    "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": "workspace:*",
     "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
-    "@chord/dev.improve.chord.hooks.use-app-permissions-state": "workspace:*",
-    "@chord/dev.improve.chord.hooks.use-tauri-state": "workspace:*",
     "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
+    "@chord/dev.improve.chord.lib.permissions": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
     "@chord/dev.improve.chord.routes.chords.index": "workspace:*",
     "@chord/dev.improve.chord.routes": "workspace:*",
     "@chord/dev.improve.chord.routes.settings": "workspace:*",
@@ -139,5 +140,8 @@
     "@tanstack/react-router-devtools": "workspace:chord/com/npmjs/tanstack__react-router-devtools",
     "@tanstack/router-plugin": "workspace:chord/com/npmjs/tanstack__router-plugin"
   },
-  "packageManager": "bun@1.3.11"
+  "packageManager": "bun@1.4.0",
+  "patchedDependencies": {
+    "@bradleyhodges/sfsymbols-react@7.0.4": "patches/@bradleyhodges%2Fsfsymbols-react@7.0.4.patch"
+  }
 }

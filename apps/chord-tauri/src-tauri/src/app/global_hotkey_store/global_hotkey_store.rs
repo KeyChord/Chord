@@ -21,7 +21,6 @@ pub struct GlobalHotkeyStore {
 #[derive(Debug)]
 #[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
 pub struct GlobalShortcutMappingInfo {
     pub shortcut: String,
     pub bundle_id: String,

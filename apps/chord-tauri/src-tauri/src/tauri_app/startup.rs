@@ -8,7 +8,6 @@ const ONBOARDING_COMPLETED_KEY: &str = "onboardingCompleted";
 #[derive(Debug)]
 #[taurpc::ipc_type]
 #[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
 pub struct StartupStatusInfo {
     pub launched_via_autostart: bool,
     pub onboarding_completed: bool,

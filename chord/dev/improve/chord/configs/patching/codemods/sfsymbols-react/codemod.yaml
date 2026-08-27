@@ -1,0 +1,18 @@
+schema_version: '1.0'
+
+name: keychord/sfsymbols-react-remove-next-dependency
+version: 0.1.0
+description: "Patch @bradleyhodges/sfsymbols-react to remove the unused next dependency that incorrectly pulls Next.js into non-Next apps"
+author: KeyChord
+license: MIT
+workflow: workflow.yaml
+category: patches
+
+targets:
+  languages: [json]
+
+keywords: [patches, sfsymbols-react, next, dependencies]
+
+registry:
+  access: private
+  visibility: private

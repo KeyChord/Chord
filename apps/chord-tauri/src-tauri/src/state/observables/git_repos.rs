@@ -15,7 +15,6 @@ pub struct GitReposState {
 #[typeshare]
 #[derive(Debug)]
 #[serde(rename_all = "camelCase")]
-#[specta(rename_all = "camelCase")]
 pub struct GitRepo {
     pub owner: String,
     pub name: String,

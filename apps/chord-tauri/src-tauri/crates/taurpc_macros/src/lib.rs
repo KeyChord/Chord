@@ -64,18 +64,9 @@ fn parse_module_ident(lit: &LitStr) -> syn::Result<syn::Ident> {
 
 #[proc_macro_attribute]
 pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let mut export_to: Option<LitStr> = None;
     let mut resolver_mod_name: Option<LitStr> = None;
 
     let parser = syn::meta::parser(|meta| {
-        if meta.path.is_ident("export_to") {
-            let value: LitStr = meta.value()?.parse()?;
-            if export_to.replace(value).is_some() {
-                return Err(meta.error("duplicate `export_to` argument"));
-            }
-            return Ok(());
-        }
-
         if meta.path.is_ident("mod") {
             let value: LitStr = meta.value()?.parse()?;
             if resolver_mod_name.replace(value).is_some() {
@@ -84,7 +75,7 @@ pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
             return Ok(());
         }
 
-        Err(meta.error("unsupported argument; expected `export_to = \"...\"` or `mod = \"...\"`"))
+        Err(meta.error("unsupported argument; expected `mod = \"...\"`"))
     });
 
     parse_macro_input!(attr with parser);
@@ -143,21 +134,8 @@ pub fn taurpc_api(attr: TokenStream, item: TokenStream) -> TokenStream {
         });
     }
 
-    let procedures_attr = match export_to {
-        Some(path) => {
-            quote! {
-                #[taurpc::procedures(export_to = #path)]
-            }
-        }
-        None => {
-            quote! {
-                #[taurpc::procedures]
-            }
-        }
-    };
-
     TokenStream::from(quote! {
-        #procedures_attr
+        #[taurpc::procedures]
         #item_trait
 
         pub mod #resolver_mod_ident {

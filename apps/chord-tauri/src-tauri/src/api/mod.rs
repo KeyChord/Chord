@@ -11,10 +11,7 @@ pub use api::*;
 mod error;
 pub use error::*;
 
-#[taurpc_api(
-    export_to = "../../../chord/dev/improve/chord/api/taurpc/bindings.gen.ts",
-    mod = "resolvers"
-)]
+#[taurpc_api(mod = "resolvers")]
 pub trait Api {
     async fn open_accessibility_settings();
     async fn open_input_monitoring_settings();

@@ -13,6 +13,10 @@ export default defineConfig({
 		babel({ presets: [reactCompilerPreset()] }),
 		tailwindcss(),
 		tanstackRouter({
+			routeTreeFileHeader: [
+				'// @ts-nocheck',
+				'// noinspection JSUnusedGlobalSymbols',
+			],
 			target: 'react',
 		}),
 	],

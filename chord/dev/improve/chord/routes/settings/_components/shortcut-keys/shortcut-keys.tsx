@@ -12,7 +12,7 @@ import { Kbd, KbdGroup } from '@chord/dev.improve.chord.components.ui.kbd';
 import getPrettyKey from 'pretty-key';
 
 export function ShortcutKeys({ shortcut }: { shortcut: string }) {
-	const chords = shortcut.split(' ').reduce<Array<{ id: string, keys: string[] }>>((items, chord) => {
+	const chords = shortcut.split(' ').reduce<{ id: string, keys: string[] }[]>((items, chord) => {
 		const prefix = items.length > 0 ? `${items.at(-1)?.id ?? ''} ${chord}` : chord;
 		items.push({
 			id: prefix,

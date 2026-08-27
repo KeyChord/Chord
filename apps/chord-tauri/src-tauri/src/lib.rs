@@ -110,8 +110,21 @@ pub fn run_app() {
         .build();
 
     let api = ApiImpl::default();
+    let api_handler = api.clone().into_handler();
+
+    #[cfg(debug_assertions)]
+    taurpc::Exporter::new()
+        .export(
+            &api_handler,
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../chord/dev/improve/chord/api/taurpc/bindings.gen.ts"
+            ),
+        )
+        .expect("failed to export TauRPC TypeScript bindings");
+
     let app = tauri::Builder::default()
-        .invoke_handler(taurpc::create_ipc_handler(api.clone().into_handler()))
+        .invoke_handler(taurpc::create_ipc_handler(api_handler))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
         .on_menu_event(|handle, event| {
             tauri_app::menu::handle_menu_event(handle, &event);
