@@ -20,7 +20,7 @@ pub struct RawChordPackage {
     pub js_files_contents: HashMap<FilePathslug, String>,
     pub bin_files_contents: HashMap<FilePathslug, Vec<u8>>,
     /// Prebuilt native build artifacts for the current target triple from the package's
-    /// top-level `target/` directory (`target/<triple>/swift/<name>/...`), keyed by pathslug.
+    /// top-level `target/` directory (`target/<triple>/native/<name>/...`), keyed by pathslug.
     pub native_files_contents: HashMap<FilePathslug, Vec<u8>>,
 }
 

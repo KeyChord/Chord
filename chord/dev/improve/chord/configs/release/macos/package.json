@@ -1,0 +1,15 @@
+{
+	"name": "@chord/dev.improve.chord.configs.release.macos",
+	"type": "module",
+	"version": "0.0.0",
+	"private": true,
+	"bin": {
+		"release-macos": "./_release-macos.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.0"
+	}
+}

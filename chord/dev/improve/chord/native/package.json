@@ -1,0 +1,15 @@
+{
+	"name": "@chord/dev.improve.chord.native",
+	"type": "module",
+	"version": "0.0.0",
+	"private": true,
+	"bin": {
+		"build-native-host": "./_build-native-host.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.0"
+	}
+}

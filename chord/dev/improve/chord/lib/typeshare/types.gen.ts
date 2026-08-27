@@ -95,7 +95,7 @@ export interface NativeLibraryArtifact {
 
 /**
  * The validated, materialized native artifacts of one package. Mirrors `ChordJsPackage`:
- * libraries are keyed by pathslug (`target/<triple>/swift/menu/menu.dylib`) and resolved
+ * libraries are keyed by pathslug (`target/<triple>/native/menu/menu.dylib`) and resolved
  * relative to the chords file that references them so bundled (nested) packages resolve to
  * their own libraries. The whole `target/` subtree is materialized together so libraries can
  * reference vendored sibling libraries via `@loader_path`.
@@ -111,7 +111,7 @@ export interface ChordNativePackage {
 export enum ChordsFileHandlerKind {
 	Js = "js",
 	/**
-	 * A prebuilt library at `target/<triple>/swift/<name>/<name>.<dylib|dll|so>` exporting
+	 * A prebuilt library at `target/<triple>/native/<name>/<name>.<dylib|dll|so>` exporting
 	 * `chord_native_run_v1`, executed inside the isolated `chord-native-host` process.
 	 */
 	Native = "native",
@@ -121,7 +121,7 @@ export interface ChordsFileHandler {
 	kind?: ChordsFileHandlerKind;
 	/**
 	 * JS: a path inside `js/` (e.g. `menu.js`). Native: a logical module name without
-	 * extension (e.g. `menu` -> `target/<triple>/swift/menu/menu.dylib`).
+	 * extension (e.g. `menu` -> `target/<triple>/native/menu/menu.dylib`).
 	 */
 	file: string;
 	args?: any[];
@@ -272,7 +272,7 @@ export interface RawChordPackage {
 	binFilesContents: Record<FilePathslug, number[]>;
 	/**
 	 * Prebuilt native build artifacts for the current target triple from the package's
-	 * top-level `target/` directory (`target/<triple>/swift/<name>/...`), keyed by pathslug.
+	 * top-level `target/` directory (`target/<triple>/native/<name>/...`), keyed by pathslug.
 	 */
 	nativeFilesContents: Record<FilePathslug, number[]>;
 }

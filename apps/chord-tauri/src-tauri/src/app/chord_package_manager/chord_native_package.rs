@@ -1,6 +1,6 @@
 use crate::app::native_host::materialize::{materialize_tree, sha256_hex};
 use crate::models::{
-    FilePathslug, NATIVE_LIBRARY_EXT, NATIVE_SWIFT_SUBDIR, NATIVE_TARGET_DIR, NATIVE_TARGET_TRIPLE,
+    FilePathslug, NATIVE_LIBRARY_EXT, NATIVE_MODULE_SUBDIR, NATIVE_TARGET_DIR, NATIVE_TARGET_TRIPLE,
     is_valid_native_target_name,
 };
 use anyhow::{Context, Result};
@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use typeshare::typeshare;
 
 /// The validated, materialized native artifacts of one package. Mirrors `ChordJsPackage`:
-/// libraries are keyed by pathslug (`target/<triple>/swift/menu/menu.dylib`) and resolved
+/// libraries are keyed by pathslug (`target/<triple>/native/menu/menu.dylib`) and resolved
 /// relative to the chords file that references them so bundled (nested) packages resolve to
 /// their own libraries. The whole `target/` subtree is materialized together so libraries can
 /// reference vendored sibling libraries via `@loader_path`.
@@ -83,9 +83,9 @@ impl ChordNativePackage {
 
     /// Resolves a logical handler name declared in a chords file to a materialized library.
     /// "menu" from chords/com/app/macos.toml
-    ///   -> target/<triple>/swift/menu/menu.dylib
+    ///   -> target/<triple>/native/menu/menu.dylib
     /// "menu" from chords/@pkg/name/chords/com/app/macos.toml
-    ///   -> target/@pkg/name/target/<triple>/swift/menu/menu.dylib
+    ///   -> target/@pkg/name/target/<triple>/native/menu/menu.dylib
     pub fn resolve_file(
         &self,
         chords_file_pathslug: &FilePathslug,
@@ -123,7 +123,7 @@ impl ChordNativePackage {
         };
         Ok(root
             .join(NATIVE_TARGET_TRIPLE)
-            .join(NATIVE_SWIFT_SUBDIR)
+            .join(NATIVE_MODULE_SUBDIR)
             .join(file)
             .join(format!("{file}.{NATIVE_LIBRARY_EXT}")))
     }
@@ -139,7 +139,7 @@ mod tests {
 
     fn lib(prefix: &str, name: &str) -> PathBuf {
         PathBuf::from(format!(
-            "{prefix}{NATIVE_TARGET_DIR}/{NATIVE_TARGET_TRIPLE}/{NATIVE_SWIFT_SUBDIR}/{name}/{name}.{NATIVE_LIBRARY_EXT}"
+            "{prefix}{NATIVE_TARGET_DIR}/{NATIVE_TARGET_TRIPLE}/{NATIVE_MODULE_SUBDIR}/{name}/{name}.{NATIVE_LIBRARY_EXT}"
         ))
     }
 
@@ -149,7 +149,7 @@ mod tests {
         files.insert(lib("", "menu"), b"top".to_vec());
         files.insert(
             PathBuf::from(format!(
-                "{NATIVE_TARGET_DIR}/{NATIVE_TARGET_TRIPLE}/{NATIVE_SWIFT_SUBDIR}/menu/Module.swiftmodule"
+                "{NATIVE_TARGET_DIR}/{NATIVE_TARGET_TRIPLE}/{NATIVE_MODULE_SUBDIR}/menu/Module.swiftmodule"
             )),
             b"module".to_vec(),
         );

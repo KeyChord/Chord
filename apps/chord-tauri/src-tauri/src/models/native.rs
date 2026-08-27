@@ -1,11 +1,12 @@
 /// Top-level package directory holding platform-specific native build artifacts:
-/// `target/<triple>/swift/<name>/<name>.<ext>` plus the Swift module files other packages import.
-/// Source language is irrelevant to Chord: anything that links into a library exporting
-/// `chord_native_run_v1` is a native handler.
+/// `target/<triple>/native/<name>/<name>.<ext>` plus the compiled module files other packages
+/// import. Source language is irrelevant to Chord: anything that links into a library exporting
+/// `chord_native_run_v1` is a native handler, so the directory names the artifact kind, not a
+/// language.
 pub const NATIVE_TARGET_DIR: &str = "target";
 
-/// Subdirectory of `target/<triple>/` holding compiled handler modules.
-pub const NATIVE_SWIFT_SUBDIR: &str = "swift";
+/// Subdirectory of `target/<triple>/` holding compiled native handler modules.
+pub const NATIVE_MODULE_SUBDIR: &str = "native";
 
 /// The Rust-style target triple this build of Chord runs on, e.g. `aarch64-apple-darwin`.
 /// Set by `build.rs` from cargo's `TARGET`.

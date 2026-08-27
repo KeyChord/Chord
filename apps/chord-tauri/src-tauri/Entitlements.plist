@@ -6,7 +6,7 @@
         Full-power profile: no App Sandbox, so native handlers (and shell/JS handlers) have the
         same authority as any other process of the user. Library validation stays enabled for the
         main process; only the chord-native-host sidecar disables it (see NativeHost.entitlements
-        and scripts/release-macos.ts). For a sandboxed distribution use Entitlements.sandbox.plist
+        and configs/release/macos). For a sandboxed distribution use Entitlements.sandbox.plist
         via tauri.sandbox.conf.json; native handlers are unavailable there.
     -->
     <key>com.apple.security.automation.apple-events</key>

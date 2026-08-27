@@ -123,15 +123,15 @@ my-package/
 ├── js/menu.js                     # portable JS build output
 └── target/                        # platform-specific native build output — commit/publish it like js/
     └── aarch64-apple-darwin/
-        └── swift/
+        └── native/
             └── menu/
-                ├── menu.dylib                          # the handler library
-                ├── MyPackageSwiftMenu.swiftmodule      # importable by other packages
-                ├── MyPackageSwiftMenu.swiftdoc
-                └── MyPackageSwiftMenu.swiftinterface
+                ├── menu.dylib                           # the handler library
+                ├── MyPackageNativeMenu.swiftmodule      # importable by other packages
+                ├── MyPackageNativeMenu.swiftdoc
+                └── MyPackageNativeMenu.swiftinterface
 ```
 
-`src/` is authored source, `chords/` is Chord configuration, `js/` holds portable JS artifacts and `target/<triple>/` holds native artifacts. The source language never appears in the output path: `menu` is the logical compiled module; Swift, C++ and Objective-C are merely its inputs. Chord loads `target/<its own triple>/swift/<name>/<name>.dylib` (`.dll`/`.so` on other platforms). Make sure your `.gitignore` does not ignore `target/`.
+`src/` is authored source, `chords/` is Chord configuration, `js/` holds portable JS artifacts and `target/<triple>/` holds native artifacts. The source language never appears in the output path: `menu` is the logical compiled module; Swift, C++ and Objective-C are merely its inputs. Chord loads `target/<its own triple>/native/<name>/<name>.dylib` (`.dll`/`.so` on other platforms). Make sure your `.gitignore` does not ignore `target/`.
 
 ## Writing one
 
@@ -159,7 +159,7 @@ These environment variables are set for the duration of each call: `CHORD_PACKAG
 ```toml
 [on.menu]
 kind = "native"   # "js" (default) or "native"
-file = "menu"     # logical module name -> target/<triple>/swift/menu/menu.dylib. No extension.
+file = "menu"     # logical module name -> target/<triple>/native/menu/menu.dylib. No extension.
 args = ["Safari"]
 
 [chords."-([a-z]+)"]
@@ -170,13 +170,13 @@ args = ["Safari"]
 
 ## Importing modules from other packages
 
-Every module is built with a deterministic Swift module name: the package name and module name in PascalCase joined by `Swift`, e.g. `@keychord/chords-menu` + `menu` → `KeychordChordsMenuSwiftMenu`. Vendoring a package (`config({ vendor: ["@keychord/chords-menu"] })`) copies its `target/` next to its `js/` and `chords/` and makes its modules importable and linked:
+Every module is built with a deterministic Swift module name: the package name and module name in PascalCase joined by `Swift`, e.g. `@keychord/chords-menu` + `menu` → `KeychordChordsMenuNativeMenu`. Vendoring a package (`config({ vendor: ["@keychord/chords-menu"] })`) copies its `target/` next to its `js/` and `chords/` and makes its modules importable and linked:
 
 ```swift
-import KeychordChordsMenuSwiftMenu   // the equivalent of importing @keychord/chords-menu/js/menu.js
+import KeychordChordsMenuNativeMenu   // the equivalent of importing @keychord/chords-menu/js/menu.js
 
 func run(_ handlerArguments: [String], _ eventArguments: [String]) throws {
-    try KeychordChordsMenuSwiftMenu.run(["Safari"], ["by-letters", "f"])
+    try KeychordChordsMenuNativeMenu.run(["Safari"], ["by-letters", "f"])
 }
 ```
 
@@ -184,7 +184,7 @@ Declarations you want to expose must be `public`. Modules are built with library
 
 ## Building
 
-Packages built with `@keychord/config` compile `src/swift` automatically as part of `vp pack` (and rebuild on change in `vp pack --watch`). It needs a Swift toolchain from Xcode or the Command Line Tools (`xcrun --find swiftc`). Options go in `vite.config.ts`:
+Packages built with `@keychord/config` compile `src/swift` automatically as part of `vp pack` (and rebuild on change in `vp pack --watch`). To build every dist folder at once — `js/` and `target/<triple>/native/` — run `vpr compile` (`--triple <triple>` to cross-build, `--skip-js`/`--skip-native` for one half, `vpr -r compile` for the whole workspace). Building needs a Swift toolchain from Xcode or the Command Line Tools (`xcrun --find swiftc`). Options go in `vite.config.ts`:
 
 ```ts
 import { config } from "@keychord/config";
@@ -206,7 +206,7 @@ export default config({
 
 Companion sources are compiled with `clang`/`clang++` (`.c`, `.cc/.cpp/.cxx`, `.m` with ARC, `.mm`) and linked into the module's library; expose them to Swift through a bridging header or a module map.
 
-Any other build system works too: Chord only requires `target/<triple>/swift/<name>/<name>.dylib` to export
+Any other build system works too: Chord only requires `target/<triple>/native/<name>/<name>.dylib` to export
 
 ```c
 int32_t chord_native_run_v1(int32_t handler_argc, const char *const *handler_argv,
@@ -220,8 +220,8 @@ so C, C++, Objective-C, Rust or Zig handlers are equally possible. The generated
 ## Testing without the app
 
 ```sh
-chord native-run target/aarch64-apple-darwin/swift/menu/menu.dylib --handler-arg Safari --event-arg by-letters --event-arg f
-chord native-bench target/aarch64-apple-darwin/swift/noop/noop.dylib --iterations 10000
+chord native-run target/aarch64-apple-darwin/native/menu/menu.dylib --handler-arg Safari --event-arg by-letters --event-arg f
+chord native-bench target/aarch64-apple-darwin/native/noop/noop.dylib --iterations 10000
 ```
 
 (`CHORD_NATIVE_HOST_BIN` points the CLI at a `chord-native-host` binary when it is not next to `chord`.)

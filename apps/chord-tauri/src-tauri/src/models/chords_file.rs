@@ -75,7 +75,7 @@ pub struct RawChordsFile {
 pub enum ChordsFileHandlerKind {
     #[default]
     Js,
-    /// A prebuilt library at `target/<triple>/swift/<name>/<name>.<dylib|dll|so>` exporting
+    /// A prebuilt library at `target/<triple>/native/<name>/<name>.<dylib|dll|so>` exporting
     /// `chord_native_run_v1`, executed inside the isolated `chord-native-host` process.
     Native,
 }
@@ -97,7 +97,7 @@ pub struct ChordsFileHandler {
     #[serde(default)]
     pub kind: ChordsFileHandlerKind,
     /// JS: a path inside `js/` (e.g. `menu.js`). Native: a logical module name without
-    /// extension (e.g. `menu` -> `target/<triple>/swift/menu/menu.dylib`).
+    /// extension (e.g. `menu` -> `target/<triple>/native/menu/menu.dylib`).
     pub file: String,
     #[serde(default)]
     #[typeshare(typescript(type = "any[]"))]

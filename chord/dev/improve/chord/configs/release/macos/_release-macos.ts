@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * macOS release pipeline for the full-power build.
  *
@@ -17,13 +18,14 @@ import { $ } from "bun";
 import fs from "node:fs";
 import path from "node:path";
 
-const appDir = path.resolve(import.meta.dir, "..");
+const repoRoot = path.resolve(import.meta.dir, "../../../../../../..");
+const appDir = path.join(repoRoot, "apps/chord-tauri");
 const srcTauri = path.join(appDir, "src-tauri");
 const config = JSON.parse(fs.readFileSync(path.join(srcTauri, "tauri.conf.json"), "utf8"));
 const identity: string | undefined =
-  process.env.APPLE_SIGNING_IDENTITY ?? config.bundle?.macOS?.signingIdentity;
+	process.env.APPLE_SIGNING_IDENTITY ?? config.bundle?.macOS?.signingIdentity;
 if (!identity) {
-  throw new Error("no signing identity: set APPLE_SIGNING_IDENTITY or bundle.macOS.signingIdentity");
+	throw new Error("no signing identity: set APPLE_SIGNING_IDENTITY or bundle.macOS.signingIdentity");
 }
 const productName: string = config.productName ?? "Chord";
 const timestampArgs = process.env.CODESIGN_NO_TIMESTAMP ? [] : ["--timestamp"];
@@ -35,7 +37,7 @@ const bundleDir = path.join(srcTauri, "target/release/bundle/macos");
 const app = path.join(bundleDir, `${productName}.app`);
 const host = path.join(app, "Contents/MacOS/chord-native-host");
 if (!fs.existsSync(host)) {
-  throw new Error(`sidecar missing from bundle: ${host}`);
+	throw new Error(`sidecar missing from bundle: ${host}`);
 }
 
 console.log("re-signing native host with NativeHost.entitlements");
@@ -57,18 +59,18 @@ const updaterArchive = path.join(outDir, `${productName}.app.tar.gz`);
 console.log(`creating updater artifact ${updaterArchive}`);
 await $`tar -czf ${updaterArchive} -C ${bundleDir} ${productName}.app`;
 if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
-  await $`bun tauri signer sign ${updaterArchive}`.cwd(appDir);
+	await $`bun tauri signer sign ${updaterArchive}`.cwd(appDir);
 } else {
-  console.log("TAURI_SIGNING_PRIVATE_KEY not set; updater artifact left unsigned");
+	console.log("TAURI_SIGNING_PRIVATE_KEY not set; updater artifact left unsigned");
 }
 
 if (process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID) {
-  console.log("notarizing");
-  await $`xcrun notarytool submit ${dmg} --apple-id ${process.env.APPLE_ID} --password ${process.env.APPLE_PASSWORD} --team-id ${process.env.APPLE_TEAM_ID} --wait`;
-  await $`xcrun stapler staple ${app}`;
-  await $`xcrun stapler staple ${dmg}`;
+	console.log("notarizing");
+	await $`xcrun notarytool submit ${dmg} --apple-id ${process.env.APPLE_ID} --password ${process.env.APPLE_PASSWORD} --team-id ${process.env.APPLE_TEAM_ID} --wait`;
+	await $`xcrun stapler staple ${app}`;
+	await $`xcrun stapler staple ${dmg}`;
 } else {
-  console.log("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not set; skipping notarization");
+	console.log("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not set; skipping notarization");
 }
 
 console.log(`done: ${outDir}`);

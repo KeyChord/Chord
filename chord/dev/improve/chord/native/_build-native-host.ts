@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 /**
  * Builds the `chord-native-host` sidecar and places it where Tauri's `externalBin` expects it:
  * `src-tauri/binaries/chord-native-host-<host triple>`. Tauri copies it next to the main
@@ -10,7 +11,8 @@ import { $ } from "bun";
 import fs from "node:fs";
 import path from "node:path";
 
-const srcTauri = path.resolve(import.meta.dir, "../src-tauri");
+const repoRoot = path.resolve(import.meta.dir, "../../../../..");
+const srcTauri = path.join(repoRoot, "apps/chord-tauri/src-tauri");
 const debug = process.argv.includes("--debug");
 const profileArgs = debug ? [] : ["--release"];
 const profileDir = debug ? "debug" : "release";
@@ -18,7 +20,7 @@ const profileDir = debug ? "debug" : "release";
 const rustcInfo = await $`rustc -vV`.text();
 const triple = rustcInfo.match(/^host: (.+)$/m)?.[1];
 if (!triple) {
-  throw new Error(`could not determine host triple from rustc -vV:\n${rustcInfo}`);
+	throw new Error(`could not determine host triple from rustc -vV:\n${rustcInfo}`);
 }
 
 await $`cargo build -p chord-native-host ${profileArgs}`.cwd(srcTauri);

@@ -5,11 +5,11 @@
 	"private": true,
 	"scripts": {
 		"dev": "bun run build-native-host && RUST_BACKTRACE=full tauri dev --no-watch --config src-tauri/tauri.dev.conf.json",
-		"build-native-host": "bun scripts/build-native-host.ts",
-		"release-macos": "bun scripts/release-macos.ts",
+		"build-native-host": "build-native-host",
+		"release-macos": "release-macos",
 		"vite-dev": "vite",
 		"build": "tsc && vite build",
-		"build-dmg": "bun scripts/release-macos.ts",
+		"build-dmg": "release-macos",
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"gen-types": "typeshare ./src-tauri --lang=typescript --output-file=../../chord/dev/improve/chord/lib/typeshare/types.gen.ts",
@@ -69,6 +69,8 @@
 		"vaul": "^1.1.2"
 	},
 	"devDependencies": {
+		"@chord/dev.improve.chord.configs.release.macos": "workspace:*",
+		"@chord/dev.improve.chord.native": "workspace:*",
 		"@chord/com.npmjs.tanstack__router-plugin": "workspace:*",
 		"@rolldown/plugin-babel": "^0.2.3",
 		"@tailwindcss/vite": "^4.3.3",
