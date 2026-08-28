@@ -2,23 +2,27 @@ use crate::app::chord_mode_manager::{ChordModeManager, ChordModeManagerProvider}
 use crate::app::chord_package_manager::{ChordPackageManager, ChordPackageManagerProvider};
 use crate::app::chord_package_store::{ChordPackageStore, ChordPackageStoreProvider};
 use crate::app::chord_runner::{ChordActionTaskRunner, ChordActionTaskRunnerProvider};
+use crate::app::controller::{AppController, AppControllerProvider};
 use crate::app::desktop_app::{DesktopAppManager, DesktopAppManagerProvider};
 use crate::app::dev_lockfile_detector::{DevLockfileDetector, DevLockfileDetectorProvider};
 use crate::app::frontmost::{AppFrontmost, AppFrontmostProvider};
 use crate::app::global_hotkey_store::{GlobalHotkeyStore, GlobalHotkeyStoreProvider};
 use crate::app::keyboard::{AppKeyboard, AppKeyboardProvider};
-use crate::app::native_host::{NativeHostSupervisor, NativeHostSupervisorProvider};
 use crate::app::permissions::{AppPermissions, AppPermissionsProvider};
 use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChordStoreProvider};
 use crate::app::settings::{AppSettings, AppSettingsProvider};
 use crate::app::{AppHandleExt, AppSingleton};
 use crate::chordpack::load_default_chordpack;
 use crate::lock_file::AppLockFile;
-use crate::state::{AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordInputObservable, ChordPanelObservable, ChordPackageManagerObservable, ChordPackageStoreObservable, DesktopAppManagerObservable, FrontmostObservable, GitRepo, GitReposObservable, KeyboardObservable, Observable};
+use crate::state::{
+    AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordInputObservable,
+    ChordPackageManagerObservable, ChordPackageStoreObservable, ChordPanelObservable,
+    DesktopAppManagerObservable, FrontmostObservable, GitRepo, GitReposObservable,
+    KeyboardObservable, Observable,
+};
 use crate::tauri_app;
 use anyhow::Result;
 use tauri::AppHandle;
-use crate::app::controller::{AppController, AppControllerProvider};
 
 pub fn setup(app: &mut tauri::App) -> Result<()> {
     let handle = app.handle().clone();
@@ -42,7 +46,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
 
     let managed = Managed {
         handle: handle.clone(),
-        init_fns: Vec::new()
+        init_fns: Vec::new(),
     };
 
     managed
@@ -65,7 +69,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
         .add(
             ChordPackageStoreProvider {
                 handle: handle.clone(),
-                chord_package_store_observable
+                chord_package_store_observable,
             }
             .provide::<ChordPackageStore>(),
         )
@@ -102,12 +106,6 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
                 keyboard_observable,
             }
             .provide::<AppKeyboard>(),
-        )
-        .add(
-            NativeHostSupervisorProvider {
-                handle: handle.clone(),
-            }
-            .provide::<NativeHostSupervisor>(),
         )
         .add(
             AppControllerProvider {
@@ -151,7 +149,12 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
         log::error!("Failed to preload chorder UI: {e}");
     }
 
-    tauri::async_runtime::spawn(load_chord_packages(handle.clone()));
+    let packages_handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(error) = load_chord_packages(packages_handle).await {
+            log::error!("Failed to load chord packages: {error:#}");
+        }
+    });
 
     // Create tray
     if let Err(error) = tauri_app::tray::create_tray(handle.clone()) {
@@ -172,13 +175,22 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
 
 async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
     let state = handle.app_state();
+    let store = &state.chord_package_manager().registry.git.git_repos_store;
+    let is_first_run = !store.has_persisted_state()?;
 
-    #[cfg(debug_assertions)]
-    {
-        log::debug!("Development mode detected, syncing default chordpack");
-        let store = &state.chord_package_manager().registry.git.git_repos_store;
-        let default_chordpack = load_default_chordpack()?;
-        store.ensure_pinned_repos(default_chordpack)?;
+    if cfg!(debug_assertions) || is_first_run {
+        log::debug!(
+            "Syncing default chordpack (development: {}, first run: {})",
+            cfg!(debug_assertions),
+            is_first_run
+        );
+        let sync_result = load_default_chordpack()
+            .and_then(|default_chordpack| store.ensure_pinned_repos(default_chordpack));
+        if let Err(error) = sync_result {
+            log::error!(
+                "Failed to sync the default chordpack; loading the existing active repositories: {error:#}"
+            );
+        }
     }
 
     let chord_pm = state.chord_package_manager();
@@ -188,7 +200,7 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
 
 struct Managed {
     pub handle: AppHandle,
-    init_fns: Vec<Box<dyn FnOnce() -> Result<()>>>
+    init_fns: Vec<Box<dyn FnOnce() -> Result<()>>>,
 }
 
 impl Managed {

@@ -1,11 +1,15 @@
-/// Top-level package directory holding platform-specific native build artifacts:
-/// `target/<triple>/native/<name>/<name>.<ext>` plus the compiled module files other packages
-/// import. Source language is irrelevant to Chord: anything that links into a library exporting
-/// `chord_native_run_v1` is a native handler, so the directory names the artifact kind, not a
-/// language.
+//! Layout of a chord package's prebuilt native libraries.
+//!
+//! Chord never loads these itself: a package's JS handler opens them with `bun:ffi`, and the
+//! `chord` module's `resolveNativeLibrary(import.meta, name)` applies this layout so packages do
+//! not hardcode paths. Anything that produces `target/<triple>/native/<name>/<name>.<ext>` works
+//! (the `@keychord/config` build tooling does).
+use std::path::PathBuf;
+
+/// Top-level package directory holding platform-specific native build artifacts.
 pub const NATIVE_TARGET_DIR: &str = "target";
 
-/// Subdirectory of `target/<triple>/` holding compiled native handler modules.
+/// Subdirectory of `target/<triple>/` holding compiled native modules.
 pub const NATIVE_MODULE_SUBDIR: &str = "native";
 
 /// The Rust-style target triple this build of Chord runs on, e.g. `aarch64-apple-darwin`.
@@ -19,7 +23,7 @@ pub const NATIVE_LIBRARY_EXT: &str = "dll";
 #[cfg(all(unix, not(target_os = "macos")))]
 pub const NATIVE_LIBRARY_EXT: &str = "so";
 
-/// A logical native handler name as written in `[on.<event>] file = "..."`.
+/// A logical native module name (`menu` -> `target/<triple>/native/menu/menu.dylib`).
 /// Conservative on purpose: it becomes part of a filesystem path.
 pub fn is_valid_native_target_name(name: &str) -> bool {
     let mut chars = name.chars();
@@ -38,10 +42,18 @@ pub fn is_valid_native_target_name(name: &str) -> bool {
     true
 }
 
-/// Whether the current process runs inside the macOS App Sandbox, in which case native handlers
-/// cannot offer the unrestricted access they promise.
-pub fn is_app_sandboxed() -> bool {
-    std::env::var_os("APP_SANDBOX_CONTAINER_ID").is_some()
+/// `target/<triple>/native/<name>/<name>.<ext>` for this build's triple, relative to the
+/// (logical) package root.
+pub fn native_library_relpath(name: &str) -> anyhow::Result<PathBuf> {
+    anyhow::ensure!(
+        is_valid_native_target_name(name),
+        "invalid native module name {name:?} (expected e.g. \"menu\")"
+    );
+    Ok(PathBuf::from(NATIVE_TARGET_DIR)
+        .join(NATIVE_TARGET_TRIPLE)
+        .join(NATIVE_MODULE_SUBDIR)
+        .join(name)
+        .join(format!("{name}.{NATIVE_LIBRARY_EXT}")))
 }
 
 #[cfg(test)]
@@ -62,6 +74,16 @@ mod tests {
         assert!(!is_valid_native_target_name("sub/menu"));
         assert!(!is_valid_native_target_name(".hidden"));
         assert!(!is_valid_native_target_name(&format!("menu.{NATIVE_LIBRARY_EXT}")));
+    }
+
+    #[test]
+    fn library_relpath_follows_the_layout() {
+        let path = native_library_relpath("menu").unwrap();
+        assert_eq!(
+            path,
+            PathBuf::from(format!("target/{NATIVE_TARGET_TRIPLE}/native/menu/menu.{NATIVE_LIBRARY_EXT}"))
+        );
+        assert!(native_library_relpath("../menu").is_err());
     }
 
     #[test]

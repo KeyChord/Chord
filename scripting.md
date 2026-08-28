@@ -101,13 +101,11 @@ If you want to run it as `chord` from anywhere, add the repo copy to your `PATH`
 
 The CLI depends on macOS recognizing the bundled Chord app as the handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once first.
 
-# Native handlers
+# Native code
 
-Chord can run **prebuilt native libraries** as chord handlers. They are written in Swift (plus any C, C++, Objective-C or other code you link in), compiled ahead of time by the package build, and executed by a persistent helper process, `chord-native-host`, that Chord starts alongside itself. On a keystroke Chord sends one small message over a local socket and the helper calls the already-loaded function — no compiler, no process spawn, no `dlopen` on the hot path (a no-op handler round-trips in well under a millisecond).
+Every chord handler is a JavaScript module, and Chord runs it on an embedded [Bun](https://bun.sh) runtime (the [`rbun`](https://github.com/KeyChord/rbun) crate). When JavaScript cannot reach an API you need, your package ships a **prebuilt native library** and opens it from the handler with Bun's [`bun:ffi`](https://bun.sh/docs/api/ffi) — in-process, on the hot path, with no helper process and nothing to compile at runtime. There is no Chord SDK on the native side: your Swift (or C, C++, Objective-C, Rust, Zig, …) code calls AppKit, Accessibility, Core Graphics or anything else directly and exports plain C functions.
 
-Use native handlers when the embedded JavaScript runtime cannot reach an API you need. There is no Chord SDK to import: your Swift code calls AppKit, Accessibility, Core Graphics, Swift packages, C libraries, shell processes, or anything else directly.
-
-> **Trust:** a native handler runs with your full user permissions, outside any sandbox. The separate process protects Chord from a handler that crashes; it does not protect you from a handler that misbehaves. Only enable native packages from sources you trust.
+> **Trust:** native code runs inside Chord with your full user permissions. Only enable packages from sources you trust.
 
 ## Package layout
 
@@ -115,8 +113,8 @@ Use native handlers when the embedded JavaScript runtime cannot reach an API you
 my-package/
 ├── chords/macos.toml
 ├── src/
-│   ├── js/menu.ts                 # JS handlers (unchanged)
-│   ├── swift/menu.swift           # one native module per file; defines `run`
+│   ├── js/menu.ts                 # the handler: opens the library with bun:ffi
+│   ├── swift/menu.swift           # one native module per file; exports @_cdecl functions
 │   ├── swift/_shared/**           # compiled into every module
 │   ├── swift/menu/**              # compiled only into `menu`
 │   └── {c,cpp,objc,objcxx}/...    # optional companion sources, linked into the module
@@ -125,62 +123,90 @@ my-package/
     └── aarch64-apple-darwin/
         └── native/
             └── menu/
-                ├── menu.dylib                           # the handler library
-                ├── MyPackageNativeMenu.swiftmodule      # importable by other packages
+                ├── menu.dylib                           # the library
+                ├── MyPackageNativeMenu.swiftmodule      # importable by other packages' Swift
                 ├── MyPackageNativeMenu.swiftdoc
                 └── MyPackageNativeMenu.swiftinterface
 ```
 
-`src/` is authored source, `chords/` is Chord configuration, `js/` holds portable JS artifacts and `target/<triple>/` holds native artifacts. The source language never appears in the output path: `menu` is the logical compiled module; Swift, C++ and Objective-C are merely its inputs. Chord loads `target/<its own triple>/native/<name>/<name>.dylib` (`.dll`/`.so` on other platforms). Make sure your `.gitignore` does not ignore `target/`.
+`src/` is authored source, `chords/` is Chord configuration, `js/` holds portable JS artifacts and `target/<triple>/` holds native artifacts. The source language never appears in the output path: `menu` is the logical compiled module; Swift, C++ and Objective-C are merely its inputs. Make sure your `.gitignore` does not ignore `target/`.
 
 ## Writing one
 
-Each `src/swift/<name>.swift` defines exactly one function:
+The native side exports whatever C ABI you like. Keep it small and string-based; return errors as strings the JS side frees:
 
 ```swift
+// src/swift/beep.swift
 import AppKit
 
-func run(_ handlerArguments: [String], _ eventArguments: [String]) throws {
-    NSSound.beep()
+/// Returns NULL on success or a strdup'ed error message (release with `beep_free`).
+@_cdecl("beep_run")
+public func beepRun(_ times: Int32) -> UnsafeMutablePointer<CChar>? {
+    guard times > 0 else { return strdup("times must be positive") }
+    for _ in 0..<times { NSSound.beep() }
+    return nil
+}
+
+@_cdecl("beep_free")
+public func beepFree(_ message: UnsafeMutablePointer<CChar>?) { free(message) }
+```
+
+The handler locates the library through the `chord` module — never by a hardcoded path — and calls it with `bun:ffi`:
+
+```ts
+// src/js/beep.ts
+import { resolveNativeLibrary } from "chord";
+import { CString, dlopen, FFIType } from "bun:ffi";
+
+const lib = dlopen(resolveNativeLibrary(import.meta, "beep"), {
+  beep_run: { args: [FFIType.i32], returns: FFIType.ptr },
+  beep_free: { args: [FFIType.ptr], returns: FFIType.void },
+});
+
+export default function build(times = 1) {
+  return function beep() {
+    const error = lib.symbols.beep_run(times);
+    if (error) {
+      const message = new CString(error).toString();
+      lib.symbols.beep_free(error);
+      throw new Error(message);
+    }
+  };
 }
 ```
 
-- `handlerArguments` are the static `args` from the handler declaration; `eventArguments` come from the chord's `emit:*` value (regex captures such as `$1` are already substituted). Both are strings: TOML strings pass through unchanged, numbers/booleans use their text form, arrays and tables arrive as compact JSON.
-- Throwing an error reports it as a handler error and leaves the helper running. A `fatalError`, forced unwrap trap, segmentation fault or `exit()` kills the helper; Chord keeps running, logs the crash with the helper's stderr, and starts a new helper. A handler that crashes or hangs three times within ten seconds is disabled until the next package reload.
-- A handler that does not return within 30 seconds is killed (which restarts the helper — there is one helper for all native handlers).
-- Handlers run one at a time on the helper's main thread, so AppKit is usable directly. The helper does not run an `NSApplication` event loop; pump `RunLoop.main.run(until:)` yourself if you wait on run-loop callbacks.
-- Module-level state persists for the lifetime of the helper (i.e. until the next package reload or crash).
-- `print` output and stderr show up in Chord's log with the `native-host` target.
-
-These environment variables are set for the duration of each call: `CHORD_PACKAGE_NAME`, `CHORD_CHORDS_FILE_PATHSLUG`, `CHORD_HANDLER_ID`, `CHORD_INVOCATION_ID`, and `CHORD_FOCUSED_APP_ID` (unset when no app is focused).
+- `resolveNativeLibrary(import.meta, "beep")` returns the absolute path of `target/<Chord's triple>/native/beep/beep.dylib` (`.so`/`.dll` elsewhere) for the calling module's package, including when the package is vendored inside another one. `resolvePackageFile(import.meta, "any/relative/path")` does the same for arbitrary package files.
+- Handlers run on Chord's JS worker thread, not the main thread. AppKit calls that require the main thread must hop there (`DispatchQueue.main.sync { … }` — the app's run loop is running, so this returns promptly). The Accessibility API can be called from any thread.
+- A thrown error (as above) is reported as a handler error. A crash in native code (`fatalError`, a bad pointer, `exit()`) takes Chord down with it — there is no separate process any more — so keep the exported surface small and validate inputs.
+- Once opened, a library stays loaded until Chord quits; reloading packages picks up changed JS, but a rebuilt `.dylib` needs a restart.
+- `print` output goes to Chord's stdout.
 
 ## Declaring it
 
-```toml
-[on.menu]
-kind = "native"   # "js" (default) or "native"
-file = "menu"     # logical module name -> target/<triple>/native/menu/menu.dylib. No extension.
-args = ["Safari"]
+Nothing special: it is a JS handler.
 
-[chords."-([a-z]+)"]
-"emit:menu" = ["by-letters", "$1"]
+```toml
+[on.beep]
+file = "beep.js"
+args = [2]
+
+[chords."-b"]
+"emit:beep" = []
 ```
 
-`kind = "js"` (or no `kind`) keeps the existing JavaScript behaviour. A chords file may mix both kinds.
+(The pre-`bun:ffi` `kind = "native"` declaration is rejected with a pointer to this section.)
 
 ## Importing modules from other packages
 
-Every module is built with a deterministic Swift module name: the package name and module name in PascalCase joined by `Swift`, e.g. `@keychord/chords-menu` + `menu` → `KeychordChordsMenuNativeMenu`. Vendoring a package (`config({ vendor: ["@keychord/chords-menu"] })`) copies its `target/` next to its `js/` and `chords/` and makes its modules importable and linked:
+Every module is built with a deterministic Swift module name: the package name and module name in PascalCase joined by `Native`, e.g. `@keychord/chords-menu` + `menu` → `KeychordChordsMenuNativeMenu`. Vendoring a package (`config({ vendor: ["@keychord/chords-menu"] })`) copies its `target/` next to its `js/` and `chords/` and makes its modules importable and linked from your own Swift:
 
 ```swift
-import KeychordChordsMenuNativeMenu   // the equivalent of importing @keychord/chords-menu/js/menu.js
+import KeychordChordsMenuNativeMenu   // the Swift equivalent of importing @keychord/chords-menu/js/menu.js
 
-func run(_ handlerArguments: [String], _ eventArguments: [String]) throws {
-    try KeychordChordsMenuNativeMenu.run(["Safari"], ["by-letters", "f"])
-}
+try KeychordChordsMenuNativeMenu.runMenuAction(processName: "Safari", action: "by-letters", value: "f")
 ```
 
-Declarations you want to expose must be `public`. Modules are built with library evolution and ship a `.swiftinterface`, so they can be imported by packages built with a different Swift compiler.
+Declarations you want to expose must be `public`. Modules are built with library evolution and ship a `.swiftinterface`, so they can be imported by packages built with a different Swift compiler. From JavaScript, simply import the vendored package's JS (`@keychord/chords-menu/js/menu.js`); its own `resolveNativeLibrary` call finds the vendored library.
 
 ## Building
 
@@ -206,37 +232,25 @@ export default config({
 
 Companion sources are compiled with `clang`/`clang++` (`.c`, `.cc/.cpp/.cxx`, `.m` with ARC, `.mm`) and linked into the module's library; expose them to Swift through a bridging header or a module map.
 
-Any other build system works too: Chord only requires `target/<triple>/native/<name>/<name>.dylib` to export
-
-```c
-int32_t chord_native_run_v1(int32_t handler_argc, const char *const *handler_argv,
-                            int32_t event_argc,   const char *const *event_argv,
-                            uint8_t *error_buf,   size_t error_buf_cap);
-// 0 ok · 1 threw (error_buf: NUL-terminated message) · 2 bad arguments · 3 other wrapper failure
-```
-
-so C, C++, Objective-C, Rust or Zig handlers are equally possible. The generated Swift wrapper that implements this lives in Chord's `crates/chord-native-protocol/swift/ChordEntry.swift`.
+Any other build system works too: Chord only cares that `target/<triple>/native/<name>/<name>.dylib` exists and exports the symbols your JS declares in `dlopen`.
 
 ## Testing without the app
 
+A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available (outside the app, `resolveNativeLibrary` anchors on the nearest `package.json`):
+
 ```sh
-chord native-run target/aarch64-apple-darwin/native/menu/menu.dylib --handler-arg Safari --event-arg by-letters --event-arg f
-chord native-bench target/aarch64-apple-darwin/native/noop/noop.dylib --iterations 10000
+chord run scripts/run.ts by-letters f     # from the chords-menu checkout
 ```
 
-(`CHORD_NATIVE_HOST_BIN` points the CLI at a `chord-native-host` binary when it is not next to `chord`.)
+## Troubleshooting
 
-## Availability and troubleshooting
-
-- Native handlers require the full-power Chord build (no App Sandbox). A sandboxed build reports `native handlers are unavailable in the sandboxed build` for `kind = "native"` handlers.
-- The helper inherits Chord's Accessibility permission. Grant it to Chord, not to the helper.
-- Look for `native-host` and `native_host` entries in Chord's log: they include the helper PID, generation loads, load failures (missing `chord_native_run_v1`, wrong architecture), crashes with the helper's stderr tail, timeouts and crash-loop suppression.
-- A package without `target/<your triple>/` artifacts fails at load time with `requires prebuilt artifacts for <triple>`; build for that triple (`native.triples`) or on that machine.
+- `dlopen` failures name the missing file or symbol; check that `target/<your triple>/` was built and committed, and that the `@_cdecl` names match the `dlopen` declarations.
+- `bun:ffi` needs the Bun engine (the default). With QuickJS selected in Settings → General → JavaScript Engine the import fails at load time.
+- Accessibility calls inherit Chord's Accessibility permission — grant it to Chord.
+- Native crashes crash Chord: run the handler from the CLI first while developing.
 
 ## FAQ
 
-### Why not bundle a full-fledged runtime like Deno or Bun?
+### Why Bun rather than a lighter runtime?
 
-Deno has too much overhead, an experiment was previously tried but it makes the keypress handler lag significantly (maybe I embedded it wrong, but not worth the trouble of debugging).
-
-Bun on the other hand is great, but doesn't have an official integration API, which makes it impossible to expose custom Rust functions (needed in order to synchronize state). It can still be used for one-off CLI tasks such as browser automation, though.
+Chord started on QuickJS (still available as a fallback engine). Bun brings JavaScriptCore's JIT, Node/Bun APIs, and `bun:ffi` — which is what lets packages load native code without Chord having to know anything about it. Bun has no official embedding API, so Chord embeds it through the [`rbun`](https://github.com/KeyChord/rbun) crate, which exposes an rquickjs-shaped Rust API (and the custom `chord` module) over a lightly patched Bun runtime.

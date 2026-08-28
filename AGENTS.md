@@ -2,7 +2,7 @@
 
 # About
 
-Chord is an app that enables users to assign key sequences to computer actions, such as simulating shortcuts, running shell commands, and even executing JavaScript (using the [rquickjs](https://crates.io/crates/rquickjs) crate as well as the [LLRT runtime](https://github.com/awslabs/llrt)).
+Chord is an app that enables users to assign key sequences to computer actions, such as simulating shortcuts, running shell commands, and even executing JavaScript (using the [rquickjs](https://crates.io/crates/rquickjs) crate as well as the [LLRT runtime](https://github.com/awslabs/llrt); an experimental Bun engine via the [rbun](https://github.com/KeyChord/rbun) crate can be selected from the settings when built with `--features bun`, see `development.md`).
 
 In contrast to shortcuts which are a combination of one or more modifier keys and a letter/number/symbol, chord key combinations are always a sequence of two or more letter/number/symbol keys.
 
@@ -47,9 +47,11 @@ On the Rust side, observable state can be accessed from anywhere via `handle.obs
 
 All the state singletons are defined inside of the [app/](./apps/chord-tauri/src-tauri/src/app) folder in `src-tauri/`. We use [a macro](./apps/chord-tauri/src-tauri/src/app/mod.rs) to make all of them exposed on the `handle` directly (e.g. `handle.chord_package_manager()` instead of handle.state::<ChordPackageManager>()`).
 
-## Native handlers
+## JS engines and native code
 
-Handlers with `kind = "native"` are prebuilt dynamic libraries from a package's top-level `target/<triple>/native/<name>/` directory (the triple comes from `build.rs` as `CHORD_TARGET_TRIPLE`; vendored packages nest as `target/@scope/name/target/...`). They never run inside the Chord process: `app/native_host/` supervises a single `chord-native-host` sidecar (`src-tauri/crates/chord-native-host`, protocol + client in `crates/chord-native-protocol`) that loads every referenced library once per package generation and invokes `chord_native_run_v1` on request over an inherited Unix socketpair. `ChordNativePackage` mirrors `ChordJsPackage` for artifact resolution and materializes each package's whole `target/` subtree into the app cache so `@rpath` links between vendored modules keep working. The sidecar is built by `@chord/dev.improve.chord.native` (run automatically by `bun run dev`) and needs its own entitlements in release builds (`@chord/dev.improve.chord.configs.release.macos`). See `scripting.md` for the author-facing contract.
+Every handler is a JavaScript module. Chord runs them on Bun by default — the embedded runtime from the sibling [`rbun`](../rbun) crate (`src-tauri/src/bun_js/`, cargo feature `bun`, on by default; `libbun_embed.dylib` is bundled from `bundle.macOS.frameworks`) — with QuickJS/LLRT (`src-tauri/src/quickjs/`) as the runtime-selectable fallback; `src-tauri/src/js_engine.rs` picks one per process. On Bun, package modules are imported straight from the package directory (`ChordJsPackage::root`), so `import.meta` is real and relative imports, `node:*`/`bun:*` and a package's `node_modules` resolve through Bun itself; the Rust resolver only serves the `chord` module.
+
+Chord has no native-handler runtime. A package that needs native code ships a prebuilt library under `target/<triple>/native/<name>/<name>.<ext>` (the triple comes from `build.rs` as `CHORD_TARGET_TRIPLE`; vendored packages nest as `target/@scope/name/target/...`) and opens it from its own JS with `bun:ffi`, locating it through the `chord` module's `resolveNativeLibrary(import.meta, name)` / `resolvePackageFile(import.meta, path)` (`models/native.rs` + `resolve_logical_package_path` in `chord_js_package.rs`). See `scripting.md` for the author-facing contract and `chords/packages/chords-menu` for the reference package.
 
 ## Terminology
 

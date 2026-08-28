@@ -1,16 +1,11 @@
 use crate::app::AppHandleExt;
 use crate::app::chord_package_manager::chord_package_registry::ChordPackageRegistry;
-use crate::app::chord_package_manager::{
-    ChordJsPackage, ChordNativePackage, ChordPackage, ChordReference,
-};
+use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
 use crate::app::state::AppSingleton;
 use crate::models::{
-    ChordInput, ChordInputEvent, ChordsFileHandlerKind, ChordsFileImportOverride,
-    CompiledChordsFile, CompiledChordsFileHandler, FilePathslug, NATIVE_TARGET_DIR,
-    NATIVE_TARGET_TRIPLE, ParsedChordsFile, RawChordPackage, RawChordsFile, is_app_sandboxed,
-    toml_value_to_native_arg,
+    ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile,
+    CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
 };
-use chord_native_protocol::NativeHandlerRegistration;
 use crate::quickjs::{format_js_error, with_js};
 use crate::state::{
     ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable, Observable,
@@ -37,6 +32,12 @@ pub struct ChordPackageManager {
     #[inject(RwLock::new(OrderMap::new()))]
     packages: RwLock<OrderMap<String, ChordPackage>>,
 
+    /// On-disk root of every package whose JS has been loaded, by package name. Filled before
+    /// the package's handlers are compiled (unlike `packages`, which only lists finished
+    /// packages) so the `chord` module can resolve package files while a module is importing.
+    #[inject(RwLock::new(HashMap::new()))]
+    package_roots: RwLock<HashMap<String, PathBuf>>,
+
     observable: ChordPackageManagerObservable,
     handle: AppHandle,
 }
@@ -46,23 +47,14 @@ struct ChordInputEventContext {
     event: ChordInputEvent,
 }
 
-/// A package that finished loading plus the native handler registrations it contributes to the
-/// next native host generation. Registrations are kept out of `ChordPackage` because they carry
-/// cache paths that have no business in frontend state.
-pub struct LoadedPackage {
-    pub package: ChordPackage,
-    pub native_registrations: Vec<NativeHandlerRegistration>,
-}
-
 impl ChordPackageManager {
     pub async fn reload_all(&self) -> Result<()> {
         let raw_chord_packages = self.registry.import_all_packages()?;
         self.packages.write().clear();
 
         let mut chord_packages = Vec::new();
-        let mut native_registrations = Vec::new();
         for (package_name, raw_chord_package) in raw_chord_packages {
-            if let Ok(loaded) = self
+            if let Ok(package) = self
                 .load_package(raw_chord_package)
                 .await
                 .inspect_err(|error| {
@@ -73,28 +65,8 @@ impl ChordPackageManager {
                     )
                 })
             {
-                chord_packages.push(loaded.package);
-                native_registrations.extend(loaded.native_registrations);
+                chord_packages.push(package);
             };
-        }
-
-        // The native host must be fully loaded before the new package state is observable, so a
-        // chord can never resolve to a handler the host cannot run.
-        let supervisor = self.handle.app_state().native_host_supervisor();
-        match supervisor.activate_generation(native_registrations).await {
-            Ok(summary) if summary.handler_count > 0 || !summary.failed.is_empty() => {
-                log::info!(
-                    "activated native generation {} with {} handlers from {} libraries ({} failed)",
-                    summary.generation_id,
-                    summary.handler_count,
-                    summary.library_count,
-                    summary.failed.len()
-                );
-            }
-            Ok(_) => {}
-            Err(error) => log::error!(
-                "failed to activate the native handler generation: {error:#}; native handlers are unavailable until the next reload"
-            ),
         }
 
         self.observable.set_state(|_| ChordPackageManagerState {
@@ -108,9 +80,26 @@ impl ChordPackageManager {
         self.packages.read().get(package_name).cloned()
     }
 
-    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<LoadedPackage> {
+    /// On-disk root of a package whose JS has been loaded (see `package_roots`).
+    pub fn package_root(&self, package_name: &str) -> Option<PathBuf> {
+        self.package_roots.read().get(package_name).cloned()
+    }
+
+    /// The loaded package containing `path` (the longest matching root wins), as
+    /// `(package name, root)`.
+    pub fn package_for_path(&self, path: &Path) -> Option<(String, PathBuf)> {
+        self.package_roots
+            .read()
+            .iter()
+            .filter(|(_, root)| path.starts_with(root))
+            .max_by_key(|(_, root)| root.as_os_str().len())
+            .map(|(name, root)| (name.clone(), root.clone()))
+    }
+
+    pub async fn load_package(&self, raw_chord_package: RawChordPackage) -> Result<ChordPackage> {
         let name = raw_chord_package.package_name();
         log::debug!("loading package {}", name);
+        let root = raw_chord_package.root.clone();
 
         let mut raw_chords_files = HashMap::new();
         let mut compiled_chords_files = HashMap::new();
@@ -146,15 +135,11 @@ impl ChordPackageManager {
         }
 
         let js_package = self
-            .load_js_package(&name, raw_chord_package.js_files_contents.clone())
+            .load_js_package(&name, root, raw_chord_package.js_files_contents.clone())
             .await?;
-        let native_package =
-            self.load_native_package(&name, raw_chord_package.native_files_contents)?;
 
         let shared_parsed_chords_files = Arc::new(parsed_chords_files.clone());
         let shared_js_package = Arc::new(js_package.clone());
-        let shared_native_package = Arc::new(native_package.clone());
-        let native_registrations = Arc::new(Mutex::new(Vec::new()));
 
         let mut set = JoinSet::new();
 
@@ -162,8 +147,6 @@ impl ChordPackageManager {
             let handle = self.handle.clone();
             let parsed_chords_files = Arc::clone(&shared_parsed_chords_files);
             let js_package = Arc::clone(&shared_js_package);
-            let native_package = Arc::clone(&shared_native_package);
-            let native_registrations = Arc::clone(&native_registrations);
             let name = name.clone();
 
             // let span = info_span!("compiling_file", file = %pathslug.to_string_lossy());
@@ -173,8 +156,6 @@ impl ChordPackageManager {
                     &parsed_chord_file,
                     pathslug.clone(),
                     &js_package,
-                    &native_package,
-                    &native_registrations,
                     &parsed_chords_files,
                     &None,
                 )
@@ -237,7 +218,6 @@ impl ChordPackageManager {
         let chord_package = ChordPackage {
             name: name.clone(),
             js_package,
-            native_package,
             compiled_chords_files,
             raw_chords_files,
             global_chords,
@@ -245,77 +225,13 @@ impl ChordPackageManager {
 
         self.packages.write().insert(name, chord_package.clone());
 
-        let native_registrations = std::mem::take(&mut *native_registrations.lock());
-        Ok(LoadedPackage {
-            package: chord_package,
-            native_registrations,
-        })
-    }
-
-    fn load_native_package(
-        &self,
-        package_name: &str,
-        files: HashMap<FilePathslug, Vec<u8>>,
-    ) -> Result<Option<ChordNativePackage>> {
-        if files.is_empty() {
-            return Ok(None);
-        }
-        log::debug!("loading native package {}", package_name);
-        let cache_root = self
-            .handle
-            .app_state()
-            .native_host_supervisor()
-            .cache_dir()?;
-        let package = ChordNativePackage::load(package_name, files, &cache_root)?;
-        Ok(Some(package))
-    }
-
-    /// Resolves a `kind = "native"` handler to a materialized library and records the
-    /// registration for the next host generation. No user code runs here.
-    fn compile_native_handler(
-        native_package: &Option<ChordNativePackage>,
-        native_registrations: &Mutex<Vec<NativeHandlerRegistration>>,
-        pathslug: &FilePathslug,
-        event: &str,
-        file: &str,
-        args: &[toml::Value],
-    ) -> Result<String> {
-        anyhow::ensure!(
-            !is_app_sandboxed(),
-            "handler {event}: native handlers are unavailable in the sandboxed build of Chord"
-        );
-        let Some(native_package) = native_package else {
-            anyhow::bail!(
-                "handler {event}: kind = \"native\" requires prebuilt artifacts for {NATIVE_TARGET_TRIPLE} in the package's {NATIVE_TARGET_DIR}/ directory"
-            );
-        };
-        let Some(artifact) = native_package.resolve_file(pathslug, file)? else {
-            anyhow::bail!(
-                "handler {event}: native library {file:?} not found in package {} (expected {:?})",
-                native_package.name,
-                ChordNativePackage::library_pathslug(pathslug, file)?
-            );
-        };
-        let handler_arguments = args
-            .iter()
-            .map(toml_value_to_native_arg)
-            .collect::<Result<Vec<_>>>()
-            .with_context(|| format!("handler {event}: invalid static argument"))?;
-
-        let handler_id = uuid::Uuid::new_v4().to_string();
-        native_registrations.lock().push(NativeHandlerRegistration {
-            handler_id: handler_id.clone(),
-            library_path: artifact.materialized_path.clone(),
-            handler_arguments,
-            package_name: native_package.name.clone(),
-            chords_file_pathslug: pathslug.to_string_lossy().into_owned(),
-        });
-        Ok(handler_id)
+        Ok(chord_package)
     }
 
     async fn load_js_package(
         &self,
         package_name: &str,
+        root: PathBuf,
         files: HashMap<FilePathslug, String>,
     ) -> Result<Option<ChordJsPackage>> {
         log::debug!("loading JS package {}", package_name);
@@ -325,7 +241,10 @@ impl ChordPackageManager {
             return Ok(None);
         }
 
-        let package = ChordJsPackage::builder(self.handle.clone(), package_name)
+        self.package_roots
+            .write()
+            .insert(package_name.to_string(), root.clone());
+        let package = ChordJsPackage::builder(self.handle.clone(), package_name, root)
             .load(files)
             .await?;
         Ok(Some(package))
@@ -336,8 +255,6 @@ impl ChordPackageManager {
         chords_file: &ParsedChordsFile,
         pathslug: FilePathslug,
         js_package: &Option<ChordJsPackage>,
-        native_package: &Option<ChordNativePackage>,
-        native_registrations: &Mutex<Vec<NativeHandlerRegistration>>,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
         r#override: &Option<ChordsFileImportOverride>,
     ) -> Result<CompiledChordsFile> {
@@ -364,23 +281,6 @@ impl ChordPackageManager {
             }
 
             let file = handler.file.clone();
-            if handler.kind == ChordsFileHandlerKind::Native {
-                let handler_id = Self::compile_native_handler(
-                    native_package,
-                    native_registrations,
-                    &pathslug,
-                    event,
-                    &file,
-                    &build_args,
-                )?;
-                handlers.push(CompiledChordsFileHandler {
-                    event: event.clone(),
-                    handler_id,
-                    kind: ChordsFileHandlerKind::Native,
-                });
-                continue;
-            }
-
             let raw = chords_file.raw.clone();
             let pathslug_string = pathslug
                 .to_str()
@@ -395,11 +295,150 @@ impl ChordPackageManager {
             let Some(js_package) = js_package else {
                 anyhow::bail!("handler {event}: a JS package (js/ directory) must be present when defining a JS handler")
             };
-            let Some(module_specifier) = js_package.resolve_file(&pathslug, &file)? else {
-                anyhow::bail!("file {} not found in js package {}", file, js_package.name);
+
+            #[cfg(feature = "bun")]
+            let use_bun = crate::js_engine::select(&handle) == crate::js_engine::JsEngine::Bun;
+            #[cfg(not(feature = "bun"))]
+            let use_bun = false;
+
+            let handler_id = if use_bun {
+                // Bun imports the module from disk, so `import.meta` and `bun:ffi` see the
+                // package directory.
+                let Some(module_path) = js_package.resolve_file_path(&pathslug, &file)? else {
+                    anyhow::bail!("file {} not found in js package {}", file, js_package.name);
+                };
+                #[cfg(feature = "bun")]
+                {
+                    bun_handlers::register_handler(
+                        handle.clone(),
+                        module_path.to_string_lossy().into_owned(),
+                        raw,
+                        pathslug_string,
+                        bundle_id,
+                        build_args,
+                    )
+                    .await?
+                }
+                #[cfg(not(feature = "bun"))]
+                unreachable!()
+            } else {
+                let Some(module_specifier) = js_package.resolve_file(&pathslug, &file)? else {
+                    anyhow::bail!("file {} not found in js package {}", file, js_package.name);
+                };
+                Self::register_quickjs_handler(
+                    handle.clone(),
+                    module_specifier,
+                    raw,
+                    pathslug_string,
+                    bundle_id,
+                    build_args,
+                )
+                .await?
             };
 
-            let handler_id = with_js(handle.clone(), move |ctx| {
+            handlers.push(CompiledChordsFileHandler {
+                event: event.clone(),
+                handler_id,
+            });
+        }
+
+        let is_bundled_chords_file = pathslug
+            .components()
+            .nth(1)
+            .and_then(|c| c.as_os_str().to_str())
+            .map(|s| s.starts_with('@'))
+            .unwrap_or(false);
+        for import in &chords_file.imports {
+            let imported_file_path = if is_bundled_chords_file {
+                let package_name = pathslug.components().take(3).collect::<PathBuf>();
+                package_name.join("chords").join(&import.file)
+            } else {
+                Path::new("chords").join(&import.file)
+            };
+
+            let imported_file = parsed_chords_files
+                .get(&imported_file_path)
+                .context(format!("import file {:?} not found", imported_file_path))?;
+            log::debug!(
+                "resolved import file {:?} from path {:?}",
+                imported_file.name,
+                imported_file_path
+            );
+
+            let compiled_file = Box::pin(Self::compile_chords_file(
+                handle.clone(),
+                imported_file,
+                imported_file_path,
+                js_package,
+                parsed_chords_files,
+                &import.r#override,
+            ))
+            .await?;
+            chords.extend(compiled_file.chords.clone());
+            chord_hints.extend(compiled_file.chord_hints.clone());
+            handlers.extend(compiled_file.handlers.clone());
+        }
+
+        log::debug!("finished compiling chords file {}", chords_file.name);
+
+        Ok(CompiledChordsFile {
+            name: chords_file.name.clone(),
+            pathslug,
+            meta: chords_file.meta.clone(),
+            handlers,
+            chords,
+            chord_hints,
+        })
+    }
+
+    /// Gets the chord package that is responsible for handling a specific chord input event
+    pub fn create_event_context(&self, event: &ChordInputEvent) -> Option<ChordPackage> {
+        let packages = self.packages.read();
+
+        if let Some(app_id) = &event.application_id {
+            let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
+            let path = PathBuf::from(path);
+            for package in packages.values() {
+                if let Some(chords_file) = package.compiled_chords_files.get(&path) {
+                    if chords_file
+                        .chords
+                        .iter()
+                        .find(|c| c.trigger.matches(&event.input))
+                        .is_some()
+                    {
+                        return Some(package.clone());
+                    }
+                }
+            }
+        }
+
+        for package in packages.values() {
+            if package
+                .global_chords
+                .iter()
+                .find(|c| c.chord.trigger.matches(&event.input))
+                .is_some()
+            {
+                return Some(package.clone());
+            }
+        }
+
+        None
+    }
+}
+
+impl ChordPackageManager {
+    /// QuickJS: import the handler module, call its default export with the
+    /// build context and register the returned handler function.
+    async fn register_quickjs_handler(
+        handle: AppHandle,
+        module_specifier: String,
+        raw: serde_json::Value,
+        pathslug_string: String,
+        bundle_id: Option<String>,
+        build_args: Vec<toml::Value>,
+    ) -> Result<String> {
+        let handler_id = with_js(handle.clone(), move |ctx| {
                 Box::pin(async move {
                     async {
                         let module_promise = Module::import(&ctx, module_specifier)?;
@@ -481,97 +520,109 @@ impl ChordPackageManager {
                 })
             })
             .await?;
-
-            handlers.push(CompiledChordsFileHandler {
-                event: event.clone(),
-                handler_id,
-                kind: ChordsFileHandlerKind::Js,
-            });
-        }
-
-        let is_bundled_chords_file = pathslug
-            .components()
-            .nth(1)
-            .and_then(|c| c.as_os_str().to_str())
-            .map(|s| s.starts_with('@'))
-            .unwrap_or(false);
-        for import in &chords_file.imports {
-            let imported_file_path = if is_bundled_chords_file {
-                let package_name = pathslug.components().take(3).collect::<PathBuf>();
-                package_name.join("chords").join(&import.file)
-            } else {
-                Path::new("chords").join(&import.file)
-            };
-
-            let imported_file = parsed_chords_files
-                .get(&imported_file_path)
-                .context(format!("import file {:?} not found", imported_file_path))?;
-            log::debug!(
-                "resolved import file {:?} from path {:?}",
-                imported_file.name,
-                imported_file_path
-            );
-
-            let compiled_file = Box::pin(Self::compile_chords_file(
-                handle.clone(),
-                imported_file,
-                imported_file_path,
-                js_package,
-                native_package,
-                native_registrations,
-                parsed_chords_files,
-                &import.r#override,
-            ))
-            .await?;
-            chords.extend(compiled_file.chords.clone());
-            chord_hints.extend(compiled_file.chord_hints.clone());
-            handlers.extend(compiled_file.handlers.clone());
-        }
-
-        log::debug!("finished compiling chords file {}", chords_file.name);
-
-        Ok(CompiledChordsFile {
-            name: chords_file.name.clone(),
-            pathslug,
-            meta: chords_file.meta.clone(),
-            handlers,
-            chords,
-            chord_hints,
-        })
+        Ok(handler_id)
     }
+}
 
-    /// Gets the chord package that is responsible for handling a specific chord input event
-    pub fn create_event_context(&self, event: &ChordInputEvent) -> Option<ChordPackage> {
-        let packages = self.packages.read();
+#[cfg(feature = "bun")]
+mod bun_handlers {
+    use crate::bun_js::{format_js_error, with_js};
+    use rbun::prelude::{Args, Object, ResultExt, Value};
+    #[allow(unused_imports)]
+    use rbun::prelude::OptionExt;
+    use rbun::Module;
+    use tauri::AppHandle;
 
-        if let Some(app_id) = &event.application_id {
-            let path = format!("chords/{}/macos.toml", app_id.replace(".", "/"));
-            let path = PathBuf::from(path);
-            for package in packages.values() {
-                if let Some(chords_file) = package.compiled_chords_files.get(&path) {
-                    if chords_file
-                        .chords
-                        .iter()
-                        .find(|c| c.trigger.matches(&event.input))
-                        .is_some()
-                    {
-                        return Some(package.clone());
+    /// Bun: same protocol as [`ChordPackageManager::register_quickjs_handler`].
+    pub async fn register_handler(
+        handle: AppHandle,
+        module_specifier: String,
+        raw: serde_json::Value,
+        pathslug_string: String,
+        bundle_id: Option<String>,
+        build_args: Vec<toml::Value>,
+    ) -> anyhow::Result<String> {
+        with_js(handle, move |ctx| {
+            Box::pin(async move {
+                async {
+                    let module_promise = Module::import(&ctx, module_specifier)?;
+                    let module = module_promise.into_future::<Object>().await?;
+                    let mut export: Value = module.get("default")?;
+
+                    if let Some(promise) = export.as_promise().cloned() {
+                        export = promise.into_future::<Value>().await?;
                     }
+
+                    let build_handler_function = export.as_function().cloned().or_throw_msg(
+                        &ctx,
+                        &format!(
+                            "JS default export did not resolve to a function: {:?}",
+                            export
+                        ),
+                    )?;
+
+                    let build_context = Object::new(ctx.clone())?;
+                    build_context.set(
+                        "chordsFile",
+                        rbun::serde::to_value(ctx.clone(), raw)
+                            .or_throw_msg(&ctx, "failed to parse chords file")?,
+                    )?;
+                    build_context.set(
+                        "chordsFilePath",
+                        rbun::serde::to_value(ctx.clone(), pathslug_string)
+                            .or_throw_msg(&ctx, "failed to parse chords file pathslug")?,
+                    )?;
+                    build_context.set(
+                        "chordsFileAppId",
+                        rbun::serde::to_value(ctx.clone(), bundle_id)
+                            .or_throw_msg(&ctx, "failed to parse chords file app ID")?,
+                    )?;
+
+                    let mut args = Args::new(ctx.clone(), build_args.len());
+                    args.this(build_context)?;
+                    log::debug!("calling build_handler with args {:?} (bun)", build_args);
+
+                    let js_args = build_args
+                        .into_iter()
+                        .map(|value| {
+                            rbun::serde::to_value(ctx.clone(), value)
+                                .or_throw_msg(&ctx, "failed to convert event TOML arguments")
+                        })
+                        .collect::<rbun::Result<Vec<_>>>()?;
+
+                    for value in js_args {
+                        args.push_arg(value)?;
+                    }
+
+                    let mut handler: Value = build_handler_function.call_arg(args)?;
+                    if let Some(promise) = handler.as_promise().cloned() {
+                        handler = promise.into_future::<Value>().await?;
+                    }
+
+                    let handler_function = handler.as_function().cloned().or_throw_msg(
+                        &ctx,
+                        "the default export function must return a function",
+                    )?;
+                    let globals = ctx.globals();
+                    let registry_key = "__RUST_HANDLER_REGISTRY";
+
+                    // Fetch the global registry object, or create it if it doesn't exist
+                    let registry: Object = match globals.get(registry_key) {
+                        Ok(obj) => obj,
+                        Err(_) => {
+                            let obj = Object::new(ctx.clone())?;
+                            globals.set(registry_key, obj.clone())?;
+                            obj
+                        }
+                    };
+                    let id = uuid::Uuid::new_v4().to_string();
+                    registry.set(&id, handler_function)?;
+                    Ok(id)
                 }
-            }
-        }
-
-        for package in packages.values() {
-            if package
-                .global_chords
-                .iter()
-                .find(|c| c.chord.trigger.matches(&event.input))
-                .is_some()
-            {
-                return Some(package.clone());
-            }
-        }
-
-        None
+                .await
+                .map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
+            })
+        })
+        .await
     }
 }

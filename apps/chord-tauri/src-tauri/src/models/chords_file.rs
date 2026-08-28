@@ -68,36 +68,13 @@ pub struct RawChordsFile {
     pub imports: Vec<ChordsFileImport>,
 }
 
-/// Which backend executes a handler. Omitted in TOML means JavaScript for backward compatibility.
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum ChordsFileHandlerKind {
-    #[default]
-    Js,
-    /// A prebuilt library at `target/<triple>/native/<name>/<name>.<dylib|dll|so>` exporting
-    /// `chord_native_run_v1`, executed inside the isolated `chord-native-host` process.
-    Native,
-}
-
-impl ChordsFileHandlerKind {
-    pub fn parse(value: &str) -> Option<Self> {
-        match value {
-            "js" => Some(Self::Js),
-            "native" => Some(Self::Native),
-            _ => None,
-        }
-    }
-}
-
+/// A handler is always a JavaScript module; native code is loaded by the module itself through
+/// `bun:ffi` (see `scripting.md`).
 #[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFileHandler {
-    #[serde(default)]
-    pub kind: ChordsFileHandlerKind,
-    /// JS: a path inside `js/` (e.g. `menu.js`). Native: a logical module name without
-    /// extension (e.g. `menu` -> `target/<triple>/native/menu/menu.dylib`).
+    /// A path inside `js/` (e.g. `menu.js`).
     pub file: String,
     #[serde(default)]
     #[typeshare(typescript(type = "any[]"))]
@@ -109,8 +86,8 @@ pub struct ChordsFileHandler {
 #[serde(rename_all = "camelCase")]
 pub struct CompiledChordsFileHandler {
     pub event: String,
+    /// Key in the JS engine's `__RUST_HANDLER_REGISTRY`.
     pub handler_id: String,
-    pub kind: ChordsFileHandlerKind,
 }
 
 // New struct for imports
@@ -155,17 +132,17 @@ impl ParsedChordsFile {
                     .get("file")
                     .and_then(|v| v.as_str())
                     .context("handler must have the file key")?;
-                let kind = match handler_table.get("kind") {
-                    None => ChordsFileHandlerKind::default(),
-                    Some(kind_value) => {
-                        let kind = kind_value
-                            .as_str()
-                            .with_context(|| format!("handler {key}: kind must be a string"))?;
-                        ChordsFileHandlerKind::parse(kind).with_context(|| {
-                            format!("handler {key}: unknown kind {kind:?} (expected \"js\" or \"native\")")
-                        })?
-                    }
-                };
+                // `kind` predates `bun:ffi`: "js" is accepted for backward compatibility, the
+                // former "native" (a prebuilt library run by a sidecar) is not.
+                if let Some(kind_value) = handler_table.get("kind") {
+                    let kind = kind_value
+                        .as_str()
+                        .with_context(|| format!("handler {key}: kind must be a string"))?;
+                    anyhow::ensure!(
+                        kind == "js",
+                        "handler {key}: unsupported kind {kind:?}; handlers are JavaScript modules — load native code from the module with `bun:ffi` (see scripting.md)"
+                    );
+                }
                 let mut args_vec = Vec::new();
                 if let Some(args_val) = handler_table.get("args") {
                     if let Some(args_array) = args_val.as_array() {
@@ -173,7 +150,6 @@ impl ParsedChordsFile {
                     }
                 }
                 let handler = ChordsFileHandler {
-                    kind,
                     file: file.to_string(),
                     args: args_vec,
                 };
@@ -384,20 +360,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn handler_kind_defaults_to_js() {
+    fn handler_kind_js_is_accepted() {
         let file: ParsedChordsFile = r#"
 name = "t"
 [on.menu]
 file = "menu.js"
 [on.other]
-kind = "native"
-file = "other"
+kind = "js"
+file = "other.js"
 args = ["a", 1]
 "#
         .parse()
         .unwrap();
-        assert_eq!(file.handlers["menu"].kind, ChordsFileHandlerKind::Js);
-        assert_eq!(file.handlers["other"].kind, ChordsFileHandlerKind::Native);
+        assert_eq!(file.handlers["menu"].file, "menu.js");
+        assert_eq!(file.handlers["other"].file, "other.js");
+        assert_eq!(file.handlers["other"].args.len(), 2);
 
         // `RawChordsFile` is the serde view (key `handlers`), used for the JS `this.chordsFile`.
         let raw: RawChordsFile = toml::from_str(
@@ -405,14 +382,25 @@ args = ["a", 1]
 name = "t"
 [handlers.menu]
 file = "menu.js"
-[handlers.other]
-kind = "native"
-file = "other"
 "#,
         )
         .unwrap();
-        assert_eq!(raw.handlers["menu"].kind, ChordsFileHandlerKind::Js);
-        assert_eq!(raw.handlers["other"].kind, ChordsFileHandlerKind::Native);
+        assert_eq!(raw.handlers["menu"].file, "menu.js");
+    }
+
+    #[test]
+    fn native_handler_kind_is_rejected_with_guidance() {
+        let error = r#"
+name = "t"
+[on.menu]
+kind = "native"
+file = "menu"
+"#
+        .parse::<ParsedChordsFile>()
+        .unwrap_err();
+        let message = format!("{error:#}");
+        assert!(message.contains("handler menu"), "{message}");
+        assert!(message.contains("bun:ffi"), "{message}");
     }
 
     #[test]

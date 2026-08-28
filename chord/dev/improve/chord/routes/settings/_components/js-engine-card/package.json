@@ -1,0 +1,24 @@
+{
+	"name": "@chord/dev.improve.chord.routes.settings._components.js-engine-card",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#js-engine-card": "./js-engine-card.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.label": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.radio-group": "workspace:*",
+		"@chord/dev.improve.chord.lib.state": "workspace:*",
+		"react": "^19.2.8"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.18",
+		"@types/react-dom": "^19.2.5"
+	}
+}

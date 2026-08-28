@@ -10,7 +10,6 @@ pub mod dev_lockfile_detector;
 pub mod frontmost;
 pub mod global_hotkey_store;
 pub mod keyboard;
-pub mod native_host;
 pub mod controller;
 pub mod permissions;
 pub mod placeholder_chord_store;

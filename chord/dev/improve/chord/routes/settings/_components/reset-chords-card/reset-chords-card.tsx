@@ -58,8 +58,8 @@ export function ResetChordsCard() {
 						<AlertDialogHeader>
 							<AlertDialogTitle>Reset managed chord repos?</AlertDialogTitle>
 							<AlertDialogDescription>
-								This removes the current managed git repo cache and replaces it with the
-								default pinned chordpack.
+								This replaces the active managed repo set with the default pinned chordpack.
+								Cached revisions are retained for reuse.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>

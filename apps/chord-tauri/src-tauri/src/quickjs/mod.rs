@@ -8,7 +8,7 @@ use rquickjs::async_with;
 use rquickjs::class::{Trace, Tracer};
 use rquickjs::{
     AsyncContext, AsyncRuntime, CaughtError, Ctx, Error, JsLifetime, Module, Object, Value,
-    loader::{Loader, Resolver},
+    loader::{Loader, Resolver, ScriptLoader},
     module::Declared,
 };
 use std::path::{Path, PathBuf};
@@ -149,6 +149,51 @@ impl Resolver for ModuleResolver {
     }
 }
 
+/// Resolves relative/absolute specifiers to absolute paths on disk.
+///
+/// rquickjs's own [`FileResolver`] cannot be used here: it resolves through the `relative-path`
+/// crate against the process CWD (`is_file` does `to_path(".")`), so an absolute base module —
+/// which is what `chord run <file>` and every import below it produces — never matches.
+#[derive(Debug, Default)]
+struct DiskResolver;
+
+/// Extensions tried for an extensionless specifier. QuickJS has no TypeScript parser, so only
+/// real JavaScript is offered.
+const DISK_EXTENSIONS: [&str; 2] = ["js", "mjs"];
+
+impl Resolver for DiskResolver {
+    fn resolve<'js>(&mut self, _ctx: &Ctx<'js>, base: &str, name: &str) -> rquickjs::Result<String> {
+        let base_dir = Path::new(base).parent().unwrap_or(Path::new("."));
+        let candidate = if name.starts_with('/') {
+            PathBuf::from(name)
+        } else if name.starts_with('.') {
+            base_dir.join(name)
+        } else {
+            return Err(rquickjs::Error::new_resolving(base, name));
+        };
+
+        let mut attempts = vec![candidate.clone()];
+        if candidate.extension().is_none() {
+            for extension in DISK_EXTENSIONS {
+                attempts.push(candidate.with_extension(extension));
+            }
+            for extension in DISK_EXTENSIONS {
+                attempts.push(candidate.join(format!("index.{extension}")));
+            }
+        }
+
+        for attempt in attempts {
+            if attempt.is_file() {
+                // Canonicalize so the same file imported by different routes is one module.
+                let resolved = attempt.canonicalize().unwrap_or(attempt);
+                return Ok(resolved.display().to_string());
+            }
+        }
+
+        Err(rquickjs::Error::new_resolving(base, name))
+    }
+}
+
 #[derive(Debug, Default)]
 struct ModuleLoader {}
 
@@ -196,6 +241,10 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
         llrt_module_resolver,
         llrt_core::modules::embedded::resolver::EmbeddedResolver,
         // llrt_core::modules::package::resolver::PackageResolver,
+        // Last resort: a real path on disk. Only reached for specifiers the resolvers above
+        // reject, so a package's in-memory modules keep their sandbox (they resolve earlier);
+        // this is what lets `chord run <file>` work on QuickJS.
+        DiskResolver,
     );
     let chord_module_loader = ModuleLoader::new();
     let loader = (
@@ -203,6 +252,10 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
         llrt_module_loader,
         llrt_core::modules::embedded::loader::EmbeddedLoader,
         // llrt_core::modules::package::loader::PackageLoader,
+        // Reads whatever `FileResolver` above resolved to a path.
+        ScriptLoader::default()
+            .with_extension("js")
+            .with_extension("mjs"),
     );
 
     rt.set_loader(resolver, loader).await;

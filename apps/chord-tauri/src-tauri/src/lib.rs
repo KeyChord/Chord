@@ -18,9 +18,11 @@ mod constants;
 pub mod git;
 mod mode;
 mod models;
-mod native_cli;
-pub use native_cli::*;
 mod quickjs;
+#[cfg(feature = "bun")]
+mod bun_js;
+mod js_engine;
+pub use js_engine::JsEngine;
 mod setup;
 mod state;
 mod tauri_app;
@@ -179,12 +181,6 @@ pub fn run_app() {
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
-            let supervisor = handle.app_state().native_host_supervisor();
-            supervisor.abort_active();
-            let _ = tauri::async_runtime::block_on(tokio::time::timeout(
-                Duration::from_secs(3),
-                supervisor.shutdown(),
-            ));
             if let Err(error) = handle.state::<AppLockFile>().cleanup() {
                 log::error!("Failed to remove app lock file on exit: {error}");
             }
@@ -200,14 +196,28 @@ pub fn run_app() {
     });
 }
 
-pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
-    quickjs::run_standalone_module(path.as_ref()).await
+pub async fn run_script(
+    path: impl AsRef<std::path::Path>,
+    engine: Option<js_engine::JsEngine>,
+) -> anyhow::Result<()> {
+    match js_engine::select_for_cli(engine) {
+        #[cfg(feature = "bun")]
+        js_engine::JsEngine::Bun => bun_js::run_standalone_module(path.as_ref()).await,
+        _ => quickjs::run_standalone_module(path.as_ref()).await,
+    }
 }
 
 pub async fn run_script_export(
     path: impl AsRef<std::path::Path>,
     export_name: impl Into<String>,
     args: Vec<String>,
+    engine: Option<js_engine::JsEngine>,
 ) -> anyhow::Result<()> {
-    quickjs::run_standalone_export(path.as_ref(), export_name.into(), args).await
+    match js_engine::select_for_cli(engine) {
+        #[cfg(feature = "bun")]
+        js_engine::JsEngine::Bun => {
+            bun_js::run_standalone_export(path.as_ref(), export_name.into(), args).await
+        }
+        _ => quickjs::run_standalone_export(path.as_ref(), export_name.into(), args).await,
+    }
 }

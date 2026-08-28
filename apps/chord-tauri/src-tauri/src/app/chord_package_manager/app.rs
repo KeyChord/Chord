@@ -24,6 +24,6 @@ pub struct ChordPackageManagerProvider {
 
 impl AppSingleton for ChordPackageManager {
     fn init(&self) -> Result<()> {
-        Ok(())
+        self.registry.git.init()
     }
 }

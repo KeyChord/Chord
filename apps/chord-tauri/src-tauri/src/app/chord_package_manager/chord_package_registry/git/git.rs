@@ -18,7 +18,7 @@ pub struct GitChordPackageRegistry {
 }
 
 impl GitChordPackageRegistry {
-    pub(super) fn init(&self) -> Result<()> {
+    pub(in crate::app::chord_package_manager) fn init(&self) -> Result<()> {
         self.git_repos_store.init()
     }
 

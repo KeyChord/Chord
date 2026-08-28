@@ -1,5 +1,5 @@
 use crate::app::state::AppSingleton;
-use crate::models::{NATIVE_TARGET_DIR, NATIVE_TARGET_TRIPLE, RawChordPackage};
+use crate::models::RawChordPackage;
 use anyhow::Context;
 use nject::injectable;
 use serde::Serialize;
@@ -144,7 +144,6 @@ impl LocalPackageRegistry {
         let mut chords_files_contents = HashMap::new();
         let mut js_files_contents = HashMap::new();
         let mut bin_files_contents = HashMap::new();
-        let mut native_files_contents = HashMap::new();
 
         let dirname = root
             .file_name()
@@ -152,7 +151,9 @@ impl LocalPackageRegistry {
             .unwrap_or_default();
         let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
 
-        for dir in ["chords", "js", "bin", NATIVE_TARGET_DIR] {
+        // Native libraries under `target/` are not read: the package's own JS opens them from
+        // disk with `bun:ffi` (see the `chord` module's `resolveNativeLibrary`).
+        for dir in ["chords", "js", "bin"] {
             let dir_path = root.join(dir);
             if !dir_path.exists() {
                 continue;
@@ -183,39 +184,26 @@ impl LocalPackageRegistry {
                         let content = fs::read(path)?;
                         bin_files_contents.insert(relpath.to_path_buf(), content);
                     }
-                    d if d == NATIVE_TARGET_DIR => {
-                        // Only this platform's artifacts (including those of vendored packages,
-                        // whose subtree also contains a `<triple>` component) are worth loading.
-                        let for_this_platform = relpath
-                            .components()
-                            .any(|c| c.as_os_str() == NATIVE_TARGET_TRIPLE);
-                        if for_this_platform {
-                            let content = fs::read(path)?;
-                            native_files_contents.insert(relpath.to_path_buf(), content);
-                        }
-                    }
                     _ => {}
                 }
             }
         }
 
         log::debug!(
-            "loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}\n{}: {:?}",
+            "loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}",
             root,
             js_files_contents.keys(),
             chords_files_contents.keys(),
-            bin_files_contents.keys(),
-            NATIVE_TARGET_DIR,
-            native_files_contents.keys()
+            bin_files_contents.keys()
         );
 
         Ok(RawChordPackage {
             dirname,
+            root: root.to_path_buf(),
             package_json_contents,
             chords_files_contents,
             js_files_contents,
             bin_files_contents,
-            native_files_contents,
         })
     }
 }

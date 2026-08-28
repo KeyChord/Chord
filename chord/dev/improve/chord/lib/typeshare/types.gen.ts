@@ -17,11 +17,22 @@ export interface AppPermissionsState {
 	isAccessibilityEnabled?: boolean;
 }
 
+export enum JsEngine {
+	QuickJs = "quickjs",
+	Bun = "bun",
+}
+
 export interface AppSettingsState {
 	bundleIdsNeedingRelaunch: string[];
 	showMenuBarIcon: boolean;
 	showDockIcon: boolean;
 	isChordPanelHiddenByDefault: boolean;
+	/** Engine used for JS handlers; takes effect after a restart. */
+	jsEngine: JsEngine;
+	/** The engine this process is actually running with. */
+	activeJsEngine: JsEngine;
+	/** Whether this build can run Bun (`--features bun`). */
+	isBunEngineAvailable: boolean;
 }
 
 /** The action that a chord can define. */
@@ -88,41 +99,12 @@ export interface ChordJsPackage {
 	files: Record<FilePathslug, string>;
 }
 
-export interface NativeLibraryArtifact {
-	sha256: string;
-	size: number;
-}
-
 /**
- * The validated, materialized native artifacts of one package. Mirrors `ChordJsPackage`:
- * libraries are keyed by pathslug (`target/<triple>/native/menu/menu.dylib`) and resolved
- * relative to the chords file that references them so bundled (nested) packages resolve to
- * their own libraries. The whole `target/` subtree is materialized together so libraries can
- * reference vendored sibling libraries via `@loader_path`.
+ * A handler is always a JavaScript module; native code is loaded by the module itself through
+ * `bun:ffi` (see `scripting.md`).
  */
-export interface ChordNativePackage {
-	name: string;
-	/** Hash of the materialized artifact tree. */
-	treeSha256: string;
-	libraries: Record<FilePathslug, NativeLibraryArtifact>;
-}
-
-/** Which backend executes a handler. Omitted in TOML means JavaScript for backward compatibility. */
-export enum ChordsFileHandlerKind {
-	Js = "js",
-	/**
-	 * A prebuilt library at `target/<triple>/native/<name>/<name>.<dylib|dll|so>` exporting
-	 * `chord_native_run_v1`, executed inside the isolated `chord-native-host` process.
-	 */
-	Native = "native",
-}
-
 export interface ChordsFileHandler {
-	kind?: ChordsFileHandlerKind;
-	/**
-	 * JS: a path inside `js/` (e.g. `menu.js`). Native: a logical module name without
-	 * extension (e.g. `menu` -> `target/<triple>/native/menu/menu.dylib`).
-	 */
+	/** A path inside `js/` (e.g. `menu.js`). */
 	file: string;
 	args?: any[];
 }
@@ -147,8 +129,8 @@ export interface RawChordsFile {
 
 export interface CompiledChordsFileHandler {
 	event: string;
+	/** Key in the JS engine's `__RUST_HANDLER_REGISTRY`. */
 	handlerId: string;
-	kind: ChordsFileHandlerKind;
 }
 
 /** A chords file that has imports inlined. */
@@ -171,7 +153,6 @@ export interface ChordPackage {
 	/** The `name` property of the `package.json` file; defaults to the folder name if not present. */
 	name: string;
 	jsPackage?: ChordJsPackage;
-	nativePackage?: ChordNativePackage;
 	rawChordsFiles: Record<FilePathslug, RawChordsFile>;
 	compiledChordsFiles: Record<FilePathslug, CompiledChordsFile>;
 	globalChords: ChordReference[];
@@ -228,12 +209,8 @@ export interface GitReposState {
 }
 
 export interface HandlerChordAction {
-	/**
-	 * JS: key in the QuickJS `__RUST_HANDLER_REGISTRY`. Native: registration id in the
-	 * native host's active generation.
-	 */
+	/** Key in the JS engine's `__RUST_HANDLER_REGISTRY`. */
 	handlerId: string;
-	kind: ChordsFileHandlerKind;
 	eventArgs: any[];
 }
 
@@ -260,8 +237,8 @@ export interface ParsedChordsFile {
 /**
  * Mapping of all the relevant files for a chord package.
  * 
- * We intentionally don't include the path of the package here to avoid leaking implementation
- * details about where the package is located on the filesystem.
+ * The on-disk location is kept out of the serialized form so the frontend never learns
+ * where a package is installed; the engines need it (`root`) to import modules from disk.
  */
 export interface RawChordPackage {
 	/** The dirname is needed for inferring the chord package name when package.json isn't present */
@@ -270,11 +247,6 @@ export interface RawChordPackage {
 	chordsFilesContents: Record<FilePathslug, string>;
 	jsFilesContents: Record<FilePathslug, string>;
 	binFilesContents: Record<FilePathslug, number[]>;
-	/**
-	 * Prebuilt native build artifacts for the current target triple from the package's
-	 * top-level `target/` directory (`target/<triple>/native/<name>/...`), keyed by pathslug.
-	 */
-	nativeFilesContents: Record<FilePathslug, number[]>;
 }
 
 export interface ShellChordAction {

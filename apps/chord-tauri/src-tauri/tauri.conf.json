@@ -25,8 +25,8 @@
 		"active": true,
 		"targets": "all",
 		"createUpdaterArtifacts": true,
-		"externalBin": ["binaries/chord-native-host"],
 		"macOS": {
+			"frameworks": ["../../../../rbun/vendor/bun/build/release/libbun_embed.dylib"],
 			"entitlements": "Entitlements.plist",
 			"signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
 			"infoPlist": "Info.plist"

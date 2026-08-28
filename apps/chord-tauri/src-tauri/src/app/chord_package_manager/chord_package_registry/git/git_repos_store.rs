@@ -1,5 +1,7 @@
 use crate::app::state::AppSingleton;
-use crate::git::{GitHubRepoRef, clone_repo, update_or_clone_repo_at_revision};
+use crate::git::{
+    GitHubRepoRef, materialize_repo_at_revision, materialize_repo_head, repo_head_sha,
+};
 use crate::state::{GitRepo, GitReposObservable, GitReposState, Observable};
 use anyhow::{Context, Result};
 use nject::injectable;
@@ -29,7 +31,14 @@ impl GitReposStore {
                 owner: repo.owner.clone(),
                 name: repo.name.clone(),
             };
-            let expected_path = repo_ref.local_abspath(&repos_root, repo.pinned_rev.as_deref());
+            let Ok(resolved_rev) = repo_head_sha(&repo.local_abspath) else {
+                log::warn!(
+                    "Unable to resolve cached HEAD for {}; leaving its stored path unchanged",
+                    repo.slug
+                );
+                continue;
+            };
+            let expected_path = repo_ref.local_abspath(&repos_root, &resolved_rev);
             if repo.local_abspath != expected_path {
                 if repo.local_abspath.exists() && !expected_path.exists() {
                     log::info!(
@@ -48,6 +57,7 @@ impl GitReposStore {
                 repo.local_abspath = expected_path;
                 changed = true;
             }
+            repo.head_short_sha = Some(resolved_rev.chars().take(7).collect());
         }
 
         if changed {
@@ -66,15 +76,26 @@ impl GitReposStore {
         Ok(self.handle.store("repos.json")?)
     }
 
+    pub fn has_persisted_state(&self) -> Result<bool> {
+        let path = tauri_plugin_store::resolve_store_path(&self.handle, "repos.json")?;
+        Ok(path.exists())
+    }
+
     fn save(&self) -> Result<()> {
         self.store()?.save()?;
         Ok(())
     }
 
-    fn add(&self, repo: GitRepo) -> Result<()> {
-        let mut state = self.observable.get_state()?.repos.clone();
-        state.insert(repo.slug.clone(), repo);
-        self.replace_all(state)
+    fn upsert(&self, repo: GitRepo) -> Result<()> {
+        let key = repo.slug.clone();
+        self.store()?.set(key.clone(), serde_json::to_value(&repo)?);
+        self.save()?;
+        self.observable.set_state(|prev| {
+            let mut next = prev;
+            next.repos.insert(key, repo);
+            next
+        })?;
+        Ok(())
     }
 
     fn replace_all(&self, repos: HashMap<String, GitRepo>) -> Result<()> {
@@ -93,9 +114,14 @@ impl GitReposStore {
             .remove(&id)
             .with_context(|| format!("Repository {id} has not been added yet"))?;
 
-        self.replace_all(repos)?;
-        let repo_path = PathBuf::from(&removed_repo.local_abspath);
-        remove_repo_cache(&repo_path)?;
+        self.store()?.delete(&id);
+        self.save()?;
+        self.observable.set_state(|_| GitReposState { repos })?;
+        log::debug!(
+            "Removed active repository {}; retained immutable cache entry at {}",
+            id,
+            removed_repo.local_abspath.display()
+        );
         Ok(())
     }
 
@@ -103,50 +129,29 @@ impl GitReposStore {
         Ok(self.app_cache_dir()?.join("repos/github.com"))
     }
 
-    pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
+    pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
         let repos_root = self.github_repos_dir()?;
-        let repo_path = repo_ref.local_abspath(&repos_root, None);
-        let repo = if repo_path.join(".git").exists() {
-            repo_ref.into_repo(&repos_root)
-        } else {
-            clone_repo(&repo_ref, &repo_path)?;
-            repo_ref.into_repo(&repos_root)
-        };
-        self.add(repo)?;
-        Ok(())
+        let repo = materialize_repo_head(&repo_ref, &repos_root)?;
+        self.upsert(repo.clone())?;
+        Ok(repo)
     }
 
-    pub fn sync_repo(&self, repo_ref: GitHubRepoRef) -> Result<()> {
+    pub fn sync_repo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
         let repos_root = self.github_repos_dir()?;
         let state = self.observable.get_state()?;
-        let current_repo = state.repos.get(&repo_ref.slug());
-        let pinned_rev = current_repo.and_then(|r| r.pinned_rev.as_deref());
+        let current_repo = state
+            .repos
+            .get(&repo_ref.slug())
+            .with_context(|| format!("Repository {} has not been added yet", repo_ref.slug()))?;
+        anyhow::ensure!(
+            current_repo.pinned_rev.is_none(),
+            "Pinned repository {} cannot be synced to HEAD",
+            repo_ref.slug()
+        );
 
-        let repo_path = repo_ref.local_abspath(&repos_root, pinned_rev);
-
-        if !repo_path.join(".git").exists() {
-            anyhow::bail!("Repository {} has not been added yet", repo_ref.slug());
-        }
-
-        crate::git::refresh_repo(&repo_ref, &repo_path)?;
-
-        let repo = match pinned_rev {
-            Some(rev) => repo_ref.into_pinned_repo(&repos_root, rev),
-            None => repo_ref.into_repo(&repos_root),
-        };
-
-        let key = repo.slug.clone();
-        let value = serde_json::to_value(repo.clone())?;
-        self.store()?.set(key.clone(), value);
-        self.save()?;
-
-        self.observable.set_state(|prev| {
-            let mut next = prev;
-            next.repos.insert(key, repo);
-            next
-        })?;
-
-        Ok(())
+        let repo = materialize_repo_head(&repo_ref, &repos_root)?;
+        self.upsert(repo.clone())?;
+        Ok(repo)
     }
 
     pub fn replace_with_pinned_repos(&self, repos: Vec<PinnedGitRepoSpec>) -> Result<Vec<GitRepo>> {
@@ -159,19 +164,23 @@ impl GitReposStore {
 
         let mut next_repos = HashMap::with_capacity(repos.len());
         for spec in repos {
-            let repo_path = spec.repo_ref.local_abspath(&repos_root, Some(&spec.rev));
-            // Use the new function to handle both cloning if not exists, and fetching/updating if exists.
-            update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
+            let repo_path = spec.repo_ref.local_abspath(&repos_root, &spec.rev);
+            materialize_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
             next_repos.insert(repo.slug.clone(), repo);
         }
 
         self.replace_all(next_repos.clone())?;
 
-        for repo in previous_repos.values() {
-            if !desired_slugs.contains(&repo.slug) {
-                remove_repo_cache(&PathBuf::from(&repo.local_abspath))?;
-            }
+        for repo in previous_repos
+            .values()
+            .filter(|repo| !desired_slugs.contains(&repo.slug))
+        {
+            log::debug!(
+                "Deactivated repository {}; retained immutable cache entry at {}",
+                repo.slug,
+                repo.local_abspath.display()
+            );
         }
 
         Ok(next_repos.into_values().collect())
@@ -183,13 +192,20 @@ impl GitReposStore {
         let mut current_repos = state.repos.clone();
 
         for spec in repos {
-            let repo_path = spec.repo_ref.local_abspath(&repos_root, Some(&spec.rev));
-            update_or_clone_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
+            let repo_path = spec.repo_ref.local_abspath(&repos_root, &spec.rev);
+            materialize_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
             current_repos.insert(repo.slug.clone(), repo);
         }
 
-        self.replace_all(current_repos)?;
+        for repo in current_repos.values() {
+            self.store()?
+                .set(repo.slug.clone(), serde_json::to_value(repo)?);
+        }
+        self.save()?;
+        self.observable.set_state(|_| GitReposState {
+            repos: current_repos,
+        })?;
         Ok(())
     }
 }
@@ -234,31 +250,17 @@ pub fn load_repos(store: &Store<Wry>) -> Result<HashMap<String, GitRepo>> {
 }
 
 pub fn rewrite_repos(store: &Store<Wry>, repos: &HashMap<String, GitRepo>) -> Result<()> {
-    store.clear();
+    let desired_slugs = repos.keys().cloned().collect::<HashSet<_>>();
+    for (slug, _) in store.entries() {
+        if !desired_slugs.contains(&slug) {
+            store.delete(&slug);
+        }
+    }
     for (slug, repo) in repos {
         let value = serde_json::to_value(repo)
             .with_context(|| format!("Failed to serialize repo {slug}"))?;
         store.set(slug.clone(), value);
     }
     store.save()?;
-    Ok(())
-}
-
-fn remove_repo_cache(repo_path: &PathBuf) -> Result<()> {
-    if repo_path.exists() {
-        fs::remove_dir_all(repo_path).with_context(|| {
-            format!(
-                "Failed to remove local repo cache at {}",
-                repo_path.display()
-            )
-        })?;
-
-        if let Some(parent) = repo_path.parent() {
-            if parent.read_dir()?.next().is_none() {
-                let _ = fs::remove_dir(parent);
-            }
-        }
-    }
-
     Ok(())
 }

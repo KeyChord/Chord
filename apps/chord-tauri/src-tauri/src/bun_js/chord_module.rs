@@ -1,22 +1,19 @@
+//! The `chord` built-in module for the Bun engine — the same surface as
+//! [`crate::quickjs::chord_module`], written against `rbun`.
+
 use crate::app::AppHandleExt;
-use crate::app::desktop_app::{
+use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
+use crate::bun_js::AppUserData;
+use crate::bun_js::lifecycle::{
     init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
-use crate::app::chord_package_manager::{PackageSpecifier, resolve_logical_package_path};
-use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
+use crate::app::chord_package_manager::resolve_logical_package_path;
 use crate::constants::GLOBAL_HOTKEYS_POOL;
 use crate::models::{ShortcutChordAction, SimulatedShortcut, native_library_relpath};
-use crate::quickjs::AppUserData;
-use llrt_core::libs::json::stringify::json_stringify;
-use llrt_core::libs::utils::result::ResultExt;
 #[cfg(target_os = "macos")]
 use osakit::{Language as OsaLanguage, Script as OsaScript};
-use rquickjs::Class;
-use rquickjs::class::{JsClass, Trace, Tracer};
-use rquickjs::function::Async;
-use rquickjs::module::{Declarations, Exports, ModuleDef};
-use rquickjs::prelude::{Func, Rest, This};
-use rquickjs::{Array, Ctx, Exception, Function, JsLifetime, Object, Value};
+use rbun::prelude::*;
+use rbun::{Array, Class, Ctx, Exception, Function, JsLifetime, Object, Value};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -27,7 +24,8 @@ enum ApplescriptLanguage {
     JavaScript,
 }
 
-#[rquickjs::class]
+#[rbun::class]
+#[derive(rbun::derive::Trace)]
 struct Applescript {
     #[cfg(target_os = "macos")]
     script: OsaScript,
@@ -39,14 +37,10 @@ unsafe impl<'js> JsLifetime<'js> for Applescript {
     type Changed<'to> = Applescript;
 }
 
-impl<'js> Trace<'js> for Applescript {
-    fn trace(&self, _tracer: Tracer<'_, 'js>) {}
-}
-
-#[rquickjs::methods(rename_all = "camelCase")]
+#[rbun::methods(rename_all = "camelCase")]
 impl Applescript {
     #[qjs(constructor)]
-    fn new<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rquickjs::Result<Self> {
+    fn new<'js>(ctx: Ctx<'js>, args: Rest<Value<'js>>) -> rbun::Result<Self> {
         let mut args_iter = args.0.into_iter();
         let Some(first_arg) = args_iter.next() else {
             return Err(Exception::throw_message(
@@ -70,7 +64,7 @@ impl Applescript {
         }
 
         if let Some(function) = first_arg.as_function() {
-            let function_source = function_source(&ctx, &function)?;
+            let function_source = function_source(&ctx, function)?;
             let wrapped_source = wrap_jxa_function(&ctx, function_source, args_iter.collect())?;
             return Ok(Self::from_source(
                 ApplescriptLanguage::JavaScript,
@@ -84,7 +78,7 @@ impl Applescript {
         ))
     }
 
-    fn compile<'js>(&mut self, ctx: Ctx<'js>) -> rquickjs::Result<()> {
+    fn compile<'js>(&mut self, ctx: Ctx<'js>) -> rbun::Result<()> {
         #[cfg(target_os = "macos")]
         {
             self.script.compile().map_err(|error| {
@@ -103,14 +97,14 @@ impl Applescript {
         }
     }
 
-    fn execute<'js>(&self, ctx: Ctx<'js>) -> rquickjs::Result<Value<'js>> {
+    fn execute<'js>(&self, ctx: Ctx<'js>) -> rbun::Result<Value<'js>> {
         #[cfg(target_os = "macos")]
         {
             let value = self.script.execute().map_err(|error| {
                 Exception::throw_message(&ctx, &format!("failed to execute AppleScript: {error}"))
             })?;
 
-            rquickjs_serde::to_value(ctx.clone(), value)
+            rbun::serde::to_value(ctx.clone(), value)
                 .or_throw_msg(&ctx, "failed to convert AppleScript result")
         }
 
@@ -142,7 +136,7 @@ impl Applescript {
     }
 }
 
-fn function_source<'js>(ctx: &Ctx<'js>, function: &Function<'js>) -> rquickjs::Result<String> {
+fn function_source<'js>(ctx: &Ctx<'js>, function: &Function<'js>) -> rbun::Result<String> {
     let to_string: Function<'js> = function
         .get("toString")
         .or_throw_msg(ctx, "failed to read function.toString")?;
@@ -156,7 +150,7 @@ fn wrap_jxa_function<'js>(
     ctx: &Ctx<'js>,
     function_source: String,
     args: Vec<Value<'js>>,
-) -> rquickjs::Result<String> {
+) -> rbun::Result<String> {
     let serialized_args = serialize_jxa_args(ctx, args)?;
 
     Ok(format!(
@@ -164,17 +158,19 @@ fn wrap_jxa_function<'js>(
     ))
 }
 
-fn serialize_jxa_args<'js>(ctx: &Ctx<'js>, args: Vec<Value<'js>>) -> rquickjs::Result<String> {
+fn serialize_jxa_args<'js>(ctx: &Ctx<'js>, args: Vec<Value<'js>>) -> rbun::Result<String> {
     let array = Array::new(ctx.clone())?;
     for (index, value) in args.into_iter().enumerate() {
         array.set(index, value)?;
     }
 
-    json_stringify(ctx, array.into_value())?
+    ctx.json_stringify(array.into_value())?
+        .map(|json| json.to_string())
+        .transpose()?
         .ok_or_else(|| Exception::throw_message(ctx, "failed to serialize JXA arguments"))
 }
 
-fn app_handle(ctx: &Ctx<'_>) -> rquickjs::Result<tauri::AppHandle> {
+fn app_handle(ctx: &Ctx<'_>) -> rbun::Result<tauri::AppHandle> {
     let userdata = ctx
         .userdata::<AppUserData>()
         .ok_or_else(|| Exception::throw_message(ctx, "missing app context"))?;
@@ -189,7 +185,7 @@ fn on_app_launch<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
     callback: Function<'js>,
-) -> rquickjs::Result<()> {
+) -> rbun::Result<()> {
     let _ = app_handle(&ctx)?;
     register_app_launch_handler(ctx, bundle_id, callback)
 }
@@ -198,12 +194,12 @@ fn on_app_terminate<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
     callback: Function<'js>,
-) -> rquickjs::Result<Function<'js>> {
+) -> rbun::Result<Function<'js>> {
     let _ = app_handle(&ctx)?;
     register_app_terminate_handler(ctx, bundle_id, callback)
 }
 
-fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
+fn press(ctx: Ctx, key: String) -> rbun::Result<()> {
     let handle = app_handle(&ctx)?;
     let runner = handle.app_state().chord_action_task_runner();
     let simulated_shortcut = key
@@ -221,7 +217,7 @@ fn press(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     Ok(())
 }
 
-fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
+fn release(ctx: Ctx, key: String) -> rbun::Result<()> {
     let handle = app_handle(&ctx)?;
     let runner = handle.app_state().chord_action_task_runner();
     let simulated_shortcut = key
@@ -238,7 +234,7 @@ fn release(ctx: Ctx, key: String) -> rquickjs::Result<()> {
     Ok(())
 }
 
-fn tap(ctx: Ctx, key: String) -> rquickjs::Result<()> {
+fn tap(ctx: Ctx, key: String) -> rbun::Result<()> {
     press(ctx.clone(), key.clone())?;
     release(ctx.clone(), key)?;
     Ok(())
@@ -248,7 +244,7 @@ fn get_global_hotkey(
     ctx: Ctx,
     bundle_id: String,
     hotkey_id: String,
-) -> rquickjs::Result<Option<String>> {
+) -> rbun::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_state().global_hotkey_store();
     let shortcut = global_hotkey_store
@@ -266,7 +262,7 @@ fn register_global_hotkey(
     ctx: Ctx,
     bundle_id: String,
     hotkey_id: String,
-) -> rquickjs::Result<Option<String>> {
+) -> rbun::Result<Option<String>> {
     let handle = app_handle(&ctx)?;
     let global_hotkey_store = handle.app_state().global_hotkey_store();
     let all = global_hotkey_store
@@ -309,7 +305,7 @@ fn set_app_needs_relaunch(
     ctx: Ctx,
     bundle_id: String,
     needs_relaunch: bool,
-) -> rquickjs::Result<()> {
+) -> rbun::Result<()> {
     let handle = app_handle(&ctx)?;
     let desktop_app_manager = handle.app_state().desktop_app_manager();
     desktop_app_manager
@@ -322,7 +318,7 @@ async fn run_sudo_command<'js>(
     ctx: Ctx<'js>,
     program: String,
     args: Array<'js>,
-) -> rquickjs::Result<()> {
+) -> rbun::Result<()> {
     let mut rust_args: Vec<String> = Vec::new();
     for item in args.into_iter() {
         let arg_string: String = item?.get()?;
@@ -350,95 +346,100 @@ async fn run_sudo_command<'js>(
     })
     .await;
 
-    // 3. Handle the thread result back on the JS context thread.
     match thread_result {
-        // Thread succeeded, command executed successfully
         Ok(Ok(_output)) => Ok(()),
-
-        // Command failed to run (e.g., UAC cancelled, binary not found)
-        Ok(Err(e)) => {
-            // Throw a JS exception using the context
-            Err(Exception::throw_message(
-                &ctx,
-                &format!("failed to run command: {}", e),
-            ))
-        }
-
-        // Tokio `spawn_blocking` failed (the background thread panicked)
+        Ok(Err(e)) => Err(Exception::throw_message(
+            &ctx,
+            &format!("failed to run command: {}", e),
+        )),
         Err(e) => Err(Exception::throw_message(
             &ctx,
             &format!("background thread failed: {}", e),
         )),
     }
 }
+
 /// `(package root, module path relative to it)` for the module whose `import.meta` is `meta`.
 ///
-/// QuickJS modules are declared from memory with `import.meta.url` set to
-/// `<package name>/<pathslug>`, so the root comes from the package manager. Standalone
-/// (`chord run file.ts`) a file URL/path is anchored at the nearest ancestor with a
-/// `package.json`.
-fn locate_module<'js>(ctx: &Ctx<'js>, meta: &Object<'js>) -> rquickjs::Result<(PathBuf, PathBuf)> {
-    let url: String = meta
-        .get::<_, Option<String>>("url")
+/// Inside the app the package is found through the package manager (the module was imported
+/// from the package directory, so `import.meta.path` is under a known root). Standalone
+/// (`chord run file.ts`) the nearest ancestor with a `package.json` is taken as the root, so
+/// packages can be exercised from a checkout.
+fn locate_module<'js>(ctx: &Ctx<'js>, meta: &Object<'js>) -> rbun::Result<(PathBuf, PathBuf)> {
+    let module_path = meta
+        .get::<_, Option<String>>("path")
         .ok()
         .flatten()
-        .or_throw_msg(ctx, "expected `import.meta` of a package module (it has no url)")?;
+        .filter(|path| !path.is_empty())
+        .or_else(|| {
+            meta.get::<_, Option<String>>("url")
+                .ok()
+                .flatten()
+                .and_then(|url| url.strip_prefix("file://").map(str::to_string))
+        });
+    let Some(module_path) = module_path else {
+        return Err(Exception::throw_message(
+            ctx,
+            "expected `import.meta` of a module loaded from disk (it has no path)",
+        ));
+    };
+    let module_path = PathBuf::from(module_path);
 
     if let Ok(handle) = app_handle(ctx) {
-        let specifier = PackageSpecifier::parse(&url);
         let package_manager = handle.app_state().chord_package_manager();
-        if let (Some(root), Some(subpath)) =
-            (package_manager.package_root(specifier.package), specifier.subpath)
-        {
-            return Ok((root, PathBuf::from(subpath)));
+        if let Some((_, root)) = package_manager.package_for_path(&module_path) {
+            let relative = module_path
+                .strip_prefix(&root)
+                .map(Path::to_path_buf)
+                .or_throw_msg(ctx, "module is not inside its package root")?;
+            return Ok((root, relative));
         }
     }
 
-    let module_path = PathBuf::from(url.strip_prefix("file://").unwrap_or(&url));
-    if module_path.is_absolute() {
-        for ancestor in module_path.ancestors().skip(1) {
-            if ancestor.join("package.json").is_file() {
-                let relative = module_path
-                    .strip_prefix(ancestor)
-                    .map(Path::to_path_buf)
-                    .or_throw_msg(ctx, "module is not inside its package root")?;
-                return Ok((ancestor.to_path_buf(), relative));
-            }
+    for ancestor in module_path.ancestors().skip(1) {
+        if ancestor.join("package.json").is_file() {
+            let relative = module_path
+                .strip_prefix(ancestor)
+                .map(Path::to_path_buf)
+                .or_throw_msg(ctx, "module is not inside its package root")?;
+            return Ok((ancestor.to_path_buf(), relative));
         }
     }
 
     Err(Exception::throw_message(
         ctx,
-        &format!("{url} is not inside a chord package"),
+        &format!("{} is not inside a chord package", module_path.display()),
     ))
 }
 
-/// `resolvePackageFile(import.meta, "target/x/y")`: see the Bun engine's counterpart.
+/// `resolvePackageFile(import.meta, "target/x/y")`: the absolute path of a file of the calling
+/// module's package, given relative to the package root as authored (vendored packages are
+/// remapped to where their folders were copied). The file need not exist.
 fn resolve_package_file<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
     relative: String,
-) -> rquickjs::Result<String> {
+) -> rbun::Result<String> {
     let (root, module_relpath) = locate_module(&ctx, &meta)?;
     let resolved = resolve_logical_package_path(&module_relpath, Path::new(&relative))
         .or_throw_msg(&ctx, "invalid package-relative path")?;
     Ok(root.join(resolved).to_string_lossy().into_owned())
 }
 
-/// `resolveNativeLibrary(import.meta, "menu")`: the path of the package's prebuilt native
-/// library for this platform. QuickJS has no `bun:ffi` to open it with; the path is still
-/// resolved so packages can report a helpful error (or spawn a helper).
+/// `resolveNativeLibrary(import.meta, "menu")`: the absolute path of the package's prebuilt
+/// native library `target/<this triple>/native/menu/menu.<dylib|so|dll>`, ready for
+/// `dlopen` from `bun:ffi`.
 fn resolve_native_library<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
     name: String,
-) -> rquickjs::Result<String> {
+) -> rbun::Result<String> {
     let relpath = native_library_relpath(&name).or_throw_msg(&ctx, "invalid native module name")?;
     resolve_package_file(ctx, meta, relpath.to_string_lossy().into_owned())
 }
 
 impl ModuleDef for ChordModule {
-    fn declare(declare: &Declarations) -> rquickjs::Result<()> {
+    fn declare(declare: &Declarations) -> rbun::Result<()> {
         declare.declare("Applescript")?;
         declare.declare("press")?;
         declare.declare("release")?;
@@ -454,7 +455,7 @@ impl ModuleDef for ChordModule {
         Ok(())
     }
 
-    fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> rquickjs::Result<()> {
+    fn evaluate<'js>(ctx: &Ctx<'js>, exports: &Exports<'js>) -> rbun::Result<()> {
         if let Ok(handle) = app_handle(ctx) {
             init_app_lifecycle(handle);
         }

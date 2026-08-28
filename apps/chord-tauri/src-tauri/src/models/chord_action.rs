@@ -1,4 +1,4 @@
-use super::{ChordsFileHandlerKind, SimulatedShortcut};
+use super::SimulatedShortcut;
 use serde::Serialize;
 use typeshare::typeshare;
 
@@ -51,10 +51,8 @@ pub struct EmitChordAction {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HandlerChordAction {
-    /// JS: key in the QuickJS `__RUST_HANDLER_REGISTRY`. Native: registration id in the
-    /// native host's active generation.
+    /// Key in the JS engine's `__RUST_HANDLER_REGISTRY`.
     pub handler_id: String,
-    pub kind: ChordsFileHandlerKind,
     #[typeshare(typescript(type = "any[]"))]
     pub event_args: Vec<toml::Value>,
 }

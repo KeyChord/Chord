@@ -213,6 +213,11 @@ pub fn clear_callbacks() {
 }
 
 pub fn dispatch_app_launch(app: ObservedApp) {
+    #[cfg(feature = "bun")]
+    if crate::js_engine::current() == crate::js_engine::JsEngine::Bun {
+        crate::bun_js::lifecycle::dispatch_app_launch(app);
+        return;
+    }
     if !HAS_LAUNCH_CALLBACKS.load(Ordering::SeqCst) {
         return;
     }
@@ -233,6 +238,11 @@ pub fn dispatch_app_launch(app: ObservedApp) {
 }
 
 pub fn dispatch_app_terminate(app: ObservedApp) {
+    #[cfg(feature = "bun")]
+    if crate::js_engine::current() == crate::js_engine::JsEngine::Bun {
+        crate::bun_js::lifecycle::dispatch_app_terminate(app);
+        return;
+    }
     if !HAS_TERMINATE_CALLBACKS.load(Ordering::SeqCst) {
         return;
     }

@@ -30,22 +30,20 @@ if (!identity) {
 const productName: string = config.productName ?? "Chord";
 const timestampArgs = process.env.CODESIGN_NO_TIMESTAMP ? [] : ["--timestamp"];
 
-await $`bun run build-native-host`.cwd(appDir);
 await $`bun tauri build --bundles app`.cwd(appDir);
 
 const bundleDir = path.join(srcTauri, "target/release/bundle/macos");
 const app = path.join(bundleDir, `${productName}.app`);
-const host = path.join(app, "Contents/MacOS/chord-native-host");
-if (!fs.existsSync(host)) {
-	throw new Error(`sidecar missing from bundle: ${host}`);
+// The embedded Bun runtime (rbun) ships as a framework dylib; tauri copies it from
+// `bundle.macOS.frameworks` and signs it, the app's rpath points at Contents/Frameworks.
+const bunRuntime = path.join(app, "Contents/Frameworks/libbun_embed.dylib");
+if (!fs.existsSync(bunRuntime)) {
+	throw new Error(`embedded Bun runtime missing from bundle: ${bunRuntime}`);
 }
 
-console.log("re-signing native host with NativeHost.entitlements");
-await $`codesign --force --options runtime ${timestampArgs} --entitlements ${path.join(srcTauri, "NativeHost.entitlements")} --sign ${identity} ${host}`;
 console.log("re-signing app bundle with Entitlements.plist");
 await $`codesign --force --options runtime ${timestampArgs} --entitlements ${path.join(srcTauri, "Entitlements.plist")} --sign ${identity} ${app}`;
 await $`codesign --verify --deep --strict --verbose=2 ${app}`;
-await $`codesign -d --entitlements - ${host}`;
 
 const outDir = path.join(srcTauri, "target/release/bundle/chord-release");
 fs.rmSync(outDir, { recursive: true, force: true });

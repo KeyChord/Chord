@@ -6,22 +6,23 @@ use typeshare::typeshare;
 
 /// Mapping of all the relevant files for a chord package.
 ///
-/// We intentionally don't include the path of the package here to avoid leaking implementation
-/// details about where the package is located on the filesystem.
+/// The on-disk location is kept out of the serialized form so the frontend never learns
+/// where a package is installed; the engines need it (`root`) to import modules from disk.
 #[typeshare]
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawChordPackage {
     /// The dirname is needed for inferring the chord package name when package.json isn't present
     pub dirname: String,
+    /// Absolute path of the package directory.
+    #[serde(skip)]
+    #[typeshare(skip)]
+    pub root: PathBuf,
     pub package_json_contents: Option<String>,
 
     pub chords_files_contents: HashMap<FilePathslug, String>,
     pub js_files_contents: HashMap<FilePathslug, String>,
     pub bin_files_contents: HashMap<FilePathslug, Vec<u8>>,
-    /// Prebuilt native build artifacts for the current target triple from the package's
-    /// top-level `target/` directory (`target/<triple>/native/<name>/...`), keyed by pathslug.
-    pub native_files_contents: HashMap<FilePathslug, Vec<u8>>,
 }
 
 impl RawChordPackage {

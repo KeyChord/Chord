@@ -782,28 +782,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "chord-native-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chord-native-protocol",
- "libc",
- "libloading 0.8.9",
- "tokio",
-]
-
-[[package]]
-name = "chord-native-protocol"
-version = "0.1.0"
-dependencies = [
- "libc",
- "rmp-serde",
- "serde",
- "thiserror 2.0.20",
- "tokio",
-]
-
-[[package]]
 name = "chords"
 version = "0.1.0"
 dependencies = [
@@ -814,7 +792,6 @@ dependencies = [
  "bitflags 2.13.1",
  "block2",
  "cc",
- "chord-native-protocol",
  "clap",
  "derive_more",
  "device_query",
@@ -823,7 +800,6 @@ dependencies = [
  "fix-path-env",
  "frontmost",
  "gix",
- "hex",
  "jsonc-parser",
  "keycode",
  "libc",
@@ -842,14 +818,13 @@ dependencies = [
  "osakit",
  "parking_lot",
  "raw-window-handle",
+ "rbun",
  "rdev",
  "regex",
- "rmp-serde",
  "rquickjs",
  "rquickjs-serde",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "specta",
  "tauri",
  "tauri-build",
@@ -4254,7 +4229,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf"
 dependencies = [
  "gtk-sys",
- "libloading 0.7.4",
+ "libloading",
  "once_cell",
 ]
 
@@ -4281,16 +4256,6 @@ checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
 dependencies = [
  "cfg-if",
  "winapi",
-]
-
-[[package]]
-name = "libloading"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link 0.2.1",
 ]
 
 [[package]]
@@ -6192,6 +6157,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
+name = "rbun"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rbun-macros",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "rbun-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "rdev"
 version = "0.6.0"
 source = "git+https://github.com/KeyChord/rdev#5a6d335ae5fc1ee062885e0a3fd82d6656e09654"
@@ -6405,25 +6390,6 @@ dependencies = [
  "libc",
  "untrusted",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "rmp"
-version = "0.8.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ba8be72d372b2c9b35542551678538b562e7cf86c3315773cae48dfbfe7790c"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
-name = "rmp-serde"
-version = "1.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f81bee8c8ef9b577d1681a70ebbc962c232461e397b22c208c43c04b67a155"
-dependencies = [
- "rmp",
- "serde",
 ]
 
 [[package]]

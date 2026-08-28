@@ -1,7 +1,6 @@
 procs:
   tauri:
     shell: >-
-      bun run build-native-host &&
       RUST_BACKTRACE=full bun run tauri dev --no-watch
       --config src-tauri/tauri.dev.conf.json
       --config '{"build":{"beforeDevCommand":null}}'

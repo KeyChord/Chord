@@ -10,8 +10,6 @@ autobins = false
 [workspace]
 members = [
 	"crates/taurpc_macros",
-	"crates/chord-native-protocol",
-	"crates/chord-native-host",
 ]
 
 [lib]
@@ -29,6 +27,14 @@ crate-type = [
 name = "chord"
 path = "src/main.rs"
 
+[features]
+default = ["bun"]
+# Bun (via rbun) is the default JS engine: it is what lets packages load native
+# code with `bun:ffi`. QuickJS stays selectable at runtime from the settings.
+# Requires the rbun checkout next to this repo with its vendored Bun built:
+# see ../../../../rbun/README.md. `--no-default-features` builds QuickJS only.
+bun = ["dep:rbun"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 cc = "1.4"
@@ -40,10 +46,6 @@ tauri = { version = "2", features = [
 	"image-png"
 ] }
 taurpc-macros = { path = "./crates/taurpc_macros" }
-chord-native-protocol = { path = "./crates/chord-native-protocol" }
-rmp-serde = "1"
-sha2 = "0.10"
-hex = "0.4"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2.7"
 tauri-plugin-fs = "2.5.1"
@@ -84,6 +86,7 @@ llrt_core = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06
 # We need to manually enable all features
 llrt_os = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb", package = "llrt_os", default-features = true }
 rquickjs-serde = "0.5.0"
+rbun = { path = "../../../../rbun", optional = true }
 tauri-plugin-store = "2"
 jsonc-parser = "0.33.1"
 typeshare = "1"

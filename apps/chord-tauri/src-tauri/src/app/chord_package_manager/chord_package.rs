@@ -1,4 +1,4 @@
-use crate::app::chord_package_manager::{ChordJsPackage, ChordNativePackage};
+use crate::app::chord_package_manager::ChordJsPackage;
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::{
     Chord, ChordAction, ChordInput, ChordInputEvent, ChordTaskAction, ChordTrigger,
@@ -18,7 +18,6 @@ pub struct ChordPackage {
     pub name: String,
 
     pub js_package: Option<ChordJsPackage>,
-    pub native_package: Option<ChordNativePackage>,
 
     pub raw_chords_files: HashMap<FilePathslug, RawChordsFile>,
     pub compiled_chords_files: HashMap<FilePathslug, CompiledChordsFile>,
@@ -148,7 +147,6 @@ impl ChordPackage {
                         initiator_file_pathslug: chord_reference.chords_file_pathslug,
                         action: ChordTaskAction::Handler(HandlerChordAction {
                             handler_id: handler.handler_id.clone(),
-                            kind: handler.kind,
                             event_args,
                         }),
                         num_times,

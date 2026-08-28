@@ -17,6 +17,7 @@ pub struct AppSettingsProvider {
 
 impl AppSingleton for AppSettings {
     fn init(&self) -> Result<()> {
+        self.load_js_engine_state()?;
         Ok(())
     }
 }
