@@ -245,7 +245,7 @@ chord run scripts/run.ts by-letters f     # from the chords-menu checkout
 ## Troubleshooting
 
 - `dlopen` failures name the missing file or symbol; check that `target/<your triple>/` was built and committed, and that the `@_cdecl` names match the `dlopen` declarations.
-- `bun:ffi` needs the Bun engine (the default). With QuickJS selected in Settings → General → JavaScript Engine the import fails at load time.
+- `bun:ffi` needs the Bun engine (the default). With the legacy QuickJS engine selected in Settings → General → JavaScript Engine the import fails at load time.
 - Accessibility calls inherit Chord's Accessibility permission — grant it to Chord.
 - Native crashes crash Chord: run the handler from the CLI first while developing.
 
@@ -253,4 +253,4 @@ chord run scripts/run.ts by-letters f     # from the chords-menu checkout
 
 ### Why Bun rather than a lighter runtime?
 
-Chord started on QuickJS (still available as a fallback engine). Bun brings JavaScriptCore's JIT, Node/Bun APIs, and `bun:ffi` — which is what lets packages load native code without Chord having to know anything about it. Bun has no official embedding API, so Chord embeds it through the [`rbun`](https://github.com/KeyChord/rbun) crate, which exposes an rquickjs-shaped Rust API (and the custom `chord` module) over a lightly patched Bun runtime.
+Chord started on QuickJS, which remains selectable as the legacy engine. Bun brings JavaScriptCore's JIT, Node/Bun APIs, and `bun:ffi` — which is what lets packages load native code without Chord having to know anything about it. Bun has no official embedding API, so Chord embeds it through the [`rbun`](https://github.com/KeyChord/rbun) crate, which exposes an rquickjs-shaped Rust API (and the custom `chord` module) over a lightly patched Bun runtime.

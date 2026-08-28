@@ -45,15 +45,22 @@ bun run dev            # Bun engine (default)
 bun run dev:quickjs    # QuickJS-only build (--no-default-features), no bun:ffi
 ```
 
-QuickJS (`rquickjs` + LLRT) remains available as a fallback engine: choose it
+QuickJS (`rquickjs` + LLRT) is the **legacy** engine, kept for compatibility
+with packages written before `bun:ffi` (it cannot load native code). Select it
 in Settings → General → JavaScript Engine (persisted as `jsEngine` in the app
-state store) or with `CHORD_JS_ENGINE=bun|quickjs`; the choice takes effect on
-the next launch. The engine-specific code lives in `src-tauri/src/quickjs/`
+state store), with `CHORD_JS_ENGINE=bun|quickjs`, or per CLI invocation with
+`chord run --engine quickjs <file>`; the app-level choice takes effect on the
+next launch. The engine-specific code lives in `src-tauri/src/quickjs/`
 and `src-tauri/src/bun_js/`; `src-tauri/src/js_engine.rs` selects between
 them. Both expose the same `chord` module to packages.
 
-The CLI honours the same environment variable:
+The CLI honours the same environment variable, and takes an explicit flag
+that overrides it:
 
 ```sh
 CHORD_JS_ENGINE=bun target/debug/chord run ./script.ts
+target/debug/chord run --engine quickjs ./script.js   # legacy engine
 ```
+
+(TypeScript and `bun:ffi` need the Bun engine; the QuickJS engine only parses
+plain JavaScript.)

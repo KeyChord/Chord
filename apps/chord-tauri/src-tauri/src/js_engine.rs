@@ -1,7 +1,7 @@
-//! Which JavaScript engine runs chord handlers: Bun (rbun, the default and
-//! the engine that gives packages `bun:ffi` for native code) or QuickJS
-//! (rquickjs + LLRT, the fallback and the only engine of a build without the
-//! `bun` cargo feature).
+//! Which JavaScript engine runs chord handlers: Bun (rbun) — the default, and
+//! the engine that gives packages `bun:ffi` for native code — or QuickJS
+//! (rquickjs + LLRT), the legacy engine, kept for compatibility and used
+//! automatically by a build without the `bun` cargo feature.
 //!
 //! The choice is read once per process — from `CHORD_JS_ENGINE` if set,
 //! otherwise from the `jsEngine` key of the app state store — the first time
@@ -88,7 +88,7 @@ pub fn select(handle: &AppHandle) -> JsEngine {
     })
 }
 
-/// The engine selected so far (QuickJS until [`select`] has run).
+/// The engine selected so far (the default until [`select`] has run).
 pub fn current() -> JsEngine {
     SELECTED.get().copied().unwrap_or_default()
 }

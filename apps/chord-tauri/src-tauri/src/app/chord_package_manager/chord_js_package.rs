@@ -278,22 +278,27 @@ mod tests {
 
     #[test]
     fn logical_paths_of_the_package_itself_are_unchanged() {
-        let resolved =
-            resolve_logical_package_path(Path::new("js/menu.js"), Path::new("target/t/native/menu/menu.dylib"))
-                .unwrap();
-        assert_eq!(resolved, PathBuf::from("target/t/native/menu/menu.dylib"));
+        let resolved = resolve_logical_package_path(
+            Path::new("js/menu.js"),
+            Path::new("target/t/ffi/menu.swift/menu.dylib"),
+        )
+        .unwrap();
+        assert_eq!(
+            resolved,
+            PathBuf::from("target/t/ffi/menu.swift/menu.dylib")
+        );
     }
 
     #[test]
     fn logical_paths_of_vendored_packages_are_remapped() {
         let resolved = resolve_logical_package_path(
             Path::new("js/@keychord/chords-menu/js/menu.js"),
-            Path::new("target/t/native/menu/menu.dylib"),
+            Path::new("target/t/ffi/menu.swift/menu.dylib"),
         )
         .unwrap();
         assert_eq!(
             resolved,
-            PathBuf::from("target/@keychord/chords-menu/target/t/native/menu/menu.dylib")
+            PathBuf::from("target/@keychord/chords-menu/target/t/ffi/menu.swift/menu.dylib")
         );
     }
 

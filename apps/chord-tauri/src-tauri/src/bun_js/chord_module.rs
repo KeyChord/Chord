@@ -426,16 +426,17 @@ fn resolve_package_file<'js>(
     Ok(root.join(resolved).to_string_lossy().into_owned())
 }
 
-/// `resolveNativeLibrary(import.meta, "menu")`: the absolute path of the package's prebuilt
-/// native library `target/<this triple>/native/menu/menu.<dylib|so|dll>`, ready for
+/// `resolveNativeLibrary(import.meta, "ffi/menu.swift")`: the absolute path of the package's prebuilt
+/// native library `target/<this triple>/ffi/menu.swift/menu.<dylib|so|dll>`, ready for
 /// `dlopen` from `bun:ffi`.
 fn resolve_native_library<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
-    name: String,
+    relpath: String,
 ) -> rbun::Result<String> {
-    let relpath = native_library_relpath(&name).or_throw_msg(&ctx, "invalid native module name")?;
-    resolve_package_file(ctx, meta, relpath.to_string_lossy().into_owned())
+    let library_relpath = native_library_relpath(&relpath)
+        .or_throw_msg(&ctx, "invalid native module relative path")?;
+    resolve_package_file(ctx, meta, library_relpath.to_string_lossy().into_owned())
 }
 
 impl ModuleDef for ChordModule {

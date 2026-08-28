@@ -15,13 +15,16 @@ const ENGINES = [
 	{
 		id: 'bun',
 		label: 'Bun',
+		badge: 'Recommended',
 		description:
-			'The default engine: JavaScriptCore with Bun\'s event loop, module loader and Bun/Node APIs (via rbun). Packages that load native code with `bun:ffi` need it.',
+			'JavaScriptCore with Bun\'s event loop, module loader and Bun/Node APIs (via rbun). Required by packages that load native code with `bun:ffi`, and faster at everything else.',
 	},
 	{
 		id: 'quickjs',
 		label: 'QuickJS (LLRT)',
-		description: 'rquickjs with the LLRT Node-compatible runtime; no `bun:ffi`.',
+		badge: 'Legacy',
+		description:
+			'rquickjs with the LLRT Node-compatible runtime. Kept for compatibility with older packages; it cannot load native code (`bun:ffi`).',
 	},
 ] as const;
 
@@ -64,9 +67,21 @@ export function JsEngineCard() {
 									disabled={unavailable}
 								/>
 								<div className="space-y-1">
-									<Label htmlFor={`js-engine-${engine.id}`}>
+									<Label
+										htmlFor={`js-engine-${engine.id}`}
+										className="flex flex-wrap items-center gap-2"
+									>
 										{engine.label}
-										{engine.id === settings.activeJsEngine ? ' — running' : ''}
+										<span
+											className={engine.badge === 'Recommended'
+												? 'rounded-full border border-primary/30 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary'
+												: 'rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground'}
+										>
+											{engine.badge}
+										</span>
+										{engine.id === settings.activeJsEngine
+											? <span className="text-xs font-normal text-muted-foreground">running</span>
+											: null}
 									</Label>
 									<p className="text-sm text-muted-foreground">
 										{engine.description}
