@@ -168,7 +168,7 @@ mc = { name = "Menu: Columns", 'emit:menu' = [
 
 The top-level `on` table maps invocation targets to JavaScript filenames. Chords must reference those targets with `js:<name>`, most commonly `js:default`.
 
-Chord embeds the [LLRT runtime](https://github.com/awslabs/llrt), a QuickJS-based JavaScript environment which provides partial compatibility with the Node.js APIs. For more information, see [scripting.md](./scripting.md).
+Chord embeds [Bun](https://bun.com) as a runtime using [rbun](https://github.com/KeyChord/rbun).
 
 ## Global Hotkeys
 

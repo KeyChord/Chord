@@ -1,7 +1,7 @@
 //! Layout of a chord package's prebuilt native libraries.
 //!
 //! Chord never loads these itself: a package's JS handler opens them with `bun:ffi`, and the
-//! `chord` module's `resolveNativeLibrary(import.meta, relpath)` applies this layout so packages do
+//! `chord` module's `resolveFfiPath(import.meta, relpath)` applies this layout so packages do
 //! not hardcode paths. Anything that produces
 //! `target/<triple>/<dir-relpath>/<filename>/<stem>.<ext>` works (the `@keychord/config` build
 //! tooling does). Example: `src/ffi/menu.swift` -> `target/<triple>/ffi/menu.swift/menu.dylib`.

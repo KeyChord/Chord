@@ -26,7 +26,7 @@
 		"targets": "all",
 		"createUpdaterArtifacts": true,
 		"macOS": {
-			"frameworks": ["../../../../rbun/vendor/bun/build/release/libbun_embed.dylib"],
+			"frameworks": ["../../../../rbun/com/github/oven-sh/bun/dist/build/release/libbun_embed.dylib"],
 			"entitlements": "Entitlements.plist",
 			"signingIdentity": "Apple Development: Leon Si (4HXF7T46Q6)",
 			"infoPlist": "Info.plist"

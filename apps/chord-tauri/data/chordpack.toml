@@ -6,7 +6,7 @@ rev = "54ff9b5c8481fd8311dedca8dfeb1b7736bed16c"
 
 [packages."@keychord/chords-commands"]
 git = "https://github.com/KeyChord/chords-commands"
-rev = "b1acf04c83239dfe7ac9a4b066167d5324ed6679"
+rev = "e8022ed88df9616b8f7f1010d8a43757664a20fd"
 
 [packages."@keychord/chords-os"]
 git = "https://github.com/KeyChord/chords-os"
@@ -14,12 +14,12 @@ rev = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
 
 [packages."@keychord/chords-menu"]
 git = "https://github.com/KeyChord/chords-menu"
-rev = "4abe0c6da250fc6943804a51099cde29737c47e1"
+rev = "a918384eabd8b2f169098abb63d1cf97396eb11e"
 
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
-rev = "4a33a21f9a5b73fc73a2305f5b4068f170932618"
+rev = "4a861ddae0231fcf2d6508bff9870691bcacd2b5"
 
 [packages."@keychord/chords-tray"]
 git = "https://github.com/KeyChord/chords-tray"
-rev = "d5f0f99b29c3e8f0e7a5de25c023e7c44f3cfa62"
+rev = "c06b4212049dec676b7b20f7fec8b571b2a41403"

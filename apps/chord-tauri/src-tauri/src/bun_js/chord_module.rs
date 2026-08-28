@@ -426,10 +426,10 @@ fn resolve_package_file<'js>(
     Ok(root.join(resolved).to_string_lossy().into_owned())
 }
 
-/// `resolveNativeLibrary(import.meta, "ffi/menu.swift")`: the absolute path of the package's prebuilt
-/// native library `target/<this triple>/ffi/menu.swift/menu.<dylib|so|dll>`, ready for
+/// `resolveFfiPath(import.meta, "menu")`: the absolute path of the package's prebuilt
+/// native library `target/<this triple>/menu/menu.<dylib|so|dll>`, ready for
 /// `dlopen` from `bun:ffi`.
-fn resolve_native_library<'js>(
+fn resolve_ffi_path<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
     relpath: String,
@@ -452,7 +452,7 @@ impl ModuleDef for ChordModule {
         declare.declare("onAppTerminate")?;
         declare.declare("runSudoCommand")?;
         declare.declare("resolvePackageFile")?;
-        declare.declare("resolveNativeLibrary")?;
+        declare.declare("resolveFfiPath")?;
         Ok(())
     }
 
@@ -475,7 +475,7 @@ impl ModuleDef for ChordModule {
         exports.export("onAppTerminate", Func::from(on_app_terminate))?;
         exports.export("runSudoCommand", Func::from(Async(run_sudo_command)))?;
         exports.export("resolvePackageFile", Func::from(resolve_package_file))?;
-        exports.export("resolveNativeLibrary", Func::from(resolve_native_library))?;
+        exports.export("resolveFfiPath", Func::from(resolve_ffi_path))?;
 
         Ok(())
     }

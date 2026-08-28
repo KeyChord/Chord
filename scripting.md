@@ -2,40 +2,17 @@
 
 ## Recommended Setup
 
-Use [pnpm] because it supports specifying a dependency which is subdirectory of a GitHub repository, which is necessary since `LLRT` doesn't have an npm package for its types:
-
-```jsonc
-// package.json
-{
-	"devDependencies": {
-		"llrt-types": "github:awslabs/llrt#path:/types"
-		// ...
-	}
-}
-```
-
-Make sure your `tsconfig.json` has the `types` property set to `llrt-types`:
-
-```jsonc
-// tsconfig.json
-{
-	"compilerOptions": {
-		"types": ["llrt-types"]
-		// ...
-	}
-}
-```
+TODO
 
 ## Recommended Packages
 
-- [nano-spawn-compat](https://github.com/leonsilicon/nano-spawn-compat) - A more ergonomic `child_process.spawn` that works in LLRT.
 - [bplist-lossless](https://github.com/leonsilicon/bplist-lossless) - A binary plist parser specifically tailored for edits by avoiding loss of precision during parsing and re-serialization.
 - [doctor-json](https://github.com/privatenumber/doctor-json) - A JSON editor that preserves all existing formatting/comments
 - [keycode-ts2](https://github.com/leonsilicon/keycode-ts2) - A TypeScript port of the [Rust `keycode` crate](https://crates.io/crates/keycode) which uses the Chromium keycode names as the source of truth (_Chords_ uses these keycode names as the source of truth).
 
-## `chord`
+## The built-in `chord` module
 
-The built-in `chord` module also exposes:
+The built-in `chord` module is intentionally kept minimal.
 
 ```ts
 export class Applescript {
@@ -103,7 +80,13 @@ The CLI depends on macOS recognizing the bundled Chord app as the handler for th
 
 # Native code
 
-Every chord handler is a JavaScript module, and Chord runs it on an embedded [Bun](https://bun.sh) runtime (the [`rbun`](https://github.com/KeyChord/rbun) crate). When JavaScript cannot reach an API you need, your package ships a **prebuilt native library** and opens it from the handler with Bun's [`bun:ffi`](https://bun.sh/docs/api/ffi) — in-process, on the hot path, with no helper process and nothing to compile at runtime. There is no Chord SDK on the native side: your Swift (or C, C++, Objective-C, Rust, Zig, …) code calls AppKit, Accessibility, Core Graphics or anything else directly and exports plain C functions.
+Every chord handler is a JavaScript module, and Chord runs it on an embedded [Bun](https://bun.sh) runtime via the [`rbun`](https://github.com/KeyChord/rbun) crate. 
+
+Native code can be run by using `bun:ffi`. The convention is to place native code inside a `src/ffi/<path>` folder (e.g. `src/ffi/menu`), and to compile the artifacts into a `target/<triple>/<path>/` folder. For example:
+
+`src/ffi/menu/menu.swift` -> `target/<triple>/menu/menu.dylib`
+
+> The `@keychord/config` package automatically compiles Swift.
 
 > **Trust:** native code runs inside Chord with your full user permissions. Only enable packages from sources you trust.
 
@@ -155,10 +138,10 @@ The handler locates the library through the `chord` module — never by a hardco
 
 ```ts
 // src/js/beep.ts
-import { resolveNativeLibrary } from "chord";
+import { resolveFfiPath } from "chord";
 import { CString, dlopen, FFIType } from "bun:ffi";
 
-const lib = dlopen(resolveNativeLibrary(import.meta, "beep"), {
+const lib = dlopen(resolveFfiPath(import.meta, "beep"), {
   beep_run: { args: [FFIType.i32], returns: FFIType.ptr },
   beep_free: { args: [FFIType.ptr], returns: FFIType.void },
 });
@@ -175,7 +158,7 @@ export default function build(times = 1) {
 }
 ```
 
-- `resolveNativeLibrary(import.meta, "beep")` returns the absolute path of `target/<Chord's triple>/native/beep/beep.dylib` (`.so`/`.dll` elsewhere) for the calling module's package, including when the package is vendored inside another one. `resolvePackageFile(import.meta, "any/relative/path")` does the same for arbitrary package files.
+- `resolveFfiPath(import.meta, "beep")` returns the absolute path of `target/<Chord's triple>/native/beep/beep.dylib` (`.so`/`.dll` elsewhere) for the calling module's package, including when the package is vendored inside another one. `resolvePackageFile(import.meta, "any/relative/path")` does the same for arbitrary package files.
 - Handlers run on Chord's JS worker thread, not the main thread. AppKit calls that require the main thread must hop there (`DispatchQueue.main.sync { … }` — the app's run loop is running, so this returns promptly). The Accessibility API can be called from any thread.
 - A thrown error (as above) is reported as a handler error. A crash in native code (`fatalError`, a bad pointer, `exit()`) takes Chord down with it — there is no separate process any more — so keep the exported surface small and validate inputs.
 - Once opened, a library stays loaded until Chord quits; reloading packages picks up changed JS, but a rebuilt `.dylib` needs a restart.
@@ -206,7 +189,7 @@ import KeychordChordsMenuNativeMenu   // the Swift equivalent of importing @keyc
 try KeychordChordsMenuNativeMenu.runMenuAction(processName: "Safari", action: "by-letters", value: "f")
 ```
 
-Declarations you want to expose must be `public`. Modules are built with library evolution and ship a `.swiftinterface`, so they can be imported by packages built with a different Swift compiler. From JavaScript, simply import the vendored package's JS (`@keychord/chords-menu/js/menu.js`); its own `resolveNativeLibrary` call finds the vendored library.
+Declarations you want to expose must be `public`. Modules are built with library evolution and ship a `.swiftinterface`, so they can be imported by packages built with a different Swift compiler. From JavaScript, simply import the vendored package's JS (`@keychord/chords-menu/js/menu.js`); its own `resolveFfiPath` call finds the vendored library.
 
 ## Building
 
@@ -236,7 +219,7 @@ Any other build system works too: Chord only cares that `target/<triple>/native/
 
 ## Testing without the app
 
-A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available (outside the app, `resolveNativeLibrary` anchors on the nearest `package.json`):
+A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available (outside the app, `resolveFfiPath` anchors on the nearest `package.json`):
 
 ```sh
 chord run scripts/run.ts by-letters f     # from the chords-menu checkout

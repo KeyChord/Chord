@@ -152,7 +152,7 @@ impl LocalPackageRegistry {
         let package_json_contents = fs::read_to_string(root.join("package.json")).ok();
 
         // Native libraries under `target/` are not read: the package's own JS opens them from
-        // disk with `bun:ffi` (see the `chord` module's `resolveNativeLibrary`).
+        // disk with `bun:ffi` (see the `chord` module's `resolveFfiPath`).
         for dir in ["chords", "js", "bin"] {
             let dir_path = root.join(dir);
             if !dir_path.exists() {
