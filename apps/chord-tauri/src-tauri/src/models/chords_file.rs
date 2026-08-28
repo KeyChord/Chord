@@ -68,8 +68,8 @@ pub struct RawChordsFile {
     pub imports: Vec<ChordsFileImport>,
 }
 
-/// A handler is always a JavaScript module; native code is loaded by the module itself through
-/// `bun:ffi` (see `scripting.md`).
+/// A handler is always a JavaScript module; native code is loaded by the module itself as a
+/// Node-API add-on through `process.dlopen` (see `scripting.md`).
 #[typeshare]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -132,7 +132,7 @@ impl ParsedChordsFile {
                     .get("file")
                     .and_then(|v| v.as_str())
                     .context("handler must have the file key")?;
-                // `kind` predates `bun:ffi`: "js" is accepted for backward compatibility, the
+                // `kind` predates in-process native add-ons: "js" is accepted for compatibility; the
                 // former "native" (a prebuilt library run by a sidecar) is not.
                 if let Some(kind_value) = handler_table.get("kind") {
                     let kind = kind_value
@@ -140,7 +140,7 @@ impl ParsedChordsFile {
                         .with_context(|| format!("handler {key}: kind must be a string"))?;
                     anyhow::ensure!(
                         kind == "js",
-                        "handler {key}: unsupported kind {kind:?}; handlers are JavaScript modules — load native code from the module with `bun:ffi` (see scripting.md)"
+                        "handler {key}: unsupported kind {kind:?}; handlers are JavaScript modules — load native code from the module as a Node-API add-on with `process.dlopen` (see scripting.md)"
                     );
                 }
                 let mut args_vec = Vec::new();
@@ -400,7 +400,7 @@ file = "menu"
         .unwrap_err();
         let message = format!("{error:#}");
         assert!(message.contains("handler menu"), "{message}");
-        assert!(message.contains("bun:ffi"), "{message}");
+        assert!(message.contains("process.dlopen"), "{message}");
     }
 
     #[test]

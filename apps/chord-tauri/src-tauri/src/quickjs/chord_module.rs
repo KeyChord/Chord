@@ -5,7 +5,7 @@ use crate::app::desktop_app::{
 use crate::app::chord_package_manager::{PackageSpecifier, resolve_logical_package_path};
 use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
 use crate::constants::GLOBAL_HOTKEYS_POOL;
-use crate::models::{ShortcutChordAction, SimulatedShortcut, native_library_relpath};
+use crate::models::{ShortcutChordAction, SimulatedShortcut, native_module_relpath};
 use crate::quickjs::AppUserData;
 use llrt_core::libs::json::stringify::json_stringify;
 use llrt_core::libs::utils::result::ResultExt;
@@ -425,17 +425,16 @@ fn resolve_package_file<'js>(
     Ok(root.join(resolved).to_string_lossy().into_owned())
 }
 
-/// `resolveFfiPath(import.meta, "menu")`: the path of the package's prebuilt native
-/// library for this platform. QuickJS has no `bun:ffi` to open it with; the path is still
-/// resolved so packages can report a helpful error (or spawn a helper).
-fn resolve_ffi_path<'js>(
+/// `resolveNativeModulePath(import.meta, "menu")`: the path of the package's prebuilt Node-API
+/// add-on. QuickJS cannot load it, but exposes the same resolver surface as Bun.
+fn resolve_native_module_path<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
     relpath: String,
 ) -> rquickjs::Result<String> {
-    let library_relpath = native_library_relpath(&relpath)
+    let module_relpath = native_module_relpath(&relpath)
         .or_throw_msg(&ctx, "invalid native module relative path")?;
-    resolve_package_file(ctx, meta, library_relpath.to_string_lossy().into_owned())
+    resolve_package_file(ctx, meta, module_relpath.to_string_lossy().into_owned())
 }
 
 impl ModuleDef for ChordModule {
@@ -451,7 +450,7 @@ impl ModuleDef for ChordModule {
         declare.declare("onAppTerminate")?;
         declare.declare("runSudoCommand")?;
         declare.declare("resolvePackageFile")?;
-        declare.declare("resolveFfiPath")?;
+        declare.declare("resolveNativeModulePath")?;
         Ok(())
     }
 
@@ -474,7 +473,10 @@ impl ModuleDef for ChordModule {
         exports.export("onAppTerminate", Func::from(on_app_terminate))?;
         exports.export("runSudoCommand", Func::from(Async(run_sudo_command)))?;
         exports.export("resolvePackageFile", Func::from(resolve_package_file))?;
-        exports.export("resolveFfiPath", Func::from(resolve_ffi_path))?;
+        exports.export(
+            "resolveNativeModulePath",
+            Func::from(resolve_native_module_path),
+        )?;
 
         Ok(())
     }

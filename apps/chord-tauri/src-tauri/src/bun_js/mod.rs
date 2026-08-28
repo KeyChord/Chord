@@ -103,7 +103,7 @@ impl ModuleResolver {
 impl Resolver for ModuleResolver {
     /// Only the built-in `chord` module is resolved here. Package modules are
     /// imported from disk by absolute path, so everything else — relative
-    /// imports between package files, `node:*`, `bun:*` (notably `bun:ffi`),
+    /// imports between package files, `node:*`, `bun:*`,
     /// `node_modules` shipped by a package — falls through to Bun's own
     /// resolution.
     fn resolve<'js>(

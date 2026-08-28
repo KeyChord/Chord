@@ -1,10 +1,8 @@
-//! Layout of a chord package's prebuilt native libraries.
+//! Layout of a chord package's prebuilt Node-API modules.
 //!
-//! Chord never loads these itself: a package's JS handler opens them with `bun:ffi`, and the
-//! `chord` module's `resolveFfiPath(import.meta, relpath)` applies this layout so packages do
-//! not hardcode paths. Anything that produces
-//! `target/<triple>/<dir-relpath>/<filename>/<stem>.<ext>` works (the `@keychord/config` build
-//! tooling does). Example: `src/ffi/menu.swift` -> `target/<triple>/ffi/menu.swift/menu.dylib`.
+//! A package's JS handler loads these through Bun's `process.dlopen`, and the `chord` module's
+//! `resolveNativeModulePath(import.meta, relpath)` applies this layout so packages do not hardcode
+//! target triples. Example: `src/swift/menu/menu.swift` -> `target/<triple>/menu/menu.node`.
 use std::path::{Component, Path, PathBuf};
 
 /// Top-level package directory holding platform-specific native build artifacts.
@@ -14,14 +12,9 @@ pub const NATIVE_TARGET_DIR: &str = "target";
 /// Set by `build.rs` from cargo's `TARGET`.
 pub const NATIVE_TARGET_TRIPLE: &str = env!("CHORD_TARGET_TRIPLE");
 
-#[cfg(target_os = "macos")]
-pub const NATIVE_LIBRARY_EXT: &str = "dylib";
-#[cfg(target_os = "windows")]
-pub const NATIVE_LIBRARY_EXT: &str = "dll";
-#[cfg(all(unix, not(target_os = "macos")))]
-pub const NATIVE_LIBRARY_EXT: &str = "so";
+pub const NATIVE_MODULE_EXT: &str = "node";
 
-/// A module path relative to `target/<triple>/`, e.g. `ffi/menu.swift`.
+/// A module path relative to `target/<triple>/`, e.g. `menu`.
 /// Conservative on purpose: it becomes part of a filesystem path.
 pub fn is_valid_native_module_relpath(relpath: &str) -> bool {
     if relpath.is_empty() || relpath.starts_with('/') || relpath.contains('\\') {
@@ -52,7 +45,7 @@ pub fn is_valid_native_module_relpath(relpath: &str) -> bool {
                 if segment == "." || segment == ".." {
                     return false;
                 }
-                if segment.ends_with(&format!(".{NATIVE_LIBRARY_EXT}")) {
+                if segment.ends_with(&format!(".{NATIVE_MODULE_EXT}")) {
                     return false;
                 }
             }
@@ -62,24 +55,24 @@ pub fn is_valid_native_module_relpath(relpath: &str) -> bool {
     true
 }
 
-fn native_library_stem(relpath: &str) -> Option<&str> {
+fn native_module_stem(relpath: &str) -> Option<&str> {
     Path::new(relpath).file_stem()?.to_str()
 }
 
-/// `target/<triple>/<relpath>/<stem>.<ext>` for this build's triple, relative to the
+/// `target/<triple>/<relpath>/<stem>.node` for this build's triple, relative to the
 /// (logical) package root.
-pub fn native_library_relpath(relpath: &str) -> anyhow::Result<PathBuf> {
+pub fn native_module_relpath(relpath: &str) -> anyhow::Result<PathBuf> {
     anyhow::ensure!(
         is_valid_native_module_relpath(relpath),
-        "invalid native module relpath {relpath:?} (expected e.g. \"ffi/menu.swift\")"
+        "invalid native module relpath {relpath:?} (expected e.g. \"menu\")"
     );
-    let stem = native_library_stem(relpath).ok_or_else(|| {
+    let stem = native_module_stem(relpath).ok_or_else(|| {
         anyhow::anyhow!("invalid native module relpath {relpath:?} (missing filename)")
     })?;
     Ok(PathBuf::from(NATIVE_TARGET_DIR)
         .join(NATIVE_TARGET_TRIPLE)
         .join(relpath)
-        .join(format!("{stem}.{NATIVE_LIBRARY_EXT}")))
+        .join(format!("{stem}.{NATIVE_MODULE_EXT}")))
 }
 
 #[cfg(test)]
@@ -88,31 +81,31 @@ mod tests {
 
     #[test]
     fn accepts_module_relpaths() {
-        assert!(is_valid_native_module_relpath("ffi/menu.swift"));
-        assert!(is_valid_native_module_relpath("ffi/sub/beep.swift"));
+        assert!(is_valid_native_module_relpath("menu"));
+        assert!(is_valid_native_module_relpath("native/beep"));
     }
 
     #[test]
     fn rejects_invalid_relpaths() {
         assert!(!is_valid_native_module_relpath(""));
-        assert!(!is_valid_native_module_relpath("../menu.swift"));
-        assert!(!is_valid_native_module_relpath("ffi/../menu.swift"));
-        assert!(!is_valid_native_module_relpath(".hidden/menu.swift"));
+        assert!(!is_valid_native_module_relpath("../menu"));
+        assert!(!is_valid_native_module_relpath("native/../menu"));
+        assert!(!is_valid_native_module_relpath(".hidden/menu"));
         assert!(!is_valid_native_module_relpath(&format!(
-            "ffi/menu.{NATIVE_LIBRARY_EXT}"
+            "menu.{NATIVE_MODULE_EXT}"
         )));
     }
 
     #[test]
-    fn library_relpath_follows_the_layout() {
-        let path = native_library_relpath("ffi/menu.swift").unwrap();
+    fn module_relpath_follows_the_layout() {
+        let path = native_module_relpath("menu").unwrap();
         assert_eq!(
             path,
             PathBuf::from(format!(
-                "target/{NATIVE_TARGET_TRIPLE}/ffi/menu.swift/menu.{NATIVE_LIBRARY_EXT}"
+                "target/{NATIVE_TARGET_TRIPLE}/menu/menu.{NATIVE_MODULE_EXT}"
             ))
         );
-        assert!(native_library_relpath("../menu.swift").is_err());
+        assert!(native_module_relpath("../menu").is_err());
     }
 
     #[test]

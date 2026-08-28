@@ -30,7 +30,7 @@ path = "src/main.rs"
 [features]
 default = ["bun"]
 # Bun (via rbun) is the default JS engine: it is what lets packages load native
-# code with `bun:ffi`. QuickJS stays selectable at runtime from the settings.
+# code through Node-API add-ons. QuickJS stays selectable at runtime from the settings.
 # Requires the rbun checkout next to this repo with its vendored Bun built:
 # see ../../../../rbun/README.md. `--no-default-features` builds QuickJS only.
 bun = ["dep:rbun"]

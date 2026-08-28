@@ -34,7 +34,7 @@ There can be many owners of Observables (e.g. the AppHandle needs to `.manage` i
 Chord runs JS handlers on Bun by default, embedded through the
 [`rbun`](https://github.com/KeyChord/rbun) crate (checked out next to this
 repo at `../rbun`; cargo feature `bun`, enabled by default). Bun is what lets
-packages load native code with `bun:ffi`. The build links
+packages load native code through Node-API add-ons with `process.dlopen`. The build links
 `libbun_embed.dylib` from the rbun checkout, so build it once:
 
 ```sh
@@ -42,11 +42,11 @@ packages load native code with `bun:ffi`. The build links
 (cd ../rbun && scripts/build-bun.sh)
 
 bun run dev            # Bun engine (default)
-bun run dev:quickjs    # QuickJS-only build (--no-default-features), no bun:ffi
+bun run dev:quickjs    # QuickJS-only build (--no-default-features), no native add-ons
 ```
 
-QuickJS (`rquickjs` + LLRT) is the **legacy** engine, kept for compatibility
-with packages written before `bun:ffi` (it cannot load native code). Select it
+QuickJS (`rquickjs` + LLRT) is the **legacy** engine (it cannot load Node-API
+add-ons). Select it
 in Settings → General → JavaScript Engine (persisted as `jsEngine` in the app
 state store), with `CHORD_JS_ENGINE=bun|quickjs`, or per CLI invocation with
 `chord run --engine quickjs <file>`; the app-level choice takes effect on the
@@ -62,5 +62,5 @@ CHORD_JS_ENGINE=bun target/debug/chord run ./script.ts
 target/debug/chord run --engine quickjs ./script.js   # legacy engine
 ```
 
-(TypeScript and `bun:ffi` need the Bun engine; the QuickJS engine only parses
+(TypeScript and Node-API add-ons need the Bun engine; the QuickJS engine only parses
 plain JavaScript.)

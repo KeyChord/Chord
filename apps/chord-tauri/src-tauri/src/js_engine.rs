@@ -1,5 +1,5 @@
 //! Which JavaScript engine runs chord handlers: Bun (rbun) — the default, and
-//! the engine that gives packages `bun:ffi` for native code — or QuickJS
+//! the engine that can load Node-API add-ons with `process.dlopen` — or QuickJS
 //! (rquickjs + LLRT), the legacy engine, kept for compatibility and used
 //! automatically by a build without the `bun` cargo feature.
 //!

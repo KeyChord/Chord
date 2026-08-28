@@ -17,14 +17,14 @@ const ENGINES = [
 		label: 'Bun',
 		badge: 'Recommended',
 		description:
-			'JavaScriptCore with Bun\'s event loop, module loader and Bun/Node APIs (via rbun). Required by packages that load native code with `bun:ffi`, and faster at everything else.',
+			'JavaScriptCore with Bun\'s event loop, module loader and Bun/Node APIs (via rbun). Required by packages that load NodeSwift add-ons with `process.dlopen`, and faster at everything else.',
 	},
 	{
 		id: 'quickjs',
 		label: 'QuickJS (LLRT)',
 		badge: 'Legacy',
 		description:
-			'rquickjs with the LLRT Node-compatible runtime. Kept for compatibility with older packages; it cannot load native code (`bun:ffi`).',
+			'rquickjs with the LLRT Node-compatible runtime. Kept for older packages; it cannot load Node-API add-ons.',
 	},
 ] as const;
 

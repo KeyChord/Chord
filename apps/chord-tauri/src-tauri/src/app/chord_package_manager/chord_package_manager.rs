@@ -302,8 +302,8 @@ impl ChordPackageManager {
             let use_bun = false;
 
             let handler_id = if use_bun {
-                // Bun imports the module from disk, so `import.meta` and `bun:ffi` see the
-                // package directory.
+                // Bun imports the module from disk, so `import.meta` and native module resolution
+                // see the package directory.
                 let Some(module_path) = js_package.resolve_file_path(&pathslug, &file)? else {
                     anyhow::bail!("file {} not found in js package {}", file, js_package.name);
                 };

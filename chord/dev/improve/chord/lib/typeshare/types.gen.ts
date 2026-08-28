@@ -100,8 +100,8 @@ export interface ChordJsPackage {
 }
 
 /**
- * A handler is always a JavaScript module; native code is loaded by the module itself through
- * `bun:ffi` (see `scripting.md`).
+ * A handler is always a JavaScript module; native code is loaded by the module itself as a
+ * Node-API add-on through `process.dlopen` (see `scripting.md`).
  */
 export interface ChordsFileHandler {
 	/** A path inside `js/` (e.g. `menu.js`). */

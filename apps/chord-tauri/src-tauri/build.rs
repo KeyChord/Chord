@@ -1,6 +1,6 @@
 fn main() {
-    // Packages keep prebuilt native libraries under `target/<triple>/...`; the `chord`
-    // module's `resolveFfiPath` needs the app's own triple to pick the right subtree.
+    // Packages keep prebuilt Node-API modules under `target/<triple>/...`; the `chord`
+    // module's `resolveNativeModulePath` needs the app's triple to pick the right subtree.
     println!(
         "cargo:rustc-env=CHORD_TARGET_TRIPLE={}",
         std::env::var("TARGET").expect("cargo sets TARGET")

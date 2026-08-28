@@ -9,7 +9,7 @@ use crate::bun_js::lifecycle::{
 };
 use crate::app::chord_package_manager::resolve_logical_package_path;
 use crate::constants::GLOBAL_HOTKEYS_POOL;
-use crate::models::{ShortcutChordAction, SimulatedShortcut, native_library_relpath};
+use crate::models::{ShortcutChordAction, SimulatedShortcut, native_module_relpath};
 #[cfg(target_os = "macos")]
 use osakit::{Language as OsaLanguage, Script as OsaScript};
 use rbun::prelude::*;
@@ -426,17 +426,16 @@ fn resolve_package_file<'js>(
     Ok(root.join(resolved).to_string_lossy().into_owned())
 }
 
-/// `resolveFfiPath(import.meta, "menu")`: the absolute path of the package's prebuilt
-/// native library `target/<this triple>/menu/menu.<dylib|so|dll>`, ready for
-/// `dlopen` from `bun:ffi`.
-fn resolve_ffi_path<'js>(
+/// `resolveNativeModulePath(import.meta, "menu")`: the absolute path of the package's prebuilt
+/// Node-API add-on `target/<this triple>/menu/menu.node`, ready for `process.dlopen`.
+fn resolve_native_module_path<'js>(
     ctx: Ctx<'js>,
     meta: Object<'js>,
     relpath: String,
 ) -> rbun::Result<String> {
-    let library_relpath = native_library_relpath(&relpath)
+    let module_relpath = native_module_relpath(&relpath)
         .or_throw_msg(&ctx, "invalid native module relative path")?;
-    resolve_package_file(ctx, meta, library_relpath.to_string_lossy().into_owned())
+    resolve_package_file(ctx, meta, module_relpath.to_string_lossy().into_owned())
 }
 
 impl ModuleDef for ChordModule {
@@ -452,7 +451,7 @@ impl ModuleDef for ChordModule {
         declare.declare("onAppTerminate")?;
         declare.declare("runSudoCommand")?;
         declare.declare("resolvePackageFile")?;
-        declare.declare("resolveFfiPath")?;
+        declare.declare("resolveNativeModulePath")?;
         Ok(())
     }
 
@@ -475,7 +474,10 @@ impl ModuleDef for ChordModule {
         exports.export("onAppTerminate", Func::from(on_app_terminate))?;
         exports.export("runSudoCommand", Func::from(Async(run_sudo_command)))?;
         exports.export("resolvePackageFile", Func::from(resolve_package_file))?;
-        exports.export("resolveFfiPath", Func::from(resolve_ffi_path))?;
+        exports.export(
+            "resolveNativeModulePath",
+            Func::from(resolve_native_module_path),
+        )?;
 
         Ok(())
     }

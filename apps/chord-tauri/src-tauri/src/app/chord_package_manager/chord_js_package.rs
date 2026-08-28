@@ -18,7 +18,7 @@ pub struct ChordJsPackage {
     files: HashMap<FilePathslug, String>,
     /// Where the package lives on disk. Not serialized: the frontend must not learn install
     /// paths. The Bun engine imports modules straight from here so `import.meta.dir` is real
-    /// and `bun:ffi` can open sibling libraries.
+    /// and Node-API add-ons can be resolved beside the package.
     #[serde(skip)]
     #[typeshare(skip)]
     root: PathBuf,
@@ -204,8 +204,8 @@ impl ChordJsPackageBuilder {
 
     /// Bun engine: modules are imported from disk by absolute path when a handler is
     /// registered, so nothing is declared up front. Bun caches modules by path, so every
-    /// file of the package is evicted first and a reload re-reads edited sources (a `bun:ffi`
-    /// library that was already opened stays loaded until Chord restarts).
+    /// file of the package is evicted first and a reload re-reads edited sources (a Node-API
+    /// add-on that was already opened stays loaded until Chord restarts).
     #[cfg(feature = "bun")]
     async fn load_bun(self, files: HashMap<FilePathslug, String>) -> Result<ChordJsPackage> {
         use crate::bun_js::with_js;
@@ -280,31 +280,31 @@ mod tests {
     fn logical_paths_of_the_package_itself_are_unchanged() {
         let resolved = resolve_logical_package_path(
             Path::new("js/menu.js"),
-            Path::new("target/t/ffi/menu.swift/menu.dylib"),
+            Path::new("target/t/menu/menu.node"),
         )
         .unwrap();
-        assert_eq!(
-            resolved,
-            PathBuf::from("target/t/ffi/menu.swift/menu.dylib")
-        );
+        assert_eq!(resolved, PathBuf::from("target/t/menu/menu.node"));
     }
 
     #[test]
     fn logical_paths_of_vendored_packages_are_remapped() {
         let resolved = resolve_logical_package_path(
             Path::new("js/@keychord/chords-menu/js/menu.js"),
-            Path::new("target/t/ffi/menu.swift/menu.dylib"),
+            Path::new("target/t/menu/menu.node"),
         )
         .unwrap();
         assert_eq!(
             resolved,
-            PathBuf::from("target/@keychord/chords-menu/target/t/ffi/menu.swift/menu.dylib")
+            PathBuf::from("target/@keychord/chords-menu/target/t/menu/menu.node")
         );
     }
 
     #[test]
     fn logical_paths_cannot_escape_the_package() {
         assert!(resolve_logical_package_path(Path::new("js/menu.js"), Path::new("../x")).is_err());
-        assert!(resolve_logical_package_path(Path::new("js/menu.js"), Path::new("/etc/passwd")).is_err());
+        assert!(
+            resolve_logical_package_path(Path::new("js/menu.js"), Path::new("/etc/passwd"))
+                .is_err()
+        );
     }
 }
