@@ -4,10 +4,10 @@ name: release
 # release. Assets are replaced in place, so the download URLs and the updater
 # endpoint are stable.
 #
-# Signing: the Apple / Tauri signing steps activate only when their secrets are
-# present. Until then the app is ad-hoc signed and users must right-click -> Open
-# on first launch. Adding the secrets is the only change needed to upgrade to a
-# fully signed + notarized release.
+# Signing: each Apple / Tauri signing step is gated on its secret (these live at
+# the org level). With them present the build is Developer ID signed and
+# notarized; without one it degrades to an ad-hoc signed build rather than
+# failing.
 
 on:
   workflow_dispatch:
@@ -253,6 +253,15 @@ jobs:
             tar -czf "$out/Chord-$suffix.app.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
           fi
 
+          # spctl only exists on macOS, so record the Gatekeeper verdict here for
+          # the ubuntu publish job to read.
+          if spctl -a -vv "$app" 2>&1 | grep -qi notarized; then
+            echo notarized > "$out/gatekeeper.txt"
+          else
+            echo unsigned > "$out/gatekeeper.txt"
+          fi
+          cat "$out/gatekeeper.txt"
+
           ls -la "$out"
           echo "dir=$out" >> "$GITHUB_OUTPUT"
 
@@ -282,7 +291,16 @@ jobs:
           set -euo pipefail
           ls -la assets
           short="${GITHUB_SHA:0:7}"
-          notes="Automatic build from \`main\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. This build is not notarized yet — on first launch, right-click the app and choose **Open**."
+          # Say which it is rather than hardcoding a claim: the signing steps are
+          # secret-gated, so an unsigned build is possible if a secret is removed.
+          # The verdict comes from the macOS build job (spctl is not on ubuntu).
+          if grep -qx notarized assets/gatekeeper.txt 2>/dev/null; then
+            gatekeeper="Signed and notarized — just open it."
+          else
+            gatekeeper="This build is not notarized; on first launch, right-click the app and choose **Open**."
+          fi
+          rm -f assets/gatekeeper.txt
+          notes="Automatic build from \`main\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. $gatekeeper"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release edit "$RELEASE_TAG" --notes "$notes" --prerelease --latest=false

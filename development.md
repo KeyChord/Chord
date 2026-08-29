@@ -39,7 +39,7 @@ packages load native code through Node-API add-ons with `process.dlopen`. The bu
 
 ```sh
 # one-time: build Bun and libbun_embed.dylib in the rbun checkout (~20 min cold)
-(cd ../rbun && scripts/build-bun.sh)
+(cd ../rbun && bun install && bun dev/improve/rbun/configs/bun/build/_build-bun.ts)
 
 bun run dev            # Bun engine (default)
 bun run dev:quickjs    # QuickJS-only build (--no-default-features), no native add-ons
@@ -64,3 +64,38 @@ target/debug/chord run --engine quickjs ./script.js   # legacy engine
 
 (TypeScript and Node-API add-ons need the Bun engine; the QuickJS engine only parses
 plain JavaScript.)
+
+## Releases
+
+Every push to `main` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml), which
+builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling
+[`nightly`](https://github.com/KeyChord/Chord/releases/tag/nightly) prerelease. Asset names carry the
+version, short commit, and architecture, and each run replaces the previous assets, so the download
+URLs stay stable.
+
+CI cannot build the vendored Bun itself — that takes ~30 minutes. Instead
+[`KeyChord/rbun`](https://github.com/KeyChord/rbun) builds `libbun_embed.dylib` once per Bun source
+commit and publishes it as a `bun-embed-<sha>` release asset; Chord's workflow downloads it and
+points the build at it with `RBUN_BUN_LIB_DIR` plus a generated overlay config that overrides
+`bundle.macOS.frameworks`. Both repos are checked out side by side so that the relative `rbun` path
+in `Cargo.toml` resolves — the dylib satisfies the linker, but cargo still needs rbun's source
+manifest. After bumping the Bun submodule in rbun, let its `build-bun-embed` workflow finish before
+the next Chord release build.
+
+### Code signing
+
+Release builds are signed with the Developer ID certificate and notarized: `spctl -a -vv` on a
+downloaded `.dmg` reports `source=Notarized Developer ID`, so the app opens by double-click with no
+Gatekeeper prompt. The secrets below live at the organization level (they do not appear in
+`gh secret list`, which shows only repository secrets). Each signing step is individually gated on
+its secret, so the workflow still produces an ad-hoc signed build if one is ever removed.
+
+| Secret | Effect |
+| --- | --- |
+| `APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64`, `APPLE_DEVELOPER_CERTIFICATE_PASSWORD` | Signs with a Developer ID certificate instead of ad-hoc |
+| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarizes and staples the bundle |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater artifact the in-app updater consumes |
+
+The updater artifact is only built when `TAURI_SIGNING_PRIVATE_KEY` is set: Tauri fails the build if
+an updater bundle is requested while `plugins.updater.pubkey` is configured without a private key.
+Generate the keypair with `bun tauri signer generate -w ~/.tauri/chord.key`.
