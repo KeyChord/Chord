@@ -1,0 +1,245 @@
+name: release
+
+# Every push to main publishes a downloadable build to the rolling `nightly`
+# release. Assets are replaced in place, so the download URLs and the updater
+# endpoint are stable.
+#
+# Signing: the Apple / Tauri signing steps activate only when their secrets are
+# present. Until then the app is ad-hoc signed and users must right-click -> Open
+# on first launch. Adding the secrets is the only change needed to upgrade to a
+# fully signed + notarized release.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RELEASE_TAG: nightly
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: aarch64
+            target: aarch64-apple-darwin
+          - runner: macos-15-intel
+            arch: x86_64
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+    env:
+      # `secrets` is not available in step-level `if:`, but `env` is.
+      APPLE_CERT_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup node
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+
+      - name: Setup proto toolchain
+        uses: moonrepo/setup-toolchain@v0
+        with:
+          proto-version: 0.61.1
+          auto-install: true
+
+      - name: Add rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/chord-tauri/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      # The `bun` cargo feature links libbun_embed.dylib from the sibling rbun
+      # checkout, which does not exist on CI. Pull the prebuilt dylib that
+      # KeyChord/rbun publishes for this architecture instead.
+      - name: Download libbun_embed
+        id: bunlib
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/bun-embed"
+          mkdir -p "$dir"
+          asset="libbun_embed-${{ matrix.target }}.dylib"
+          tag="$(gh release list -R KeyChord/rbun --limit 100 \
+                  --json tagName --jq '.[].tagName | select(startswith("bun-embed-"))' \
+                | head -n1)"
+          if [ -z "$tag" ]; then
+            echo "::error::no bun-embed release found in KeyChord/rbun; run its build-bun-embed workflow first"
+            exit 1
+          fi
+          echo "using $tag / $asset"
+          gh release download "$tag" -R KeyChord/rbun --pattern "$asset" --dir "$dir" --clobber
+          mv "$dir/$asset" "$dir/libbun_embed.dylib"
+          lipo -info "$dir/libbun_embed.dylib"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # tauri.conf.json points `bundle.macOS.frameworks` at the local rbun
+      # checkout. Emit an overlay config pointing at the downloaded dylib, and
+      # stamp the version so each nightly build is identifiable.
+      - name: Build CI tauri config
+        id: cfg
+        run: |
+          set -euo pipefail
+          version="$(bun -e 'console.log(JSON.parse(await Bun.file("apps/chord-tauri/src-tauri/tauri.conf.json").text()).version)')"
+          short="${GITHUB_SHA:0:7}"
+          cfg="apps/chord-tauri/src-tauri/tauri.ci.conf.json"
+          bun -e '
+            const dylib = process.argv[1] + "/libbun_embed.dylib";
+            await Bun.write(process.argv[2], JSON.stringify({
+              bundle: { macOS: { frameworks: [dylib], signingIdentity: "-" } },
+            }, null, 2));
+          ' "${{ steps.bunlib.outputs.dir }}" "$cfg"
+          cat "$cfg"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          echo "config=src-tauri/tauri.ci.conf.json" >> "$GITHUB_OUTPUT"
+
+      - name: Import Apple certificate
+        id: cert
+        if: ${{ env.APPLE_CERT_B64 != '' }}
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
+          p12-password: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+
+      - name: Resolve signing identity
+        id: signing
+        run: |
+          set -euo pipefail
+          if [ -n "${APPLE_CERT_B64:-}" ]; then
+            id="$(security find-identity -v -p codesigning signing_temp.keychain \
+                  | grep "Developer ID Application" | head -n1 | awk -F'"' '{print $2}')"
+            echo "identity=$id" >> "$GITHUB_OUTPUT"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no Apple certificate secret; ad-hoc signing"
+            echo "identity=-" >> "$GITHUB_OUTPUT"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Select bundle targets
+        id: bundles
+        env:
+          UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          # tauri hard-errors when an Updater-type bundle is requested while
+          # `plugins.updater.pubkey` is set but TAURI_SIGNING_PRIVATE_KEY is not
+          # ("A public key has been found, but no private key"). Building only
+          # dmg+app skips updater signing entirely, so the unsigned path works.
+          if [ -n "${UPDATER_KEY:-}" ]; then
+            echo "bundles=dmg,app,updater" >> "$GITHUB_OUTPUT"
+          else
+            echo "no updater signing key; building dmg,app only"
+            echo "bundles=dmg,app" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build Tauri app
+        working-directory: apps/chord-tauri
+        env:
+          RBUN_BUN_LIB_DIR: ${{ steps.bunlib.outputs.dir }}
+          APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.identity }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          bun tauri build \
+            --target ${{ matrix.target }} \
+            --config ${{ steps.cfg.outputs.config }} \
+            --bundles ${{ steps.bundles.outputs.bundles }}
+
+      - name: Stage assets
+        id: stage
+        run: |
+          set -euo pipefail
+          bundle="apps/chord-tauri/src-tauri/target/${{ matrix.target }}/release/bundle"
+          out="$RUNNER_TEMP/release-assets"
+          mkdir -p "$out"
+          suffix="${{ steps.cfg.outputs.version }}-${{ steps.cfg.outputs.short }}-${{ matrix.arch }}"
+
+          dmg="$(find "$bundle/dmg" -maxdepth 1 -name '*.dmg' | head -n1)"
+          test -n "$dmg" || { echo "::error::no .dmg produced"; exit 1; }
+          cp "$dmg" "$out/Chord-$suffix.dmg"
+
+          app="$(find "$bundle/macos" -maxdepth 1 -name '*.app' | head -n1)"
+          test -n "$app" || { echo "::error::no .app produced"; exit 1; }
+          # Sanity-check that the embedded Bun runtime actually shipped.
+          test -f "$app/Contents/Frameworks/libbun_embed.dylib" \
+            || { echo "::error::libbun_embed.dylib missing from bundle"; exit 1; }
+
+          # When the updater bundle ran it already produced a signed archive;
+          # reuse it so the archive and its .sig stay a matched pair. Otherwise
+          # roll our own plain archive of the .app.
+          updater="$(find "$bundle/macos" -maxdepth 1 -name '*.app.tar.gz' | head -n1)"
+          if [ -n "$updater" ]; then
+            cp "$updater" "$out/Chord-$suffix.app.tar.gz"
+            [ -e "$updater.sig" ] && cp "$updater.sig" "$out/Chord-$suffix.app.tar.gz.sig"
+          else
+            tar -czf "$out/Chord-$suffix.app.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+          fi
+
+          ls -la "$out"
+          echo "dir=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chord-${{ matrix.arch }}
+          path: ${{ steps.stage.outputs.dir }}/*
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Publish rolling release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ls -la assets
+          short="${GITHUB_SHA:0:7}"
+          notes="Automatic build from \`main\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. This build is not notarized yet — on first launch, right-click the app and choose **Open**."
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes "$notes" --prerelease --latest=false
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "Chord (latest from main)" \
+              --notes "$notes" \
+              --prerelease
+          fi
+          # `--clobber` replaces the previous build's assets in place.
+          gh release upload "$RELEASE_TAG" assets/* --clobber
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
