@@ -1,14 +1,12 @@
 {
-  "name": "@-/chord-monorepo",
+  "name": "@-/chord",
   "version": "0.1.0-alpha.3",
   "private": true,
   "type": "module",
-  "workspaces": {
-    "packages": [
-      "apps/*",
-      "chord/**"
-    ]
-  },
+  "workspaces": [
+    "apps/*",
+    "chord/**"
+  ],
   "scripts": {
     "dev": "vp exec _dev",
     "build": "bun --filter chord-tauri build",

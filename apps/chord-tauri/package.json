@@ -28,6 +28,7 @@
 		"@chord/com.npmjs.sonner": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
+		"@tanstack/react-router": "npm:@chord/com.npmjs.tanstack__react-router@*",
 		"@chord/com.npmjs.utils-cn": "workspace:*",
 		"@chord/dev.improve.chord.routes.chords.index": "workspace:*",
 		"@chord/dev.improve.chord.routes": "workspace:*",

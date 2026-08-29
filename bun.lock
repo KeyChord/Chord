@@ -152,6 +152,7 @@
         "@headless-tree/core": "^1.7.0",
         "@headless-tree/react": "^1.7.0",
         "@mittwald/react-use-promise": "^4.2.2",
+        "@tanstack/react-router": "npm:@chord/com.npmjs.tanstack__react-router@*",
         "@tauri-apps/api": "^2.11.1",
         "@tauri-apps/plugin-autostart": "^2.5.1",
         "@tauri-apps/plugin-global-shortcut": "^2.3.2",
