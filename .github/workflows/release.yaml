@@ -303,9 +303,15 @@ jobs:
           notes="Automatic build from \`main\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. $gatekeeper"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            # Move the rolling tag onto this commit, then refresh the release.
+            git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
+            git push -f origin "refs/tags/$RELEASE_TAG"
             gh release edit "$RELEASE_TAG" --notes "$notes" --prerelease --latest=false
           else
+            # Pin the tag to the commit that was actually built rather than
+            # whatever the default branch points at by the time this runs.
             gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
               --title "Chord (latest from main)" \
               --notes "$notes" \
               --prerelease
