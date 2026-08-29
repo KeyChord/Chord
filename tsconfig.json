@@ -1,8 +1,24 @@
 {
   "compilerOptions": {
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "target": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "strict": true
   },
   "include": ["apps/**/*", "chord/**/*"],
+  // `target/` holds Rust/CMake build output, including CMake's
+  // `compiler_depend.ts` dependency stubs, which are not TypeScript.
+  "exclude": ["**/target/**", "**/dist/**", "**/node_modules/**"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
