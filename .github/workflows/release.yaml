@@ -75,11 +75,21 @@ jobs:
           dir="$RUNNER_TEMP/bun-embed"
           mkdir -p "$dir"
           asset="libbun_embed-${{ matrix.target }}.dylib"
-          tag="$(gh release list -R KeyChord/rbun --limit 100 \
-                  --json tagName --jq '.[].tagName | select(startswith("bun-embed-"))' \
-                | head -n1)"
+          # Newest bun-embed release that actually carries this arch's asset:
+          # the two matrix legs publish independently, so the newest tag may
+          # briefly have only one of them.
+          tag=""
+          for candidate in $(gh release list -R KeyChord/rbun --limit 100 \
+                --order desc --json tagName,createdAt \
+                --jq 'sort_by(.createdAt) | reverse | .[].tagName | select(startswith("bun-embed-"))'); do
+            if gh release view "$candidate" -R KeyChord/rbun --json assets \
+                 --jq '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+              tag="$candidate"
+              break
+            fi
+          done
           if [ -z "$tag" ]; then
-            echo "::error::no bun-embed release found in KeyChord/rbun; run its build-bun-embed workflow first"
+            echo "::error::no bun-embed release in KeyChord/rbun provides $asset; run its build-bun-embed workflow first"
             exit 1
           fi
           echo "using $tag / $asset"
