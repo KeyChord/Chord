@@ -66,14 +66,36 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Setup proto toolchain
-        uses: moonrepo/setup-toolchain@v0
-        with:
-          proto-version: 0.61.1
-          auto-install: true
+      # setup-toolchain runs `proto install` at the workspace root, which no
+      # longer holds `.prototools` now that Chord is checked out one level down,
+      # and it has no working-directory input. Install the two pinned tools
+      # directly instead: the versions come from `.prototools` and
+      # `rust-toolchain.toml`.
+      - name: Read pinned bun version
+        id: tools
+        working-directory: .
+        run: |
+          set -euo pipefail
+          # setup-bun cannot read .prototools, so parse the pin out of it and
+          # keep .prototools the single source of truth.
+          v="$(sed -n 's/^bun[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' Chord/.prototools)"
+          test -n "$v" || { echo "::error::no bun pin in .prototools"; exit 1; }
+          echo "bun=$v" >> "$GITHUB_OUTPUT"
+          echo "bun $v"
 
-      - name: Add rust target
-        run: rustup target add ${{ matrix.target }}
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ steps.tools.outputs.bun }}
+
+      - name: Setup rust
+        run: |
+          set -euo pipefail
+          # rust-toolchain.toml pins the channel and targets; rustup honours it
+          # automatically for every cargo invocation inside the repo.
+          rustup show active-toolchain || rustup toolchain install
+          rustup target add ${{ matrix.target }}
+          rustc --version
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
