@@ -206,7 +206,9 @@ jobs:
           updater="$(find "$bundle/macos" -maxdepth 1 -name '*.app.tar.gz' | head -n1)"
           if [ -n "$updater" ]; then
             cp "$updater" "$out/Chord-$suffix.app.tar.gz"
-            [ -e "$updater.sig" ] && cp "$updater.sig" "$out/Chord-$suffix.app.tar.gz.sig"
+            if [ -e "$updater.sig" ]; then
+              cp "$updater.sig" "$out/Chord-$suffix.app.tar.gz.sig"
+            fi
           else
             tar -czf "$out/Chord-$suffix.app.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
           fi
