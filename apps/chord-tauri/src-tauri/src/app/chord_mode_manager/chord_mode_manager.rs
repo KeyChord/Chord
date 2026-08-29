@@ -21,7 +21,7 @@ pub struct ChordModeManager {
 
 impl ChordModeManager {
     pub(super) fn init(&self) -> Result<()> {
-        self.panel.init();
+        self.panel.init()?;
 
         let surface_window = self.panel.get_or_create_window()?;
         let surface_handle = self.handle.clone();
