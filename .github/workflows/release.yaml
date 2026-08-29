@@ -228,7 +228,7 @@ jobs:
           bundle="apps/chord-tauri/src-tauri/target/${{ matrix.target }}/release/bundle"
           out="$RUNNER_TEMP/release-assets"
           mkdir -p "$out"
-          suffix="${{ steps.cfg.outputs.version }}-${{ steps.cfg.outputs.short }}-${{ matrix.arch }}"
+          suffix="${{ matrix.arch }}"
 
           dmg="$(find "$bundle/dmg" -maxdepth 1 -name '*.dmg' | head -n1)"
           test -n "$dmg" || { echo "::error::no .dmg produced"; exit 1; }
@@ -316,6 +316,18 @@ jobs:
               --notes "$notes" \
               --prerelease
           fi
-          # `--clobber` replaces the previous build's assets in place.
+          # `--clobber` replaces the previous build's assets in place. Names are
+          # commit-free, so the download URLs are stable across releases.
           gh release upload "$RELEASE_TAG" assets/* --clobber
+
+          # Delete anything left from an older naming scheme; otherwise the
+          # release accumulates a stale set of assets on every push.
+          keep="$(cd assets && ls)"
+          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' \
+            | while read -r existing; do
+                if ! grep -qxF "$existing" <<<"$keep"; then
+                  echo "removing stale asset $existing"
+                  gh release delete-asset "$RELEASE_TAG" "$existing" --yes
+                fi
+              done
           gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
