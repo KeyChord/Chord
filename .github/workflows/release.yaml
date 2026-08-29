@@ -40,8 +40,26 @@ jobs:
     env:
       # `secrets` is not available in step-level `if:`, but `env` is.
       APPLE_CERT_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
+    defaults:
+      run:
+        working-directory: Chord
     steps:
+      # Both repos are checked out side by side under GITHUB_WORKSPACE, because
+      # `Cargo.toml` depends on rbun by relative path: from
+      # `Chord/apps/chord-tauri/src-tauri`, `../../../../rbun` resolves to the
+      # sibling `rbun` directory here. checkout refuses a `path` outside the
+      # workspace, so nesting Chord one level down is what makes that line up.
+      # The prebuilt dylib downloaded below only satisfies the *linker*; cargo
+      # still needs rbun's source manifest to resolve the dependency at all.
       - uses: actions/checkout@v6
+        with:
+          path: Chord
+
+      - name: Checkout rbun
+        uses: actions/checkout@v6
+        with:
+          repository: KeyChord/rbun
+          path: rbun
 
       - name: Setup node
         uses: actions/setup-node@v6
@@ -60,7 +78,7 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: apps/chord-tauri/src-tauri -> target
+          workspaces: Chord/apps/chord-tauri/src-tauri -> target
           key: ${{ matrix.target }}
 
       # The `bun` cargo feature links libbun_embed.dylib from the sibling rbun
@@ -163,7 +181,7 @@ jobs:
           fi
 
       - name: Build Tauri app
-        working-directory: apps/chord-tauri
+        working-directory: Chord/apps/chord-tauri
         env:
           RBUN_BUN_LIB_DIR: ${{ steps.bunlib.outputs.dir }}
           APPLE_SIGNING_IDENTITY: ${{ steps.signing.outputs.identity }}
