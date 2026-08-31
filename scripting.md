@@ -219,7 +219,7 @@ chord run scripts/run.ts by-letters f     # from the chords-menu checkout
 ## Troubleshooting
 
 - `process.dlopen` failures name the missing file or Node-API registration problem; check that the add-on and `libNodeAPI.dylib` under `target/<your triple>/` were built and committed and that the `#NodeModule` export names match the TypeScript binding.
-- Node-API add-ons need the Bun engine (the default). With the legacy QuickJS engine selected in Settings → General → JavaScript Engine, loading the add-on fails.
+- Node-API add-ons run in Chord's embedded Bun runtime; check that the add-on targets Bun's supported Node-API surface.
 - Accessibility calls inherit Chord's Accessibility permission—grant it to Chord.
 - Native crashes crash Chord: run the handler from the CLI first while developing.
 
@@ -227,4 +227,4 @@ chord run scripts/run.ts by-letters f     # from the chords-menu checkout
 
 ### Why Bun rather than a lighter runtime?
 
-Chord started on QuickJS, which remains selectable as the legacy engine. Bun brings JavaScriptCore's JIT and Node/Bun APIs, including the Node-API loader used by NodeSwift add-ons. Bun has no official embedding API, so Chord embeds it through the [`rbun`](https://github.com/KeyChord/rbun) crate, which exposes an rquickjs-shaped Rust API (and the custom `chord` module) over a lightly patched Bun runtime.
+Bun brings JavaScriptCore's JIT and Node/Bun APIs, including the Node-API loader used by NodeSwift add-ons. Bun has no official embedding API, so Chord embeds a lightly patched Bun runtime through the [`rbun`](https://github.com/KeyChord/rbun) crate and exposes the custom `chord` module to scripts.

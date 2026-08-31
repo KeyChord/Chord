@@ -1,13 +1,12 @@
-//! The `chord` built-in module for the Bun engine — the same surface as
-//! [`crate::quickjs::chord_module`], written against `rbun`.
+//! The `chord` built-in module exposed by the embedded Bun runtime.
 
 use crate::app::AppHandleExt;
+use crate::app::chord_package_manager::resolve_logical_package_path;
 use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
 use crate::bun_js::AppUserData;
 use crate::bun_js::lifecycle::{
     init_app_lifecycle, register_app_launch_handler, register_app_terminate_handler,
 };
-use crate::app::chord_package_manager::resolve_logical_package_path;
 use crate::constants::GLOBAL_HOTKEYS_POOL;
 use crate::models::{ShortcutChordAction, SimulatedShortcut, native_module_relpath};
 #[cfg(target_os = "macos")]
@@ -301,11 +300,7 @@ fn register_global_hotkey(
     Ok(Some(shortcut))
 }
 
-fn set_app_needs_relaunch(
-    ctx: Ctx,
-    bundle_id: String,
-    needs_relaunch: bool,
-) -> rbun::Result<()> {
+fn set_app_needs_relaunch(ctx: Ctx, bundle_id: String, needs_relaunch: bool) -> rbun::Result<()> {
     let handle = app_handle(&ctx)?;
     let desktop_app_manager = handle.app_state().desktop_app_manager();
     desktop_app_manager

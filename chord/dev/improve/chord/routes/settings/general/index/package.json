@@ -10,7 +10,6 @@
 	},
 	"dependencies": {
 		"@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.js-engine-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",

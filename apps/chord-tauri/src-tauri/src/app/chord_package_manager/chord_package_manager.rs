@@ -6,16 +6,13 @@ use crate::models::{
     ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile,
     CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
 };
-use crate::quickjs::{format_js_error, with_js};
 use crate::state::{
     ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable, Observable,
 };
 use anyhow::{Context, Result};
-use llrt_core::libs::utils::result::ResultExt;
 use nject::{inject, injectable};
 use ordermap::OrderMap;
 use parking_lot::{Mutex, RwLock};
-use rquickjs::{Module, Object, Value, function::Args};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -293,48 +290,25 @@ impl ChordPackageManager {
                 .context("failed to get pathslug as str")?
                 .map(|p| p.to_string().replace("/", "."));
             let Some(js_package) = js_package else {
-                anyhow::bail!("handler {event}: a JS package (js/ directory) must be present when defining a JS handler")
-            };
-
-            #[cfg(feature = "bun")]
-            let use_bun = crate::js_engine::select(&handle) == crate::js_engine::JsEngine::Bun;
-            #[cfg(not(feature = "bun"))]
-            let use_bun = false;
-
-            let handler_id = if use_bun {
-                // Bun imports the module from disk, so `import.meta` and native module resolution
-                // see the package directory.
-                let Some(module_path) = js_package.resolve_file_path(&pathslug, &file)? else {
-                    anyhow::bail!("file {} not found in js package {}", file, js_package.name);
-                };
-                #[cfg(feature = "bun")]
-                {
-                    bun_handlers::register_handler(
-                        handle.clone(),
-                        module_path.to_string_lossy().into_owned(),
-                        raw,
-                        pathslug_string,
-                        bundle_id,
-                        build_args,
-                    )
-                    .await?
-                }
-                #[cfg(not(feature = "bun"))]
-                unreachable!()
-            } else {
-                let Some(module_specifier) = js_package.resolve_file(&pathslug, &file)? else {
-                    anyhow::bail!("file {} not found in js package {}", file, js_package.name);
-                };
-                Self::register_quickjs_handler(
-                    handle.clone(),
-                    module_specifier,
-                    raw,
-                    pathslug_string,
-                    bundle_id,
-                    build_args,
+                anyhow::bail!(
+                    "handler {event}: a JS package (js/ directory) must be present when defining a JS handler"
                 )
-                .await?
             };
+
+            // Bun imports the module from disk, so `import.meta` and native module resolution
+            // see the package directory.
+            let Some(module_path) = js_package.resolve_file_path(&pathslug, &file)? else {
+                anyhow::bail!("file {} not found in js package {}", file, js_package.name);
+            };
+            let handler_id = bun_handlers::register_handler(
+                handle.clone(),
+                module_path.to_string_lossy().into_owned(),
+                raw,
+                pathslug_string,
+                bundle_id,
+                build_args,
+            )
+            .await?;
 
             handlers.push(CompiledChordsFileHandler {
                 event: event.clone(),
@@ -427,113 +401,16 @@ impl ChordPackageManager {
     }
 }
 
-impl ChordPackageManager {
-    /// QuickJS: import the handler module, call its default export with the
-    /// build context and register the returned handler function.
-    async fn register_quickjs_handler(
-        handle: AppHandle,
-        module_specifier: String,
-        raw: serde_json::Value,
-        pathslug_string: String,
-        bundle_id: Option<String>,
-        build_args: Vec<toml::Value>,
-    ) -> Result<String> {
-        let handler_id = with_js(handle.clone(), move |ctx| {
-                Box::pin(async move {
-                    async {
-                        let module_promise = Module::import(&ctx, module_specifier)?;
-                        let module = module_promise.into_future::<Object>().await?;
-                        let mut export: Value = module.get("default")?;
-
-                        if let Some(promise) = export.as_promise().cloned() {
-                            export = promise.into_future::<Value>().await?;
-                        }
-
-                        let build_handler_function = export.as_function().cloned().or_throw_msg(
-                            &ctx,
-                            &format!(
-                                "JS default export did not resolve to a function: {:?}",
-                                export
-                            ),
-                        )?;
-
-                        let build_context = Object::new(ctx.clone())?;
-                        build_context.set(
-                            "chordsFile",
-                            rquickjs_serde::to_value(ctx.clone(), raw)
-                                .or_throw_msg(&ctx, "failed to parse chords file")?,
-                        )?;
-                        build_context.set(
-                            "chordsFilePath",
-                            rquickjs_serde::to_value(ctx.clone(), pathslug_string)
-                                .or_throw_msg(&ctx, "failed to parse chords file pathslug")?,
-                        )?;
-                        build_context.set(
-                            "chordsFileAppId",
-                            rquickjs_serde::to_value(ctx.clone(), bundle_id)
-                                .or_throw_msg(&ctx, "failed to parse chords file app ID")?,
-                        )?;
-
-                        let mut args = Args::new(ctx.clone(), build_args.len());
-                        args.this(build_context)?;
-                        log::debug!("calling build_handler with args {:?}", build_args);
-
-                        let js_args = build_args
-                            .into_iter()
-                            .map(|value| {
-                                rquickjs_serde::to_value(ctx.clone(), value)
-                                    .or_throw_msg(&ctx, "failed to convert event TOML arguments")
-                            })
-                            .collect::<rquickjs::Result<Vec<_>>>()?;
-
-                        for value in js_args {
-                            args.push_arg(value)?;
-                        }
-
-                        let mut handler: Value = build_handler_function.call_arg(args)?;
-                        if let Some(promise) = handler.as_promise().cloned() {
-                            handler = promise.into_future::<Value>().await?;
-                        }
-
-                        let handler_function = handler.as_function().cloned().or_throw_msg(
-                            &ctx,
-                            "the default export function must return a function",
-                        )?;
-                        let globals = ctx.globals();
-                        let registry_key = "__RUST_HANDLER_REGISTRY";
-
-                        // Fetch the global registry object, or create it if it doesn't exist
-                        let registry: Object = match globals.get(registry_key) {
-                            Ok(obj) => obj,
-                            Err(_) => {
-                                let obj = Object::new(ctx.clone())?;
-                                globals.set(registry_key, obj.clone())?;
-                                obj
-                            }
-                        };
-                        let id = uuid::Uuid::new_v4().to_string();
-                        registry.set(&id, handler_function)?;
-                        Ok(id)
-                    }
-                    .await
-                    .map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
-                })
-            })
-            .await?;
-        Ok(handler_id)
-    }
-}
-
-#[cfg(feature = "bun")]
 mod bun_handlers {
     use crate::bun_js::{format_js_error, with_js};
-    use rbun::prelude::{Args, Object, ResultExt, Value};
+    use rbun::Module;
     #[allow(unused_imports)]
     use rbun::prelude::OptionExt;
-    use rbun::Module;
+    use rbun::prelude::{Args, Object, ResultExt, Value};
     use tauri::AppHandle;
 
-    /// Bun: same protocol as [`ChordPackageManager::register_quickjs_handler`].
+    /// Import a handler module, call its default export with the build context, and register the
+    /// returned handler function.
     pub async fn register_handler(
         handle: AppHandle,
         module_specifier: String,
@@ -599,10 +476,10 @@ mod bun_handlers {
                         handler = promise.into_future::<Value>().await?;
                     }
 
-                    let handler_function = handler.as_function().cloned().or_throw_msg(
-                        &ctx,
-                        "the default export function must return a function",
-                    )?;
+                    let handler_function = handler
+                        .as_function()
+                        .cloned()
+                        .or_throw_msg(&ctx, "the default export function must return a function")?;
                     let globals = ctx.globals();
                     let registry_key = "__RUST_HANDLER_REGISTRY";
 

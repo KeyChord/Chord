@@ -1,29 +1,18 @@
 use crate::app::desktop_app::DesktopApp;
-use crate::app::state::AppSingleton;
-use crate::quickjs::with_js;
 use crate::state::{DesktopAppManagerObservable, DesktopAppManagerState, Observable};
 use anyhow::Result;
-use llrt_core::libs::utils::result::ResultExt;
-#[allow(unused_imports)]
-use log::kv::ToValue;
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;
 use nject::injectable;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
 use objc2_foundation::NSString;
-#[allow(unused_imports)]
-use rquickjs::{Ctx, Function, Persistent, Promise, Value};
 use serde::Serialize;
-use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 #[injectable]
 pub struct DesktopAppManager {
     observable: DesktopAppManagerObservable,
-    handle: AppHandle,
 }
 
 impl DesktopAppManager {
@@ -106,29 +95,6 @@ impl DesktopAppManager {
     }
 }
 
-static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
-static HAS_LAUNCH_CALLBACKS: AtomicBool = AtomicBool::new(false);
-static HAS_TERMINATE_CALLBACKS: AtomicBool = AtomicBool::new(false);
-static NEXT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
-
-thread_local! {
-    static APP_LIFECYCLE_CALLBACKS: RefCell<AppLifecycleCallbacks> =
-        RefCell::new(AppLifecycleCallbacks::default());
-}
-
-#[derive(Default)]
-struct AppLifecycleCallbacks {
-    launch: Vec<AppLifecycleCallbackEntry>,
-    terminate: Vec<AppLifecycleCallbackEntry>,
-}
-
-#[derive(Clone)]
-struct AppLifecycleCallbackEntry {
-    id: u64,
-    bundle_id: String,
-    callback: Persistent<Function<'static>>,
-}
-
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ObservedApp {
@@ -137,169 +103,18 @@ pub struct ObservedApp {
 }
 
 pub fn init_app_lifecycle(handle: AppHandle) {
-    let _ = APP_HANDLE.set(handle.clone());
-
     #[cfg(target_os = "macos")]
     if let Err(error) = handle.run_on_main_thread(init_macos_observers) {
         log::error!("Failed to initialize app lifecycle observers: {error}");
     }
 }
 
-pub fn register_app_launch_handler<'js>(
-    ctx: Ctx<'js>,
-    bundle_id: String,
-    callback: Function<'js>,
-) -> rquickjs::Result<()> {
-    let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::SeqCst);
-
-    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
-        callbacks
-            .borrow_mut()
-            .launch
-            .push(AppLifecycleCallbackEntry {
-                id,
-                bundle_id,
-                callback: Persistent::save(&ctx, callback),
-            });
-    });
-    HAS_LAUNCH_CALLBACKS.store(true, Ordering::SeqCst);
-
-    Ok(())
-}
-
-pub fn register_app_terminate_handler<'js>(
-    ctx: Ctx<'js>,
-    bundle_id: String,
-    callback: Function<'js>,
-) -> rquickjs::Result<Function<'js>> {
-    let id = NEXT_CALLBACK_ID.fetch_add(1, Ordering::SeqCst);
-
-    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
-        callbacks
-            .borrow_mut()
-            .terminate
-            .push(AppLifecycleCallbackEntry {
-                id,
-                bundle_id,
-                callback: Persistent::save(&ctx, callback),
-            });
-    });
-    HAS_TERMINATE_CALLBACKS.store(true, Ordering::SeqCst);
-
-    Function::new(ctx.clone(), move || -> rquickjs::Result<()> {
-        unregister_app_terminate_handler(id);
-        Ok(())
-    })?
-    .with_name("off")
-}
-
-fn unregister_app_terminate_handler(id: u64) {
-    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
-        let mut callbacks = callbacks.borrow_mut();
-        callbacks.terminate.retain(|entry| entry.id != id);
-        HAS_TERMINATE_CALLBACKS.store(!callbacks.terminate.is_empty(), Ordering::SeqCst);
-    });
-}
-
-#[allow(dead_code)]
-pub fn clear_callbacks() {
-    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
-        let mut callbacks = callbacks.borrow_mut();
-        callbacks.launch.clear();
-        callbacks.terminate.clear();
-    });
-    HAS_LAUNCH_CALLBACKS.store(false, Ordering::SeqCst);
-    HAS_TERMINATE_CALLBACKS.store(false, Ordering::SeqCst);
-}
-
 pub fn dispatch_app_launch(app: ObservedApp) {
-    #[cfg(feature = "bun")]
-    if crate::js_engine::current() == crate::js_engine::JsEngine::Bun {
-        crate::bun_js::lifecycle::dispatch_app_launch(app);
-        return;
-    }
-    if !HAS_LAUNCH_CALLBACKS.load(Ordering::SeqCst) {
-        return;
-    }
-
-    let Some(handle) = APP_HANDLE.get().cloned() else {
-        return;
-    };
-
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = with_js(handle, move |ctx| {
-            Box::pin(invoke_launch_callbacks(ctx, app))
-        })
-        .await
-        {
-            log::error!("Failed to run app launch callbacks: {error}");
-        }
-    });
+    crate::bun_js::lifecycle::dispatch_app_launch(app);
 }
 
 pub fn dispatch_app_terminate(app: ObservedApp) {
-    #[cfg(feature = "bun")]
-    if crate::js_engine::current() == crate::js_engine::JsEngine::Bun {
-        crate::bun_js::lifecycle::dispatch_app_terminate(app);
-        return;
-    }
-    if !HAS_TERMINATE_CALLBACKS.load(Ordering::SeqCst) {
-        return;
-    }
-
-    let Some(handle) = APP_HANDLE.get().cloned() else {
-        return;
-    };
-
-    tauri::async_runtime::spawn(async move {
-        if let Err(error) = with_js(handle, move |ctx| {
-            Box::pin(invoke_terminate_callbacks(ctx, app))
-        })
-        .await
-        {
-            log::error!("Failed to run app terminate callbacks: {error}");
-        }
-    });
-}
-
-pub async fn invoke_launch_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Result<()> {
-    let callbacks = APP_LIFECYCLE_CALLBACKS.with(|callbacks| callbacks.borrow().launch.clone());
-
-    for callback in callbacks {
-        if callback.bundle_id != app.bundle_id {
-            continue;
-        }
-
-        let callback = callback.callback.restore(&ctx)?;
-        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone())
-            .or_throw_msg(&ctx, "failed to serialize launch payload")?;
-        let result: Value<'js> = callback.call((js_app,))?;
-        if let Some(promise) = result.into_promise() {
-            promise.into_future::<Value<'js>>().await.map(|_| ())?
-        }
-    }
-
-    Ok(())
-}
-
-pub async fn invoke_terminate_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Result<()> {
-    let callbacks = APP_LIFECYCLE_CALLBACKS.with(|callbacks| callbacks.borrow().terminate.clone());
-
-    for callback in callbacks {
-        if callback.bundle_id != app.bundle_id {
-            continue;
-        }
-
-        let callback = callback.callback.restore(&ctx)?;
-        let js_app = rquickjs_serde::to_value(ctx.clone(), app.clone())
-            .or_throw_msg(&ctx, "failed to serialize app terminate payload")?;
-        let result: Value<'js> = callback.call((js_app,))?;
-        if let Some(promise) = result.into_promise() {
-            promise.into_future::<Value<'js>>().await.map(|_| ())?
-        }
-    }
-
-    Ok(())
+    crate::bun_js::lifecycle::dispatch_app_terminate(app);
 }
 
 #[cfg(target_os = "macos")]

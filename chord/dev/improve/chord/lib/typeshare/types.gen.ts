@@ -17,22 +17,11 @@ export interface AppPermissionsState {
 	isAccessibilityEnabled?: boolean;
 }
 
-export enum JsEngine {
-	QuickJs = "quickjs",
-	Bun = "bun",
-}
-
 export interface AppSettingsState {
 	bundleIdsNeedingRelaunch: string[];
 	showMenuBarIcon: boolean;
 	showDockIcon: boolean;
 	isChordPanelHiddenByDefault: boolean;
-	/** Engine used for JS handlers; takes effect after a restart. */
-	jsEngine: JsEngine;
-	/** The engine this process is actually running with. */
-	activeJsEngine: JsEngine;
-	/** Whether this build can run Bun (`--features bun`). */
-	isBunEngineAvailable: boolean;
 }
 
 /** The action that a chord can define. */

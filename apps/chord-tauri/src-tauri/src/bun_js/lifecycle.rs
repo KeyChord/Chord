@@ -1,15 +1,13 @@
-//! App launch / terminate callbacks registered from JS through the `chord`
-//! module when Bun is the engine — the counterpart of the registries in
-//! `crate::app::desktop_app::desktop_app_manager`.
+//! App launch / terminate callbacks registered from JS through the `chord` module.
 
 use crate::app::desktop_app::ObservedApp;
 use crate::bun_js::with_js;
 use anyhow::Result;
-use rbun::prelude::*;
 use rbun::Persistent;
+use rbun::prelude::*;
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::AppHandle;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();

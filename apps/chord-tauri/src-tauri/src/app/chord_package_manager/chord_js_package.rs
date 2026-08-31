@@ -1,14 +1,10 @@
 use crate::models::FilePathslug;
-use crate::quickjs::{format_js_error, with_js};
 use anyhow::{Context, Result};
-use llrt_core::Module;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use tauri::AppHandle;
 use typeshare::typeshare;
-
-type FullImportSpecifier = String;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
@@ -17,8 +13,8 @@ pub struct ChordJsPackage {
     pub name: String,
     files: HashMap<FilePathslug, String>,
     /// Where the package lives on disk. Not serialized: the frontend must not learn install
-    /// paths. The Bun engine imports modules straight from here so `import.meta.dir` is real
-    /// and Node-API add-ons can be resolved beside the package.
+    /// paths. Bun imports modules straight from here so `import.meta.dir` is real and Node-API
+    /// add-ons can be resolved beside the package.
     #[serde(skip)]
     #[typeshare(skip)]
     root: PathBuf,
@@ -49,27 +45,7 @@ impl ChordJsPackage {
         self.files.keys().map(|pathslug| self.root.join(pathslug))
     }
 
-    /// Gets the module specifier for a file, supporting nested (bundled) packages.
-    /// The pathslug is used to detect nested packages.
-    /// "file.js" from chords/com/app/macos.toml -> "js/file.js"
-    /// "file.js" from chords/@pkg/name/chords/com/app/macos.toml -> "js/@pkg/name/js/file.js"
-    pub fn resolve_file(
-        &self,
-        chords_file_pathslug: &FilePathslug,
-        file: &str,
-    ) -> Result<Option<String>> {
-        let final_js_path = Self::js_pathslug(chords_file_pathslug, file)?;
-
-        // Convert to string and resolve through the package registry
-        let import_specifier = final_js_path
-            .to_str()
-            .context("Failed to convert path to UTF-8")?;
-
-        Ok(self.resolve_import(import_specifier))
-    }
-
-    /// Like [`Self::resolve_file`], but as the absolute on-disk path of the module (what the
-    /// Bun engine imports).
+    /// Resolves a handler file to the absolute on-disk path imported by Bun.
     pub fn resolve_file_path(
         &self,
         chords_file_pathslug: &FilePathslug,
@@ -80,13 +56,6 @@ impl ChordJsPackage {
             .files
             .contains_key(&pathslug)
             .then(|| self.root.join(&pathslug)))
-    }
-
-    /// Gets the module specifier for a pathslug import, e.g. "js/tray.js"
-    pub fn resolve_import(&self, import_specifier: &str) -> Option<String> {
-        self.files
-            .get(&FilePathslug::from(import_specifier))
-            .map(|_| format!("{}/{}", self.name, import_specifier))
     }
 
     /// The pathslug of handler `file` declared by the chords file at `chords_file_pathslug`.
@@ -163,51 +132,6 @@ pub fn resolve_logical_package_path(module_relpath: &Path, relative: &Path) -> R
 
 impl ChordJsPackageBuilder {
     pub async fn load(self, files: HashMap<FilePathslug, String>) -> Result<ChordJsPackage> {
-        #[cfg(feature = "bun")]
-        if crate::js_engine::select(&self.handle) == crate::js_engine::JsEngine::Bun {
-            return self.load_bun(files).await;
-        }
-
-        for (file_pathslug, js) in &files {
-            let file_pathslug = file_pathslug.to_owned();
-            let js_string = js.clone();
-            let path = PathBuf::from(self.name.clone()).join(file_pathslug.clone());
-            let module_specifier = path.to_str().context("invalid path")?.to_string();
-            with_js(self.handle.clone(), move |ctx| {
-                Box::pin(async move {
-                    async {
-                        log::debug!("declaring module {}", module_specifier);
-                        let module = Module::declare(
-                            ctx.clone(),
-                            module_specifier.clone(),
-                            js_string.clone(),
-                        )?;
-                        let meta = module.meta()?;
-                        meta.set("url", module_specifier)?;
-                        let (_evaluated, promise) = module.eval()?;
-                        promise.into_future::<()>().await?;
-                        Ok(())
-                    }
-                    .await
-                    .map_err(|e| anyhow::anyhow!(format_js_error(&ctx, e)))
-                })
-            })
-            .await?;
-        }
-
-        Ok(ChordJsPackage {
-            name: self.name,
-            files,
-            root: self.root,
-        })
-    }
-
-    /// Bun engine: modules are imported from disk by absolute path when a handler is
-    /// registered, so nothing is declared up front. Bun caches modules by path, so every
-    /// file of the package is evicted first and a reload re-reads edited sources (a Node-API
-    /// add-on that was already opened stays loaded until Chord restarts).
-    #[cfg(feature = "bun")]
-    async fn load_bun(self, files: HashMap<FilePathslug, String>) -> Result<ChordJsPackage> {
         use crate::bun_js::with_js;
 
         let paths: Vec<String> = files
@@ -229,46 +153,6 @@ impl ChordJsPackageBuilder {
             files,
             root: self.root,
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct PackageSpecifier<'a> {
-    pub package: &'a str,
-    #[allow(dead_code)]
-    pub subpath: Option<&'a str>,
-}
-
-impl<'a> PackageSpecifier<'a> {
-    pub fn parse(specifier: &'a str) -> Self {
-        if specifier.starts_with('@') {
-            // Scoped package
-            let mut parts = specifier.splitn(3, '/');
-
-            match (parts.next(), parts.next(), parts.next()) {
-                (Some(scope), Some(name), rest) => {
-                    let pkg_len = scope.len() + 1 + name.len();
-                    let package = &specifier[..pkg_len];
-
-                    Self {
-                        package,
-                        subpath: rest,
-                    }
-                }
-                _ => Self {
-                    package: specifier,
-                    subpath: None,
-                },
-            }
-        } else {
-            // Unscoped package
-            let mut parts = specifier.splitn(2, '/');
-
-            let package = parts.next().unwrap_or(specifier);
-            let subpath = parts.next();
-
-            Self { package, subpath }
-        }
     }
 }
 

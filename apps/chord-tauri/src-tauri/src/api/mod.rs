@@ -42,7 +42,6 @@ pub trait Api {
     async fn toggle_menu_bar_icon() -> AppResult<()>;
     async fn toggle_dock_icon() -> AppResult<()>;
     async fn toggle_hide_guide_by_default() -> AppResult<()>;
-    async fn set_js_engine(engine: String) -> AppResult<()>;
     async fn quit_app() -> AppResult<()>;
     async fn get_current_states() -> AppResult<String>;
 }

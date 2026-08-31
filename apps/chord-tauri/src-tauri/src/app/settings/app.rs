@@ -1,7 +1,6 @@
 use crate::app::AppSingleton;
 use crate::app::settings::settings::AppSettings;
-use crate::app::settings::settings_ui::SettingsUi;
-use crate::state::{AppSettingsObservable, Observable};
+use crate::state::AppSettingsObservable;
 use anyhow::Result;
 use nject::provider;
 use tauri::AppHandle;
@@ -17,7 +16,6 @@ pub struct AppSettingsProvider {
 
 impl AppSingleton for AppSettings {
     fn init(&self) -> Result<()> {
-        self.load_js_engine_state()?;
         Ok(())
     }
 }

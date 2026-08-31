@@ -1,4 +1,4 @@
-//! The Bun engine: the same shape as [`crate::quickjs`], on top of `rbun`.
+//! The embedded Bun runtime, exposed through `rbun`.
 //!
 //! Everything runs on a dedicated `bun-worker` thread that owns the Bun VM
 //! (JavaScriptCore is bound to the thread that created it) and a
@@ -20,14 +20,14 @@ use tokio::sync::oneshot;
 mod chord_module;
 pub mod lifecycle;
 
-struct JsEngine {
+struct BunEngine {
     // Keep the runtime alive for as long as the context exists.
     _rt: AsyncRuntime,
     ctx: AsyncContext,
 }
 
 thread_local! {
-    static JS_ENGINE: RefCell<Option<JsEngine>> = const { RefCell::new(None) };
+    static BUN_ENGINE: RefCell<Option<BunEngine>> = const { RefCell::new(None) };
 }
 
 type JsTask = Box<dyn FnOnce(&Runtime) + Send + 'static>;
@@ -135,10 +135,7 @@ impl ModuleLoader {
         let module = match name {
             "chord" => Module::declare_def::<ChordModule, _>(ctx.clone(), "chord")?,
             _ => {
-                return Err(rbun::Error::new_loading_message(
-                    "chord",
-                    "unable to load",
-                ));
+                return Err(rbun::Error::new_loading_message("chord", "unable to load"));
             }
         };
 
@@ -161,7 +158,7 @@ fn runtime_cwd(handle: Option<&AppHandle>) -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("/"))
 }
 
-async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
+async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<BunEngine> {
     let rt = AsyncRuntime::new_with(RuntimeOptions {
         cwd: runtime_cwd(handle.as_ref()),
         argv: Some(vec!["chord".into()]),
@@ -181,21 +178,21 @@ async fn build_engine(handle: Option<AppHandle>) -> anyhow::Result<JsEngine> {
     })
     .await?;
 
-    Ok(JsEngine {
+    Ok(BunEngine {
         _rt: rt,
         ctx: context,
     })
 }
 
 async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
-    let existing = JS_ENGINE.with(|cell| cell.borrow().as_ref().map(|engine| engine.ctx.clone()));
+    let existing = BUN_ENGINE.with(|cell| cell.borrow().as_ref().map(|engine| engine.ctx.clone()));
     if let Some(ctx) = existing {
         return Ok(ctx);
     }
 
     let engine = build_engine(Some(handle)).await?;
     let out = engine.ctx.clone();
-    JS_ENGINE.with(|cell| {
+    BUN_ENGINE.with(|cell| {
         *cell.borrow_mut() = Some(engine);
     });
 
@@ -204,8 +201,7 @@ async fn ensure_engine(handle: AppHandle) -> anyhow::Result<AsyncContext> {
 
 type LocalBoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a>>;
 
-/// Run `f` with a [`Ctx`] on the Bun worker thread; the same contract as
-/// [`crate::quickjs::with_js`].
+/// Run `f` with a [`Ctx`] on the Bun worker thread.
 pub async fn with_js<F, R>(handle: AppHandle, f: F) -> anyhow::Result<R>
 where
     F: Send + 'static + for<'js> FnOnce(Ctx<'js>) -> LocalBoxFuture<'js, anyhow::Result<R>>,

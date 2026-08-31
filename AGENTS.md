@@ -2,7 +2,7 @@
 
 # About
 
-Chord is an app that enables users to assign key sequences to computer actions, such as simulating shortcuts, running shell commands, and even executing JavaScript (using the [rquickjs](https://crates.io/crates/rquickjs) crate as well as the [LLRT runtime](https://github.com/awslabs/llrt); an experimental Bun engine via the [rbun](https://github.com/KeyChord/rbun) crate can be selected from the settings when built with `--features bun`, see `development.md`).
+Chord is an app that enables users to assign key sequences to computer actions, such as simulating shortcuts, running shell commands, and executing JavaScript through the embedded Bun runtime provided by the [rbun](https://github.com/KeyChord/rbun) crate (see `development.md`).
 
 In contrast to shortcuts which are a combination of one or more modifier keys and a letter/number/symbol, chord key combinations are always a sequence of two or more letter/number/symbol keys.
 
@@ -49,7 +49,7 @@ All the state singletons are defined inside of the [app/](./apps/chord-tauri/src
 
 ## JS engines and native code
 
-Every handler is a JavaScript module. Chord runs them on Bun — the embedded runtime from the sibling [`rbun`](../rbun) crate (`src-tauri/src/bun_js/`, cargo feature `bun`, on by default; `libbun_embed.dylib` is bundled from `bundle.macOS.frameworks`) — which is the default and the only engine that can load Node-API add-ons with `process.dlopen`. QuickJS/LLRT (`src-tauri/src/quickjs/`) is the legacy engine, still runtime-selectable and the automatic choice for a `--no-default-features` build; `src-tauri/src/js_engine.rs` picks one per process. On Bun, package modules are imported straight from the package directory (`ChordJsPackage::root`), so `import.meta` is real and relative imports, `node:*`/`bun:*` and a package's `node_modules` resolve through Bun itself; the Rust resolver only serves the `chord` module.
+Every handler is a JavaScript module. Chord runs handlers exclusively on Bun, using the embedded runtime from the sibling [`rbun`](../rbun) crate (`src-tauri/src/bun_js/`; `libbun_embed.dylib` is bundled from `bundle.macOS.frameworks`). Package modules are imported straight from the package directory (`ChordJsPackage::root`), so `import.meta` is real and relative imports, `node:*`/`bun:*`, and a package's `node_modules` resolve through Bun itself; the Rust resolver only serves the `chord` module.
 
 Chord has no separate native-handler runtime. A package that needs native code ships a prebuilt Node-API add-on under `target/<triple>/<relpath>/<stem>.node` with NodeSwift's `libNodeAPI.dylib` beside it (e.g. `target/<triple>/menu/{menu.node,libNodeAPI.dylib}`; the triple comes from `build.rs` as `CHORD_TARGET_TRIPLE`; vendored packages nest as `target/@scope/name/target/...`) and loads it from its own JS with `process.dlopen`, locating it through the `chord` module's `resolveNativeModulePath(import.meta, relpath)` / `resolvePackageFile(import.meta, path)` (`models/native.rs` + `resolve_logical_package_path` in `chord_js_package.rs`). `@keychord/config` builds Swift add-ons with NodeSwift from `src/swift/`. See `scripting.md` for the author-facing contract and `chords/packages/chords-menu` for the reference package.
 

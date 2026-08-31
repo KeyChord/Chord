@@ -38,30 +38,6 @@ impl AppSettings {
         })
     }
 
-    /// Persist the JS engine choice; the running process keeps its current
-    /// engine until restarted.
-    pub fn set_js_engine(&self, engine: crate::js_engine::JsEngine) -> anyhow::Result<()> {
-        self.update_state(|state| {
-            state.js_engine = engine;
-        })
-    }
-
-    /// Reflect the persisted engine choice (and which engine is running) in
-    /// the observable state at startup.
-    pub fn load_js_engine_state(&self) -> anyhow::Result<()> {
-        let configured = crate::js_engine::configured(&self.handle);
-        let active = crate::js_engine::select(&self.handle);
-        self.observable.try_set_state(|prev| {
-            Ok(AppSettingsState {
-                js_engine: configured,
-                active_js_engine: active,
-                is_bun_engine_available: crate::js_engine::bun_available(),
-                ..prev
-            })
-        })?;
-        Ok(())
-    }
-
     fn update_state<F>(&self, update: F) -> anyhow::Result<()>
     where
         F: FnOnce(&mut AppSettingsState),
@@ -103,9 +79,6 @@ impl AppSettings {
         let defaults = AppSettingsState::default();
 
         Ok(AppSettingsState {
-            js_engine: crate::js_engine::configured(handle),
-            active_js_engine: crate::js_engine::current(),
-            is_bun_engine_available: defaults.is_bun_engine_available,
             bundle_ids_needing_relaunch: defaults.bundle_ids_needing_relaunch,
             show_menu_bar_icon: Self::read_bool_setting(
                 handle,
@@ -146,8 +119,10 @@ impl AppSettings {
 
         store.set(SHOW_MENU_BAR_ICON_KEY, state.show_menu_bar_icon);
         store.set(SHOW_DOCK_ICON_KEY, state.show_dock_icon);
-        store.set(HIDE_GUIDE_BY_DEFAULT_KEY, state.is_chord_panel_hidden_by_default);
-        store.set(crate::js_engine::STORE_KEY, state.js_engine.as_str());
+        store.set(
+            HIDE_GUIDE_BY_DEFAULT_KEY,
+            state.is_chord_panel_hidden_by_default,
+        );
         store.save().context("failed to save app state store")?;
 
         Ok(())

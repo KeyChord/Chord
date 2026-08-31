@@ -5,7 +5,6 @@
 	"private": true,
 	"scripts": {
 		"dev": "RUST_BACKTRACE=full tauri dev --no-watch --config src-tauri/tauri.dev.conf.json",
-		"dev:quickjs": "RUST_BACKTRACE=full tauri dev --no-watch --config src-tauri/tauri.dev.conf.json --no-default-features",
 		"release-macos": "release-macos",
 		"vite-dev": "vite",
 		"build": "tsc && vite build",

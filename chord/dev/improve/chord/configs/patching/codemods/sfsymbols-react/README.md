@@ -28,7 +28,7 @@ codemod.ts        # JSSG transformation
 @fixtures/        # JSSG fixture pairs (input.json / expected.json)
 ```
 
-Unlike the LLRT codemod (a git Cargo dependency), this is an **npm package** patch applied automatically via Bun `patchedDependencies`.
+This is an **npm package** patch applied automatically via Bun `patchedDependencies`.
 
 ## Regenerate the Bun patch file
 
