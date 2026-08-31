@@ -1,4 +1,4 @@
-import type { GlobalShortcutMappingInfo, StartupStatusInfo } from '#bindings';
+import type { GlobalShortcutMappingInfo } from '#bindings';
 import {
 	createTauRPCProxy,
 
@@ -8,5 +8,4 @@ export const taurpc = createTauRPCProxy();
 
 export type {
 	GlobalShortcutMappingInfo,
-	StartupStatusInfo,
 };

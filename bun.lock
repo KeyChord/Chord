@@ -100,11 +100,11 @@
         "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": "workspace:*",
@@ -1122,11 +1122,11 @@
       "name": "@chord/dev.improve.chord.routes.settings",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.sidebar": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
+        "lucide-react": "^1.34.0",
         "react": "^19.2.8",
       },
       "devDependencies": {
@@ -1236,23 +1236,6 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/first-run-onboarding": {
-      "name": "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding",
-      "dependencies": {
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.lib.permissions": "workspace:*",
-        "lucide-react": "^1.34.0",
-        "react": "^19.2.8",
-      },
-      "devDependencies": {
-        "@types/react": "^19.2.18",
-        "@types/react-dom": "^19.2.5",
-      },
-    },
     "chord/dev/improve/chord/routes/settings/_components/js-engine-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.js-engine-card",
       "dependencies": {
@@ -1320,6 +1303,22 @@
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "lucide-react": "^1.34.0",
+        "react": "^19.2.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+      },
+    },
+    "chord/dev/improve/chord/routes/settings/_components/permissions-dialog": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.permissions-dialog",
+      "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "lucide-react": "^1.34.0",
         "react": "^19.2.8",
@@ -1792,8 +1791,6 @@
 
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-repos-card@workspace:chord/dev/improve/chord/routes/settings/_components/chord-repos-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding": ["@chord/dev.improve.chord.routes.settings._components.first-run-onboarding@workspace:chord/dev/improve/chord/routes/settings/_components/first-run-onboarding"],
-
     "@chord/dev.improve.chord.routes.settings._components.js-engine-card": ["@chord/dev.improve.chord.routes.settings._components.js-engine-card@workspace:chord/dev/improve/chord/routes/settings/_components/js-engine-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": ["@chord/dev.improve.chord.routes.settings._components.launch-on-login-card@workspace:chord/dev/improve/chord/routes/settings/_components/launch-on-login-card"],
@@ -1803,6 +1800,8 @@
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": ["@chord/dev.improve.chord.routes.settings._components.open-repo-button@workspace:chord/dev/improve/chord/routes/settings/_components/open-repo-button"],
 
     "@chord/dev.improve.chord.routes.settings._components.permissions-card": ["@chord/dev.improve.chord.routes.settings._components.permissions-card@workspace:chord/dev/improve/chord/routes/settings/_components/permissions-card"],
+
+    "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": ["@chord/dev.improve.chord.routes.settings._components.permissions-dialog@workspace:chord/dev/improve/chord/routes/settings/_components/permissions-dialog"],
 
     "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": ["@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card@workspace:chord/dev/improve/chord/routes/settings/_components/placeholder-chords-card"],
 

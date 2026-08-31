@@ -23,6 +23,21 @@ Start the desktop app with:
 bun run dev
 ```
 
+### Runtime log levels
+
+While the development runner is open, focus the `tauri` pane and enter a log command:
+
+```text
+log debug
+log info
+log trace
+log toggle
+log status
+```
+
+Level changes take effect immediately and are persisted as `logLevel` in the development app's
+state store. `RUST_LOG` remains a startup override and takes precedence over the persisted level.
+
 The project tool versions are declared in [`.prototools`](./.prototools). Rust is also pinned in [`rust-toolchain.toml`](./rust-toolchain.toml) because proto delegates Rust version selection to rustup.
 
 ## Stores
@@ -67,11 +82,13 @@ plain JavaScript.)
 
 ## Releases
 
-Every push to `main` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml), which
+Every push to `beta` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml), which
 builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling
-[`nightly`](https://github.com/KeyChord/Chord/releases/tag/nightly) prerelease. Asset names carry the
-version, short commit, and architecture, and each run replaces the previous assets, so the download
-URLs stay stable.
+[`beta`](https://github.com/KeyChord/Chord/releases/tag/beta) prerelease. Beta uses the
+`com.leonsilicon.chord.beta` application identifier, while local development uses
+`com.leonsilicon.chord.development` and production uses `com.leonsilicon.chord`. This keeps each
+channel's settings, packages, caches, logs, and other application-scoped data separate. Each run
+replaces the previous assets, so the download URLs stay stable.
 
 CI cannot build the vendored Bun itself — that takes ~30 minutes. Instead
 [`KeyChord/rbun`](https://github.com/KeyChord/rbun) builds `libbun_embed.dylib` once per Bun source

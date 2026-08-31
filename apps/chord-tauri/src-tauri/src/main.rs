@@ -1,27 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use chords_lib::JsEngine;
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::PathBuf;
-
-/// `--engine quickjs|bun` for the script-running subcommands. Overrides `CHORD_JS_ENGINE`.
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum EngineArg {
-    #[value(alias = "rquickjs", alias = "llrt")]
-    Quickjs,
-    #[value(alias = "rbun")]
-    Bun,
-}
-
-impl From<EngineArg> for JsEngine {
-    fn from(value: EngineArg) -> Self {
-        match value {
-            EngineArg::Quickjs => JsEngine::QuickJs,
-            EngineArg::Bun => JsEngine::Bun,
-        }
-    }
-}
 
 #[derive(Debug, Parser)]
 #[command(name = "chord", about = "shortcuts reimagined")]
@@ -36,9 +17,6 @@ enum Commands {
     Run {
         #[arg(value_name = "FILE", value_hint = ValueHint::FilePath)]
         file: PathBuf,
-        /// JS engine to run it on (default: `CHORD_JS_ENGINE`, else Bun).
-        #[arg(long, value_name = "ENGINE")]
-        engine: Option<EngineArg>,
     },
     /// Call an exported function of a JavaScript/TypeScript file.
     #[command(trailing_var_arg = true)]
@@ -47,9 +25,6 @@ enum Commands {
         file: PathBuf,
         #[arg(value_name = "EXPORT")]
         export: String,
-        /// JS engine to run it on (default: `CHORD_JS_ENGINE`, else Bun).
-        #[arg(long, value_name = "ENGINE")]
-        engine: Option<EngineArg>,
         #[arg(value_name = "ARG", allow_hyphen_values = true)]
         args: Vec<String>,
     },
@@ -68,8 +43,8 @@ fn main() {
     }
 
     match cli.command {
-        Some(Commands::Run { file, engine }) => {
-            if let Err(error) = run_cli(file, engine.map(JsEngine::from)) {
+        Some(Commands::Run { file }) => {
+            if let Err(error) = run_cli(file) {
                 eprintln!("{error:#}");
                 std::process::exit(1);
             }
@@ -77,10 +52,9 @@ fn main() {
         Some(Commands::RunExport {
             file,
             export,
-            engine,
             args,
         }) => {
-            if let Err(error) = run_export_cli(file, export, args, engine.map(JsEngine::from)) {
+            if let Err(error) = run_export_cli(file, export, args) {
                 eprintln!("{error:#}");
                 std::process::exit(1);
             }
@@ -89,14 +63,14 @@ fn main() {
     }
 }
 
-fn run_cli(file: PathBuf, engine: Option<JsEngine>) -> anyhow::Result<()> {
+fn run_cli(file: PathBuf) -> anyhow::Result<()> {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()
             .unwrap();
 
-        rt.block_on(chords_lib::run_script(file, engine))
+        rt.block_on(chords_lib::run_script(file))
     })
     .join()
     .unwrap()
@@ -106,7 +80,6 @@ fn run_export_cli(
     file: PathBuf,
     export: String,
     args: Vec<String>,
-    engine: Option<JsEngine>,
 ) -> anyhow::Result<()> {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -114,7 +87,7 @@ fn run_export_cli(
             .build()
             .unwrap();
 
-        rt.block_on(chords_lib::run_script_export(file, export, args, engine))
+        rt.block_on(chords_lib::run_script_export(file, export, args))
     })
     .join()
     .unwrap()

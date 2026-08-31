@@ -1,6 +1,6 @@
-name: release
+name: beta
 
-# Every push to main publishes a downloadable build to the rolling `nightly`
+# Every push to beta publishes a downloadable build to the rolling `beta`
 # release. Assets are replaced in place, so the download URLs and the updater
 # endpoint are stable.
 #
@@ -13,14 +13,14 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main
+      - beta
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  RELEASE_TAG: nightly
+  RELEASE_TAG: beta
 
 jobs:
   build:
@@ -142,9 +142,9 @@ jobs:
         run: bun install --frozen-lockfile
 
       # tauri.conf.json points `bundle.macOS.frameworks` at the local rbun
-      # checkout. Emit an overlay config pointing at the downloaded dylib, and
-      # stamp the version so each nightly build is identifiable.
-      - name: Build CI tauri config
+      # checkout. The checked-in beta config supplies the channel identity;
+      # this generated overlay only points the build at the downloaded dylib.
+      - name: Build CI framework config
         id: cfg
         run: |
           set -euo pipefail
@@ -218,6 +218,7 @@ jobs:
           set -euo pipefail
           bun tauri build \
             --target ${{ matrix.target }} \
+            --config src-tauri/tauri.beta.conf.json \
             --config ${{ steps.cfg.outputs.config }} \
             --bundles ${{ steps.bundles.outputs.bundles }}
 
@@ -300,7 +301,7 @@ jobs:
             gatekeeper="This build is not notarized; on first launch, right-click the app and choose **Open**."
           fi
           rm -f assets/gatekeeper.txt
-          notes="Automatic build from \`main\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. $gatekeeper"
+          notes="Automatic beta build from \`beta\` @ ${short}. Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel. $gatekeeper"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             # Move the rolling tag onto this commit, then refresh the release.
@@ -312,7 +313,7 @@ jobs:
             # whatever the default branch points at by the time this runs.
             gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
-              --title "Chord (latest from main)" \
+              --title "Chord Beta" \
               --notes "$notes" \
               --prerelease
           fi

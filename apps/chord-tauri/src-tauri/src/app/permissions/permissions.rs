@@ -24,7 +24,7 @@ impl AppPermissions {
         Ok(())
     }
 
-    pub async fn load(&self) -> Result<()> {
+    pub async fn load(&self) -> Result<(bool, bool)> {
         let is_input_monitoring_enabled =
             tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
         let is_accessibility_enabled =
@@ -34,7 +34,7 @@ impl AppPermissions {
             is_accessibility_enabled: Some(is_accessibility_enabled),
             ..prev
         })?;
-        Ok(())
+        Ok((is_accessibility_enabled, is_input_monitoring_enabled))
     }
 
     pub fn toggle_autostart(&self) -> Result<()> {
@@ -68,8 +68,14 @@ pub struct AppPermissionsInputMonitoring {
 impl AppPermissionsInputMonitoring {
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
-        observable.subscribe(Arc::new(move |_, state| {
-            if state.is_input_monitoring_enabled.is_some_and(|s| s) {
+        observable.subscribe(Arc::new(move |previous_state, state| {
+            if !previous_state
+                .is_input_monitoring_enabled
+                .is_some_and(|enabled| enabled)
+                && state
+                    .is_input_monitoring_enabled
+                    .is_some_and(|enabled| enabled)
+            {
                 let app = handle.app_state();
                 let keyboard = handle.app_state().keyboard();
                 if let Err(e) = keyboard.register_caps_lock_input_handler() {
@@ -90,8 +96,14 @@ pub struct AppPermissionsAccessibility {
 impl AppPermissionsAccessibility {
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
-        observable.subscribe(Arc::new(move |_, state| {
-            if state.is_accessibility_enabled.is_some_and(|s| s) {
+        observable.subscribe(Arc::new(move |previous_state, state| {
+            if !previous_state
+                .is_accessibility_enabled
+                .is_some_and(|enabled| enabled)
+                && state
+                    .is_accessibility_enabled
+                    .is_some_and(|enabled| enabled)
+            {
                 let keyboard = handle.app_state().keyboard();
                 keyboard.register_input_handler();
             }

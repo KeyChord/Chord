@@ -1,95 +1,165 @@
 import { TanStackDevtools } from '@chord/com.npmjs.tanstack__react-devtools';
-import { useQuery } from '@chord/com.npmjs.tanstack__react-query';
-import { Link, Outlet } from '@chord/com.npmjs.tanstack__react-router';
+import { Link, Outlet, useRouterState } from '@chord/com.npmjs.tanstack__react-router';
 import { TanStackRouterDevtoolsPanel } from '@chord/com.npmjs.tanstack__react-router-devtools';
-import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
-import { FirstRunOnboarding } from '@chord/dev.improve.chord.routes.settings._components.first-run-onboarding';
-import { useState } from 'react';
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarGroup,
+	SidebarGroupContent,
+	SidebarGroupLabel,
+	SidebarHeader,
+	SidebarInset,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+} from '@chord/dev.improve.chord.components.ui.sidebar';
+import { PermissionsDialog } from '@chord/dev.improve.chord.routes.settings._components.permissions-dialog';
+import {
+	Command,
+	Compass,
+	Keyboard,
+	Settings2,
+	SlidersHorizontal,
+	TriangleAlert,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+
+const navigationGroups = [
+	{
+		label: 'Configuration',
+		items: [
+			{
+				label: 'General',
+				to: '/settings/general',
+				icon: Settings2,
+			},
+			{
+				label: 'Chords',
+				to: '/settings/chords',
+				icon: Keyboard,
+			},
+			{
+				label: 'Browse',
+				to: '/settings/browse',
+				icon: Compass,
+			},
+			{
+				label: 'Configure',
+				to: '/settings/configure',
+				icon: SlidersHorizontal,
+			},
+			{
+				label: 'Global Shortcuts',
+				to: '/settings/global-shortcuts',
+				icon: Command,
+			},
+		],
+	},
+	{
+		label: 'Maintenance',
+		items: [
+			{
+				label: 'Danger Zone',
+				to: '/settings/danger',
+				icon: TriangleAlert,
+			},
+		],
+	},
+] as const;
+
+function SettingsShell({ children }: { children: React.ReactNode }) {
+	const pathname = useRouterState({
+		select: state => state.location.pathname,
+	});
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		scrollContainerRef.current?.scrollTo({ top: 0 });
+	}, [pathname]);
+
+	return (
+		<SidebarProvider className="settings-window-shell min-h-0 h-full" style={{ '--sidebar-width': '15.5rem' } as React.CSSProperties}>
+			<Sidebar
+				collapsible="none"
+				className="settings-window-sidebar shrink-0 border-r border-black/[0.08] bg-transparent text-sidebar-foreground"
+			>
+				<SidebarHeader
+					data-tauri-drag-region
+					className="h-[50px] shrink-0 p-0"
+				/>
+
+				<SidebarContent className="px-2.5 pb-4 pt-1">
+					{navigationGroups.map(group => (
+						<SidebarGroup key={group.label} className="px-0 py-2">
+							<SidebarGroupLabel className="h-6 px-2.5 text-[11px] font-semibold tracking-[0.01em] text-sidebar-foreground/40">
+								{group.label}
+							</SidebarGroupLabel>
+							<SidebarGroupContent>
+								<SidebarMenu className="gap-0.5">
+									{group.items.map((item) => {
+										const isActive = pathname === item.to || pathname === `${item.to}/`;
+										const Icon = item.icon;
+
+										return (
+											<SidebarMenuItem key={item.to}>
+												<SidebarMenuButton
+													asChild
+													isActive={isActive}
+													className="h-8 rounded-[8px] px-2.5 text-[13px] font-medium text-sidebar-foreground/85 hover:bg-black/[0.05] data-active:bg-[#3478f6] data-active:text-white data-active:shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.08)] data-active:hover:bg-[#3478f6] data-active:hover:text-white"
+												>
+													<Link to={item.to}>
+														<Icon strokeWidth={1.8} />
+														<span>{item.label}</span>
+													</Link>
+												</SidebarMenuButton>
+											</SidebarMenuItem>
+										);
+									})}
+								</SidebarMenu>
+							</SidebarGroupContent>
+						</SidebarGroup>
+					))}
+				</SidebarContent>
+			</Sidebar>
+
+			<SidebarInset className="settings-content-surface min-h-0 min-w-0 overflow-hidden bg-background">
+				<header
+					data-tauri-drag-region
+					className="flex h-[62px] shrink-0 items-center px-7"
+				>
+					<h1 className="text-[18px] font-semibold tracking-[-0.018em]">Chord Settings</h1>
+				</header>
+				<div
+					ref={scrollContainerRef}
+					className="settings-page-scroll min-h-0 flex-1 overflow-y-auto bg-background"
+				>
+					<div className="settings-page-content w-full px-7 pb-10 pt-3">
+						{children}
+					</div>
+				</div>
+			</SidebarInset>
+		</SidebarProvider>
+	);
+}
 
 export function SettingsPage() {
-	const [dismissedOnboarding, setDismissedOnboarding] = useState(false);
-	const startupStatusQuery = useQuery({
-		queryKey: ['startup-status'],
-		queryFn: taurpc.getStartupStatus,
-	});
-	const shouldShowOnboarding
-		= startupStatusQuery.data?.shouldShowOnboarding === true && !dismissedOnboarding;
+	const [permissionDialogDismissed, setPermissionDialogDismissed] = useState(false);
 
 	return (
 		<>
-			{startupStatusQuery.isLoading
+			<SettingsShell>
+				<Outlet />
+			</SettingsShell>
+			{!permissionDialogDismissed
 				? (
-						<div className="flex min-h-full items-center justify-center bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
-							Loading settings...
-						</div>
+						<PermissionsDialog
+							onDismiss={() => {
+								setPermissionDialogDismissed(true);
+							}}
+						/>
 					)
-				: shouldShowOnboarding
-					? (
-							<FirstRunOnboarding
-								onSkip={() => {
-									setDismissedOnboarding(true);
-								}}
-								onComplete={() => {
-									setDismissedOnboarding(true);
-									void startupStatusQuery.refetch();
-								}}
-							/>
-						)
-					: (
-							<div className="min-h-full bg-muted/30 px-5 py-4 text-sm text-foreground">
-								<div className="mx-auto flex max-w-[720px] flex-col gap-4">
-									<div className="flex items-start justify-between gap-3">
-										<div>
-											<h1 className="text-[20px] font-semibold">Settings</h1>
-											<p className="mt-1 text-muted-foreground">
-												Configure permissions, manage chord sources, assign placeholder chords, and review the app's shortcuts.
-											</p>
-										</div>
-									</div>
-
-									<div className="h-auto w-full flex-wrap justify-start gap-2 rounded-2xl bg-transparent p-0">
-										<Link
-											to="/settings/general"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											General
-										</Link>
-										<Link
-											to="/settings/chords"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											Chords
-										</Link>
-										<Link
-											to="/settings/browse"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											Browse
-										</Link>
-										<Link
-											to="/settings/configure"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											Configure
-										</Link>
-										<Link
-											to="/settings/global-shortcuts"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											Shortcuts
-										</Link>
-										<Link
-											to="/settings/danger"
-											className="h-auto flex-none rounded-2xl border border-border bg-background px-4 py-2.5 text-sm data-active:border-foreground/15 data-active:bg-background data-active:shadow-sm"
-										>
-											Danger
-										</Link>
-									</div>
-
-									<Outlet />
-								</div>
-							</div>
-						)}
+				: null}
 			{import.meta.env.DEV
 				? (
 						<TanStackDevtools

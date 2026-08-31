@@ -111,7 +111,7 @@
     "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
-    "@chord/dev.improve.chord.routes.settings._components.first-run-onboarding": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",

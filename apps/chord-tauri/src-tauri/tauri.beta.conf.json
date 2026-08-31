@@ -1,0 +1,9 @@
+{
+	"productName": "Chord (Beta)",
+	"identifier": "com.leonsilicon.chord.beta",
+	"plugins": {
+		"updater": {
+			"endpoints": ["https://github.com/KeyChord/Chord/releases/download/beta/latest.json"]
+		}
+	}
+}

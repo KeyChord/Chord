@@ -84,8 +84,12 @@ mod tests {
             Path::new("/tmp/com.leonsilicon.chord.lock")
         );
         assert_eq!(
-            lock_file_path(temp_dir, "com.leonsilicon.chord-dev"),
-            Path::new("/tmp/com.leonsilicon.chord-dev.lock")
+            lock_file_path(temp_dir, "com.leonsilicon.chord.development"),
+            Path::new("/tmp/com.leonsilicon.chord.development.lock")
+        );
+        assert_eq!(
+            lock_file_path(temp_dir, "com.leonsilicon.chord.beta"),
+            Path::new("/tmp/com.leonsilicon.chord.beta.lock")
         );
     }
 }

@@ -1,8 +1,7 @@
+use crate::app::chord_package_manager::LocalChordPackage;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
-use crate::startup::StartupStatusInfo;
 use crate::state::GitRepo;
 use taurpc_macros::taurpc_api;
-use crate::app::chord_package_manager::LocalChordPackage;
 
 pub use crate::api::ApiImpl;
 
@@ -15,8 +14,7 @@ pub use error::*;
 pub trait Api {
     async fn open_accessibility_settings();
     async fn open_input_monitoring_settings();
-    async fn get_startup_status() -> AppResult<StartupStatusInfo>;
-    async fn complete_onboarding() -> AppResult<()>;
+    async fn refresh_permissions() -> AppResult<(bool, bool)>;
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
     async fn reset_default_chords() -> AppResult<()>;
     async fn remove_git_repo(repo: String) -> AppResult<()>;

@@ -3,7 +3,6 @@ use crate::app::AppHandleExt;
 use crate::setup::setup;
 use crate::tauri_app::lock_file::AppLockFile;
 use parking_lot::deadlock;
-use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
@@ -18,11 +17,8 @@ mod constants;
 pub mod git;
 mod mode;
 mod models;
-mod quickjs;
-#[cfg(feature = "bun")]
 mod bun_js;
-mod js_engine;
-pub use js_engine::JsEngine;
+mod logging;
 mod setup;
 mod state;
 mod tauri_app;
@@ -81,12 +77,12 @@ pub fn run_app() {
         }
     });
 
-    let env_log_level = std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
-    let parsed_level = log::LevelFilter::from_str(&env_log_level).unwrap_or(log::LevelFilter::Info);
+    logging::initialize_early();
 
     let log_plugin = tauri_plugin_log::Builder::new()
         .clear_targets()
-        .level(parsed_level)
+        .level(log::LevelFilter::Trace)
+        .filter(logging::enabled)
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}] {}:{} - {}",
@@ -164,6 +160,9 @@ pub fn run_app() {
         .plugin(tauri_plugin_user_input::init())
         .setup(move |app| {
             api.set_handle(app.handle().clone());
+            if let Err(error) = logging::initialize(app.handle()) {
+                log::warn!("Failed to initialize runtime log level: {error:#}");
+            }
             if let Err(e) = setup(app) {
                 log::error!("Failed to set up app:\n{:#?}", e);
                 app.dialog()
@@ -196,28 +195,14 @@ pub fn run_app() {
     });
 }
 
-pub async fn run_script(
-    path: impl AsRef<std::path::Path>,
-    engine: Option<js_engine::JsEngine>,
-) -> anyhow::Result<()> {
-    match js_engine::select_for_cli(engine) {
-        #[cfg(feature = "bun")]
-        js_engine::JsEngine::Bun => bun_js::run_standalone_module(path.as_ref()).await,
-        _ => quickjs::run_standalone_module(path.as_ref()).await,
-    }
+pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
+    bun_js::run_standalone_module(path.as_ref()).await
 }
 
 pub async fn run_script_export(
     path: impl AsRef<std::path::Path>,
     export_name: impl Into<String>,
     args: Vec<String>,
-    engine: Option<js_engine::JsEngine>,
 ) -> anyhow::Result<()> {
-    match js_engine::select_for_cli(engine) {
-        #[cfg(feature = "bun")]
-        js_engine::JsEngine::Bun => {
-            bun_js::run_standalone_export(path.as_ref(), export_name.into(), args).await
-        }
-        _ => quickjs::run_standalone_export(path.as_ref(), export_name.into(), args).await,
-    }
+    bun_js::run_standalone_export(path.as_ref(), export_name.into(), args).await
 }

@@ -27,14 +27,6 @@ crate-type = [
 name = "chord"
 path = "src/main.rs"
 
-[features]
-default = ["bun"]
-# Bun (via rbun) is the default JS engine: it is what lets packages load native
-# code through Node-API add-ons. QuickJS stays selectable at runtime from the settings.
-# Requires the rbun checkout next to this repo with its vendored Bun built:
-# see ../../../../rbun/README.md. `--no-default-features` builds QuickJS only.
-bun = ["dep:rbun"]
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 cc = "1.4"
@@ -73,20 +65,10 @@ clap = { version = "4.6", features = [ "derive" ] }
 keycode = "1"
 device_query = "4"
 walkdir = "2.5.0"
-dirs = "6"
 gix = { version = "0.87.1", features = [ "blocking-http-transport-reqwest-rust-tls" ] }
 fix-path-env = { git = "https://github.com/tauri-apps/fix-path-env-rs" }
-rquickjs = { version = "0.11.0", features = [ "full-async" ] }
 mac-keycode = "0.0.2"
-llrt_modules = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb", package = "llrt_modules" }
-llrt_core = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb", package = "llrt_core", features = [
-	'no-sdk',
-	'uncompressed',
-] }
-# We need to manually enable all features
-llrt_os = { git = "https://github.com/KeyChord/llrt", rev = "4230f36b0d0ab4b06cf2a6db22b81046e2aa0beb", package = "llrt_os", default-features = true }
-rquickjs-serde = "0.5.0"
-rbun = { path = "../../../../rbun/crates/rbun", optional = true }
+rbun = { path = "../../../../rbun/crates/rbun" }
 tauri-plugin-store = "2"
 jsonc-parser = "0.33.1"
 typeshare = "1"

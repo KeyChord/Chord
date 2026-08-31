@@ -138,3 +138,87 @@
 		@apply bg-transparent;
 	}
 }
+
+.settings-window-shell {
+	background: transparent;
+	font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+}
+
+.settings-window-sidebar {
+	background: rgb(247 246 240 / 66%);
+	-webkit-backdrop-filter: saturate(1.35) blur(24px);
+	backdrop-filter: saturate(1.35) blur(24px);
+}
+
+.settings-content-surface {
+	box-shadow: -1px 0 0 rgb(0 0 0 / 3%);
+}
+
+.dark .settings-window-sidebar {
+	background: rgb(32 32 32 / 72%);
+}
+
+.settings-page-content > .space-y-4 {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+}
+
+.settings-page-content [data-slot='card'] {
+	--card-spacing: 0px;
+	gap: 0;
+	overflow: visible;
+	border-radius: 0;
+	background: transparent;
+	padding: 0;
+	box-shadow: none;
+}
+
+.settings-page-content > .space-y-4 > [data-slot='card'] + [data-slot='card'] {
+	margin-top: 20px;
+	border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+	padding-top: 20px;
+}
+
+.settings-page-content [data-slot='card-header'] {
+	display: block;
+	border-radius: 0;
+	padding: 0;
+	margin-bottom: 11px;
+}
+
+.settings-page-content [data-slot='card-title'] {
+	font-size: 14px;
+	font-weight: 600;
+	line-height: 1.3;
+	letter-spacing: -0.01em;
+}
+
+.settings-page-content [data-slot='card-description'] {
+	margin-top: 3px;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.settings-page-content [data-slot='card-content'] {
+	padding: 0;
+}
+
+.settings-page-content [data-slot='card-footer'] {
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	padding: 12px 0 0;
+}
+
+.settings-page-content [data-slot='card-content'] > .rounded-lg.border,
+.settings-page-content [data-slot='card-content'] > .space-y-2 > .rounded-lg.border {
+	border-color: color-mix(in srgb, var(--border) 85%, transparent);
+	border-radius: 8px;
+	background: rgb(248 248 248 / 88%);
+	box-shadow: none;
+}
+
+.settings-page-content [data-slot='card-content'] > .space-y-2 {
+	gap: 6px;
+}

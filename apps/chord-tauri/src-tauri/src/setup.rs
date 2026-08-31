@@ -163,8 +163,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let settings = state.settings();
     settings.apply_all()?;
 
-    let startup_status = tauri_app::startup::get_startup_status(&handle)?;
-    if startup_status.should_show_onboarding {
+    if tauri_app::startup::should_show_permission_dialog() {
         settings.ui.open()?;
     }
 

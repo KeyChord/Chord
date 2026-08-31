@@ -28,29 +28,22 @@ export type Result<T, E> = {
 	ok: T,
 	err: E,
 };
+const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"getCurrentStates":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"setJsEngine":["engine"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
 
-export type StartupStatusInfo = {
-	launchedViaAutostart: boolean,
-	onboardingCompleted: boolean,
-	shouldShowOnboarding: boolean,
-};
-const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"completeOnboarding":[],"getCurrentStates":[],"getStartupStatus":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"setJsEngine":["engine"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
-
-const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"completeOnboarding":true,"getCurrentStates":true,"getStartupStatus":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"setJsEngine":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
+const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"getCurrentStates":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshPermissions":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"setJsEngine":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
 
 export type Router = {
 	"": {
 		addGitRepo: (repo: string) => Promise<GitRepo>,
 		addLocalChordFolder: (path: string) => Promise<LocalChordPackage>,
-		completeOnboarding: () => Promise<null>,
 		getCurrentStates: () => Promise<string>,
-		getStartupStatus: () => Promise<StartupStatusInfo>,
 		listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>,
 		listLocalChordFolders: () => Promise<string[]>,
 		openAccessibilitySettings: () => Promise<void>,
 		openInputMonitoringSettings: () => Promise<void>,
 		pickLocalChordFolder: () => Promise<string | null>,
 		quitApp: () => Promise<null>,
+		refreshPermissions: () => Promise<[boolean, boolean]>,
 		relaunchApp: (bundleId: string) => Promise<null>,
 		removeGitRepo: (repo: string) => Promise<null>,
 		removeGlobalShortcutMapping: (shortcut: string) => Promise<null>,

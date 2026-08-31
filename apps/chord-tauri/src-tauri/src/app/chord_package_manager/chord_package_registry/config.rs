@@ -4,17 +4,18 @@ use nject::injectable;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
 
 #[injectable]
-pub struct ConfigPackageRegistry;
+pub struct ConfigPackageRegistry {
+    handle: AppHandle,
+}
 
 impl ConfigPackageRegistry {
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
 
-        let Some(packages_dir) = self.get_packages_dir() else {
-            return Ok(packages);
-        };
+        let packages_dir = self.get_packages_dir()?;
 
         if !packages_dir.exists() {
             return Ok(packages);
@@ -43,7 +44,7 @@ impl ConfigPackageRegistry {
         Ok(packages)
     }
 
-    fn get_packages_dir(&self) -> Option<PathBuf> {
-        dirs::config_dir().map(|p| p.join("chord").join("packages"))
+    fn get_packages_dir(&self) -> anyhow::Result<PathBuf> {
+        Ok(self.handle.path().app_config_dir()?.join("packages"))
     }
 }
