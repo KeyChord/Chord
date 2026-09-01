@@ -1,6 +1,6 @@
 use crate::app::chord_runner::ChordActionTask;
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
 use nject::injectable;
 use tauri::AppHandle;
 
@@ -27,16 +27,23 @@ impl ShortcutChordActionTaskRunner {
             })
             .collect::<Result<_>>()?;
 
-        // rdev must be run on main thread
+        // rdev must be run on the main thread. Wait for the closure so failures can
+        // propagate to the task runner and trigger user feedback.
+        let (result_tx, result_rx) = std::sync::mpsc::sync_channel(1);
         self.handle.run_on_main_thread(move || {
+            let mut result = Ok(());
             for (event, suppress_shift) in events {
                 if let Err(e) = rdev::simulate(&event, suppress_shift) {
-                    log::error!("error simulating {} keypress", e);
+                    result = Err(anyhow!("error simulating keypress: {e}"));
+                    break;
                 }
             }
+            let _ = result_tx.send(result);
         })?;
 
-        Ok(())
+        result_rx
+            .recv()
+            .context("main thread stopped before simulating shortcut")?
     }
 
     pub fn get_start_simulated_shortcut_actions(

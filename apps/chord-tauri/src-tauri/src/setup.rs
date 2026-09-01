@@ -151,9 +151,10 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
 
     let packages_handle = handle.clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = load_chord_packages(packages_handle).await {
+        if let Err(error) = load_chord_packages(packages_handle.clone()).await {
             log::error!("Failed to load chord packages: {error:#}");
         }
+        tauri_app::scripting::mark_chord_packages_ready(&packages_handle);
     });
 
     // Create tray

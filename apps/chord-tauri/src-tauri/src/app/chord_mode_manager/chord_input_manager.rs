@@ -3,7 +3,7 @@ use crate::app::chord_runner::{ChordActionTask, ChordActionTaskRun};
 use crate::app::state::AppSingleton;
 use crate::models::{ChordInput, ChordInputEvent, Key, KeyEvent};
 use crate::state::{ChordInputObservable, ChordInputState, ChordPanelState, FrontmostObservable, Observable};
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
 use device_query::{DeviceQuery, Keycode};
 use keycode::KeyMappingCode;
 use nject::injectable;
@@ -30,6 +30,30 @@ pub struct ChordInputManager {
 impl ChordInputManager {
     pub fn reset(&self) -> Result<()> {
         self.observable.set_state(|_| ChordInputState::default())
+    }
+
+    /// Execute a complete chord sequence without synthesizing keyboard input.
+    pub fn execute_sequence(&self, sequence: &str) -> Result<()> {
+        let input = Key::parse_sequence(sequence)?;
+        if input.len() < 2 {
+            bail!("a chord sequence must contain at least two keys");
+        }
+
+        self.spawn_end_active_task()?;
+        let task = self
+            .resolve_task_from_keys(&input, 1)?
+            .with_context(|| format!("no chord is configured for `{sequence}`"))?;
+        let event = task.event.clone();
+        self.observable.set_state(move |state| ChordInputState {
+            input: vec![],
+            pressed_input_event: Some(event.clone()),
+            selected_input_event: Some(event),
+            ..state
+        })?;
+
+        let runner = self.handle.app_state().chord_action_task_runner();
+        let task_run = runner.start_task(&task)?;
+        self.spawn_end_task(task_run)
     }
 
     fn spawn_end_task(&self, task_run: ChordActionTaskRun) -> Result<()> {

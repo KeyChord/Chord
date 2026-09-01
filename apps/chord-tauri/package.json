@@ -38,6 +38,7 @@
 		"@chord/dev.improve.chord.routes.settings.danger.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings.general.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
 		"@fontsource-variable/geist": "^5.3.0",
 		"@headless-tree/core": "^1.7.0",
 		"@headless-tree/react": "^1.7.0",

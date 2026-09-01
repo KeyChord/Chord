@@ -14,13 +14,16 @@ import {
 	SidebarMenuItem,
 	SidebarProvider,
 } from '@chord/dev.improve.chord.components.ui.sidebar';
+import { LogStreamProvider } from '@chord/dev.improve.chord.routes.settings._components.log-stream';
 import { PermissionsDialog } from '@chord/dev.improve.chord.routes.settings._components.permissions-dialog';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import {
 	Command,
 	Compass,
 	Keyboard,
 	Settings2,
 	SlidersHorizontal,
+	Terminal,
 	TriangleAlert,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -60,6 +63,11 @@ const navigationGroups = [
 		label: 'Maintenance',
 		items: [
 			{
+				label: 'Log',
+				to: '/settings/log',
+				icon: Terminal,
+			},
+			{
 				label: 'Danger Zone',
 				to: '/settings/danger',
 				icon: TriangleAlert,
@@ -68,11 +76,21 @@ const navigationGroups = [
 	},
 ] as const;
 
+function handleTitleBarMouseDown(event: React.MouseEvent<HTMLElement>) {
+	if (event.buttons !== 1) {
+		return;
+	}
+
+	const window = getCurrentWindow();
+	void (event.detail === 2 ? window.toggleMaximize() : window.startDragging());
+}
+
 function SettingsShell({ children }: { children: React.ReactNode }) {
 	const pathname = useRouterState({
 		select: state => state.location.pathname,
 	});
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const isLogPage = pathname === '/settings/log' || pathname === '/settings/log/';
 
 	useEffect(() => {
 		scrollContainerRef.current?.scrollTo({ top: 0 });
@@ -85,8 +103,8 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
 				className="settings-window-sidebar shrink-0 border-r border-black/[0.08] bg-transparent text-sidebar-foreground"
 			>
 				<SidebarHeader
-					data-tauri-drag-region
 					className="h-[50px] shrink-0 p-0"
+					onMouseDown={handleTitleBarMouseDown}
 				/>
 
 				<SidebarContent className="px-2.5 pb-4 pt-1">
@@ -125,16 +143,22 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
 
 			<SidebarInset className="settings-content-surface min-h-0 min-w-0 overflow-hidden bg-background">
 				<header
-					data-tauri-drag-region
 					className="flex h-[62px] shrink-0 items-center px-7"
+					onMouseDown={handleTitleBarMouseDown}
 				>
-					<h1 className="text-[18px] font-semibold tracking-[-0.018em]">Chord Settings</h1>
+					<h1 className="cursor-default select-none text-[18px] font-semibold tracking-[-0.018em]">Chord</h1>
 				</header>
 				<div
 					ref={scrollContainerRef}
-					className="settings-page-scroll min-h-0 flex-1 overflow-y-auto bg-background"
+					className={isLogPage
+						? 'settings-page-scroll min-h-0 flex-1 overflow-hidden bg-background'
+						: 'settings-page-scroll min-h-0 flex-1 overflow-y-auto bg-background'}
 				>
-					<div className="settings-page-content w-full px-7 pb-10 pt-3">
+					<div
+						className={isLogPage
+							? 'settings-page-content h-full w-full px-7 pb-7 pt-3'
+							: 'settings-page-content w-full px-7 pb-10 pt-3'}
+					>
 						{children}
 					</div>
 				</div>
@@ -147,7 +171,7 @@ export function SettingsPage() {
 	const [permissionDialogDismissed, setPermissionDialogDismissed] = useState(false);
 
 	return (
-		<>
+		<LogStreamProvider>
 			<SettingsShell>
 				<Outlet />
 			</SettingsShell>
@@ -175,6 +199,6 @@ export function SettingsPage() {
 						/>
 					)
 				: null}
-		</>
+		</LogStreamProvider>
 	);
 }

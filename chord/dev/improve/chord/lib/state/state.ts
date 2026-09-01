@@ -15,10 +15,9 @@ import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useState } from 'react';
 
-async function createUseTauriState<T>(stateId: string) {
-	const initialStates = JSON.parse(await taurpc.getCurrentStates());
+function createUseTauriState<T>(stateId: string, initialState: T) {
 	const useTauriState = () => {
-		const [state, setState] = useState<T>(initialStates[stateId]);
+		const [state, setState] = useState<T>(initialState);
 		useEffect(() => {
 			const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
 				setState(event.payload);
@@ -46,15 +45,42 @@ export const [
 	useChordPackageManagerState,
 	useDesktopAppManagerState,
 	useChordPackageStoreState,
-] = await Promise.all([
-	createUseTauriState<KeyboardState>('keyboard'),
-	createUseTauriState<ChordPanelState>('chord-panel'),
-	createUseTauriState<ChordInputState>('chord-input'),
-	createUseTauriState<AppSettingsState>('settings'),
-	createUseTauriState<AppPermissionsState>('permissions'),
-	createUseTauriState<GitReposState>('git-repos'),
-	createUseTauriState<FrontmostState>('frontmost'),
-	createUseTauriState<ChordPackageManagerState>('chord-package-manager'),
-	createUseTauriState<DesktopAppManagerState>('desktop-app-manager'),
-	createUseTauriState<ChordPackageStoreState>('chord-package-store'),
-]);
+] = await (async () => {
+	const initialStates = JSON.parse(await taurpc.getCurrentStates()) as Record<string, unknown>;
+	return [
+		createUseTauriState<KeyboardState>('keyboard', initialStates.keyboard as KeyboardState),
+		createUseTauriState<ChordPanelState>(
+			'chord-panel',
+			initialStates['chord-panel'] as ChordPanelState,
+		),
+		createUseTauriState<ChordInputState>(
+			'chord-input',
+			initialStates['chord-input'] as ChordInputState,
+		),
+		createUseTauriState<AppSettingsState>('settings', initialStates.settings as AppSettingsState),
+		createUseTauriState<AppPermissionsState>(
+			'permissions',
+			initialStates.permissions as AppPermissionsState,
+		),
+		createUseTauriState<GitReposState>(
+			'git-repos',
+			initialStates['git-repos'] as GitReposState,
+		),
+		createUseTauriState<FrontmostState>(
+			'frontmost',
+			initialStates.frontmost as FrontmostState,
+		),
+		createUseTauriState<ChordPackageManagerState>(
+			'chord-package-manager',
+			initialStates['chord-package-manager'] as ChordPackageManagerState,
+		),
+		createUseTauriState<DesktopAppManagerState>(
+			'desktop-app-manager',
+			initialStates['desktop-app-manager'] as DesktopAppManagerState,
+		),
+		createUseTauriState<ChordPackageStoreState>(
+			'chord-package-store',
+			initialStates['chord-package-store'] as ChordPackageStoreState,
+		),
+	] as const;
+})();

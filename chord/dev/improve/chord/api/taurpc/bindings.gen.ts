@@ -4,6 +4,17 @@
 import { createTauRPCProxy as createProxy, type InferCommandOutput, type TauRpcResult, type UnlistenFn } from 'taurpc'
 export type AppError = { Message: string };
 
+export type AppLogEntry = {
+	level: string,
+	message: string,
+};
+
+export type ChordCommandOutput = {
+	exitCode: number | null,
+	stderr: string,
+	stdout: string,
+};
+
 export type GitRepo = {
 	owner: string,
 	name: string,
@@ -28,14 +39,15 @@ export type Result<T, E> = {
 	ok: T,
 	err: E,
 };
-const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"getCurrentStates":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
+const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"getAppLogs":[],"getCurrentStates":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
 
-const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"getCurrentStates":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshPermissions":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
+const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"getAppLogs":true,"getCurrentStates":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshPermissions":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
 
 export type Router = {
 	"": {
 		addGitRepo: (repo: string) => Promise<GitRepo>,
 		addLocalChordFolder: (path: string) => Promise<LocalChordPackage>,
+		getAppLogs: () => Promise<AppLogEntry[]>,
 		getCurrentStates: () => Promise<string>,
 		listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>,
 		listLocalChordFolders: () => Promise<string[]>,
@@ -49,6 +61,7 @@ export type Router = {
 		removeGlobalShortcutMapping: (shortcut: string) => Promise<null>,
 		removePlaceholderChordBinding: (filePath: string, sequenceTemplate: string) => Promise<null>,
 		resetDefaultChords: () => Promise<null>,
+		runChordCommand: (command: string) => Promise<ChordCommandOutput>,
 		setPlaceholderChordBinding: (filePath: string, sequenceTemplate: string, sequence: string) => Promise<null>,
 		syncGitRepo: (repo: string) => Promise<GitRepo>,
 		toggleAutostart: () => Promise<null>,

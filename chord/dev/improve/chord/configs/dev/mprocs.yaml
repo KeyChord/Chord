@@ -1,6 +1,6 @@
 procs:
   tauri:
-    shell: bun ../../chord/dev/improve/chord/configs/dev/_tauri-dev.ts
+    shell: bun <CONFIG_DIR>/tauri/_tauri-dev.ts
     cwd: "<CONFIG_DIR>/../../../../../../apps/chord-tauri"
     autostart: true
     stop: SIGINT

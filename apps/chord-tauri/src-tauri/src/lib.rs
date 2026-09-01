@@ -19,6 +19,7 @@ mod mode;
 mod models;
 mod bun_js;
 mod logging;
+mod process;
 mod setup;
 mod state;
 mod tauri_app;
@@ -44,6 +45,14 @@ pub fn run() {
 }
 
 pub fn run_app() {
+    run_app_with_cli_command(None);
+}
+
+pub fn run_app_with_chord(sequence: String) {
+    run_app_with_cli_command(Some(tauri_app::scripting::CliAppCommand::Chord(sequence)));
+}
+
+fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliAppCommand>) {
     std::panic::set_hook(Box::new(|info| {
         let bt = std::backtrace::Backtrace::force_capture();
 
@@ -84,6 +93,7 @@ pub fn run_app() {
         .level(log::LevelFilter::Trace)
         .filter(logging::enabled)
         .format(|out, message, record| {
+            let message = logging::bounded_message(message);
             out.finish(format_args!(
                 "[{}] {}:{} - {}",
                 record.level(),
@@ -101,11 +111,12 @@ pub fn run_app() {
             ))
         })
         .targets([
+            logging::history_target(),
             Target::new(TargetKind::Stdout),
             Target::new(TargetKind::LogDir {
                 file_name: Some("chords".into()),
             }),
-            Target::new(TargetKind::Webview),
+            logging::webview_target(),
         ])
         .build();
 
@@ -131,7 +142,15 @@ pub fn run_app() {
         })
         .plugin(log_plugin)
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_single_instance::init(|handle, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|handle, args, _cwd| {
+            if let Some(command) = tauri_app::scripting::cli_app_command_from_args(&args) {
+                if let Err(error) = tauri_app::scripting::handle_cli_app_command(handle, command) {
+                    log::error!("Failed to handle command from another Chord instance: {error:#}");
+                    tauri_app::play_failure_sound(handle);
+                }
+                return;
+            }
+
             let settings = handle.app_state().settings();
             if let Err(error) = settings.ui.open() {
                 log::error!("Failed to show settings window for existing instance: {error}");
@@ -173,6 +192,15 @@ pub fn run_app() {
                 std::process::exit(1);
             }
 
+            if let Some(command) = startup_command.clone() {
+                if let Err(error) =
+                    tauri_app::scripting::handle_cli_app_command(app.handle(), command)
+                {
+                    log::error!("Failed to handle startup Chord command: {error:#}");
+                    tauri_app::play_failure_sound(app.handle());
+                }
+            }
+
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -197,6 +225,13 @@ pub fn run_app() {
 
 pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
     bun_js::run_standalone_module(path.as_ref()).await
+}
+
+pub async fn run_script_with_args(
+    path: impl AsRef<std::path::Path>,
+    args: Vec<String>,
+) -> anyhow::Result<()> {
+    bun_js::run_standalone_module_with_args(path.as_ref(), args).await
 }
 
 pub async fn run_script_export(

@@ -1,0 +1,20 @@
+{
+  "name": "@chord/dev.improve.chord.routes.settings._components.log-stream",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#log-stream": "./log-stream.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@tauri-apps/plugin-log": "^2.9.0",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5"
+  }
+}

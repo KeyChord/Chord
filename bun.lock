@@ -82,10 +82,12 @@
         "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
         "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
         "@chord/dev.improve.chord.configs.dev": "workspace:*",
+        "@chord/dev.improve.chord.configs.dev.tauri": "workspace:*",
         "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": "workspace:*",
         "@chord/dev.improve.chord.configs.release.macos": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
+        "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.permissions": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
@@ -101,6 +103,7 @@
         "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
@@ -116,6 +119,7 @@
         "@chord/dev.improve.chord.routes.settings.danger.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.general.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
       },
       "devDependencies": {
         "vite-plus": "^0.3.0",
@@ -147,6 +151,7 @@
         "@chord/dev.improve.chord.routes.settings.danger.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.general.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
         "@fontsource-variable/geist": "^5.3.0",
         "@headless-tree/core": "^1.7.0",
         "@headless-tree/react": "^1.7.0",
@@ -1027,6 +1032,16 @@
         "mprocs": "^0.9.6",
       },
     },
+    "chord/dev/improve/chord/configs/dev/tauri": {
+      "name": "@chord/dev.improve.chord.configs.dev.tauri",
+      "version": "0.0.0",
+      "bin": {
+        "tauri-dev": "./_tauri-dev.ts",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.4.0",
+      },
+    },
     "chord/dev/improve/chord/configs/patching/codemods/sfsymbols-react": {
       "name": "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react",
       "version": "0.0.0",
@@ -1052,6 +1067,9 @@
       "dependencies": {
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
       },
+    },
+    "chord/dev/improve/chord/lib/github": {
+      "name": "@chord/dev.improve.chord.lib.github",
     },
     "chord/dev/improve/chord/lib/permissions": {
       "name": "@chord/dev.improve.chord.lib.permissions",
@@ -1117,7 +1135,9 @@
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
         "@chord/dev.improve.chord.components.ui.sidebar": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
+        "@tauri-apps/api": "^2.11.1",
         "lucide-react": "^1.34.0",
         "react": "^19.2.8",
       },
@@ -1252,6 +1272,18 @@
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "react": "^19.2.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+      },
+    },
+    "chord/dev/improve/chord/routes/settings/_components/log-stream": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.log-stream",
+      "dependencies": {
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@tauri-apps/plugin-log": "^2.9.0",
         "react": "^19.2.8",
       },
       "devDependencies": {
@@ -1406,6 +1438,7 @@
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
+        "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "lucide-react": "^1.34.0",
         "react": "^19.2.8",
@@ -1484,6 +1517,20 @@
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
+        "lucide-react": "^1.34.0",
+        "react": "^19.2.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+      },
+    },
+    "chord/dev/improve/chord/routes/settings/log/index": {
+      "name": "@chord/dev.improve.chord.routes.settings.log.index",
+      "dependencies": {
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "lucide-react": "^1.34.0",
         "react": "^19.2.8",
       },
@@ -1730,6 +1777,8 @@
 
     "@chord/dev.improve.chord.configs.dev": ["@chord/dev.improve.chord.configs.dev@workspace:chord/dev/improve/chord/configs/dev"],
 
+    "@chord/dev.improve.chord.configs.dev.tauri": ["@chord/dev.improve.chord.configs.dev.tauri@workspace:chord/dev/improve/chord/configs/dev/tauri"],
+
     "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": ["@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react@workspace:chord/dev/improve/chord/configs/patching/codemods/sfsymbols-react"],
 
     "@chord/dev.improve.chord.configs.release.macos": ["@chord/dev.improve.chord.configs.release.macos@workspace:chord/dev/improve/chord/configs/release/macos"],
@@ -1737,6 +1786,8 @@
     "@chord/dev.improve.chord.data.official-chord-repos": ["@chord/dev.improve.chord.data.official-chord-repos@workspace:chord/dev/improve/chord/data/official-chord-repos"],
 
     "@chord/dev.improve.chord.lib.chord-files": ["@chord/dev.improve.chord.lib.chord-files@workspace:chord/dev/improve/chord/lib/chord-files"],
+
+    "@chord/dev.improve.chord.lib.github": ["@chord/dev.improve.chord.lib.github@workspace:chord/dev/improve/chord/lib/github"],
 
     "@chord/dev.improve.chord.lib.permissions": ["@chord/dev.improve.chord.lib.permissions@workspace:chord/dev/improve/chord/lib/permissions"],
 
@@ -1768,6 +1819,8 @@
 
     "@chord/dev.improve.chord.routes.settings._components.local-folders-card": ["@chord/dev.improve.chord.routes.settings._components.local-folders-card@workspace:chord/dev/improve/chord/routes/settings/_components/local-folders-card"],
 
+    "@chord/dev.improve.chord.routes.settings._components.log-stream": ["@chord/dev.improve.chord.routes.settings._components.log-stream@workspace:chord/dev/improve/chord/routes/settings/_components/log-stream"],
+
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": ["@chord/dev.improve.chord.routes.settings._components.open-repo-button@workspace:chord/dev/improve/chord/routes/settings/_components/open-repo-button"],
 
     "@chord/dev.improve.chord.routes.settings._components.permissions-card": ["@chord/dev.improve.chord.routes.settings._components.permissions-card@workspace:chord/dev/improve/chord/routes/settings/_components/permissions-card"],
@@ -1797,6 +1850,8 @@
     "@chord/dev.improve.chord.routes.settings.general.index": ["@chord/dev.improve.chord.routes.settings.general.index@workspace:chord/dev/improve/chord/routes/settings/general/index"],
 
     "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": ["@chord/dev.improve.chord.routes.settings.global-shortcuts.index@workspace:chord/dev/improve/chord/routes/settings/global-shortcuts/index"],
+
+    "@chord/dev.improve.chord.routes.settings.log.index": ["@chord/dev.improve.chord.routes.settings.log.index@workspace:chord/dev/improve/chord/routes/settings/log/index"],
 
     "@codemod.com/jssg-types": ["@codemod.com/jssg-types@1.6.3", "", {}, "sha512-b5829ixO5TdGL5xg5YcL9YfiLC3WwFZU+8Zx78NpsHlJ1iySbqfA0g0psqNXv8ss/r7hdpy2KiBXm3GE6bN5bQ=="],
 

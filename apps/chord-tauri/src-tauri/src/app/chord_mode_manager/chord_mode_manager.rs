@@ -51,6 +51,10 @@ impl ChordModeManager {
         self.input_manager.handle_key_event(key_event)
     }
 
+    pub fn execute_sequence(&self, sequence: &str) -> Result<()> {
+        self.input_manager.execute_sequence(sequence)
+    }
+
     pub fn ensure_active(&self) -> Result<()> {
         log::debug!("Activating Chord Mode");
         if self.panel.ensure_visible()? {

@@ -3,6 +3,7 @@ use super::{
     ShellChordActionTaskRunner, ShortcutChordActionTaskRun, ShortcutChordActionTaskRunner,
 };
 use crate::models::{ChordInputEvent, ChordTaskAction, FilePathslug};
+use crate::tauri_app::play_failure_sound;
 use nject::injectable;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -33,6 +34,7 @@ pub enum ChordActionTaskRun {
 #[injectable]
 pub struct ChordActionTaskRunner {
     handler: HandlerChordActionTaskRunner,
+    handle: AppHandle,
     shell: ShellChordActionTaskRunner,
     pub shortcut: ShortcutChordActionTaskRunner,
 }
@@ -41,28 +43,37 @@ impl ChordActionTaskRunner {
     /// Called when the chord keys are pressed down.
     pub fn start_task(&self, task: &ChordActionTask) -> anyhow::Result<ChordActionTaskRun> {
         log::debug!("Starting task: {:?}", task);
-        let task_run = match &task.action {
-            ChordTaskAction::Handler(action) => {
-                ChordActionTaskRun::Handler(self.handler.start(task, action)?)
-            }
-            ChordTaskAction::Shell(action) => {
-                ChordActionTaskRun::Shell(self.shell.start(task, action)?)
-            }
-            ChordTaskAction::Shortcut(action) => {
-                ChordActionTaskRun::Shortcut(self.shortcut.start(task, action)?)
-            }
+        let result = match &task.action {
+            ChordTaskAction::Handler(action) => self
+                .handler
+                .start(task, action)
+                .map(ChordActionTaskRun::Handler),
+            ChordTaskAction::Shell(action) => self
+                .shell
+                .start(task, action)
+                .map(ChordActionTaskRun::Shell),
+            ChordTaskAction::Shortcut(action) => self
+                .shortcut
+                .start(task, action)
+                .map(ChordActionTaskRun::Shortcut),
         };
-        Ok(task_run)
+        if result.is_err() {
+            play_failure_sound(&self.handle);
+        }
+        result
     }
 
     /// Called when the chord keys are lifted. Async is needed for buffering chords.
     pub async fn end_task(&self, task_run: ChordActionTaskRun) -> anyhow::Result<()> {
-        match task_run {
-            ChordActionTaskRun::Handler(task_run) => self.handler.end(task_run).await?,
-            ChordActionTaskRun::Shell(task_run) => self.shell.end(task_run).await?,
-            ChordActionTaskRun::Shortcut(task_run) => self.shortcut.end(task_run).await?,
+        let result = match task_run {
+            ChordActionTaskRun::Handler(task_run) => self.handler.end(task_run).await,
+            ChordActionTaskRun::Shell(task_run) => self.shell.end(task_run).await,
+            ChordActionTaskRun::Shortcut(task_run) => self.shortcut.end(task_run).await,
         };
-        Ok(())
+        if result.is_err() {
+            play_failure_sound(&self.handle);
+        }
+        result
     }
 
     /// Called if the user explicitly presses `Esc` or reloads the config

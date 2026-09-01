@@ -1,14 +1,29 @@
 use crate::app::AppHandleExt;
+use crate::tauri_app::play_failure_sound;
 use anyhow::{Context, Result, bail};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+static PENDING_CHORDS: Mutex<PendingChords> = Mutex::new(PendingChords {
+    ready: false,
+    sequences: Vec::new(),
+});
+
+struct PendingChords {
+    ready: bool,
+    sequences: Vec<String>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ScriptCommand {
     OpenSettings,
     ReloadConfigs,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CliAppCommand {
+    Chord(String),
 }
 
 pub fn init(handle: AppHandle) {
@@ -34,6 +49,61 @@ pub fn handle_url(url: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn handle_cli_app_command(handle: &AppHandle, command: CliAppCommand) -> Result<()> {
+    match command {
+        CliAppCommand::Chord(sequence) => execute_or_queue_chord(handle, sequence),
+    }
+}
+
+pub fn cli_app_command_from_args(args: &[String]) -> Option<CliAppCommand> {
+    match args.get(1..)? {
+        [sequence] if !sequence.starts_with('-') => Some(CliAppCommand::Chord(sequence.clone())),
+        [command, sequence] if command == "chord" || command == "__app-chord" => {
+            Some(CliAppCommand::Chord(sequence.clone()))
+        }
+        _ => None,
+    }
+}
+
+fn execute_or_queue_chord(handle: &AppHandle, sequence: String) -> Result<()> {
+    {
+        let mut pending = PENDING_CHORDS
+            .lock()
+            .map_err(|_| anyhow::anyhow!("pending chord queue is poisoned"))?;
+        if !pending.ready {
+            pending.sequences.push(sequence);
+            return Ok(());
+        }
+    }
+
+    handle
+        .app_state()
+        .chord_mode_manager()
+        .execute_sequence(&sequence)
+}
+
+pub fn mark_chord_packages_ready(handle: &AppHandle) {
+    let sequences = {
+        let Ok(mut pending) = PENDING_CHORDS.lock() else {
+            log::error!("Pending chord queue is poisoned");
+            return;
+        };
+        pending.ready = true;
+        std::mem::take(&mut pending.sequences)
+    };
+
+    for sequence in sequences {
+        if let Err(error) = handle
+            .app_state()
+            .chord_mode_manager()
+            .execute_sequence(&sequence)
+        {
+            log::error!("Failed to execute queued CLI chord `{sequence}`: {error:#}");
+            play_failure_sound(handle);
+        }
+    }
 }
 
 pub fn reload_configs(handle: AppHandle) {
@@ -164,7 +234,9 @@ mod macos {
 
 #[cfg(test)]
 mod tests {
-    use super::{ScriptCommand, normalize_command, parse_command};
+    use super::{
+        CliAppCommand, ScriptCommand, cli_app_command_from_args, normalize_command, parse_command,
+    };
 
     #[test]
     fn parses_direct_scheme_command() {
@@ -187,6 +259,43 @@ mod tests {
         assert_eq!(
             normalize_command("chord://reload-configs?source=raycast").unwrap(),
             "reload-configs"
+        );
+    }
+
+    #[test]
+    fn parses_explicit_cli_chord() {
+        assert_eq!(
+            cli_app_command_from_args(&["/Applications/Chord".into(), "chord".into(), "fq".into()]),
+            Some(CliAppCommand::Chord("fq".into()))
+        );
+    }
+
+    #[test]
+    fn parses_internal_detached_chord() {
+        assert_eq!(
+            cli_app_command_from_args(&[
+                "/Applications/Chord".into(),
+                "__app-chord".into(),
+                "fq".into()
+            ]),
+            Some(CliAppCommand::Chord("fq".into()))
+        );
+    }
+
+    #[test]
+    fn parses_shorthand_cli_chord() {
+        assert_eq!(
+            cli_app_command_from_args(&["/Applications/Chord".into(), "fq".into()]),
+            Some(CliAppCommand::Chord("fq".into()))
+        );
+    }
+
+    #[test]
+    fn ignores_non_chord_instance_arguments() {
+        assert_eq!(cli_app_command_from_args(&["chord".into()]), None);
+        assert_eq!(
+            cli_app_command_from_args(&["chord".into(), "--autostart".into()]),
+            None
         );
     }
 }

@@ -4,9 +4,17 @@ set -eu
 
 print_help() {
   cat <<'EOF'
-Usage: chord <command>
+Usage:
+  chord bun <script> [args...]
+  chord exec <shell-command>
+  chord chord <sequence>
+  chord <sequence>
+  chord <command>
 
 Commands:
+  bun <script> [args...]       Run a script with Chord's embedded Bun runtime
+  exec <shell-command>        Run a shell command under Chord
+  chord <sequence>            Execute a chord sequence
   settings
   open-settings
   show-settings
@@ -15,9 +23,60 @@ Commands:
   help
 
 Examples:
+  chord bun ./script.ts hello
+  chord exec 'open https://example.com'
+  chord chord fq
+  chord fq
   chord settings
   chord reload-configs
 EOF
+}
+
+open_chord_url() {
+  url="$1"
+  if ! output="$(open --background "$url" 2>&1)"; then
+    if [ -n "$output" ]; then
+      echo "$output" >&2
+      echo >&2
+    fi
+    echo "Failed to open $url." >&2
+    echo "Make sure the Chord app bundle has been built and opened at least once so macOS registers the chord: URL scheme." >&2
+    exit 1
+  fi
+}
+
+run_chord_executable() {
+  script_path="$0"
+  while [ -L "$script_path" ]; do
+    link_path="$(readlink "$script_path")"
+    case "$link_path" in
+      /*) script_path="$link_path" ;;
+      *) script_path="$(dirname "$script_path")/$link_path" ;;
+    esac
+  done
+  script_dir="$(CDPATH= cd "$(dirname "$script_path")" && pwd)"
+
+  for executable in \
+    "${CHORD_EXECUTABLE:-}" \
+    "$script_dir/src-tauri/target/debug/chord" \
+    "$script_dir/src-tauri/target/release/chord" \
+    "/Applications/Chord.app/Contents/MacOS/chord" \
+    "/Applications/Chord.app/Contents/MacOS/"* \
+    "/Applications/Chord (Beta).app/Contents/MacOS/chord" \
+    "/Applications/Chord (Beta).app/Contents/MacOS/"* \
+    "${HOME:-}/Applications/Chord.app/Contents/MacOS/chord" \
+    "${HOME:-}/Applications/Chord.app/Contents/MacOS/"* \
+    "${HOME:-}/Applications/Chord (Beta).app/Contents/MacOS/chord" \
+    "${HOME:-}/Applications/Chord (Beta).app/Contents/MacOS/"*
+  do
+    if [ -n "$executable" ] && [ -x "$executable" ]; then
+      exec "$executable" "$@"
+    fi
+  done
+
+  echo "Could not find the Chord executable." >&2
+  echo "Build Chord first or set CHORD_EXECUTABLE to its path." >&2
+  exit 1
 }
 
 if [ "$#" -eq 0 ]; then
@@ -32,22 +91,20 @@ case "$command_name" in
     print_help
     exit 0
     ;;
+  bun)
+    run_chord_executable "$@"
+    ;;
+  exec)
+    run_chord_executable "$@"
+    ;;
+  chord)
+    run_chord_executable "$@"
+    ;;
   settings|open-settings|show-settings|reload-config|reload-configs)
-    if ! output="$(open --background "chord:${command_name}" 2>&1)"; then
-      if [ -n "$output" ]; then
-        echo "$output" >&2
-        echo >&2
-      fi
-      echo "Failed to open chord:${command_name}." >&2
-      echo "Make sure the Chord app bundle has been built and opened at least once so macOS registers the chord: URL scheme." >&2
-      exit 1
-    fi
+    open_chord_url "chord:${command_name}"
     exit 0
     ;;
   *)
-    echo "Unknown command: $command_name" >&2
-    echo >&2
-    print_help >&2
-    exit 1
+    run_chord_executable "$@"
     ;;
 esac

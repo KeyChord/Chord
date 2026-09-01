@@ -8,6 +8,7 @@ import { Checkbox } from '@chord/dev.improve.chord.components.ui.checkbox';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@chord/dev.improve.chord.components.ui.empty';
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
 import { officialChordReposData } from '@chord/dev.improve.chord.data.official-chord-repos';
+import { getGitHubSlug } from '@chord/dev.improve.chord.lib.github';
 import { useGitRepoStoreState } from '@chord/dev.improve.chord.lib.state';
 import { CheckCircle2, Plus, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -17,7 +18,6 @@ interface OfficialChordRepo {
 	url: string
 }
 
-const githubDotGitSuffixRegex = /\.git$/i;
 const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
 
 export function SettingsBrowsePage() {
@@ -273,27 +273,4 @@ export function SettingsBrowsePage() {
 			</CardContent>
 		</Card>
 	);
-}
-
-function getGitHubSlug(url: string) {
-	try {
-		const parsedUrl = new URL(url);
-		if (!parsedUrl.hostname.endsWith('github.com')) {
-			return undefined;
-		}
-
-		const [owner, name] = parsedUrl.pathname
-			.split('/')
-			.filter(Boolean)
-			.map(segment => segment.replace(githubDotGitSuffixRegex, ''));
-
-		if (!owner || !name) {
-			return undefined;
-		}
-
-		return `${owner}/${name}`;
-	}
-	catch {
-		return undefined;
-	}
 }

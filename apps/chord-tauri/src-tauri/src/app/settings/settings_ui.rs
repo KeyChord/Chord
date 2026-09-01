@@ -38,7 +38,7 @@ impl SettingsUi {
             .transparent(true)
             .title_bar_style(TitleBarStyle::Overlay)
             .hidden_title(true)
-            .traffic_light_position(LogicalPosition::new(18.0, 18.0))
+            .traffic_light_position(LogicalPosition::new(18.0, 24.0))
             .effects(
                 EffectsBuilder::new()
                     .effect(Effect::Sidebar)

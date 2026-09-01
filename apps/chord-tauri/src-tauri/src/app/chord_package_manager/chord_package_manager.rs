@@ -15,10 +15,8 @@ use ordermap::OrderMap;
 use parking_lot::{Mutex, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::AppHandle;
-use tokio::task::JoinSet;
-use tracing::{Instrument, info, info_span};
 
 #[injectable]
 pub struct ChordPackageManager {
@@ -35,6 +33,21 @@ pub struct ChordPackageManager {
     #[inject(RwLock::new(HashMap::new()))]
     package_roots: RwLock<HashMap<String, PathBuf>>,
 
+    #[inject(tokio::sync::Mutex::new(()))]
+    reload_lock: tokio::sync::Mutex<()>,
+
+    #[inject(AtomicU64::new(0))]
+    reload_requested: AtomicU64,
+
+    #[inject(AtomicU64::new(0))]
+    reload_completed: AtomicU64,
+
+    #[inject(Mutex::new(None))]
+    last_reload_error: Mutex<Option<String>>,
+
+    #[inject(AtomicU64::new(0))]
+    lifecycle_generation: AtomicU64,
+
     observable: ChordPackageManagerObservable,
     handle: AppHandle,
 }
@@ -44,12 +57,57 @@ struct ChordInputEventContext {
     event: ChordInputEvent,
 }
 
+fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
+    packages
+        .values()
+        .flat_map(|package| package.compiled_chords_files.values())
+        .flat_map(|file| file.handlers.iter())
+        .map(|handler| handler.handler_id.clone())
+        .collect()
+}
+
 impl ChordPackageManager {
     pub async fn reload_all(&self) -> Result<()> {
-        let raw_chord_packages = self.registry.import_all_packages()?;
-        self.packages.write().clear();
+        let request = self.reload_requested.fetch_add(1, Ordering::SeqCst) + 1;
+        let _reload_guard = self.reload_lock.lock().await;
 
-        let mut chord_packages = Vec::new();
+        if self.reload_completed.load(Ordering::SeqCst) >= request {
+            return self.last_reload_result();
+        }
+
+        // Include every request that arrived while this caller was waiting. Requests arriving
+        // during the reload will be handled by one trailing caller instead of creating a queue of
+        // complete reloads.
+        let generation = self.reload_requested.load(Ordering::SeqCst);
+        let result = self.reload_once().await;
+        *self.last_reload_error.lock() = result.as_ref().err().map(|error| format!("{error:#}"));
+        self.reload_completed.store(generation, Ordering::SeqCst);
+        result
+    }
+
+    fn last_reload_result(&self) -> Result<()> {
+        match self.last_reload_error.lock().clone() {
+            Some(error) => Err(anyhow::anyhow!(error)),
+            None => Ok(()),
+        }
+    }
+
+    async fn reload_once(&self) -> Result<()> {
+        let raw_chord_packages = self.registry.import_all_packages()?;
+        let previous_roots = self.package_roots.read().clone();
+        let previous_handler_ids = handler_ids(&self.packages.read());
+        let lifecycle_generation = crate::bun_js::lifecycle::begin_registration_generation();
+
+        let next_roots = raw_chord_packages
+            .values()
+            .filter(|package| !package.js_files_contents.is_empty())
+            .map(|package| (package.package_name(), package.root.clone()))
+            .collect::<HashMap<_, _>>();
+        let mut loading_roots = previous_roots.clone();
+        loading_roots.extend(next_roots.clone());
+        *self.package_roots.write() = loading_roots;
+
+        let mut chord_packages = OrderMap::new();
         for (package_name, raw_chord_package) in raw_chord_packages {
             if let Ok(package) = self
                 .load_package(raw_chord_package)
@@ -62,14 +120,36 @@ impl ChordPackageManager {
                     )
                 })
             {
-                chord_packages.push(package);
+                chord_packages.insert(package.name.clone(), package);
             };
         }
 
-        self.observable.set_state(|_| ChordPackageManagerState {
-            packages: chord_packages,
-        })?;
+        let next_handler_ids = handler_ids(&chord_packages);
+        let retained_handler_ids = previous_handler_ids
+            .union(&next_handler_ids)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let observable_packages = chord_packages.values().cloned().collect();
 
+        *self.packages.write() = chord_packages;
+        *self.package_roots.write() = next_roots;
+        let observable_result = self.observable.set_state(|_| ChordPackageManagerState {
+            packages: observable_packages,
+        });
+
+        self.lifecycle_generation
+            .store(lifecycle_generation, Ordering::SeqCst);
+        if let Err(error) = bun_handlers::retain_runtime_registrations(
+            self.handle.clone(),
+            retained_handler_ids,
+            lifecycle_generation,
+        )
+        .await
+        {
+            log::warn!("Failed to prune stale Bun registrations after reload: {error:#}");
+        }
+
+        observable_result?;
         Ok(())
     }
 
@@ -132,46 +212,28 @@ impl ChordPackageManager {
         }
 
         let js_package = self
-            .load_js_package(&name, root, raw_chord_package.js_files_contents.clone())
+            .load_js_package(&name, root, raw_chord_package.js_files_contents)
             .await?;
 
-        let shared_parsed_chords_files = Arc::new(parsed_chords_files.clone());
-        let shared_js_package = Arc::new(js_package.clone());
-
-        let mut set = JoinSet::new();
-
-        for (pathslug, parsed_chord_file) in parsed_chords_files {
-            let handle = self.handle.clone();
-            let parsed_chords_files = Arc::clone(&shared_parsed_chords_files);
-            let js_package = Arc::clone(&shared_js_package);
-            let name = name.clone();
-
-            // let span = info_span!("compiling_file", file = %pathslug.to_string_lossy());
-            set.spawn(async move {
-                let result = Self::compile_chords_file(
-                    handle,
-                    &parsed_chord_file,
-                    pathslug.clone(),
-                    &js_package,
-                    &parsed_chords_files,
-                    &None,
-                )
-                .await;
-
-                // Return the data back to the main thread
-                (pathslug, name, result)
-            });
-        }
-
-        // 2. Collect results as they finish (Promise.all style)
-        while let Some(res) = set.join_next().await {
-            let (pathslug, name, compile_result) = res?;
+        // Bun owns one VM on one thread, so spawning one Tokio task per file only creates a
+        // memory-heavy queue. Compile sequentially and let the bounded Bun worker provide the
+        // ordering and backpressure.
+        for (pathslug, parsed_chord_file) in &parsed_chords_files {
+            let compile_result = Self::compile_chords_file(
+                self.handle.clone(),
+                parsed_chord_file,
+                pathslug.clone(),
+                &js_package,
+                &parsed_chords_files,
+                &None,
+            )
+            .await;
 
             match compile_result {
                 Ok(chords_file) => {
                     log::debug!(
                         "compiled chords file {:#?} with {} chords",
-                        Path::new(&name).join(&pathslug),
+                        Path::new(&name).join(pathslug),
                         chords_file.chords.len()
                     );
 
@@ -199,7 +261,7 @@ impl ChordPackageManager {
                         }
                     }
 
-                    compiled_chords_files.insert(pathslug.to_owned(), chords_file);
+                    compiled_chords_files.insert(pathslug.clone(), chords_file);
                 }
                 Err(e) => {
                     log::error!(
@@ -220,8 +282,6 @@ impl ChordPackageManager {
             global_chords,
         };
 
-        self.packages.write().insert(name, chord_package.clone());
-
         Ok(chord_package)
     }
 
@@ -238,9 +298,6 @@ impl ChordPackageManager {
             return Ok(None);
         }
 
-        self.package_roots
-            .write()
-            .insert(package_name.to_string(), root.clone());
         let package = ChordJsPackage::builder(self.handle.clone(), package_name, root)
             .load(files)
             .await?;
@@ -402,12 +459,39 @@ impl ChordPackageManager {
 }
 
 mod bun_handlers {
-    use crate::bun_js::{format_js_error, with_js};
+    use crate::bun_js::{format_js_error, lifecycle, with_js};
     use rbun::Module;
     #[allow(unused_imports)]
     use rbun::prelude::OptionExt;
     use rbun::prelude::{Args, Object, ResultExt, Value};
+    use std::collections::HashSet;
     use tauri::AppHandle;
+
+    pub async fn retain_runtime_registrations(
+        handle: AppHandle,
+        handler_ids: HashSet<String>,
+        lifecycle_generation: u64,
+    ) -> anyhow::Result<()> {
+        with_js(handle, move |ctx| {
+            Box::pin(async move {
+                let globals = ctx.globals();
+                let registry: Option<Object> = globals.get("__RUST_HANDLER_REGISTRY")?;
+                if let Some(registry) = registry {
+                    let keys = registry
+                        .keys::<String>()
+                        .collect::<rbun::Result<Vec<_>>>()?;
+                    for key in keys {
+                        if !handler_ids.contains(&key) {
+                            registry.remove(key)?;
+                        }
+                    }
+                }
+                lifecycle::retain_registration_generation(lifecycle_generation);
+                Ok(())
+            })
+        })
+        .await
+    }
 
     /// Import a handler module, call its default export with the build context, and register the
     /// returned handler function.

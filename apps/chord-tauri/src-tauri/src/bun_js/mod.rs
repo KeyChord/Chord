@@ -10,12 +10,12 @@ use rbun::module::Declared;
 use rbun::prelude::*;
 use rbun::{AsyncContext, AsyncRuntime, Module, RuntimeOptions, async_with};
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, mpsc};
+use std::sync::OnceLock;
 use std::thread;
 use std::{cell::RefCell, future::Future, pin::Pin};
 use tauri::{AppHandle, Manager};
 use tokio::runtime::Runtime;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc, oneshot};
 
 mod chord_module;
 pub mod lifecycle;
@@ -31,6 +31,7 @@ thread_local! {
 }
 
 type JsTask = Box<dyn FnOnce(&Runtime) + Send + 'static>;
+const JS_WORKER_QUEUE_CAPACITY: usize = 64;
 
 struct JsWorker {
     tx: mpsc::Sender<JsTask>,
@@ -41,7 +42,7 @@ impl JsWorker {
         static WORKER: OnceLock<JsWorker> = OnceLock::new();
 
         WORKER.get_or_init(|| {
-            let (tx, rx) = mpsc::channel::<JsTask>();
+            let (tx, mut rx) = mpsc::channel::<JsTask>(JS_WORKER_QUEUE_CAPACITY);
 
             thread::Builder::new()
                 .name("bun-worker".into())
@@ -54,7 +55,7 @@ impl JsWorker {
                         .build()
                         .expect("failed to build bun worker runtime");
 
-                    while let Ok(task) = rx.recv() {
+                    while let Some(task) = rx.blocking_recv() {
                         task(&runtime);
                     }
                 })
@@ -75,6 +76,7 @@ impl JsWorker {
             .send(Box::new(move |runtime| {
                 let _ = tx.send(task(runtime));
             }))
+            .await
             .map_err(|_| anyhow::anyhow!("bun worker is unavailable"))?;
 
         rx.await
@@ -280,10 +282,18 @@ where
 }
 
 pub async fn run_standalone_module(path: &Path) -> anyhow::Result<()> {
+    run_standalone_module_with_args(path, Vec::new()).await
+}
+
+pub async fn run_standalone_module_with_args(path: &Path, args: Vec<String>) -> anyhow::Result<()> {
     let module_path = canonicalize_module_path(path)?.display().to_string();
     run_on_worker(move |runtime| {
         runtime.block_on(async move {
             let engine = build_engine(None).await?;
+            engine
+                ._rt
+                .inner()
+                .configure_entrypoint(&module_path, &args)?;
             engine
                 .ctx
                 .async_with(|ctx| {

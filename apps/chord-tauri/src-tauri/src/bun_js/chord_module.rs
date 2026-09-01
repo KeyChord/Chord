@@ -321,28 +321,41 @@ async fn run_sudo_command<'js>(
     }
 
     let thread_result = tauri::async_runtime::spawn_blocking(move || {
-        let mut cmd = std::process::Command::new(program);
-        for arg in rust_args {
-            cmd.arg(arg);
-        }
-        cmd.stderr(std::process::Stdio::piped());
-
-        // Execute and return a standard `std::io::Result` from the closure
         if elevated_command::Command::is_elevated() {
-            cmd.output()
-                .map_err(|e| format!("elevated output failed: {}", e.to_string()))
+            std::process::Command::new(program)
+                .args(rust_args)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .map_err(|error| format!("elevated command failed: {error}"))
         } else {
-            let mut elevated_cmd = elevated_command::Command::new(cmd);
+            // elevated-command captures its child's complete output. Run Chord's small helper
+            // under elevation instead; the helper discards the target command's output so the
+            // elevation bridge can never accumulate it in memory or in its temporary files.
+            let chord_executable = std::env::current_exe()
+                .map_err(|error| format!("failed to locate Chord executable: {error}"))?;
+            let mut helper = std::process::Command::new(chord_executable);
+            helper.arg("__elevated-exec");
+            helper.arg(encode_elevated_argument(&program));
+            helper.args(rust_args.iter().map(|arg| encode_elevated_argument(arg)));
+
+            let mut elevated_cmd = elevated_command::Command::new(helper);
             elevated_cmd.name("Chord".to_string());
             elevated_cmd
                 .output()
-                .map_err(|e| format!("elevated output failed: {}", e.to_string()))
+                .map(|output| output.status)
+                .map_err(|error| format!("elevated command failed: {error}"))
         }
     })
     .await;
 
     match thread_result {
-        Ok(Ok(_output)) => Ok(()),
+        Ok(Ok(status)) if status.success() => Ok(()),
+        Ok(Ok(status)) => Err(Exception::throw_message(
+            &ctx,
+            &format!("elevated command exited with status {status}"),
+        )),
         Ok(Err(e)) => Err(Exception::throw_message(
             &ctx,
             &format!("failed to run command: {}", e),
@@ -354,11 +367,22 @@ async fn run_sudo_command<'js>(
     }
 }
 
+fn encode_elevated_argument(argument: &str) -> String {
+    use std::fmt::Write;
+
+    let mut encoded = String::with_capacity(1 + argument.len() * 2);
+    encoded.push('x');
+    for byte in argument.as_bytes() {
+        write!(&mut encoded, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    encoded
+}
+
 /// `(package root, module path relative to it)` for the module whose `import.meta` is `meta`.
 ///
 /// Inside the app the package is found through the package manager (the module was imported
 /// from the package directory, so `import.meta.path` is under a known root). Standalone
-/// (`chord run file.ts`) the nearest ancestor with a `package.json` is taken as the root, so
+/// (`chord bun file.ts`) the nearest ancestor with a `package.json` is taken as the root, so
 /// packages can be exercised from a checkout.
 fn locate_module<'js>(ctx: &Ctx<'js>, meta: &Object<'js>) -> rbun::Result<(PathBuf, PathBuf)> {
     let module_path = meta

@@ -60,7 +60,11 @@ open --background 'chord:reload-config'
 
 ## CLI
 
-This repo also includes a small `chord` CLI wrapper that forwards commands to the `chord:` URL scheme.
+This repo also includes a small `chord` CLI wrapper. It delegates dynamic commands to the compiled
+Chord executable rather than putting command payloads in the public URL scheme. Chord sequences
+execute in the running app (launching it in the background when needed) so they use its loaded
+packages and frontmost-app context; `bun` uses Chord's embedded runtime, and `exec` runs the command
+as a Chord child process.
 
 ### Commands
 
@@ -69,17 +73,30 @@ This repo also includes a small `chord` CLI wrapper that forwards commands to th
 - `show-settings`
 - `reload-config`
 - `reload-configs`
+- `bun <script> [args...]`
+- `exec <shell-command>`
+- `chord <sequence>`
+- `<sequence>` (shorthand for `chord <sequence>`)
 
 ### Examples
 
 ```sh
+./chord bun ./script.ts hello
+./chord exec 'open https://example.com'
+./chord chord fq
+./chord fq
 ./chord settings
 ./chord reload-configs
 ```
 
 If you want to run it as `chord` from anywhere, add the repo copy to your `PATH` or symlink it into a directory that is already on your `PATH`.
 
-The CLI depends on macOS recognizing the bundled Chord app as the handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once first.
+The wrapper finds a development/release build in `src-tauri/target`, then checks the standard
+`/Applications` locations. Set `CHORD_EXECUTABLE` when the binary lives somewhere else.
+
+The static settings/reload commands depend on macOS recognizing the bundled Chord app as the
+handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once
+first.
 
 # Native code
 
@@ -213,7 +230,7 @@ Any other build system works too: Chord only cares that `target/<triple>/<path>/
 A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available (`resolveNativeModulePath` anchors on the nearest `package.json`):
 
 ```sh
-chord run scripts/run.ts by-letters f     # from the chords-menu checkout
+chord bun scripts/run.ts by-letters f     # from the chords-menu checkout
 ```
 
 ## Troubleshooting

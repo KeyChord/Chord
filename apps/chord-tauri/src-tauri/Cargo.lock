@@ -708,6 +708,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "shlex",
  "specta",
  "tauri",
  "tauri-build",

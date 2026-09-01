@@ -14,6 +14,8 @@
 		"core:window:allow-hide",
 		"core:window:allow-set-focus",
 		"core:window:allow-show",
+		"core:window:allow-start-dragging",
+		"core:window:allow-toggle-maximize",
 		"core:window:allow-unminimize",
 		"fs:read-dirs",
 		"store:default"

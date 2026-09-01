@@ -1,0 +1,11 @@
+{
+	"name": "@chord/dev.improve.chord.lib.github",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#github": "./github.ts"
+	},
+	"exports": {
+		".": "./+.ts"
+	}
+}

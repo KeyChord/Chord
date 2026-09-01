@@ -17,6 +17,7 @@ import { Route as SettingsConfigureIndexRouteImport } from './routes/settings/co
 import { Route as SettingsDangerIndexRouteImport } from './routes/settings/danger/index'
 import { Route as SettingsGeneralIndexRouteImport } from './routes/settings/general/index'
 import { Route as SettingsGlobalShortcutsIndexRouteImport } from './routes/settings/global-shortcuts/index'
+import { Route as SettingsLogIndexRouteImport } from './routes/settings/log/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -69,6 +70,11 @@ const SettingsGlobalShortcutsIndexRoute =
     path: '/global-shortcuts/',
     getParentRoute: () => SettingsRouteRoute,
   } as any)
+const SettingsLogIndexRoute = SettingsLogIndexRouteImport.update({
+  id: '/log/',
+  path: '/log/',
+  getParentRoute: () => SettingsRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/settings/danger/': typeof SettingsDangerIndexRoute
   '/settings/general/': typeof SettingsGeneralIndexRoute
   '/settings/global-shortcuts/': typeof SettingsGlobalShortcutsIndexRoute
+  '/settings/log/': typeof SettingsLogIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/settings/danger': typeof SettingsDangerIndexRoute
   '/settings/general': typeof SettingsGeneralIndexRoute
   '/settings/global-shortcuts': typeof SettingsGlobalShortcutsIndexRoute
+  '/settings/log': typeof SettingsLogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/settings/danger/': typeof SettingsDangerIndexRoute
   '/settings/general/': typeof SettingsGeneralIndexRoute
   '/settings/global-shortcuts/': typeof SettingsGlobalShortcutsIndexRoute
+  '/settings/log/': typeof SettingsLogIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/settings/danger/'
     | '/settings/general/'
     | '/settings/global-shortcuts/'
+    | '/settings/log/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/settings/danger'
     | '/settings/general'
     | '/settings/global-shortcuts'
+    | '/settings/log'
   id:
     | '__root__'
     | '/'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/settings/danger/'
     | '/settings/general/'
     | '/settings/global-shortcuts/'
+    | '/settings/log/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -222,6 +234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsGlobalShortcutsIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/settings/log/': {
+      id: '/settings/log/'
+      path: '/log'
+      fullPath: '/settings/log/'
+      preLoaderRoute: typeof SettingsLogIndexRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
   }
 }
 
@@ -233,6 +252,7 @@ interface SettingsRouteRouteChildren {
   SettingsDangerIndexRoute: typeof SettingsDangerIndexRoute
   SettingsGeneralIndexRoute: typeof SettingsGeneralIndexRoute
   SettingsGlobalShortcutsIndexRoute: typeof SettingsGlobalShortcutsIndexRoute
+  SettingsLogIndexRoute: typeof SettingsLogIndexRoute
 }
 
 const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
@@ -243,6 +263,7 @@ const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsDangerIndexRoute: SettingsDangerIndexRoute,
   SettingsGeneralIndexRoute: SettingsGeneralIndexRoute,
   SettingsGlobalShortcutsIndexRoute: SettingsGlobalShortcutsIndexRoute,
+  SettingsLogIndexRoute: SettingsLogIndexRoute,
 }
 
 const SettingsRouteRouteWithChildren = SettingsRouteRoute._addFileChildren(

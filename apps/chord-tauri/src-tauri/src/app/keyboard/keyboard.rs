@@ -1,21 +1,26 @@
 use crate::app::AppHandleExt;
 use crate::app::state::AppSingleton;
 use crate::models::{AppKeyboardState, Key, KeyEvent, KeyEventAction};
+use crate::state::KeyboardObservable;
 use anyhow::Result;
 use bitflags::bitflags;
 use device_query::{DeviceQuery, DeviceState};
-use keycode::{KeyMappingCode};
+use keycode::KeyMappingCode;
 use nject::injectable;
+use rdev::Key::KeyE;
 use std::os::raw::c_int;
 use std::process::Command;
-use std::sync::atomic::{AtomicU16, Ordering};
-use std::sync::mpsc::channel;
-use std::sync::{OnceLock, mpsc::Sender};
-use rdev::Key::KeyE;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
+use std::sync::mpsc::{SyncSender, TrySendError, sync_channel};
 use tauri::{AppHandle, Manager};
-use crate::state::KeyboardObservable;
 
-static TX: OnceLock<Sender<bool>> = OnceLock::new();
+const CAPS_LOCK_QUEUE_CAPACITY: usize = 16;
+const KEY_EVENT_QUEUE_CAPACITY: usize = 1_024;
+
+static CAPS_LOCK_QUEUE_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
+static KEY_EVENT_QUEUE_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
+static TX: OnceLock<SyncSender<bool>> = OnceLock::new();
 
 bitflags! {
   pub struct Modifiers: u16 {
@@ -48,7 +53,7 @@ impl AppKeyboard {
 
     pub fn register_input_handler(&self) -> Result<()> {
         let handle = self.handle.clone();
-        let (tx, rx) = channel::<KeyEvent>();
+        let (tx, rx) = sync_channel::<KeyEvent>(KEY_EVENT_QUEUE_CAPACITY);
 
         {
             let handle = self.handle.clone();
@@ -97,8 +102,18 @@ impl AppKeyboard {
                 let keyboard = handle.app_state().keyboard();
                 let action = keyboard.handle_key_event(&key_event);
 
-                if let Err(e) = tx.send(key_event) {
-                    log::error!("Failed to send key event: {e}");
+                match tx.try_send(key_event) {
+                    Ok(()) => {}
+                    Err(TrySendError::Full(_)) => {
+                        if !KEY_EVENT_QUEUE_WARNING_EMITTED.swap(true, Ordering::Relaxed) {
+                            log::warn!(
+                                "Dropping keyboard events because the bounded input queue is saturated"
+                            );
+                        }
+                    }
+                    Err(TrySendError::Disconnected(_)) => {
+                        log::error!("Keyboard event handler is unavailable");
+                    }
                 }
 
                 match action {
@@ -117,7 +132,7 @@ impl AppKeyboard {
 
     pub fn register_caps_lock_input_handler(&self) -> Result<()> {
         log::info!("Registering caps lock handler");
-        let (tx, rx) = channel();
+        let (tx, rx) = sync_channel(CAPS_LOCK_QUEUE_CAPACITY);
 
         TX.set(tx)
             .map_err(|_| anyhow::anyhow!("failed to set tx"))?;
@@ -134,9 +149,9 @@ impl AppKeyboard {
                     keyboard.handle_key_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
 
                     let app_controller = handle.app_state().app_controller();
-                    if let Err(e) = app_controller.handle_key_event(
-                        &KeyEvent::Press(Key(KeyMappingCode::CapsLock)),
-                    ) {
+                    if let Err(e) = app_controller
+                        .handle_key_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)))
+                    {
                         log::error!("Failed to handle Caps Lock Press: {e}");
                     }
                 } else {
@@ -144,9 +159,9 @@ impl AppKeyboard {
                     keyboard.handle_key_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
 
                     let app_controller = handle.app_state().app_controller();
-                    if let Err(e) = app_controller.handle_key_event(
-                        &KeyEvent::Release(Key(KeyMappingCode::CapsLock)),
-                    ) {
+                    if let Err(e) = app_controller
+                        .handle_key_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)))
+                    {
                         log::error!("Failed to handle Caps Lock Release: {e}");
                     }
                 }
@@ -189,7 +204,9 @@ impl AppKeyboard {
             Self::set_caps_lock_off();
         }
 
-        if event == &KeyEvent::Press(Key(KeyMappingCode::Space)) && self.keyboard_state.is_caps_pressed() {
+        if event == &KeyEvent::Press(Key(KeyMappingCode::Space))
+            && self.keyboard_state.is_caps_pressed()
+        {
             return KeyEventAction::Consume;
         }
 
@@ -248,8 +265,18 @@ unsafe extern "C" {
 extern "C" fn caps_lock_changed(pressed: c_int) {
     log::debug!("caps_lock_changed: {}", pressed);
     if let Some(tx) = TX.get() {
-        if let Err(e) = tx.send(pressed != 0) {
-            log::error!("Failed to send caps lock changed event: {e}");
+        match tx.try_send(pressed != 0) {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                if !CAPS_LOCK_QUEUE_WARNING_EMITTED.swap(true, Ordering::Relaxed) {
+                    log::warn!(
+                        "Dropping caps-lock events because the bounded input queue is saturated"
+                    );
+                }
+            }
+            Err(TrySendError::Disconnected(_)) => {
+                log::error!("Caps-lock event handler is unavailable");
+            }
         }
     } else {
         log::error!("No tx found");
