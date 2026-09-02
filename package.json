@@ -6,14 +6,14 @@
   "workspaces": {
     "packages": [
       "apps/*",
-      "chord/**"
+      "packages/**"
     ]
   },
   "scripts": {
     "dev": "vp exec _dev",
     "build": "bun --filter chord-tauri build",
     "build-dmg": "bun --filter chord-tauri build-dmg",
-    "lint": "vp lint --fix apps/chord-tauri chord/dev/improve/chord",
+    "lint": "vp lint --fix apps/chord-tauri packages/dev/improve/chord",
     "gen-types": "bun --filter chord-tauri gen-types"
   },
   "dependencies": {
@@ -137,13 +137,13 @@
     "vite-plus": "^0.3.0"
   },
   "overrides": {
-    "@tanstack/devtools-client": "workspace:chord/com/npmjs/tanstack__devtools-client",
-    "@tanstack/devtools-utils": "workspace:chord/com/npmjs/tanstack__devtools-utils",
-    "@tanstack/react-devtools": "workspace:chord/com/npmjs/tanstack__react-devtools",
-    "@tanstack/react-query": "workspace:chord/com/npmjs/tanstack__react-query",
-    "@tanstack/react-router": "workspace:chord/com/npmjs/tanstack__react-router",
-    "@tanstack/react-router-devtools": "workspace:chord/com/npmjs/tanstack__react-router-devtools",
-    "@tanstack/router-plugin": "workspace:chord/com/npmjs/tanstack__router-plugin"
+    "@tanstack/devtools-client": "workspace:packages/com/npmjs/tanstack__devtools-client",
+    "@tanstack/devtools-utils": "workspace:packages/com/npmjs/tanstack__devtools-utils",
+    "@tanstack/react-devtools": "workspace:packages/com/npmjs/tanstack__react-devtools",
+    "@tanstack/react-query": "workspace:packages/com/npmjs/tanstack__react-query",
+    "@tanstack/react-router": "workspace:packages/com/npmjs/tanstack__react-router",
+    "@tanstack/react-router-devtools": "workspace:packages/com/npmjs/tanstack__react-router-devtools",
+    "@tanstack/router-plugin": "workspace:packages/com/npmjs/tanstack__router-plugin"
   },
   "packageManager": "bun@1.4.0",
   "patchedDependencies": {

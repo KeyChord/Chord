@@ -11,7 +11,7 @@
 		"build-dmg": "release-macos",
 		"preview": "vite preview",
 		"tauri": "tauri",
-		"gen-types": "typeshare ./src-tauri --lang=typescript --output-file=../../chord/dev/improve/chord/lib/typeshare/types.gen.ts",
+		"gen-types": "typeshare ./src-tauri --lang=typescript --output-file=../../packages/dev/improve/chord/lib/typeshare/types.gen.ts",
 		"lint": "cd ../.. && ./node_modules/.bin/vp lint --fix apps/chord-tauri"
 	},
 	"dependencies": {

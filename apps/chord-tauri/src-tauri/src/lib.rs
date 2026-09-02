@@ -129,7 +129,7 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
             &api_handler,
             concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../../../chord/dev/improve/chord/api/taurpc/bindings.gen.ts"
+                "/../../../packages/dev/improve/chord/api/taurpc/bindings.gen.ts"
             ),
         )
         .expect("failed to export TauRPC TypeScript bindings");

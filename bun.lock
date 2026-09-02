@@ -197,130 +197,130 @@
         "vite": "^8.2.2",
       },
     },
-    "chord/com/npmjs/cmdk": {
+    "packages/com/npmjs/cmdk": {
       "name": "@chord/com.npmjs.cmdk",
       "dependencies": {
         "cmdk": "^1.1.1",
       },
     },
-    "chord/com/npmjs/date-fns": {
+    "packages/com/npmjs/date-fns": {
       "name": "@chord/com.npmjs.date-fns",
       "dependencies": {
         "date-fns": "^4.4.0",
       },
     },
-    "chord/com/npmjs/desm": {
+    "packages/com/npmjs/desm": {
       "name": "@chord/com.npmjs.desm",
       "dependencies": {
         "desm": "^1.3.1",
       },
     },
-    "chord/com/npmjs/map-obj": {
+    "packages/com/npmjs/map-obj": {
       "name": "@chord/com.npmjs.map-obj",
       "dependencies": {
         "map-obj": "^6.0.0",
       },
     },
-    "chord/com/npmjs/pathe": {
+    "packages/com/npmjs/pathe": {
       "name": "@chord/com.npmjs.pathe",
       "dependencies": {
         "pathe": "^2.0.3",
       },
     },
-    "chord/com/npmjs/react-day-picker": {
+    "packages/com/npmjs/react-day-picker": {
       "name": "@chord/com.npmjs.react-day-picker",
       "dependencies": {
         "react-day-picker": "^10.0.1",
       },
     },
-    "chord/com/npmjs/react-resizable-panels": {
+    "packages/com/npmjs/react-resizable-panels": {
       "name": "@chord/com.npmjs.react-resizable-panels",
       "dependencies": {
         "react-resizable-panels": "^4.12.3",
       },
     },
-    "chord/com/npmjs/recharts": {
+    "packages/com/npmjs/recharts": {
       "name": "@chord/com.npmjs.recharts",
       "dependencies": {
         "recharts": "3.10.1",
       },
     },
-    "chord/com/npmjs/rename-fn": {
+    "packages/com/npmjs/rename-fn": {
       "name": "@chord/com.npmjs.rename-fn",
       "dependencies": {
         "rename-fn": "^2.1.0",
       },
     },
-    "chord/com/npmjs/smol-toml": {
+    "packages/com/npmjs/smol-toml": {
       "name": "@chord/com.npmjs.smol-toml",
       "dependencies": {
         "smol-toml": "^1.8.0",
       },
     },
-    "chord/com/npmjs/sonner": {
+    "packages/com/npmjs/sonner": {
       "name": "@chord/com.npmjs.sonner",
       "dependencies": {
         "sonner": "^2.0.8",
       },
     },
-    "chord/com/npmjs/tanstack__devtools-client": {
+    "packages/com/npmjs/tanstack__devtools-client": {
       "name": "@chord/com.npmjs.tanstack__devtools-client",
       "dependencies": {
         "@tanstack/devtools-client-original": "npm:@tanstack/devtools-client@^0.0.8",
       },
     },
-    "chord/com/npmjs/tanstack__devtools-utils": {
+    "packages/com/npmjs/tanstack__devtools-utils": {
       "name": "@chord/com.npmjs.tanstack__devtools-utils",
       "dependencies": {
         "@tanstack/devtools-utils-original": "npm:@tanstack/devtools-utils@^0.7.0",
       },
     },
-    "chord/com/npmjs/tanstack__react-devtools": {
+    "packages/com/npmjs/tanstack__react-devtools": {
       "name": "@chord/com.npmjs.tanstack__react-devtools",
       "dependencies": {
         "@tanstack/react-devtools-original": "npm:@tanstack/react-devtools@^0.10.12",
       },
     },
-    "chord/com/npmjs/tanstack__react-query": {
+    "packages/com/npmjs/tanstack__react-query": {
       "name": "@chord/com.npmjs.tanstack__react-query",
       "dependencies": {
         "@tanstack/react-query-original": "npm:@tanstack/react-query@^5.102.8",
       },
     },
-    "chord/com/npmjs/tanstack__react-router": {
+    "packages/com/npmjs/tanstack__react-router": {
       "name": "@chord/com.npmjs.tanstack__react-router",
       "dependencies": {
         "@tanstack/react-router-original": "npm:@tanstack/react-router@^1.170.32",
       },
     },
-    "chord/com/npmjs/tanstack__react-router-devtools": {
+    "packages/com/npmjs/tanstack__react-router-devtools": {
       "name": "@chord/com.npmjs.tanstack__react-router-devtools",
       "dependencies": {
         "@tanstack/react-router-devtools-original": "npm:@tanstack/react-router-devtools@^1.167.1",
       },
     },
-    "chord/com/npmjs/tanstack__router-plugin": {
+    "packages/com/npmjs/tanstack__router-plugin": {
       "name": "@chord/com.npmjs.tanstack__router-plugin",
       "dependencies": {
         "@tanstack/router-plugin-original": "npm:@tanstack/router-plugin@^1.168.35",
       },
     },
-    "chord/com/npmjs/utils-cn": {
+    "packages/com/npmjs/utils-cn": {
       "name": "@chord/com.npmjs.utils-cn",
       "dependencies": {
         "utils-cn": "^1.0.2",
       },
     },
-    "chord/dev/improve/chord": {
+    "packages/dev/improve/chord": {
       "name": "@chord/dev.improve.chord",
     },
-    "chord/dev/improve/chord/api/taurpc": {
+    "packages/dev/improve/chord/api/taurpc": {
       "name": "@chord/dev.improve.chord.api.taurpc",
       "dependencies": {
         "taurpc": "^2.0.0",
       },
     },
-    "chord/dev/improve/chord/components/ui/accordion": {
+    "packages/dev/improve/chord/components/ui/accordion": {
       "name": "@chord/dev.improve.chord.components.ui.accordion",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -333,7 +333,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/alert": {
+    "packages/dev/improve/chord/components/ui/alert": {
       "name": "@chord/dev.improve.chord.components.ui.alert",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -345,7 +345,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/alert-dialog": {
+    "packages/dev/improve/chord/components/ui/alert-dialog": {
       "name": "@chord/dev.improve.chord.components.ui.alert-dialog",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -358,7 +358,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/aspect-ratio": {
+    "packages/dev/improve/chord/components/ui/aspect-ratio": {
       "name": "@chord/dev.improve.chord.components.ui.aspect-ratio",
       "dependencies": {
         "radix-ui": "^1.6.7",
@@ -369,7 +369,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/avatar": {
+    "packages/dev/improve/chord/components/ui/avatar": {
       "name": "@chord/dev.improve.chord.components.ui.avatar",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -381,7 +381,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/badge": {
+    "packages/dev/improve/chord/components/ui/badge": {
       "name": "@chord/dev.improve.chord.components.ui.badge",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -394,7 +394,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/breadcrumb": {
+    "packages/dev/improve/chord/components/ui/breadcrumb": {
       "name": "@chord/dev.improve.chord.components.ui.breadcrumb",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -407,7 +407,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/button": {
+    "packages/dev/improve/chord/components/ui/button": {
       "name": "@chord/dev.improve.chord.components.ui.button",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -420,7 +420,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/button-group": {
+    "packages/dev/improve/chord/components/ui/button-group": {
       "name": "@chord/dev.improve.chord.components.ui.button-group",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -434,7 +434,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/calendar": {
+    "packages/dev/improve/chord/components/ui/calendar": {
       "name": "@chord/dev.improve.chord.components.ui.calendar",
       "dependencies": {
         "@chord/com.npmjs.react-day-picker": "workspace:*",
@@ -448,7 +448,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/card": {
+    "packages/dev/improve/chord/components/ui/card": {
       "name": "@chord/dev.improve.chord.components.ui.card",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -459,7 +459,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/carousel": {
+    "packages/dev/improve/chord/components/ui/carousel": {
       "name": "@chord/dev.improve.chord.components.ui.carousel",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -473,7 +473,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/chart": {
+    "packages/dev/improve/chord/components/ui/chart": {
       "name": "@chord/dev.improve.chord.components.ui.chart",
       "dependencies": {
         "@chord/com.npmjs.recharts": "workspace:*",
@@ -485,7 +485,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/checkbox": {
+    "packages/dev/improve/chord/components/ui/checkbox": {
       "name": "@chord/dev.improve.chord.components.ui.checkbox",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -498,7 +498,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/collapsible": {
+    "packages/dev/improve/chord/components/ui/collapsible": {
       "name": "@chord/dev.improve.chord.components.ui.collapsible",
       "dependencies": {
         "radix-ui": "^1.6.7",
@@ -509,7 +509,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/combobox": {
+    "packages/dev/improve/chord/components/ui/combobox": {
       "name": "@chord/dev.improve.chord.components.ui.combobox",
       "dependencies": {
         "@base-ui/react": "^1.7.0",
@@ -524,7 +524,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/command": {
+    "packages/dev/improve/chord/components/ui/command": {
       "name": "@chord/dev.improve.chord.components.ui.command",
       "dependencies": {
         "@chord/com.npmjs.cmdk": "workspace:*",
@@ -539,7 +539,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/context-menu": {
+    "packages/dev/improve/chord/components/ui/context-menu": {
       "name": "@chord/dev.improve.chord.components.ui.context-menu",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -552,7 +552,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/dialog": {
+    "packages/dev/improve/chord/components/ui/dialog": {
       "name": "@chord/dev.improve.chord.components.ui.dialog",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -566,7 +566,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/direction": {
+    "packages/dev/improve/chord/components/ui/direction": {
       "name": "@chord/dev.improve.chord.components.ui.direction",
       "dependencies": {
         "radix-ui": "^1.6.7",
@@ -577,7 +577,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/drawer": {
+    "packages/dev/improve/chord/components/ui/drawer": {
       "name": "@chord/dev.improve.chord.components.ui.drawer",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -589,7 +589,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/dropdown-menu": {
+    "packages/dev/improve/chord/components/ui/dropdown-menu": {
       "name": "@chord/dev.improve.chord.components.ui.dropdown-menu",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -602,7 +602,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/empty": {
+    "packages/dev/improve/chord/components/ui/empty": {
       "name": "@chord/dev.improve.chord.components.ui.empty",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -614,7 +614,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/field": {
+    "packages/dev/improve/chord/components/ui/field": {
       "name": "@chord/dev.improve.chord.components.ui.field",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -628,7 +628,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/hover-card": {
+    "packages/dev/improve/chord/components/ui/hover-card": {
       "name": "@chord/dev.improve.chord.components.ui.hover-card",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -640,7 +640,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/input": {
+    "packages/dev/improve/chord/components/ui/input": {
       "name": "@chord/dev.improve.chord.components.ui.input",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -651,7 +651,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/input-group": {
+    "packages/dev/improve/chord/components/ui/input-group": {
       "name": "@chord/dev.improve.chord.components.ui.input-group",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -666,7 +666,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/input-otp": {
+    "packages/dev/improve/chord/components/ui/input-otp": {
       "name": "@chord/dev.improve.chord.components.ui.input-otp",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -679,7 +679,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/item": {
+    "packages/dev/improve/chord/components/ui/item": {
       "name": "@chord/dev.improve.chord.components.ui.item",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -693,7 +693,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/kbd": {
+    "packages/dev/improve/chord/components/ui/kbd": {
       "name": "@chord/dev.improve.chord.components.ui.kbd",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -704,7 +704,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/label": {
+    "packages/dev/improve/chord/components/ui/label": {
       "name": "@chord/dev.improve.chord.components.ui.label",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -716,7 +716,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/menubar": {
+    "packages/dev/improve/chord/components/ui/menubar": {
       "name": "@chord/dev.improve.chord.components.ui.menubar",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -729,7 +729,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/native-select": {
+    "packages/dev/improve/chord/components/ui/native-select": {
       "name": "@chord/dev.improve.chord.components.ui.native-select",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -741,7 +741,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/navigation-menu": {
+    "packages/dev/improve/chord/components/ui/navigation-menu": {
       "name": "@chord/dev.improve.chord.components.ui.navigation-menu",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -755,7 +755,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/pagination": {
+    "packages/dev/improve/chord/components/ui/pagination": {
       "name": "@chord/dev.improve.chord.components.ui.pagination",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -768,7 +768,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/popover": {
+    "packages/dev/improve/chord/components/ui/popover": {
       "name": "@chord/dev.improve.chord.components.ui.popover",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -780,7 +780,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/progress": {
+    "packages/dev/improve/chord/components/ui/progress": {
       "name": "@chord/dev.improve.chord.components.ui.progress",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -792,7 +792,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/radio-group": {
+    "packages/dev/improve/chord/components/ui/radio-group": {
       "name": "@chord/dev.improve.chord.components.ui.radio-group",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -804,7 +804,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/resizable": {
+    "packages/dev/improve/chord/components/ui/resizable": {
       "name": "@chord/dev.improve.chord.components.ui.resizable",
       "dependencies": {
         "@chord/com.npmjs.react-resizable-panels": "workspace:*",
@@ -816,7 +816,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/scroll-area": {
+    "packages/dev/improve/chord/components/ui/scroll-area": {
       "name": "@chord/dev.improve.chord.components.ui.scroll-area",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -828,7 +828,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/select": {
+    "packages/dev/improve/chord/components/ui/select": {
       "name": "@chord/dev.improve.chord.components.ui.select",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -841,7 +841,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/separator": {
+    "packages/dev/improve/chord/components/ui/separator": {
       "name": "@chord/dev.improve.chord.components.ui.separator",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -853,7 +853,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/sheet": {
+    "packages/dev/improve/chord/components/ui/sheet": {
       "name": "@chord/dev.improve.chord.components.ui.sheet",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -867,7 +867,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/sidebar": {
+    "packages/dev/improve/chord/components/ui/sidebar": {
       "name": "@chord/dev.improve.chord.components.ui.sidebar",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -887,7 +887,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/skeleton": {
+    "packages/dev/improve/chord/components/ui/skeleton": {
       "name": "@chord/dev.improve.chord.components.ui.skeleton",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -898,7 +898,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/slider": {
+    "packages/dev/improve/chord/components/ui/slider": {
       "name": "@chord/dev.improve.chord.components.ui.slider",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -910,7 +910,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/sonner": {
+    "packages/dev/improve/chord/components/ui/sonner": {
       "name": "@chord/dev.improve.chord.components.ui.sonner",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -923,7 +923,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/spinner": {
+    "packages/dev/improve/chord/components/ui/spinner": {
       "name": "@chord/dev.improve.chord.components.ui.spinner",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -935,7 +935,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/switch": {
+    "packages/dev/improve/chord/components/ui/switch": {
       "name": "@chord/dev.improve.chord.components.ui.switch",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -947,7 +947,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/table": {
+    "packages/dev/improve/chord/components/ui/table": {
       "name": "@chord/dev.improve.chord.components.ui.table",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -958,7 +958,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/tabs": {
+    "packages/dev/improve/chord/components/ui/tabs": {
       "name": "@chord/dev.improve.chord.components.ui.tabs",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -971,7 +971,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/textarea": {
+    "packages/dev/improve/chord/components/ui/textarea": {
       "name": "@chord/dev.improve.chord.components.ui.textarea",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -982,7 +982,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/toggle": {
+    "packages/dev/improve/chord/components/ui/toggle": {
       "name": "@chord/dev.improve.chord.components.ui.toggle",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -995,7 +995,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/toggle-group": {
+    "packages/dev/improve/chord/components/ui/toggle-group": {
       "name": "@chord/dev.improve.chord.components.ui.toggle-group",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -1009,7 +1009,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/components/ui/tooltip": {
+    "packages/dev/improve/chord/components/ui/tooltip": {
       "name": "@chord/dev.improve.chord.components.ui.tooltip",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -1021,7 +1021,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/configs/dev": {
+    "packages/dev/improve/chord/configs/dev": {
       "name": "@chord/dev.improve.chord.configs.dev",
       "version": "0.0.0",
       "bin": {
@@ -1032,7 +1032,7 @@
         "mprocs": "^0.9.6",
       },
     },
-    "chord/dev/improve/chord/configs/dev/tauri": {
+    "packages/dev/improve/chord/configs/dev/tauri": {
       "name": "@chord/dev.improve.chord.configs.dev.tauri",
       "version": "0.0.0",
       "bin": {
@@ -1042,14 +1042,14 @@
         "@types/bun": "^1.4.0",
       },
     },
-    "chord/dev/improve/chord/configs/patching/codemods/sfsymbols-react": {
+    "packages/dev/improve/chord/configs/patching/codemods/sfsymbols-react": {
       "name": "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react",
       "version": "0.0.0",
       "devDependencies": {
         "@codemod.com/jssg-types": "^1.6.3",
       },
     },
-    "chord/dev/improve/chord/configs/release/macos": {
+    "packages/dev/improve/chord/configs/release/macos": {
       "name": "@chord/dev.improve.chord.configs.release.macos",
       "version": "0.0.0",
       "bin": {
@@ -1059,19 +1059,19 @@
         "@types/bun": "^1.4.0",
       },
     },
-    "chord/dev/improve/chord/data/official-chord-repos": {
+    "packages/dev/improve/chord/data/official-chord-repos": {
       "name": "@chord/dev.improve.chord.data.official-chord-repos",
     },
-    "chord/dev/improve/chord/lib/chord-files": {
+    "packages/dev/improve/chord/lib/chord-files": {
       "name": "@chord/dev.improve.chord.lib.chord-files",
       "dependencies": {
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
       },
     },
-    "chord/dev/improve/chord/lib/github": {
+    "packages/dev/improve/chord/lib/github": {
       "name": "@chord/dev.improve.chord.lib.github",
     },
-    "chord/dev/improve/chord/lib/permissions": {
+    "packages/dev/improve/chord/lib/permissions": {
       "name": "@chord/dev.improve.chord.lib.permissions",
       "dependencies": {
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
@@ -1082,7 +1082,7 @@
         "@types/react": "^19.2.18",
       },
     },
-    "chord/dev/improve/chord/lib/state": {
+    "packages/dev/improve/chord/lib/state": {
       "name": "@chord/dev.improve.chord.lib.state",
       "dependencies": {
         "@chord/com.npmjs.rename-fn": "workspace:*",
@@ -1095,10 +1095,10 @@
         "@types/react": "^19.2.18",
       },
     },
-    "chord/dev/improve/chord/lib/typeshare": {
+    "packages/dev/improve/chord/lib/typeshare": {
       "name": "@chord/dev.improve.chord.lib.typeshare",
     },
-    "chord/dev/improve/chord/routes": {
+    "packages/dev/improve/chord/routes": {
       "name": "@chord/dev.improve.chord.routes",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1112,7 +1112,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/chords/index": {
+    "packages/dev/improve/chord/routes/chords/index": {
       "name": "@chord/dev.improve.chord.routes.chords.index",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
@@ -1128,7 +1128,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings": {
+    "packages/dev/improve/chord/routes/settings": {
       "name": "@chord/dev.improve.chord.routes.settings",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
@@ -1146,7 +1146,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/activation-trigger-card": {
+    "packages/dev/improve/chord/routes/settings/_components/activation-trigger-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card",
       "dependencies": {
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
@@ -1158,7 +1158,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/active-chords-tab": {
+    "packages/dev/improve/chord/routes/settings/_components/active-chords-tab": {
       "name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tab",
       "dependencies": {
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
@@ -1174,7 +1174,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/active-chords-tree": {
+    "packages/dev/improve/chord/routes/settings/_components/active-chords-tree": {
       "name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tree",
       "dependencies": {
         "react": "^19.2.8",
@@ -1184,7 +1184,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/add-repo-button": {
+    "packages/dev/improve/chord/routes/settings/_components/add-repo-button": {
       "name": "@chord/dev.improve.chord.routes.settings._components.add-repo-button",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1199,7 +1199,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/app-icon": {
+    "packages/dev/improve/chord/routes/settings/_components/app-icon": {
       "name": "@chord/dev.improve.chord.routes.settings._components.app-icon",
       "dependencies": {
         "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
@@ -1211,7 +1211,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card": {
+    "packages/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card",
       "dependencies": {
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
@@ -1226,7 +1226,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/chord-repos-card": {
+    "packages/dev/improve/chord/routes/settings/_components/chord-repos-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.chord-repos-card",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1248,7 +1248,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/launch-on-login-card": {
+    "packages/dev/improve/chord/routes/settings/_components/launch-on-login-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1264,7 +1264,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/local-folders-card": {
+    "packages/dev/improve/chord/routes/settings/_components/local-folders-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.local-folders-card",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1279,7 +1279,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/log-stream": {
+    "packages/dev/improve/chord/routes/settings/_components/log-stream": {
       "name": "@chord/dev.improve.chord.routes.settings._components.log-stream",
       "dependencies": {
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
@@ -1291,7 +1291,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/open-repo-button": {
+    "packages/dev/improve/chord/routes/settings/_components/open-repo-button": {
       "name": "@chord/dev.improve.chord.routes.settings._components.open-repo-button",
       "dependencies": {
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
@@ -1304,7 +1304,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/permissions-card": {
+    "packages/dev/improve/chord/routes/settings/_components/permissions-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.permissions-card",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1320,7 +1320,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/permissions-dialog": {
+    "packages/dev/improve/chord/routes/settings/_components/permissions-dialog": {
       "name": "@chord/dev.improve.chord.routes.settings._components.permissions-dialog",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1336,7 +1336,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/placeholder-chords-card": {
+    "packages/dev/improve/chord/routes/settings/_components/placeholder-chords-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1355,7 +1355,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/quit-chord-card": {
+    "packages/dev/improve/chord/routes/settings/_components/quit-chord-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.quit-chord-card",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1369,7 +1369,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/relaunch-app-button": {
+    "packages/dev/improve/chord/routes/settings/_components/relaunch-app-button": {
       "name": "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1382,7 +1382,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/reset-chords-card": {
+    "packages/dev/improve/chord/routes/settings/_components/reset-chords-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.reset-chords-card",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1398,7 +1398,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/shortcut-keys": {
+    "packages/dev/improve/chord/routes/settings/_components/shortcut-keys": {
       "name": "@chord/dev.improve.chord.routes.settings._components.shortcut-keys",
       "dependencies": {
         "@bradleyhodges/sfsymbols": "^7.0.4",
@@ -1412,7 +1412,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/_components/sync-repo-button": {
+    "packages/dev/improve/chord/routes/settings/_components/sync-repo-button": {
       "name": "@chord/dev.improve.chord.routes.settings._components.sync-repo-button",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1425,7 +1425,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/browse/index": {
+    "packages/dev/improve/chord/routes/settings/browse/index": {
       "name": "@chord/dev.improve.chord.routes.settings.browse.index",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1448,7 +1448,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/chords/index": {
+    "packages/dev/improve/chord/routes/settings/chords/index": {
       "name": "@chord/dev.improve.chord.routes.settings.chords.index",
       "dependencies": {
         "@chord/com.npmjs.sonner": "workspace:*",
@@ -1468,7 +1468,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/configure/index": {
+    "packages/dev/improve/chord/routes/settings/configure/index": {
       "name": "@chord/dev.improve.chord.routes.settings.configure.index",
       "dependencies": {
         "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
@@ -1479,7 +1479,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/danger/index": {
+    "packages/dev/improve/chord/routes/settings/danger/index": {
       "name": "@chord/dev.improve.chord.routes.settings.danger.index",
       "dependencies": {
         "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": "workspace:*",
@@ -1490,7 +1490,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/general/index": {
+    "packages/dev/improve/chord/routes/settings/general/index": {
       "name": "@chord/dev.improve.chord.routes.settings.general.index",
       "dependencies": {
         "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
@@ -1504,7 +1504,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/global-shortcuts/index": {
+    "packages/dev/improve/chord/routes/settings/global-shortcuts/index": {
       "name": "@chord/dev.improve.chord.routes.settings.global-shortcuts.index",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
@@ -1525,7 +1525,7 @@
         "@types/react-dom": "^19.2.5",
       },
     },
-    "chord/dev/improve/chord/routes/settings/log/index": {
+    "packages/dev/improve/chord/routes/settings/log/index": {
       "name": "@chord/dev.improve.chord.routes.settings.log.index",
       "dependencies": {
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
@@ -1544,13 +1544,13 @@
     "@bradleyhodges/sfsymbols-react@7.0.4": "patches/@bradleyhodges%2Fsfsymbols-react@7.0.4.patch",
   },
   "overrides": {
-    "@tanstack/devtools-client": "workspace:chord/com/npmjs/tanstack__devtools-client",
-    "@tanstack/devtools-utils": "workspace:chord/com/npmjs/tanstack__devtools-utils",
-    "@tanstack/react-devtools": "workspace:chord/com/npmjs/tanstack__react-devtools",
-    "@tanstack/react-query": "workspace:chord/com/npmjs/tanstack__react-query",
-    "@tanstack/react-router": "workspace:chord/com/npmjs/tanstack__react-router",
-    "@tanstack/react-router-devtools": "workspace:chord/com/npmjs/tanstack__react-router-devtools",
-    "@tanstack/router-plugin": "workspace:chord/com/npmjs/tanstack__router-plugin",
+    "@tanstack/devtools-client": "workspace:packages/com/npmjs/tanstack__devtools-client",
+    "@tanstack/devtools-utils": "workspace:packages/com/npmjs/tanstack__devtools-utils",
+    "@tanstack/react-devtools": "workspace:packages/com/npmjs/tanstack__react-devtools",
+    "@tanstack/react-query": "workspace:packages/com/npmjs/tanstack__react-query",
+    "@tanstack/react-router": "workspace:packages/com/npmjs/tanstack__react-router",
+    "@tanstack/react-router-devtools": "workspace:packages/com/npmjs/tanstack__react-router-devtools",
+    "@tanstack/router-plugin": "workspace:packages/com/npmjs/tanstack__router-plugin",
   },
   "packages": {
     "@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
@@ -1623,235 +1623,235 @@
 
     "@bradleyhodges/sfsymbols-types": ["@bradleyhodges/sfsymbols-types@7.0.4", "", {}, "sha512-mt6IuAwAb63W83C6ywNDMXDQgCOKwiqIISjD0rt2dX0ybjs3dRxPkAHC8q1GIRXYNmp6lgnTFhnQ4CFZH/0+Gg=="],
 
-    "@chord/com.npmjs.cmdk": ["@chord/com.npmjs.cmdk@workspace:chord/com/npmjs/cmdk"],
+    "@chord/com.npmjs.cmdk": ["@chord/com.npmjs.cmdk@workspace:packages/com/npmjs/cmdk"],
 
-    "@chord/com.npmjs.date-fns": ["@chord/com.npmjs.date-fns@workspace:chord/com/npmjs/date-fns"],
+    "@chord/com.npmjs.date-fns": ["@chord/com.npmjs.date-fns@workspace:packages/com/npmjs/date-fns"],
 
-    "@chord/com.npmjs.desm": ["@chord/com.npmjs.desm@workspace:chord/com/npmjs/desm"],
+    "@chord/com.npmjs.desm": ["@chord/com.npmjs.desm@workspace:packages/com/npmjs/desm"],
 
-    "@chord/com.npmjs.map-obj": ["@chord/com.npmjs.map-obj@workspace:chord/com/npmjs/map-obj"],
+    "@chord/com.npmjs.map-obj": ["@chord/com.npmjs.map-obj@workspace:packages/com/npmjs/map-obj"],
 
-    "@chord/com.npmjs.pathe": ["@chord/com.npmjs.pathe@workspace:chord/com/npmjs/pathe"],
+    "@chord/com.npmjs.pathe": ["@chord/com.npmjs.pathe@workspace:packages/com/npmjs/pathe"],
 
-    "@chord/com.npmjs.react-day-picker": ["@chord/com.npmjs.react-day-picker@workspace:chord/com/npmjs/react-day-picker"],
+    "@chord/com.npmjs.react-day-picker": ["@chord/com.npmjs.react-day-picker@workspace:packages/com/npmjs/react-day-picker"],
 
-    "@chord/com.npmjs.react-resizable-panels": ["@chord/com.npmjs.react-resizable-panels@workspace:chord/com/npmjs/react-resizable-panels"],
+    "@chord/com.npmjs.react-resizable-panels": ["@chord/com.npmjs.react-resizable-panels@workspace:packages/com/npmjs/react-resizable-panels"],
 
-    "@chord/com.npmjs.recharts": ["@chord/com.npmjs.recharts@workspace:chord/com/npmjs/recharts"],
+    "@chord/com.npmjs.recharts": ["@chord/com.npmjs.recharts@workspace:packages/com/npmjs/recharts"],
 
-    "@chord/com.npmjs.rename-fn": ["@chord/com.npmjs.rename-fn@workspace:chord/com/npmjs/rename-fn"],
+    "@chord/com.npmjs.rename-fn": ["@chord/com.npmjs.rename-fn@workspace:packages/com/npmjs/rename-fn"],
 
-    "@chord/com.npmjs.smol-toml": ["@chord/com.npmjs.smol-toml@workspace:chord/com/npmjs/smol-toml"],
+    "@chord/com.npmjs.smol-toml": ["@chord/com.npmjs.smol-toml@workspace:packages/com/npmjs/smol-toml"],
 
-    "@chord/com.npmjs.sonner": ["@chord/com.npmjs.sonner@workspace:chord/com/npmjs/sonner"],
+    "@chord/com.npmjs.sonner": ["@chord/com.npmjs.sonner@workspace:packages/com/npmjs/sonner"],
 
-    "@chord/com.npmjs.tanstack__devtools-client": ["@chord/com.npmjs.tanstack__devtools-client@workspace:chord/com/npmjs/tanstack__devtools-client"],
+    "@chord/com.npmjs.tanstack__devtools-client": ["@chord/com.npmjs.tanstack__devtools-client@workspace:packages/com/npmjs/tanstack__devtools-client"],
 
-    "@chord/com.npmjs.tanstack__devtools-utils": ["@chord/com.npmjs.tanstack__devtools-utils@workspace:chord/com/npmjs/tanstack__devtools-utils"],
+    "@chord/com.npmjs.tanstack__devtools-utils": ["@chord/com.npmjs.tanstack__devtools-utils@workspace:packages/com/npmjs/tanstack__devtools-utils"],
 
-    "@chord/com.npmjs.tanstack__react-devtools": ["@chord/com.npmjs.tanstack__react-devtools@workspace:chord/com/npmjs/tanstack__react-devtools"],
+    "@chord/com.npmjs.tanstack__react-devtools": ["@chord/com.npmjs.tanstack__react-devtools@workspace:packages/com/npmjs/tanstack__react-devtools"],
 
-    "@chord/com.npmjs.tanstack__react-query": ["@chord/com.npmjs.tanstack__react-query@workspace:chord/com/npmjs/tanstack__react-query"],
+    "@chord/com.npmjs.tanstack__react-query": ["@chord/com.npmjs.tanstack__react-query@workspace:packages/com/npmjs/tanstack__react-query"],
 
-    "@chord/com.npmjs.tanstack__react-router": ["@chord/com.npmjs.tanstack__react-router@workspace:chord/com/npmjs/tanstack__react-router"],
+    "@chord/com.npmjs.tanstack__react-router": ["@chord/com.npmjs.tanstack__react-router@workspace:packages/com/npmjs/tanstack__react-router"],
 
-    "@chord/com.npmjs.tanstack__react-router-devtools": ["@chord/com.npmjs.tanstack__react-router-devtools@workspace:chord/com/npmjs/tanstack__react-router-devtools"],
+    "@chord/com.npmjs.tanstack__react-router-devtools": ["@chord/com.npmjs.tanstack__react-router-devtools@workspace:packages/com/npmjs/tanstack__react-router-devtools"],
 
-    "@chord/com.npmjs.tanstack__router-plugin": ["@chord/com.npmjs.tanstack__router-plugin@workspace:chord/com/npmjs/tanstack__router-plugin"],
+    "@chord/com.npmjs.tanstack__router-plugin": ["@chord/com.npmjs.tanstack__router-plugin@workspace:packages/com/npmjs/tanstack__router-plugin"],
 
-    "@chord/com.npmjs.utils-cn": ["@chord/com.npmjs.utils-cn@workspace:chord/com/npmjs/utils-cn"],
+    "@chord/com.npmjs.utils-cn": ["@chord/com.npmjs.utils-cn@workspace:packages/com/npmjs/utils-cn"],
 
-    "@chord/dev.improve.chord": ["@chord/dev.improve.chord@workspace:chord/dev/improve/chord"],
+    "@chord/dev.improve.chord": ["@chord/dev.improve.chord@workspace:packages/dev/improve/chord"],
 
-    "@chord/dev.improve.chord.api.taurpc": ["@chord/dev.improve.chord.api.taurpc@workspace:chord/dev/improve/chord/api/taurpc"],
+    "@chord/dev.improve.chord.api.taurpc": ["@chord/dev.improve.chord.api.taurpc@workspace:packages/dev/improve/chord/api/taurpc"],
 
-    "@chord/dev.improve.chord.components.ui.accordion": ["@chord/dev.improve.chord.components.ui.accordion@workspace:chord/dev/improve/chord/components/ui/accordion"],
+    "@chord/dev.improve.chord.components.ui.accordion": ["@chord/dev.improve.chord.components.ui.accordion@workspace:packages/dev/improve/chord/components/ui/accordion"],
 
-    "@chord/dev.improve.chord.components.ui.alert": ["@chord/dev.improve.chord.components.ui.alert@workspace:chord/dev/improve/chord/components/ui/alert"],
+    "@chord/dev.improve.chord.components.ui.alert": ["@chord/dev.improve.chord.components.ui.alert@workspace:packages/dev/improve/chord/components/ui/alert"],
 
-    "@chord/dev.improve.chord.components.ui.alert-dialog": ["@chord/dev.improve.chord.components.ui.alert-dialog@workspace:chord/dev/improve/chord/components/ui/alert-dialog"],
+    "@chord/dev.improve.chord.components.ui.alert-dialog": ["@chord/dev.improve.chord.components.ui.alert-dialog@workspace:packages/dev/improve/chord/components/ui/alert-dialog"],
 
-    "@chord/dev.improve.chord.components.ui.aspect-ratio": ["@chord/dev.improve.chord.components.ui.aspect-ratio@workspace:chord/dev/improve/chord/components/ui/aspect-ratio"],
+    "@chord/dev.improve.chord.components.ui.aspect-ratio": ["@chord/dev.improve.chord.components.ui.aspect-ratio@workspace:packages/dev/improve/chord/components/ui/aspect-ratio"],
 
-    "@chord/dev.improve.chord.components.ui.avatar": ["@chord/dev.improve.chord.components.ui.avatar@workspace:chord/dev/improve/chord/components/ui/avatar"],
+    "@chord/dev.improve.chord.components.ui.avatar": ["@chord/dev.improve.chord.components.ui.avatar@workspace:packages/dev/improve/chord/components/ui/avatar"],
 
-    "@chord/dev.improve.chord.components.ui.badge": ["@chord/dev.improve.chord.components.ui.badge@workspace:chord/dev/improve/chord/components/ui/badge"],
+    "@chord/dev.improve.chord.components.ui.badge": ["@chord/dev.improve.chord.components.ui.badge@workspace:packages/dev/improve/chord/components/ui/badge"],
 
-    "@chord/dev.improve.chord.components.ui.breadcrumb": ["@chord/dev.improve.chord.components.ui.breadcrumb@workspace:chord/dev/improve/chord/components/ui/breadcrumb"],
+    "@chord/dev.improve.chord.components.ui.breadcrumb": ["@chord/dev.improve.chord.components.ui.breadcrumb@workspace:packages/dev/improve/chord/components/ui/breadcrumb"],
 
-    "@chord/dev.improve.chord.components.ui.button": ["@chord/dev.improve.chord.components.ui.button@workspace:chord/dev/improve/chord/components/ui/button"],
+    "@chord/dev.improve.chord.components.ui.button": ["@chord/dev.improve.chord.components.ui.button@workspace:packages/dev/improve/chord/components/ui/button"],
 
-    "@chord/dev.improve.chord.components.ui.button-group": ["@chord/dev.improve.chord.components.ui.button-group@workspace:chord/dev/improve/chord/components/ui/button-group"],
+    "@chord/dev.improve.chord.components.ui.button-group": ["@chord/dev.improve.chord.components.ui.button-group@workspace:packages/dev/improve/chord/components/ui/button-group"],
 
-    "@chord/dev.improve.chord.components.ui.calendar": ["@chord/dev.improve.chord.components.ui.calendar@workspace:chord/dev/improve/chord/components/ui/calendar"],
+    "@chord/dev.improve.chord.components.ui.calendar": ["@chord/dev.improve.chord.components.ui.calendar@workspace:packages/dev/improve/chord/components/ui/calendar"],
 
-    "@chord/dev.improve.chord.components.ui.card": ["@chord/dev.improve.chord.components.ui.card@workspace:chord/dev/improve/chord/components/ui/card"],
+    "@chord/dev.improve.chord.components.ui.card": ["@chord/dev.improve.chord.components.ui.card@workspace:packages/dev/improve/chord/components/ui/card"],
 
-    "@chord/dev.improve.chord.components.ui.carousel": ["@chord/dev.improve.chord.components.ui.carousel@workspace:chord/dev/improve/chord/components/ui/carousel"],
+    "@chord/dev.improve.chord.components.ui.carousel": ["@chord/dev.improve.chord.components.ui.carousel@workspace:packages/dev/improve/chord/components/ui/carousel"],
 
-    "@chord/dev.improve.chord.components.ui.chart": ["@chord/dev.improve.chord.components.ui.chart@workspace:chord/dev/improve/chord/components/ui/chart"],
+    "@chord/dev.improve.chord.components.ui.chart": ["@chord/dev.improve.chord.components.ui.chart@workspace:packages/dev/improve/chord/components/ui/chart"],
 
-    "@chord/dev.improve.chord.components.ui.checkbox": ["@chord/dev.improve.chord.components.ui.checkbox@workspace:chord/dev/improve/chord/components/ui/checkbox"],
+    "@chord/dev.improve.chord.components.ui.checkbox": ["@chord/dev.improve.chord.components.ui.checkbox@workspace:packages/dev/improve/chord/components/ui/checkbox"],
 
-    "@chord/dev.improve.chord.components.ui.collapsible": ["@chord/dev.improve.chord.components.ui.collapsible@workspace:chord/dev/improve/chord/components/ui/collapsible"],
+    "@chord/dev.improve.chord.components.ui.collapsible": ["@chord/dev.improve.chord.components.ui.collapsible@workspace:packages/dev/improve/chord/components/ui/collapsible"],
 
-    "@chord/dev.improve.chord.components.ui.combobox": ["@chord/dev.improve.chord.components.ui.combobox@workspace:chord/dev/improve/chord/components/ui/combobox"],
+    "@chord/dev.improve.chord.components.ui.combobox": ["@chord/dev.improve.chord.components.ui.combobox@workspace:packages/dev/improve/chord/components/ui/combobox"],
 
-    "@chord/dev.improve.chord.components.ui.command": ["@chord/dev.improve.chord.components.ui.command@workspace:chord/dev/improve/chord/components/ui/command"],
+    "@chord/dev.improve.chord.components.ui.command": ["@chord/dev.improve.chord.components.ui.command@workspace:packages/dev/improve/chord/components/ui/command"],
 
-    "@chord/dev.improve.chord.components.ui.context-menu": ["@chord/dev.improve.chord.components.ui.context-menu@workspace:chord/dev/improve/chord/components/ui/context-menu"],
+    "@chord/dev.improve.chord.components.ui.context-menu": ["@chord/dev.improve.chord.components.ui.context-menu@workspace:packages/dev/improve/chord/components/ui/context-menu"],
 
-    "@chord/dev.improve.chord.components.ui.dialog": ["@chord/dev.improve.chord.components.ui.dialog@workspace:chord/dev/improve/chord/components/ui/dialog"],
+    "@chord/dev.improve.chord.components.ui.dialog": ["@chord/dev.improve.chord.components.ui.dialog@workspace:packages/dev/improve/chord/components/ui/dialog"],
 
-    "@chord/dev.improve.chord.components.ui.direction": ["@chord/dev.improve.chord.components.ui.direction@workspace:chord/dev/improve/chord/components/ui/direction"],
+    "@chord/dev.improve.chord.components.ui.direction": ["@chord/dev.improve.chord.components.ui.direction@workspace:packages/dev/improve/chord/components/ui/direction"],
 
-    "@chord/dev.improve.chord.components.ui.drawer": ["@chord/dev.improve.chord.components.ui.drawer@workspace:chord/dev/improve/chord/components/ui/drawer"],
+    "@chord/dev.improve.chord.components.ui.drawer": ["@chord/dev.improve.chord.components.ui.drawer@workspace:packages/dev/improve/chord/components/ui/drawer"],
 
-    "@chord/dev.improve.chord.components.ui.dropdown-menu": ["@chord/dev.improve.chord.components.ui.dropdown-menu@workspace:chord/dev/improve/chord/components/ui/dropdown-menu"],
+    "@chord/dev.improve.chord.components.ui.dropdown-menu": ["@chord/dev.improve.chord.components.ui.dropdown-menu@workspace:packages/dev/improve/chord/components/ui/dropdown-menu"],
 
-    "@chord/dev.improve.chord.components.ui.empty": ["@chord/dev.improve.chord.components.ui.empty@workspace:chord/dev/improve/chord/components/ui/empty"],
+    "@chord/dev.improve.chord.components.ui.empty": ["@chord/dev.improve.chord.components.ui.empty@workspace:packages/dev/improve/chord/components/ui/empty"],
 
-    "@chord/dev.improve.chord.components.ui.field": ["@chord/dev.improve.chord.components.ui.field@workspace:chord/dev/improve/chord/components/ui/field"],
+    "@chord/dev.improve.chord.components.ui.field": ["@chord/dev.improve.chord.components.ui.field@workspace:packages/dev/improve/chord/components/ui/field"],
 
-    "@chord/dev.improve.chord.components.ui.hover-card": ["@chord/dev.improve.chord.components.ui.hover-card@workspace:chord/dev/improve/chord/components/ui/hover-card"],
+    "@chord/dev.improve.chord.components.ui.hover-card": ["@chord/dev.improve.chord.components.ui.hover-card@workspace:packages/dev/improve/chord/components/ui/hover-card"],
 
-    "@chord/dev.improve.chord.components.ui.input": ["@chord/dev.improve.chord.components.ui.input@workspace:chord/dev/improve/chord/components/ui/input"],
+    "@chord/dev.improve.chord.components.ui.input": ["@chord/dev.improve.chord.components.ui.input@workspace:packages/dev/improve/chord/components/ui/input"],
 
-    "@chord/dev.improve.chord.components.ui.input-group": ["@chord/dev.improve.chord.components.ui.input-group@workspace:chord/dev/improve/chord/components/ui/input-group"],
+    "@chord/dev.improve.chord.components.ui.input-group": ["@chord/dev.improve.chord.components.ui.input-group@workspace:packages/dev/improve/chord/components/ui/input-group"],
 
-    "@chord/dev.improve.chord.components.ui.input-otp": ["@chord/dev.improve.chord.components.ui.input-otp@workspace:chord/dev/improve/chord/components/ui/input-otp"],
+    "@chord/dev.improve.chord.components.ui.input-otp": ["@chord/dev.improve.chord.components.ui.input-otp@workspace:packages/dev/improve/chord/components/ui/input-otp"],
 
-    "@chord/dev.improve.chord.components.ui.item": ["@chord/dev.improve.chord.components.ui.item@workspace:chord/dev/improve/chord/components/ui/item"],
+    "@chord/dev.improve.chord.components.ui.item": ["@chord/dev.improve.chord.components.ui.item@workspace:packages/dev/improve/chord/components/ui/item"],
 
-    "@chord/dev.improve.chord.components.ui.kbd": ["@chord/dev.improve.chord.components.ui.kbd@workspace:chord/dev/improve/chord/components/ui/kbd"],
+    "@chord/dev.improve.chord.components.ui.kbd": ["@chord/dev.improve.chord.components.ui.kbd@workspace:packages/dev/improve/chord/components/ui/kbd"],
 
-    "@chord/dev.improve.chord.components.ui.label": ["@chord/dev.improve.chord.components.ui.label@workspace:chord/dev/improve/chord/components/ui/label"],
+    "@chord/dev.improve.chord.components.ui.label": ["@chord/dev.improve.chord.components.ui.label@workspace:packages/dev/improve/chord/components/ui/label"],
 
-    "@chord/dev.improve.chord.components.ui.menubar": ["@chord/dev.improve.chord.components.ui.menubar@workspace:chord/dev/improve/chord/components/ui/menubar"],
+    "@chord/dev.improve.chord.components.ui.menubar": ["@chord/dev.improve.chord.components.ui.menubar@workspace:packages/dev/improve/chord/components/ui/menubar"],
 
-    "@chord/dev.improve.chord.components.ui.native-select": ["@chord/dev.improve.chord.components.ui.native-select@workspace:chord/dev/improve/chord/components/ui/native-select"],
+    "@chord/dev.improve.chord.components.ui.native-select": ["@chord/dev.improve.chord.components.ui.native-select@workspace:packages/dev/improve/chord/components/ui/native-select"],
 
-    "@chord/dev.improve.chord.components.ui.navigation-menu": ["@chord/dev.improve.chord.components.ui.navigation-menu@workspace:chord/dev/improve/chord/components/ui/navigation-menu"],
+    "@chord/dev.improve.chord.components.ui.navigation-menu": ["@chord/dev.improve.chord.components.ui.navigation-menu@workspace:packages/dev/improve/chord/components/ui/navigation-menu"],
 
-    "@chord/dev.improve.chord.components.ui.pagination": ["@chord/dev.improve.chord.components.ui.pagination@workspace:chord/dev/improve/chord/components/ui/pagination"],
+    "@chord/dev.improve.chord.components.ui.pagination": ["@chord/dev.improve.chord.components.ui.pagination@workspace:packages/dev/improve/chord/components/ui/pagination"],
 
-    "@chord/dev.improve.chord.components.ui.popover": ["@chord/dev.improve.chord.components.ui.popover@workspace:chord/dev/improve/chord/components/ui/popover"],
+    "@chord/dev.improve.chord.components.ui.popover": ["@chord/dev.improve.chord.components.ui.popover@workspace:packages/dev/improve/chord/components/ui/popover"],
 
-    "@chord/dev.improve.chord.components.ui.progress": ["@chord/dev.improve.chord.components.ui.progress@workspace:chord/dev/improve/chord/components/ui/progress"],
+    "@chord/dev.improve.chord.components.ui.progress": ["@chord/dev.improve.chord.components.ui.progress@workspace:packages/dev/improve/chord/components/ui/progress"],
 
-    "@chord/dev.improve.chord.components.ui.radio-group": ["@chord/dev.improve.chord.components.ui.radio-group@workspace:chord/dev/improve/chord/components/ui/radio-group"],
+    "@chord/dev.improve.chord.components.ui.radio-group": ["@chord/dev.improve.chord.components.ui.radio-group@workspace:packages/dev/improve/chord/components/ui/radio-group"],
 
-    "@chord/dev.improve.chord.components.ui.resizable": ["@chord/dev.improve.chord.components.ui.resizable@workspace:chord/dev/improve/chord/components/ui/resizable"],
+    "@chord/dev.improve.chord.components.ui.resizable": ["@chord/dev.improve.chord.components.ui.resizable@workspace:packages/dev/improve/chord/components/ui/resizable"],
 
-    "@chord/dev.improve.chord.components.ui.scroll-area": ["@chord/dev.improve.chord.components.ui.scroll-area@workspace:chord/dev/improve/chord/components/ui/scroll-area"],
+    "@chord/dev.improve.chord.components.ui.scroll-area": ["@chord/dev.improve.chord.components.ui.scroll-area@workspace:packages/dev/improve/chord/components/ui/scroll-area"],
 
-    "@chord/dev.improve.chord.components.ui.select": ["@chord/dev.improve.chord.components.ui.select@workspace:chord/dev/improve/chord/components/ui/select"],
+    "@chord/dev.improve.chord.components.ui.select": ["@chord/dev.improve.chord.components.ui.select@workspace:packages/dev/improve/chord/components/ui/select"],
 
-    "@chord/dev.improve.chord.components.ui.separator": ["@chord/dev.improve.chord.components.ui.separator@workspace:chord/dev/improve/chord/components/ui/separator"],
+    "@chord/dev.improve.chord.components.ui.separator": ["@chord/dev.improve.chord.components.ui.separator@workspace:packages/dev/improve/chord/components/ui/separator"],
 
-    "@chord/dev.improve.chord.components.ui.sheet": ["@chord/dev.improve.chord.components.ui.sheet@workspace:chord/dev/improve/chord/components/ui/sheet"],
+    "@chord/dev.improve.chord.components.ui.sheet": ["@chord/dev.improve.chord.components.ui.sheet@workspace:packages/dev/improve/chord/components/ui/sheet"],
 
-    "@chord/dev.improve.chord.components.ui.sidebar": ["@chord/dev.improve.chord.components.ui.sidebar@workspace:chord/dev/improve/chord/components/ui/sidebar"],
+    "@chord/dev.improve.chord.components.ui.sidebar": ["@chord/dev.improve.chord.components.ui.sidebar@workspace:packages/dev/improve/chord/components/ui/sidebar"],
 
-    "@chord/dev.improve.chord.components.ui.skeleton": ["@chord/dev.improve.chord.components.ui.skeleton@workspace:chord/dev/improve/chord/components/ui/skeleton"],
+    "@chord/dev.improve.chord.components.ui.skeleton": ["@chord/dev.improve.chord.components.ui.skeleton@workspace:packages/dev/improve/chord/components/ui/skeleton"],
 
-    "@chord/dev.improve.chord.components.ui.slider": ["@chord/dev.improve.chord.components.ui.slider@workspace:chord/dev/improve/chord/components/ui/slider"],
+    "@chord/dev.improve.chord.components.ui.slider": ["@chord/dev.improve.chord.components.ui.slider@workspace:packages/dev/improve/chord/components/ui/slider"],
 
-    "@chord/dev.improve.chord.components.ui.sonner": ["@chord/dev.improve.chord.components.ui.sonner@workspace:chord/dev/improve/chord/components/ui/sonner"],
+    "@chord/dev.improve.chord.components.ui.sonner": ["@chord/dev.improve.chord.components.ui.sonner@workspace:packages/dev/improve/chord/components/ui/sonner"],
 
-    "@chord/dev.improve.chord.components.ui.spinner": ["@chord/dev.improve.chord.components.ui.spinner@workspace:chord/dev/improve/chord/components/ui/spinner"],
+    "@chord/dev.improve.chord.components.ui.spinner": ["@chord/dev.improve.chord.components.ui.spinner@workspace:packages/dev/improve/chord/components/ui/spinner"],
 
-    "@chord/dev.improve.chord.components.ui.switch": ["@chord/dev.improve.chord.components.ui.switch@workspace:chord/dev/improve/chord/components/ui/switch"],
+    "@chord/dev.improve.chord.components.ui.switch": ["@chord/dev.improve.chord.components.ui.switch@workspace:packages/dev/improve/chord/components/ui/switch"],
 
-    "@chord/dev.improve.chord.components.ui.table": ["@chord/dev.improve.chord.components.ui.table@workspace:chord/dev/improve/chord/components/ui/table"],
+    "@chord/dev.improve.chord.components.ui.table": ["@chord/dev.improve.chord.components.ui.table@workspace:packages/dev/improve/chord/components/ui/table"],
 
-    "@chord/dev.improve.chord.components.ui.tabs": ["@chord/dev.improve.chord.components.ui.tabs@workspace:chord/dev/improve/chord/components/ui/tabs"],
+    "@chord/dev.improve.chord.components.ui.tabs": ["@chord/dev.improve.chord.components.ui.tabs@workspace:packages/dev/improve/chord/components/ui/tabs"],
 
-    "@chord/dev.improve.chord.components.ui.textarea": ["@chord/dev.improve.chord.components.ui.textarea@workspace:chord/dev/improve/chord/components/ui/textarea"],
+    "@chord/dev.improve.chord.components.ui.textarea": ["@chord/dev.improve.chord.components.ui.textarea@workspace:packages/dev/improve/chord/components/ui/textarea"],
 
-    "@chord/dev.improve.chord.components.ui.toggle": ["@chord/dev.improve.chord.components.ui.toggle@workspace:chord/dev/improve/chord/components/ui/toggle"],
+    "@chord/dev.improve.chord.components.ui.toggle": ["@chord/dev.improve.chord.components.ui.toggle@workspace:packages/dev/improve/chord/components/ui/toggle"],
 
-    "@chord/dev.improve.chord.components.ui.toggle-group": ["@chord/dev.improve.chord.components.ui.toggle-group@workspace:chord/dev/improve/chord/components/ui/toggle-group"],
+    "@chord/dev.improve.chord.components.ui.toggle-group": ["@chord/dev.improve.chord.components.ui.toggle-group@workspace:packages/dev/improve/chord/components/ui/toggle-group"],
 
-    "@chord/dev.improve.chord.components.ui.tooltip": ["@chord/dev.improve.chord.components.ui.tooltip@workspace:chord/dev/improve/chord/components/ui/tooltip"],
+    "@chord/dev.improve.chord.components.ui.tooltip": ["@chord/dev.improve.chord.components.ui.tooltip@workspace:packages/dev/improve/chord/components/ui/tooltip"],
 
-    "@chord/dev.improve.chord.configs.dev": ["@chord/dev.improve.chord.configs.dev@workspace:chord/dev/improve/chord/configs/dev"],
+    "@chord/dev.improve.chord.configs.dev": ["@chord/dev.improve.chord.configs.dev@workspace:packages/dev/improve/chord/configs/dev"],
 
-    "@chord/dev.improve.chord.configs.dev.tauri": ["@chord/dev.improve.chord.configs.dev.tauri@workspace:chord/dev/improve/chord/configs/dev/tauri"],
+    "@chord/dev.improve.chord.configs.dev.tauri": ["@chord/dev.improve.chord.configs.dev.tauri@workspace:packages/dev/improve/chord/configs/dev/tauri"],
 
-    "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": ["@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react@workspace:chord/dev/improve/chord/configs/patching/codemods/sfsymbols-react"],
+    "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": ["@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react@workspace:packages/dev/improve/chord/configs/patching/codemods/sfsymbols-react"],
 
-    "@chord/dev.improve.chord.configs.release.macos": ["@chord/dev.improve.chord.configs.release.macos@workspace:chord/dev/improve/chord/configs/release/macos"],
+    "@chord/dev.improve.chord.configs.release.macos": ["@chord/dev.improve.chord.configs.release.macos@workspace:packages/dev/improve/chord/configs/release/macos"],
 
-    "@chord/dev.improve.chord.data.official-chord-repos": ["@chord/dev.improve.chord.data.official-chord-repos@workspace:chord/dev/improve/chord/data/official-chord-repos"],
+    "@chord/dev.improve.chord.data.official-chord-repos": ["@chord/dev.improve.chord.data.official-chord-repos@workspace:packages/dev/improve/chord/data/official-chord-repos"],
 
-    "@chord/dev.improve.chord.lib.chord-files": ["@chord/dev.improve.chord.lib.chord-files@workspace:chord/dev/improve/chord/lib/chord-files"],
+    "@chord/dev.improve.chord.lib.chord-files": ["@chord/dev.improve.chord.lib.chord-files@workspace:packages/dev/improve/chord/lib/chord-files"],
 
-    "@chord/dev.improve.chord.lib.github": ["@chord/dev.improve.chord.lib.github@workspace:chord/dev/improve/chord/lib/github"],
+    "@chord/dev.improve.chord.lib.github": ["@chord/dev.improve.chord.lib.github@workspace:packages/dev/improve/chord/lib/github"],
 
-    "@chord/dev.improve.chord.lib.permissions": ["@chord/dev.improve.chord.lib.permissions@workspace:chord/dev/improve/chord/lib/permissions"],
+    "@chord/dev.improve.chord.lib.permissions": ["@chord/dev.improve.chord.lib.permissions@workspace:packages/dev/improve/chord/lib/permissions"],
 
-    "@chord/dev.improve.chord.lib.state": ["@chord/dev.improve.chord.lib.state@workspace:chord/dev/improve/chord/lib/state"],
+    "@chord/dev.improve.chord.lib.state": ["@chord/dev.improve.chord.lib.state@workspace:packages/dev/improve/chord/lib/state"],
 
-    "@chord/dev.improve.chord.lib.typeshare": ["@chord/dev.improve.chord.lib.typeshare@workspace:chord/dev/improve/chord/lib/typeshare"],
+    "@chord/dev.improve.chord.lib.typeshare": ["@chord/dev.improve.chord.lib.typeshare@workspace:packages/dev/improve/chord/lib/typeshare"],
 
-    "@chord/dev.improve.chord.routes": ["@chord/dev.improve.chord.routes@workspace:chord/dev/improve/chord/routes"],
+    "@chord/dev.improve.chord.routes": ["@chord/dev.improve.chord.routes@workspace:packages/dev/improve/chord/routes"],
 
-    "@chord/dev.improve.chord.routes.chords.index": ["@chord/dev.improve.chord.routes.chords.index@workspace:chord/dev/improve/chord/routes/chords/index"],
+    "@chord/dev.improve.chord.routes.chords.index": ["@chord/dev.improve.chord.routes.chords.index@workspace:packages/dev/improve/chord/routes/chords/index"],
 
-    "@chord/dev.improve.chord.routes.settings": ["@chord/dev.improve.chord.routes.settings@workspace:chord/dev/improve/chord/routes/settings"],
+    "@chord/dev.improve.chord.routes.settings": ["@chord/dev.improve.chord.routes.settings@workspace:packages/dev/improve/chord/routes/settings"],
 
-    "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": ["@chord/dev.improve.chord.routes.settings._components.activation-trigger-card@workspace:chord/dev/improve/chord/routes/settings/_components/activation-trigger-card"],
+    "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": ["@chord/dev.improve.chord.routes.settings._components.activation-trigger-card@workspace:packages/dev/improve/chord/routes/settings/_components/activation-trigger-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.active-chords-tab": ["@chord/dev.improve.chord.routes.settings._components.active-chords-tab@workspace:chord/dev/improve/chord/routes/settings/_components/active-chords-tab"],
+    "@chord/dev.improve.chord.routes.settings._components.active-chords-tab": ["@chord/dev.improve.chord.routes.settings._components.active-chords-tab@workspace:packages/dev/improve/chord/routes/settings/_components/active-chords-tab"],
 
-    "@chord/dev.improve.chord.routes.settings._components.active-chords-tree": ["@chord/dev.improve.chord.routes.settings._components.active-chords-tree@workspace:chord/dev/improve/chord/routes/settings/_components/active-chords-tree"],
+    "@chord/dev.improve.chord.routes.settings._components.active-chords-tree": ["@chord/dev.improve.chord.routes.settings._components.active-chords-tree@workspace:packages/dev/improve/chord/routes/settings/_components/active-chords-tree"],
 
-    "@chord/dev.improve.chord.routes.settings._components.add-repo-button": ["@chord/dev.improve.chord.routes.settings._components.add-repo-button@workspace:chord/dev/improve/chord/routes/settings/_components/add-repo-button"],
+    "@chord/dev.improve.chord.routes.settings._components.add-repo-button": ["@chord/dev.improve.chord.routes.settings._components.add-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/add-repo-button"],
 
-    "@chord/dev.improve.chord.routes.settings._components.app-icon": ["@chord/dev.improve.chord.routes.settings._components.app-icon@workspace:chord/dev/improve/chord/routes/settings/_components/app-icon"],
+    "@chord/dev.improve.chord.routes.settings._components.app-icon": ["@chord/dev.improve.chord.routes.settings._components.app-icon@workspace:packages/dev/improve/chord/routes/settings/_components/app-icon"],
 
-    "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": ["@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card@workspace:chord/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card"],
+    "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": ["@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card@workspace:packages/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-repos-card@workspace:chord/dev/improve/chord/routes/settings/_components/chord-repos-card"],
+    "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-repos-card@workspace:packages/dev/improve/chord/routes/settings/_components/chord-repos-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": ["@chord/dev.improve.chord.routes.settings._components.launch-on-login-card@workspace:chord/dev/improve/chord/routes/settings/_components/launch-on-login-card"],
+    "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": ["@chord/dev.improve.chord.routes.settings._components.launch-on-login-card@workspace:packages/dev/improve/chord/routes/settings/_components/launch-on-login-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.local-folders-card": ["@chord/dev.improve.chord.routes.settings._components.local-folders-card@workspace:chord/dev/improve/chord/routes/settings/_components/local-folders-card"],
+    "@chord/dev.improve.chord.routes.settings._components.local-folders-card": ["@chord/dev.improve.chord.routes.settings._components.local-folders-card@workspace:packages/dev/improve/chord/routes/settings/_components/local-folders-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.log-stream": ["@chord/dev.improve.chord.routes.settings._components.log-stream@workspace:chord/dev/improve/chord/routes/settings/_components/log-stream"],
+    "@chord/dev.improve.chord.routes.settings._components.log-stream": ["@chord/dev.improve.chord.routes.settings._components.log-stream@workspace:packages/dev/improve/chord/routes/settings/_components/log-stream"],
 
-    "@chord/dev.improve.chord.routes.settings._components.open-repo-button": ["@chord/dev.improve.chord.routes.settings._components.open-repo-button@workspace:chord/dev/improve/chord/routes/settings/_components/open-repo-button"],
+    "@chord/dev.improve.chord.routes.settings._components.open-repo-button": ["@chord/dev.improve.chord.routes.settings._components.open-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/open-repo-button"],
 
-    "@chord/dev.improve.chord.routes.settings._components.permissions-card": ["@chord/dev.improve.chord.routes.settings._components.permissions-card@workspace:chord/dev/improve/chord/routes/settings/_components/permissions-card"],
+    "@chord/dev.improve.chord.routes.settings._components.permissions-card": ["@chord/dev.improve.chord.routes.settings._components.permissions-card@workspace:packages/dev/improve/chord/routes/settings/_components/permissions-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": ["@chord/dev.improve.chord.routes.settings._components.permissions-dialog@workspace:chord/dev/improve/chord/routes/settings/_components/permissions-dialog"],
+    "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": ["@chord/dev.improve.chord.routes.settings._components.permissions-dialog@workspace:packages/dev/improve/chord/routes/settings/_components/permissions-dialog"],
 
-    "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": ["@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card@workspace:chord/dev/improve/chord/routes/settings/_components/placeholder-chords-card"],
+    "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": ["@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card@workspace:packages/dev/improve/chord/routes/settings/_components/placeholder-chords-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": ["@chord/dev.improve.chord.routes.settings._components.quit-chord-card@workspace:chord/dev/improve/chord/routes/settings/_components/quit-chord-card"],
+    "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": ["@chord/dev.improve.chord.routes.settings._components.quit-chord-card@workspace:packages/dev/improve/chord/routes/settings/_components/quit-chord-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": ["@chord/dev.improve.chord.routes.settings._components.relaunch-app-button@workspace:chord/dev/improve/chord/routes/settings/_components/relaunch-app-button"],
+    "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": ["@chord/dev.improve.chord.routes.settings._components.relaunch-app-button@workspace:packages/dev/improve/chord/routes/settings/_components/relaunch-app-button"],
 
-    "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": ["@chord/dev.improve.chord.routes.settings._components.reset-chords-card@workspace:chord/dev/improve/chord/routes/settings/_components/reset-chords-card"],
+    "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": ["@chord/dev.improve.chord.routes.settings._components.reset-chords-card@workspace:packages/dev/improve/chord/routes/settings/_components/reset-chords-card"],
 
-    "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": ["@chord/dev.improve.chord.routes.settings._components.shortcut-keys@workspace:chord/dev/improve/chord/routes/settings/_components/shortcut-keys"],
+    "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": ["@chord/dev.improve.chord.routes.settings._components.shortcut-keys@workspace:packages/dev/improve/chord/routes/settings/_components/shortcut-keys"],
 
-    "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": ["@chord/dev.improve.chord.routes.settings._components.sync-repo-button@workspace:chord/dev/improve/chord/routes/settings/_components/sync-repo-button"],
+    "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": ["@chord/dev.improve.chord.routes.settings._components.sync-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/sync-repo-button"],
 
-    "@chord/dev.improve.chord.routes.settings.browse.index": ["@chord/dev.improve.chord.routes.settings.browse.index@workspace:chord/dev/improve/chord/routes/settings/browse/index"],
+    "@chord/dev.improve.chord.routes.settings.browse.index": ["@chord/dev.improve.chord.routes.settings.browse.index@workspace:packages/dev/improve/chord/routes/settings/browse/index"],
 
-    "@chord/dev.improve.chord.routes.settings.chords.index": ["@chord/dev.improve.chord.routes.settings.chords.index@workspace:chord/dev/improve/chord/routes/settings/chords/index"],
+    "@chord/dev.improve.chord.routes.settings.chords.index": ["@chord/dev.improve.chord.routes.settings.chords.index@workspace:packages/dev/improve/chord/routes/settings/chords/index"],
 
-    "@chord/dev.improve.chord.routes.settings.configure.index": ["@chord/dev.improve.chord.routes.settings.configure.index@workspace:chord/dev/improve/chord/routes/settings/configure/index"],
+    "@chord/dev.improve.chord.routes.settings.configure.index": ["@chord/dev.improve.chord.routes.settings.configure.index@workspace:packages/dev/improve/chord/routes/settings/configure/index"],
 
-    "@chord/dev.improve.chord.routes.settings.danger.index": ["@chord/dev.improve.chord.routes.settings.danger.index@workspace:chord/dev/improve/chord/routes/settings/danger/index"],
+    "@chord/dev.improve.chord.routes.settings.danger.index": ["@chord/dev.improve.chord.routes.settings.danger.index@workspace:packages/dev/improve/chord/routes/settings/danger/index"],
 
-    "@chord/dev.improve.chord.routes.settings.general.index": ["@chord/dev.improve.chord.routes.settings.general.index@workspace:chord/dev/improve/chord/routes/settings/general/index"],
+    "@chord/dev.improve.chord.routes.settings.general.index": ["@chord/dev.improve.chord.routes.settings.general.index@workspace:packages/dev/improve/chord/routes/settings/general/index"],
 
-    "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": ["@chord/dev.improve.chord.routes.settings.global-shortcuts.index@workspace:chord/dev/improve/chord/routes/settings/global-shortcuts/index"],
+    "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": ["@chord/dev.improve.chord.routes.settings.global-shortcuts.index@workspace:packages/dev/improve/chord/routes/settings/global-shortcuts/index"],
 
-    "@chord/dev.improve.chord.routes.settings.log.index": ["@chord/dev.improve.chord.routes.settings.log.index@workspace:chord/dev/improve/chord/routes/settings/log/index"],
+    "@chord/dev.improve.chord.routes.settings.log.index": ["@chord/dev.improve.chord.routes.settings.log.index@workspace:packages/dev/improve/chord/routes/settings/log/index"],
 
     "@codemod.com/jssg-types": ["@codemod.com/jssg-types@1.6.3", "", {}, "sha512-b5829ixO5TdGL5xg5YcL9YfiLC3WwFZU+8Zx78NpsHlJ1iySbqfA0g0psqNXv8ss/r7hdpy2KiBXm3GE6bN5bQ=="],
 
@@ -2281,7 +2281,7 @@
 
     "@tanstack/devtools": ["@tanstack/devtools@0.14.2", "", { "dependencies": { "@neodrag/core": "3.0.0-next.11", "@neodrag/solid": "3.0.0-next.11", "@solid-primitives/event-listener": "^2.4.3", "@solid-primitives/keyboard": "^1.3.3", "@solid-primitives/resize-observer": "^2.1.3", "@tanstack/devtools-client": "0.0.8", "@tanstack/devtools-event-bus": "0.4.3", "@tanstack/devtools-ui": "0.7.1", "clsx": "^2.1.1", "goober": "^2.1.16", "solid-js": "^1.9.9" }, "bin": { "intent": "./bin/intent.js" } }, "sha512-8FVVmDU+x3iEwrl5rtbIhud8gwp9eSXPlhs36SCV59yAtXmheFFvLqLAUXpfIU79sZVBg3LLTy2VlTIXaWbaBw=="],
 
-    "@tanstack/devtools-client": ["@chord/com.npmjs.tanstack__devtools-client@workspace:chord/com/npmjs/tanstack__devtools-client"],
+    "@tanstack/devtools-client": ["@chord/com.npmjs.tanstack__devtools-client@workspace:packages/com/npmjs/tanstack__devtools-client"],
 
     "@tanstack/devtools-client-original": ["@tanstack/devtools-client@0.0.8", "", { "dependencies": { "@tanstack/devtools-event-client": "^0.5.0" } }, "sha512-cG3iZkGWCwN330bLBKa8+9r4Of2AXNoz2zUqcsy/4XsD3105ghVBx78cGyvJj9fSclNomPxoqAnDGXXhg1WLvA=="],
 
@@ -2301,7 +2301,7 @@
 
     "@tanstack/react-query-original": ["@tanstack/react-query@5.102.8", "", { "dependencies": { "@tanstack/query-core": "5.102.8" }, "peerDependencies": { "react": "^18 || ^19" } }, "sha512-TYBea4OuXWD7MhaSHq069TWbFe7rcwWN6kzT7JF0OKi1K6c1gTv2IzD6A6ExJsCMozdkqBWeuIUZmu4KQg0O5A=="],
 
-    "@tanstack/react-router": ["@chord/com.npmjs.tanstack__react-router@workspace:chord/com/npmjs/tanstack__react-router"],
+    "@tanstack/react-router": ["@chord/com.npmjs.tanstack__react-router@workspace:packages/com/npmjs/tanstack__react-router"],
 
     "@tanstack/react-router-devtools-original": ["@tanstack/react-router-devtools@1.167.1", "", { "dependencies": { "@tanstack/router-devtools-core": "1.168.1" }, "peerDependencies": { "@tanstack/react-router": "^1.170.19", "@tanstack/router-core": "^1.171.16", "react": ">=18.0.0 || >=19.0.0", "react-dom": ">=18.0.0 || >=19.0.0" }, "optionalPeers": ["@tanstack/router-core"] }, "sha512-pjfGrmjj4d7naEPM7oshqFfwBoxDPNo/UxltlHH5ePbHsJ+plBhd+JaAewm1ueYOjZ0js9hckjWWDYXpCrSfKw=="],
 

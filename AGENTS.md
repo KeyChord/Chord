@@ -11,18 +11,18 @@ In contrast to shortcuts which are a combination of one or more modifier keys an
 This repo is a Bun workspace monorepo that follows the [flatcap](https://github.com/leonsilicon/flatcap) convention:
 
 - `apps/chord-tauri` — the Tauri desktop app. Its React source contains only desktop bootstrapping, generated router glue, route adapters, and global CSS; reusable UI and feature code belongs in workspace packages.
-- `chord/com/npmjs/**` — npm wrapper packages named `@chord/com.npmjs.*`.
-- `chord/dev/improve/chord/components/ui/**` — one isolated package per reusable UI primitive.
-- `chord/dev/improve/chord/routes/**` — route packages (page UI + logic). Route-owned shared packages use internal path segments such as `routes/settings/_components/**`.
-- `chord/dev/improve/chord/api/**`, `hooks/**`, `lib/**`, and `data/**` — narrowly scoped shared packages.
-- `chord/dev/improve/chord/configs/**` — tooling packages (e.g. patching codemods)
+- `packages/com/npmjs/**` — npm wrapper packages named `@chord/com.npmjs.*`.
+- `packages/dev/improve/chord/components/ui/**` — one isolated package per reusable UI primitive.
+- `packages/dev/improve/chord/routes/**` — route packages (page UI + logic). Route-owned shared packages use internal path segments such as `routes/settings/_components/**`.
+- `packages/dev/improve/chord/api/**`, `hooks/**`, `lib/**`, and `data/**` — narrowly scoped shared packages.
+- `packages/dev/improve/chord/configs/**` — tooling packages (e.g. patching codemods)
 
 Run app commands from the repo root with `bun run dev`, `bun run build`, etc., or `cd apps/chord-tauri` for direct access.
 
 ## Flatcap packages
 
-- The top-level scope folder is `chord/`, so workspace package names use the `@chord` scope.
-- Product packages live below `chord/dev/improve/chord/` and therefore start with `@chord/dev.improve.chord`.
+- Workspace packages live under `packages/` and use the `@chord` scope.
+- Product packages live below `packages/dev/improve/chord/` and therefore start with `@chord/dev.improve.chord`.
 - Package code is flat: code files live beside `package.json`. Package-owned non-code assets may live in an `@assets/` directory.
 - Public entry files start with `+` and contain re-exports only. Use `+.ts` for the root export.
 - Relative source imports are not allowed inside flatcap packages. Declare local `#...` subpath imports in `package.json`; import other packages by their workspace name.
@@ -31,13 +31,13 @@ Run app commands from the repo root with `bun run dev`, `bun run build`, etc., o
 
 # Architecture
 
-Chord is built with Tauri and uses Rust for the app backend (located in `apps/chord-tauri/src-tauri/`) and TypeScript + React for the app frontend (primarily in `chord/dev/improve/chord/`, with platform glue in `apps/chord-tauri/src/`).
+Chord is built with Tauri and uses Rust for the app backend (located in `apps/chord-tauri/src-tauri/`) and TypeScript + React for the app frontend (primarily in `packages/dev/improve/chord/`, with platform glue in `apps/chord-tauri/src/`).
 
 ## State
 
 The source of truth for app state lives in the Rust backend; only UI/ephemeral state (e.g. search input) should live in React `useState`.
 
-Rust shares state with React using "observables", which are provided by the [observable-property](https://crates.io/crates/observable-property) crate, all of which are located in `apps/chord-tauri/src-tauri/src/state/observables/`). You should use an observable for any state you want accessible to the frontend. Under the hood, we call Tauri's `invoke` function to update it whenever the state in an observable changes and keep it synced in React using the [`lib/state` package](./chord/dev/improve/chord/lib/state/state.ts), which wraps `listen`.
+Rust shares state with React using "observables", which are provided by the [observable-property](https://crates.io/crates/observable-property) crate, all of which are located in `apps/chord-tauri/src-tauri/src/state/observables/`). You should use an observable for any state you want accessible to the frontend. Under the hood, we call Tauri's `invoke` function to update it whenever the state in an observable changes and keep it synced in React using the [`lib/state` package](./packages/dev/improve/chord/lib/state/state.ts), which wraps `listen`.
 
 On the Rust side, observable state can be accessed from anywhere via `handle.observable_state::<MyObservable>()`. However, they are always owned by state singletons: app-level structs which are registered using [Tauri's state management](https://v2.tauri.app/develop/state-management/) via [`app.manage::<MyStateType>`](./apps/chord-tauri/src-tauri/src/setup.rs). In `setup.rs`, we create a single instance of each of these state singletons, as well as a single instance of each observable.
 

@@ -16,7 +16,7 @@
     "moduleDetection": "force",
     "strict": true
   },
-  "include": ["apps/**/*", "chord/**/*"],
+  "include": ["apps/**/*", "packages/**/*"],
   // `target/` holds Rust/CMake build output, including CMake's
   // `compiler_depend.ts` dependency stubs, which are not TypeScript.
   "exclude": ["**/target/**", "**/dist/**", "**/node_modules/**"],
