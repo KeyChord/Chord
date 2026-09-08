@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+pub mod dev_instance;
 pub mod lock_file;
 pub mod menu;
 pub mod scripting;

@@ -23,6 +23,13 @@ Start the desktop app with:
 bun run dev
 ```
 
+On macOS, a new development app launch replaces the running instance with the
+same development bundle identifier. Startup logs the previous PID, sends SIGTERM,
+and waits for it to exit before starting the new instance. If it ignores SIGTERM
+for two seconds, startup verifies its socket ownership and sends SIGKILL. Concurrent launches
+are serialized. CLI chord commands still forward to the running app, and
+production/beta launches retain the existing instance.
+
 ### Input ownership across app instances
 
 Each process registers at most one keyboard event tap and one Caps Lock HID listener.

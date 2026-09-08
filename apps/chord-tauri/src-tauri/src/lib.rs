@@ -134,6 +134,18 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
         )
         .expect("failed to export TauRPC TypeScript bindings");
 
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "macos")]
+    let dev_launch = if tauri_app::dev_instance::should_replace(
+        &context.config().identifier,
+        startup_command.is_some(),
+    ) {
+        Some(tauri_app::dev_instance::LaunchGuard::acquire(&context.config().identifier)
+            .expect("failed to replace previous development instance"))
+    } else {
+        None
+    };
+
     let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api_handler))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
@@ -203,8 +215,14 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
 
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri_app application");
+
+    #[cfg(target_os = "macos")]
+    if let Some(guard) = dev_launch {
+        guard.wait_until_listening()
+            .expect("failed to initialize development instance");
+    }
 
     app.run(|handle, event| {
         if let RunEvent::Exit = event {
