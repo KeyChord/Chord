@@ -1,27 +1,21 @@
+use super::gate::InputGate;
 use nject::injectable;
-use std::path::{Path, PathBuf};
+use tauri::AppHandle;
 
 #[injectable]
-#[allow(dead_code)]
 pub struct DevLockfileDetector {
-    #[inject(false)]
-    enforce_lockfile_check: bool,
-    #[inject(PathBuf::new())]
-    lockfile_path: PathBuf,
+    // Ownership changes wait for callbacks and queued handlers to finish before
+    // releasing the OS lease. Queued events retain their originating generation.
+    #[inject(InputGate::default())]
+    pub(super) gate: InputGate,
+    pub(super) handle: AppHandle,
 }
 
 impl DevLockfileDetector {
-    #[allow(dead_code)]
-    pub fn should_intercept_input_events(&self) -> bool {
-        if !self.enforce_lockfile_check {
-            return true;
-        }
-
-        !is_dev_lockfile_present(&self.lockfile_path)
+    pub fn with_input_owner<T>(&self, f: impl FnOnce(u64) -> T) -> Option<T> {
+        self.gate.capture(f)
     }
-}
-
-#[allow(dead_code)]
-fn is_dev_lockfile_present(lockfile_path: &Path) -> bool {
-    lockfile_path.exists()
+    pub fn with_input_generation<T>(&self, expected: u64, f: impl FnOnce() -> T) -> Option<T> {
+        self.gate.process(expected, f)
+    }
 }

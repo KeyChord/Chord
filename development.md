@@ -23,6 +23,31 @@ Start the desktop app with:
 bun run dev
 ```
 
+### Input ownership across app instances
+
+Each process registers at most one keyboard event tap and one Caps Lock HID listener.
+All app channels share an OS-held input lease. Development bundle identifiers
+(`com.leonsilicon.chord.development` and its dotted suffixes) take priority over
+production and other channels. Among instances of the same priority, the current
+owner stays active until it exits or becomes ineligible.
+
+An instance must have Accessibility and Input Monitoring enabled and its input
+handlers running before requesting ownership. Standby instances forward keyboard
+events untouched and ignore Caps Lock input. On handoff, Chord drains in-flight
+input processing, exits chord mode, clears held-key state, and rejects queued
+input from the previous ownership generation. Ownership is checked every 25 ms;
+a handoff also waits for any current input handler to finish.
+
+Lease files live in the user's application-support directory under
+`com.leonsilicon.chord/input-ownership-v1/`, shared across bundle identifiers and
+independent of `TMPDIR`. **Do not delete these files while Chord is running.**
+Their existence does not indicate ownership: the OS releases the locks even on
+crash or force-quit, so a remaining lockfile cannot suppress another instance.
+Ownership transitions appear in logs as `Input ownership: active` / `standby`.
+
+Both dev and production must run a build containing this protocol. Older installed
+builds do not participate and must be quit or updated before running alongside dev.
+
 ### Runtime log levels
 
 While the development runner is open, focus the `tauri` pane and enter a log command:

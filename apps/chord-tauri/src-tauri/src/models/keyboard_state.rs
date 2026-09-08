@@ -24,6 +24,11 @@ pub struct AppKeyboardState {
 }
 
 impl AppKeyboardState {
+    pub fn reset(&self) {
+        self.is_caps_pressed.store(false, Ordering::SeqCst);
+        self.is_shift_pressed.store(false, Ordering::SeqCst);
+    }
+
     pub fn is_caps_pressed(&self) -> bool {
         self.is_caps_pressed.load(Ordering::SeqCst)
     }

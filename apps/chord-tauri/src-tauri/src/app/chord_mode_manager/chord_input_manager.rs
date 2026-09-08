@@ -29,6 +29,8 @@ pub struct ChordInputManager {
 
 impl ChordInputManager {
     pub fn reset(&self) -> Result<()> {
+        self.held_keys.lock().clear();
+        self.spawn_end_active_task()?;
         self.observable.set_state(|_| ChordInputState::default())
     }
 

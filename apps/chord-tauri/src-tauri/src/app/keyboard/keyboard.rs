@@ -1,3 +1,4 @@
+use super::registration::Registration;
 use crate::app::AppHandleExt;
 use crate::app::state::AppSingleton;
 use crate::models::{AppKeyboardState, Key, KeyEvent, KeyEventAction};
@@ -20,7 +21,10 @@ const KEY_EVENT_QUEUE_CAPACITY: usize = 1_024;
 
 static CAPS_LOCK_QUEUE_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
 static KEY_EVENT_QUEUE_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
-static TX: OnceLock<SyncSender<bool>> = OnceLock::new();
+static INPUT_REGISTRATION: Registration = Registration::new();
+static CAPS_REGISTRATION: Registration = Registration::new();
+static CAPS_RUNNING: AtomicBool = AtomicBool::new(false);
+static TX: OnceLock<(SyncSender<(u64, bool)>, AppHandle)> = OnceLock::new();
 
 bitflags! {
   pub struct Modifiers: u16 {
@@ -51,35 +55,48 @@ impl AppKeyboard {
         &self.keyboard_state
     }
 
+    pub fn input_handlers_running(&self) -> bool {
+        INPUT_REGISTRATION.is_registered() && CAPS_RUNNING.load(Ordering::Acquire)
+    }
+
+    pub fn reset_input_state(&self) {
+        self.keyboard_state.reset();
+        self.modifier_flags.store(0, Ordering::Relaxed);
+    }
+
     pub fn register_input_handler(&self) -> Result<()> {
+        let Some(registration) = INPUT_REGISTRATION.acquire() else {
+            return Ok(());
+        };
         let handle = self.handle.clone();
-        let (tx, rx) = sync_channel::<KeyEvent>(KEY_EVENT_QUEUE_CAPACITY);
+        let (tx, rx) = sync_channel::<(u64, KeyEvent)>(KEY_EVENT_QUEUE_CAPACITY);
 
         {
             let handle = self.handle.clone();
             // Spawning the handler in a separate thread to keep the key grabber callback as fast as possible
-            std::thread::spawn(move || {
-                while let Ok(event) = rx.recv() {
-                    let app_controller = handle.app_state().app_controller();
-                    if let Err(e) = app_controller.handle_key_event(&event) {
-                        log::error!("Failed to handle key event: {e}");
+            std::thread::Builder::new()
+                .name("chord-key-events".into())
+                .spawn(move || {
+                    while let Ok((generation, event)) = rx.recv() {
+                        handle
+                            .app_state()
+                            .dev_lockfile_detector()
+                            .with_input_generation(generation, || {
+                                if let Err(e) =
+                                    handle.app_state().app_controller().handle_key_event(&event)
+                                {
+                                    log::error!("Failed to handle key event: {e}");
+                                }
+                            });
                     }
-                }
-            });
+                })?;
         }
 
-        std::thread::spawn(move || {
+        std::thread::Builder::new().name("chord-key-tap".into()).spawn(move || {
+            let _registration = registration;
             let callback = move |event: rdev::Event| -> Option<rdev::Event> {
                 // Synthetic, skip processing
                 if event.source_user_data == 0xDEADBEEF || event.source_user_data == 0xDEADDEAD {
-                    return Some(event);
-                }
-
-                if !handle
-                    .app_state()
-                    .dev_lockfile_detector()
-                    .should_intercept_input_events()
-                {
                     return Some(event);
                 }
 
@@ -99,10 +116,9 @@ impl AppKeyboard {
                     _ => return Some(event),
                 };
 
-                let keyboard = handle.app_state().keyboard();
-                let action = keyboard.handle_key_event(&key_event);
-
-                match tx.try_send(key_event) {
+                let action = handle.app_state().dev_lockfile_detector().with_input_owner(|generation| {
+                    let action = handle.app_state().keyboard().handle_key_event(&key_event);
+                    match tx.try_send((generation, key_event)) {
                     Ok(()) => {}
                     Err(TrySendError::Full(_)) => {
                         if !KEY_EVENT_QUEUE_WARNING_EMITTED.swap(true, Ordering::Relaxed) {
@@ -116,6 +132,8 @@ impl AppKeyboard {
                     }
                 }
 
+                    action
+                }).unwrap_or(KeyEventAction::Forward);
                 match action {
                     KeyEventAction::Consume => None,
                     _ => Some(event),
@@ -123,51 +141,56 @@ impl AppKeyboard {
             };
 
             if let Err(error) = rdev::grab(callback) {
-                println!("Error: {:?}", error)
+                log::error!("Keyboard event tap stopped: {error:?}");
             }
-        });
+        })?;
 
         Ok(())
     }
 
     pub fn register_caps_lock_input_handler(&self) -> Result<()> {
+        let Some(registration) = CAPS_REGISTRATION.acquire() else {
+            return Ok(());
+        };
         log::info!("Registering caps lock handler");
-        let (tx, rx) = sync_channel(CAPS_LOCK_QUEUE_CAPACITY);
-
-        TX.set(tx)
-            .map_err(|_| anyhow::anyhow!("failed to set tx"))?;
-
-        std::thread::spawn(|| unsafe {
-            start_caps_lock_listener(caps_lock_changed);
-        });
-
-        let handle = self.handle.clone();
-        std::thread::spawn(move || {
-            while let Ok(pressed) = rx.recv() {
-                if pressed {
-                    let keyboard = handle.app_state().keyboard();
-                    keyboard.handle_key_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)));
-
-                    let app_controller = handle.app_state().app_controller();
-                    if let Err(e) = app_controller
-                        .handle_key_event(&KeyEvent::Press(Key(KeyMappingCode::CapsLock)))
-                    {
-                        log::error!("Failed to handle Caps Lock Press: {e}");
+        // One receiver for the lifetime of the process, including native startup retries.
+        if TX.get().is_none() {
+            let (tx, rx) = sync_channel::<(u64, bool)>(CAPS_LOCK_QUEUE_CAPACITY);
+            let handle = self.handle.clone();
+            std::thread::Builder::new()
+                .name("chord-caps-events".into())
+                .spawn(move || {
+                    while let Ok((generation, pressed)) = rx.recv() {
+                        handle
+                            .app_state()
+                            .dev_lockfile_detector()
+                            .with_input_generation(generation, || {
+                                let key = Key(KeyMappingCode::CapsLock);
+                                let event = if pressed {
+                                    KeyEvent::Press(key)
+                                } else {
+                                    KeyEvent::Release(key)
+                                };
+                                handle.app_state().keyboard().handle_key_event(&event);
+                                if let Err(e) =
+                                    handle.app_state().app_controller().handle_key_event(&event)
+                                {
+                                    log::error!("Failed to handle Caps Lock event: {e}");
+                                }
+                            });
                     }
-                } else {
-                    let keyboard = handle.app_state().keyboard();
-                    keyboard.handle_key_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)));
-
-                    let app_controller = handle.app_state().app_controller();
-                    if let Err(e) = app_controller
-                        .handle_key_event(&KeyEvent::Release(Key(KeyMappingCode::CapsLock)))
-                    {
-                        log::error!("Failed to handle Caps Lock Release: {e}");
-                    }
-                }
-            }
-        });
-
+                })?;
+            TX.set((tx, self.handle.clone()))
+                .map_err(|_| anyhow::anyhow!("caps channel already initialized"))?;
+        }
+        std::thread::Builder::new()
+            .name("chord-caps-hid".into())
+            .spawn(move || {
+                let _registration = registration;
+                let result = unsafe { start_caps_lock_listener(caps_lock_changed) };
+                CAPS_RUNNING.store(false, Ordering::Release);
+                log::error!("Caps Lock HID listener stopped: {result}");
+            })?;
         Ok(())
     }
 
@@ -257,28 +280,34 @@ impl AppKeyboard {
 }
 
 unsafe extern "C" {
-    fn start_caps_lock_listener(cb: extern "C" fn(c_int));
+    fn start_caps_lock_listener(cb: extern "C" fn(c_int)) -> c_int;
     fn toggle_caps() -> c_int;
     fn set_caps_off() -> c_int;
 }
 
 extern "C" fn caps_lock_changed(pressed: c_int) {
-    log::debug!("caps_lock_changed: {}", pressed);
-    if let Some(tx) = TX.get() {
-        match tx.try_send(pressed != 0) {
-            Ok(()) => {}
-            Err(TrySendError::Full(_)) => {
-                if !CAPS_LOCK_QUEUE_WARNING_EMITTED.swap(true, Ordering::Relaxed) {
-                    log::warn!(
-                        "Dropping caps-lock events because the bounded input queue is saturated"
-                    );
+    // Native device availability: only claim ownership with an open keyboard.
+    if pressed == -1 || pressed == -2 {
+        CAPS_RUNNING.store(pressed == -1, Ordering::Release);
+        return;
+    }
+    if let Some((tx, handle)) = TX.get() {
+        handle
+            .app_state()
+            .dev_lockfile_detector()
+            .with_input_owner(|generation| match tx.try_send((generation, pressed != 0)) {
+                Ok(()) => {}
+                Err(TrySendError::Full(_)) => {
+                    if !CAPS_LOCK_QUEUE_WARNING_EMITTED.swap(true, Ordering::Relaxed) {
+                        log::warn!(
+                            "Dropping caps-lock events because the bounded input queue is saturated"
+                        );
+                    }
                 }
-            }
-            Err(TrySendError::Disconnected(_)) => {
-                log::error!("Caps-lock event handler is unavailable");
-            }
-        }
-    } else {
-        log::error!("No tx found");
+                Err(TrySendError::Disconnected(_)) => {
+                    CAPS_RUNNING.store(false, Ordering::Release);
+                    log::error!("Caps-lock event handler is unavailable");
+                }
+            });
     }
 }

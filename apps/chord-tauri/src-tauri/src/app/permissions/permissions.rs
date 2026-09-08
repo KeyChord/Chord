@@ -24,6 +24,13 @@ impl AppPermissions {
         Ok(())
     }
 
+    pub fn can_intercept_input(&self) -> bool {
+        self.observable.get_state().is_ok_and(|state| {
+            state.is_accessibility_enabled == Some(true)
+                && state.is_input_monitoring_enabled == Some(true)
+        })
+    }
+
     pub async fn load(&self) -> Result<(bool, bool)> {
         let is_input_monitoring_enabled =
             tauri_plugin_macos_permissions::check_input_monitoring_permission().await;
@@ -68,15 +75,8 @@ pub struct AppPermissionsInputMonitoring {
 impl AppPermissionsInputMonitoring {
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
-        observable.subscribe(Arc::new(move |previous_state, state| {
-            if !previous_state
-                .is_input_monitoring_enabled
-                .is_some_and(|enabled| enabled)
-                && state
-                    .is_input_monitoring_enabled
-                    .is_some_and(|enabled| enabled)
-            {
-                let app = handle.app_state();
+        observable.subscribe(Arc::new(move |_previous_state, state| {
+            if state.is_input_monitoring_enabled == Some(true) {
                 let keyboard = handle.app_state().keyboard();
                 if let Err(e) = keyboard.register_caps_lock_input_handler() {
                     log::error!("Failed to handle caps lock input: {e}");
@@ -96,16 +96,12 @@ pub struct AppPermissionsAccessibility {
 impl AppPermissionsAccessibility {
     pub fn init(&self, observable: &AppPermissionsObservable) -> Result<()> {
         let handle = self.handle.clone();
-        observable.subscribe(Arc::new(move |previous_state, state| {
-            if !previous_state
-                .is_accessibility_enabled
-                .is_some_and(|enabled| enabled)
-                && state
-                    .is_accessibility_enabled
-                    .is_some_and(|enabled| enabled)
-            {
+        observable.subscribe(Arc::new(move |_previous_state, state| {
+            if state.is_accessibility_enabled == Some(true) {
                 let keyboard = handle.app_state().keyboard();
-                keyboard.register_input_handler();
+                if let Err(error) = keyboard.register_input_handler() {
+                    log::error!("Failed to register keyboard input: {error:#}");
+                }
             }
         }))?;
         Ok(())

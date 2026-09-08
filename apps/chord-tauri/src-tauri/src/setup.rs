@@ -86,7 +86,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
             }
             .provide::<DesktopAppManager>(),
         )
-        .add(DevLockfileDetectorProvider.provide::<DevLockfileDetector>())
+        .add(DevLockfileDetectorProvider { handle: handle.clone() }.provide::<DevLockfileDetector>())
         .add(
             AppFrontmostProvider {
                 handle: handle.clone(),

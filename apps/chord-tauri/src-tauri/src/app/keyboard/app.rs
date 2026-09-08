@@ -18,8 +18,7 @@ pub struct AppKeyboardProvider {
 
 impl AppSingleton for AppKeyboard {
     fn init(&self) -> Result<()> {
-        self.register_input_handler();
-
+        // Permission loading starts the listeners once access is available.
         Ok(())
     }
 }
