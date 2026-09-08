@@ -10,77 +10,51 @@ import type {
 	GitReposState,
 	KeyboardState,
 } from '@chord/dev.improve.chord.lib.typeshare';
-import renameFunction from '@chord/com.npmjs.rename-fn';
+import { useQuery, useQueryClient } from '@chord/com.npmjs.tanstack__react-query';
 import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
 import { listen } from '@tauri-apps/api/event';
-import { useEffect, useState } from 'react';
+import { createStateQuery } from '#state-query';
 
-function createUseTauriState<T>(stateId: string, initialState: T) {
-	const useTauriState = () => {
-		const [state, setState] = useState<T>(initialState);
-		useEffect(() => {
-			const unlistenPromise = listen<T>(`state:${stateId}`, (event) => {
-				setState(event.payload);
-			});
-
-			return () => {
-				void unlistenPromise.then(unlisten => unlisten?.());
-			};
-		}, []);
-
-		return state;
-	};
-
-	return renameFunction(useTauriState, stateId);
+export interface TauriStates {
+	keyboard: KeyboardState
+	'chord-panel': ChordPanelState
+	'chord-input': ChordInputState
+	settings: AppSettingsState
+	permissions: AppPermissionsState
+	'git-repos': GitReposState
+	frontmost: FrontmostState
+	'chord-package-manager': ChordPackageManagerState
+	'desktop-app-manager': DesktopAppManagerState
+	'chord-package-store': ChordPackageStoreState
 }
 
-export const [
-	useKeyboardState,
-	useChordPanelState,
-	useChordInputState,
-	useSettingsState,
-	usePermissionsState,
-	useGitRepoStoreState,
-	useFrontmostState,
-	useChordPackageManagerState,
-	useDesktopAppManagerState,
-	useChordPackageStoreState,
-] = await (async () => {
-	const initialStates = JSON.parse(await taurpc.getCurrentStates()) as Record<string, unknown>;
-	return [
-		createUseTauriState<KeyboardState>('keyboard', initialStates.keyboard as KeyboardState),
-		createUseTauriState<ChordPanelState>(
-			'chord-panel',
-			initialStates['chord-panel'] as ChordPanelState,
-		),
-		createUseTauriState<ChordInputState>(
-			'chord-input',
-			initialStates['chord-input'] as ChordInputState,
-		),
-		createUseTauriState<AppSettingsState>('settings', initialStates.settings as AppSettingsState),
-		createUseTauriState<AppPermissionsState>(
-			'permissions',
-			initialStates.permissions as AppPermissionsState,
-		),
-		createUseTauriState<GitReposState>(
-			'git-repos',
-			initialStates['git-repos'] as GitReposState,
-		),
-		createUseTauriState<FrontmostState>(
-			'frontmost',
-			initialStates.frontmost as FrontmostState,
-		),
-		createUseTauriState<ChordPackageManagerState>(
-			'chord-package-manager',
-			initialStates['chord-package-manager'] as ChordPackageManagerState,
-		),
-		createUseTauriState<DesktopAppManagerState>(
-			'desktop-app-manager',
-			initialStates['desktop-app-manager'] as DesktopAppManagerState,
-		),
-		createUseTauriState<ChordPackageStoreState>(
-			'chord-package-store',
-			initialStates['chord-package-store'] as ChordPackageStoreState,
-		),
-	] as const;
-})();
+const stateIds = [
+	'keyboard', 'chord-panel', 'chord-input', 'settings', 'permissions',
+	'git-repos', 'frontmost', 'chord-package-manager', 'desktop-app-manager',
+	'chord-package-store',
+] as const;
+
+const stateQuery = createStateQuery<TauriStates>({
+	stateIds,
+	read: async () => JSON.parse(await taurpc.getCurrentStates()) as TauriStates,
+	subscribe: (id, onChange) => listen(`state:${id}`, event => onChange(event.payload)),
+});
+
+function createUseTauriState<K extends keyof TauriStates>(stateId: K) {
+	const select = (states: TauriStates) => states[stateId];
+	return function useTauriState() {
+		const client = useQueryClient();
+		return useQuery({ ...stateQuery(client), select });
+	};
+}
+
+export const useKeyboardState = createUseTauriState('keyboard');
+export const useChordPanelState = createUseTauriState('chord-panel');
+export const useChordInputState = createUseTauriState('chord-input');
+export const useSettingsState = createUseTauriState('settings');
+export const usePermissionsState = createUseTauriState('permissions');
+export const useGitRepoStoreState = createUseTauriState('git-repos');
+export const useFrontmostState = createUseTauriState('frontmost');
+export const useChordPackageManagerState = createUseTauriState('chord-package-manager');
+export const useDesktopAppManagerState = createUseTauriState('desktop-app-manager');
+export const useChordPackageStoreState = createUseTauriState('chord-package-store');

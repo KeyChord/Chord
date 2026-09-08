@@ -17,12 +17,14 @@ pub struct ChordPackageRegistry {
 }
 
 impl ChordPackageRegistry {
-    /// TODO: return sorted by priority
+    /// Merge remote sources first so every locally linked source overrides GitHub packages.
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
 
         packages.extend(self.config.import_all_packages()?);
-        packages.extend(self.git.import_all_packages()?);
+        packages.extend(self.git.import_packages(false)?);
+        packages.extend(self.local.import_monorepos()?);
+        packages.extend(self.git.import_packages(true)?);
         packages.extend(self.local.import_all_packages()?);
 
         Ok(packages)

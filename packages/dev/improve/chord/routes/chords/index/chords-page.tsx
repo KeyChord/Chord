@@ -1,10 +1,10 @@
 import type { Chord, ChordHint, ChordReference } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd } from '@chord/dev.improve.chord.components.ui.kbd';
-import { useChordInputState, useChordPackageManagerState, useChordPanelState, useFrontmostState, useKeyboardState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useChordInputState, useChordPackageManagerState, useChordPanelState, useFrontmostState, useKeyboardState } from '@chord/dev.improve.chord.lib.state';
 import { emit, listen } from '@tauri-apps/api/event';
 import getPrettyKey from 'pretty-key';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 	String.fromCharCode('A'.charCodeAt(0) + index));
@@ -48,6 +48,7 @@ function sortTokens(tokens: Iterable<string>) {
 
 function ChordKeyRow({
 	token,
+	rangeEnd,
 	description = '',
 	isSelected = false,
 	isDimmed = false,
@@ -55,6 +56,7 @@ function ChordKeyRow({
 	descriptionFontSize,
 }: {
 	token: string
+	rangeEnd?: string
 	description?: string
 	isSelected?: boolean
 	isDimmed?: boolean
@@ -69,32 +71,61 @@ function ChordKeyRow({
 				'text-foreground/95',
 			)}
 		>
-			<Kbd
-				style={{
-					height: `${keySize}px`,
-					minWidth: `${keySize}px`,
-					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
-				}}
-				className={cn(
-					'rounded-md border px-0 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
-					isSelected
-						? 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
-						: 'border-border/80 bg-background/95 text-foreground',
-				)}
-			>
-				{token}
-			</Kbd>
+			<div className="flex shrink-0 items-center gap-2">
+				{(rangeEnd ? [token, rangeEnd] : [token]).map((keyToken, index) => (
+					<Fragment key={index}>
+						{index > 0 && <span aria-hidden="true">-</span>}
+						<Kbd
+							style={{
+								height: `${keySize}px`,
+								minWidth: `${keySize}px`,
+								fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
+							}}
+							className={cn(
+								'rounded-md border px-0 font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
+								isSelected
+									? 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
+									: 'border-border/80 bg-background/95 text-foreground',
+							)}
+						>
+							{keyToken}
+						</Kbd>
+					</Fragment>
+				))}
+			</div>
 			<div style={{ fontSize: `${descriptionFontSize}px` }}>{description}</div>
 		</div>
 	);
 }
 
 export function ChordsPage() {
-	const chordInputState = useChordInputState();
-	const chordPanelState = useChordPanelState();
-	const keyboardState = useKeyboardState();
-	const { frontmostAppBundleId } = useFrontmostState();
-	const { packages } = useChordPackageManagerState();
+	return (
+		<StateQueries queries={[useChordInputState(), useChordPanelState(), useKeyboardState(), useFrontmostState(), useChordPackageManagerState()]} quiet>
+			{(chordInputData, chordPanelData, keyboardData, frontmostData, chordPackageManagerData) => (
+				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} keyboardData={keyboardData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function ChordsPageContent({
+	chordInputData,
+	chordPanelData,
+	keyboardData,
+	frontmostData,
+	chordPackageManagerData,
+}: {
+	chordInputData: NonNullable<ReturnType<typeof useChordInputState>['data']>
+	chordPanelData: NonNullable<ReturnType<typeof useChordPanelState>['data']>
+	keyboardData: NonNullable<ReturnType<typeof useKeyboardState>['data']>
+	frontmostData: NonNullable<ReturnType<typeof useFrontmostState>['data']>
+	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
+}) {
+	const chordInputState = chordInputData;
+	const chordPanelState = chordPanelData;
+	const keyboardState = keyboardData;
+	const { frontmostAppBundleId } = frontmostData;
+	const { packages } = chordPackageManagerData;
 
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
@@ -253,6 +284,20 @@ export function ChordsPage() {
 	const hintSequences = Object.values(hintsByRawPattern).flatMap(hint =>
 		'keys' in hint.pattern
 			? [{ tokens: hint.pattern.keys.map(normalizeToken), description: hint.description }]
+			: 'range' in hint.pattern
+				? [{ tokens: hint.pattern.range.prefix.map(normalizeToken), description: '' }]
+				: [],
+	);
+
+	const rangeHints = Object.values(hintsByRawPattern).flatMap(hint =>
+		'range' in hint.pattern
+			? [
+					{
+						prefix: hint.pattern.range.prefix.map(normalizeToken),
+						keys: hint.pattern.range.keys.map(normalizeToken),
+						description: hint.description,
+					},
+				]
 			: [],
 	);
 
@@ -308,7 +353,16 @@ export function ChordsPage() {
 				}
 			}
 
-			const rows = sortTokens(activeTokens).map((token) => {
+			const matchingRanges = rangeHints.filter(
+				hint =>
+					hint.prefix.length === columnIndex &&
+					prefixTokens.every((token, index) => hint.prefix[index] === token),
+			);
+			for (const range of matchingRanges) {
+				for (const token of range.keys) activeTokens.delete(token);
+			}
+
+			const rows = sortTokens(activeTokens).map(token => {
 				const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
 				const exactHint = matchingHints.findLast(
 					hint => hint.tokens[columnIndex] === token && hint.tokens.length === columnIndex + 1,
@@ -319,9 +373,22 @@ export function ChordsPage() {
 
 				return {
 					token,
+					rangeEnd: undefined as string | undefined,
+					keys: [token],
 					description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
 				};
 			});
+
+			for (const range of matchingRanges) {
+				rows.push({
+					token: range.keys[0]!,
+					rangeEnd: range.keys.at(-1)!,
+					keys: range.keys,
+					description: range.description,
+				});
+			}
+			const tokenOrder = sortTokens(rows.map(row => row.token));
+			rows.sort((left, right) => tokenOrder.indexOf(left.token) - tokenOrder.indexOf(right.token));
 
 			return {
 				id: `column-${columnIndex}`,
@@ -372,11 +439,12 @@ export function ChordsPage() {
 										: null}
 									{column.rows.map(row => (
 										<ChordKeyRow
-											key={`${column.id}-${row.token}`}
+											key={`${column.id}-${row.token}-${row.rangeEnd ?? ''}`}
 											token={row.token}
+											rangeEnd={row.rangeEnd}
 											description={row.description}
-											isSelected={column.selectedToken === row.token}
-											isDimmed={column.hasSelection && column.selectedToken !== row.token}
+											isSelected={row.keys.includes(column.selectedToken)}
+											isDimmed={column.hasSelection && !row.keys.includes(column.selectedToken)}
 											keySize={keySize}
 											descriptionFontSize={descriptionFontSize}
 										/>

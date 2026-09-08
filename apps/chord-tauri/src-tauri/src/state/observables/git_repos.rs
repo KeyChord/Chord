@@ -22,6 +22,11 @@ pub struct GitRepo {
     pub url: String,
     #[typeshare(serialized_as = "String")]
     pub local_abspath: PathBuf,
+    #[serde(default)]
+    #[typeshare(serialized_as = "Option<String>")]
+    pub linked_local_path: Option<PathBuf>,
+    #[serde(default)]
+    pub is_monorepo: bool,
     pub head_short_sha: Option<String>,
     #[serde(default)]
     pub pinned_rev: Option<String>,

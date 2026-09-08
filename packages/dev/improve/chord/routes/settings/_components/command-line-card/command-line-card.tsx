@@ -9,11 +9,25 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
-import { useSettingsState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useSettingsState } from '@chord/dev.improve.chord.lib.state';
 import { useEffect } from 'react';
 
 export function CommandLineCard() {
-	const { cliCommand, isCliInstalled } = useSettingsState();
+	return (
+		<StateQueries queries={[useSettingsState()]}>
+			{(settingsData) => (
+				<CommandLineCardContent settingsData={settingsData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function CommandLineCardContent({
+	settingsData,
+}: {
+	settingsData: NonNullable<ReturnType<typeof useSettingsState>['data']>
+}) {
+	const { cliCommand, isCliInstalled } = settingsData;
 	const install = useMutation({ mutationFn: taurpc.installCli });
 	const refresh = useMutation({ mutationFn: taurpc.refreshCliInstallation });
 	const { mutate: refreshStatus } = refresh;

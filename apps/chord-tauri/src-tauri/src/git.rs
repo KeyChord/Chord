@@ -88,6 +88,8 @@ impl GitHubRepoRef {
             slug,
             url,
             local_abspath,
+            linked_local_path: None,
+            is_monorepo: false,
             head_short_sha,
             pinned_rev,
         }

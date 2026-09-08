@@ -8,7 +8,9 @@ use typeshare::typeshare;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordHint {
-    #[typeshare(typescript(type = "{ keys: string[] } | { regex: string }"))]
+    #[typeshare(typescript(
+        type = "{ keys: string[] } | { regex: string } | { range: { prefix: string[], keys: string[] } }"
+    ))]
     pub pattern: ChordHintPattern,
     pub raw_pattern: String,
     pub description: String,
@@ -18,6 +20,7 @@ pub struct ChordHint {
 pub enum ChordHintPattern {
     Keys(Vec<Key>),
     Regex(Regex),
+    Range { prefix: Vec<Key>, keys: Vec<Key> },
 }
 
 impl Serialize for ChordHintPattern {
@@ -29,6 +32,14 @@ impl Serialize for ChordHintPattern {
             ChordHintPattern::Keys(keys) => {
                 let mut s = serializer.serialize_struct("ChordTrigger", 1)?;
                 s.serialize_field("keys", keys)?;
+                s.end()
+            }
+            ChordHintPattern::Range { prefix, keys } => {
+                let mut s = serializer.serialize_struct("ChordHintPattern", 1)?;
+                s.serialize_field(
+                    "range",
+                    &serde_json::json!({ "prefix": prefix, "keys": keys }),
+                )?;
                 s.end()
             }
             ChordHintPattern::Regex(regex) => {

@@ -6,12 +6,26 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
-import { useSettingsState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useSettingsState } from '@chord/dev.improve.chord.lib.state';
 import { AppIcon } from '@chord/dev.improve.chord.routes.settings._components.app-icon';
 import { RelaunchAppButton } from '@chord/dev.improve.chord.routes.settings._components.relaunch-app-button';
 
 export function AppsNeedingRelaunchCard() {
-	const { bundleIdsNeedingRelaunch } = useSettingsState();
+	return (
+		<StateQueries queries={[useSettingsState()]}>
+			{(settingsData) => (
+				<AppsNeedingRelaunchCardContent settingsData={settingsData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function AppsNeedingRelaunchCardContent({
+	settingsData,
+}: {
+	settingsData: NonNullable<ReturnType<typeof useSettingsState>['data']>
+}) {
+	const { bundleIdsNeedingRelaunch } = settingsData;
 
 	return (
 		<Card size="sm">

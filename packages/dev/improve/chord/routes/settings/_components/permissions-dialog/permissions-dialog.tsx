@@ -9,7 +9,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@chord/dev.improve.chord.components.ui.dialog';
-import { usePermissionsState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, usePermissionsState } from '@chord/dev.improve.chord.lib.state';
 import { Keyboard, MousePointer2 } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -38,7 +38,23 @@ const permissions: Permission[] = [
 ];
 
 export function PermissionsDialog({ onDismiss }: { onDismiss: () => void }) {
-	const initialPermissions = usePermissionsState();
+	return (
+		<StateQueries queries={[usePermissionsState()]} quiet>
+			{(permissionsData) => (
+				<PermissionsDialogContent onDismiss={onDismiss} permissionsData={permissionsData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function PermissionsDialogContent({
+	onDismiss,
+	permissionsData,
+}: {
+	onDismiss: () => void
+	permissionsData: NonNullable<ReturnType<typeof usePermissionsState>['data']>
+}) {
+	const initialPermissions = permissionsData;
 	const { data: permissionState, refetch: refetchPermissions } = useQuery({
 		queryKey: ['macos-permissions'],
 		queryFn: async () => {

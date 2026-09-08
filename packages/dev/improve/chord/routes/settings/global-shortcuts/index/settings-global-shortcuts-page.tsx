@@ -11,13 +11,27 @@ import {
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
-import { useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
 import { AppIcon } from '@chord/dev.improve.chord.routes.settings._components.app-icon';
 import { ShortcutKeys } from '@chord/dev.improve.chord.routes.settings._components.shortcut-keys';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 
 export function SettingsGlobalShortcutsPage() {
+	return (
+		<StateQueries queries={[useDesktopAppManagerState()]}>
+			{(desktopAppManagerData) => (
+				<SettingsGlobalShortcutsPageContent desktopAppManagerData={desktopAppManagerData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function SettingsGlobalShortcutsPageContent({
+	desktopAppManagerData,
+}: {
+	desktopAppManagerData: NonNullable<ReturnType<typeof useDesktopAppManagerState>['data']>
+}) {
 	const [input, setInput] = useState('');
 	const queryClient = useQueryClient();
 	const removeGlobalShortcutMappingMutation = useMutation({
@@ -33,7 +47,7 @@ export function SettingsGlobalShortcutsPage() {
 		queryFn: taurpc.listGlobalShortcutMappings,
 	});
 	const mappings = data ?? [];
-	const { appsMetadata } = useDesktopAppManagerState();
+	const { appsMetadata } = desktopAppManagerData;
 	const normalizedFilter = input.trim().toLowerCase();
 	const filteredMappings = mappings.filter((mapping) => {
 		if (!normalizedFilter) {

@@ -68,7 +68,7 @@ export interface ChordActionTask {
 }
 
 export interface ChordHint {
-	pattern: { keys: string[] } | { regex: string };
+	pattern: { keys: string[] } | { regex: string } | { range: { prefix: string[], keys: string[] } };
 	rawPattern: string;
 	description: string;
 }
@@ -191,6 +191,8 @@ export interface GitRepo {
 	slug: string;
 	url: string;
 	localAbspath: string;
+	linkedLocalPath?: string;
+	isMonorepo?: boolean;
 	headShortSha?: string;
 	pinnedRev?: string;
 }

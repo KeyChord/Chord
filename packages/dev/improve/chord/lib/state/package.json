@@ -3,19 +3,24 @@
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#state": "./state.ts"
+		"#state": "./state.ts",
+		"#state-query": "./state-query.ts",
+		"#state-queries": "./state-queries.tsx"
 	},
 	"exports": {
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/com.npmjs.rename-fn": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"@tauri-apps/api": "^2.11.1",
-		"react": "^19.2.8"
+		"react": "^19.2.8",
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*"
 	},
 	"devDependencies": {
-		"@types/react": "^19.2.18"
+		"@types/react": "^19.2.18",
+		"@types/bun": "^1.4.0",
+		"@types/react-dom": "^19.2.5",
+		"react-dom": "^19.2.8"
 	}
 }

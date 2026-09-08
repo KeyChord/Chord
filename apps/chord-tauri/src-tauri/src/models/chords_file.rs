@@ -196,7 +196,22 @@ impl ParsedChordsFile {
         let chord_name = value.get("name").and_then(|n| n.as_str());
 
         let raw_pattern = &key[1..];
-        let pattern = if raw_pattern.contains('(') {
+        // A terminal character range is a compact display hint, not a handler regex.
+        let range = Regex::new(r"^(?P<prefix>[^()]*)\((?P<start>[a-z0-9])-(?P<end>[a-z0-9])\)$")?;
+        let pattern = if let Some(captures) = range.captures(raw_pattern) {
+            let start = captures["start"].as_bytes()[0];
+            let end = captures["end"].as_bytes()[0];
+            anyhow::ensure!(
+                start <= end && start.is_ascii_digit() == end.is_ascii_digit(),
+                "invalid hint range: {}",
+                raw_pattern
+            );
+            let sequence: String = (start..=end).map(char::from).collect();
+            ChordHintPattern::Range {
+                prefix: Key::parse_sequence(&captures["prefix"])?,
+                keys: Key::parse_sequence(&sequence)?,
+            }
+        } else if raw_pattern.contains('(') {
             if let Ok(re) = Regex::new(raw_pattern) {
                 ChordHintPattern::Regex(re)
             } else {
@@ -357,6 +372,49 @@ impl FromStr for ParsedChordsFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_compact_help_ranges() {
+        for (pattern, prefix, count) in [
+            ("?-(a-z)", "-", 26),
+            ("?m(0-9)", "m", 10),
+            ("?(a-a)", "", 1),
+        ] {
+            let hint = ParsedChordsFile::parse_hint(pattern, &Table::new()).unwrap();
+            let ChordHintPattern::Range {
+                prefix: actual_prefix,
+                keys,
+            } = &hint.pattern
+            else {
+                panic!("expected range for {pattern}");
+            };
+            assert_eq!(actual_prefix, &Key::parse_sequence(prefix).unwrap());
+            assert_eq!(keys.len(), count);
+            let serialized = serde_json::to_value(&hint).unwrap();
+            assert_eq!(
+                serialized["pattern"]["range"]["keys"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                count
+            );
+        }
+        for pattern in ["?-(z-a)", "?-(0-z)"] {
+            assert!(ParsedChordsFile::parse_hint(pattern, &Table::new()).is_err());
+        }
+        assert!(matches!(
+            ParsedChordsFile::parse_hint("?-(.*)", &Table::new())
+                .unwrap()
+                .pattern,
+            ChordHintPattern::Regex(_)
+        ));
+        assert!(matches!(
+            ParsedChordsFile::parse_hint("?-a", &Table::new())
+                .unwrap()
+                .pattern,
+            ChordHintPattern::Keys(_)
+        ));
+    }
 
     #[test]
     fn handler_kind_js_is_accepted() {

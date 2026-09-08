@@ -8,7 +8,7 @@ import {
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
-import { useChordPackageManagerState, useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useChordPackageManagerState, useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
 import { ActiveChordTree } from '@chord/dev.improve.chord.routes.settings._components.active-chords-tree';
 import { useMemo, useState } from 'react';
 
@@ -16,9 +16,25 @@ import { useMemo, useState } from 'react';
 const normalizeString = (str: string): string => str.trim().toLowerCase();
 
 export function ActiveChordsTab() {
+	return (
+		<StateQueries queries={[useChordPackageManagerState(), useDesktopAppManagerState()]}>
+			{(chordPackageManagerData, desktopAppManagerData) => (
+				<ActiveChordsTabContent chordPackageManagerData={chordPackageManagerData} desktopAppManagerData={desktopAppManagerData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function ActiveChordsTabContent({
+	chordPackageManagerData,
+	desktopAppManagerData,
+}: {
+	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
+	desktopAppManagerData: NonNullable<ReturnType<typeof useDesktopAppManagerState>['data']>
+}) {
 	const [searchInput, setSearchInput] = useState('');
-	const { packages } = useChordPackageManagerState();
-	const { appsMetadata } = useDesktopAppManagerState();
+	const { packages } = chordPackageManagerData;
+	const { appsMetadata } = desktopAppManagerData;
 
 	const normalizedFilter = normalizeString(searchInput);
 

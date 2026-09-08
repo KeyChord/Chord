@@ -100,6 +100,7 @@
         "@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
@@ -1086,14 +1087,17 @@
     "packages/dev/improve/chord/lib/state": {
       "name": "@chord/dev.improve.chord.lib.state",
       "dependencies": {
-        "@chord/com.npmjs.rename-fn": "workspace:*",
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@tauri-apps/api": "^2.11.1",
         "react": "^19.2.8",
       },
       "devDependencies": {
+        "@types/bun": "^1.4.0",
         "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+        "react-dom": "^19.2.8",
       },
     },
     "packages/dev/improve/chord/lib/typeshare": {
@@ -1227,6 +1231,24 @@
         "@types/react-dom": "^19.2.5",
       },
     },
+    "packages/dev/improve/chord/routes/settings/_components/chord-monorepos-card": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card",
+      "dependencies": {
+        "@chord/com.npmjs.sonner": "workspace:*",
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
+        "lucide-react": "^1.34.0",
+        "react": "^19.2.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+      },
+    },
     "packages/dev/improve/chord/routes/settings/_components/chord-repos-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.chord-repos-card",
       "dependencies": {
@@ -1237,6 +1259,7 @@
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
@@ -1288,6 +1311,7 @@
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "react": "^19.2.8",
       },
       "devDependencies": {
@@ -1467,15 +1491,15 @@
     "packages/dev/improve/chord/routes/settings/chords/index": {
       "name": "@chord/dev.improve.chord.routes.settings.chords.index",
       "dependencies": {
-        "@chord/com.npmjs.sonner": "workspace:*",
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
         "lucide-react": "^1.34.0",
         "react": "^19.2.8",
       },
@@ -1829,6 +1853,8 @@
     "@chord/dev.improve.chord.routes.settings._components.app-icon": ["@chord/dev.improve.chord.routes.settings._components.app-icon@workspace:packages/dev/improve/chord/routes/settings/_components/app-icon"],
 
     "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": ["@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card@workspace:packages/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card"],
+
+    "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card@workspace:packages/dev/improve/chord/routes/settings/_components/chord-monorepos-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-repos-card@workspace:packages/dev/improve/chord/routes/settings/_components/chord-repos-card"],
 

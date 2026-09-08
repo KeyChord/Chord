@@ -9,7 +9,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@c
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
 import { officialChordReposData } from '@chord/dev.improve.chord.data.official-chord-repos';
 import { getGitHubSlug } from '@chord/dev.improve.chord.lib.github';
-import { useGitRepoStoreState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useGitRepoStoreState } from '@chord/dev.improve.chord.lib.state';
 import { CheckCircle2, Plus, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -21,7 +21,21 @@ interface OfficialChordRepo {
 const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
 
 export function SettingsBrowsePage() {
-	const { repos } = useGitRepoStoreState();
+	return (
+		<StateQueries queries={[useGitRepoStoreState()]}>
+			{(gitRepoStoreData) => (
+				<SettingsBrowsePageContent gitRepoStoreData={gitRepoStoreData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function SettingsBrowsePageContent({
+	gitRepoStoreData,
+}: {
+	gitRepoStoreData: NonNullable<ReturnType<typeof useGitRepoStoreState>['data']>
+}) {
+	const { repos } = gitRepoStoreData;
 	const [searchInput, setSearchInput] = useState('');
 	const [selectedRepoUrls, setSelectedRepoUrls] = useState<string[]>([]);
 

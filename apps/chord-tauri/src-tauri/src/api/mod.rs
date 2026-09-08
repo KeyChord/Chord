@@ -27,9 +27,15 @@ pub trait Api {
     async fn open_input_monitoring_settings();
     async fn refresh_permissions() -> AppResult<(bool, bool)>;
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
+    async fn add_git_monorepo(repo: String) -> AppResult<GitRepo>;
+    async fn list_local_chord_monorepos() -> AppResult<Vec<String>>;
+    async fn add_local_chord_monorepo(path: String) -> AppResult<()>;
+    async fn remove_local_chord_monorepo(path: String) -> AppResult<()>;
     async fn reset_default_chords() -> AppResult<()>;
     async fn remove_git_repo(repo: String) -> AppResult<()>;
     async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
+    async fn set_git_repo_local_link(repo: String, path: Option<String>) -> AppResult<GitRepo>;
+    async fn reload_chords() -> AppResult<()>;
     async fn list_local_chord_folders() -> AppResult<Vec<String>>;
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;

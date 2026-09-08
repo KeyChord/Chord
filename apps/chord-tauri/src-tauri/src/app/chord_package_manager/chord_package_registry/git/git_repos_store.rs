@@ -130,8 +130,28 @@ impl GitReposStore {
     }
 
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
+        if let Some(repo) = self.observable.get_state()?.repos.get(&repo_ref.slug()) {
+            if repo.linked_local_path.is_some() || repo.is_monorepo {
+                return Ok(repo.clone());
+            }
+        }
         let repos_root = self.github_repos_dir()?;
         let repo = materialize_repo_head(&repo_ref, &repos_root)?;
+        self.upsert(repo.clone())?;
+        Ok(repo)
+    }
+
+    pub fn add_monorepo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
+        if let Some(existing) = self.observable.get_state()?.repos.get(&repo_ref.slug()) {
+            anyhow::ensure!(
+                existing.is_monorepo,
+                "This repository is already added as a single package. Remove it before adding it as a monorepo."
+            );
+            return Ok(existing.clone());
+        }
+        let mut repo = materialize_repo_head(&repo_ref, &self.github_repos_dir()?)?;
+        super::super::validate_monorepo_path(&repo.local_abspath.to_string_lossy())?;
+        repo.is_monorepo = true;
         self.upsert(repo.clone())?;
         Ok(repo)
     }
@@ -144,12 +164,21 @@ impl GitReposStore {
             .get(&repo_ref.slug())
             .with_context(|| format!("Repository {} has not been added yet", repo_ref.slug()))?;
         anyhow::ensure!(
+            current_repo.linked_local_path.is_none(),
+            "Unlink repository {} before syncing",
+            repo_ref.slug()
+        );
+        anyhow::ensure!(
             current_repo.pinned_rev.is_none(),
             "Pinned repository {} cannot be synced to HEAD",
             repo_ref.slug()
         );
 
-        let repo = materialize_repo_head(&repo_ref, &repos_root)?;
+        let mut repo = materialize_repo_head(&repo_ref, &repos_root)?;
+        repo.is_monorepo = current_repo.is_monorepo;
+        if repo.is_monorepo {
+            super::super::validate_monorepo_path(&repo.local_abspath.to_string_lossy())?;
+        }
         self.upsert(repo.clone())?;
         Ok(repo)
     }
@@ -194,7 +223,13 @@ impl GitReposStore {
         for spec in repos {
             let repo_path = spec.repo_ref.local_abspath(&repos_root, &spec.rev);
             materialize_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
-            let repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
+            let mut repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
+            repo.linked_local_path = current_repos
+                .get(&repo.slug)
+                .and_then(|previous| previous.linked_local_path.clone());
+            repo.is_monorepo = current_repos
+                .get(&repo.slug)
+                .is_some_and(|previous| previous.is_monorepo);
             current_repos.insert(repo.slug.clone(), repo);
         }
 
@@ -208,6 +243,44 @@ impl GitReposStore {
         })?;
         Ok(())
     }
+
+    pub fn set_local_link(&self, slug: &str, path: Option<String>) -> Result<GitRepo> {
+        let mut repo = self
+            .observable
+            .get_state()?
+            .repos
+            .get(slug)
+            .with_context(|| format!("Repository {slug} has not been added yet"))?
+            .clone();
+        repo.linked_local_path = path
+            .map(|path| {
+                if repo.is_monorepo {
+                    super::super::validate_monorepo_path(&path)
+                } else {
+                    validate_local_link(&repo.local_abspath, &path)
+                }
+            })
+            .transpose()?;
+        self.upsert(repo.clone())?;
+        Ok(repo)
+    }
+}
+
+fn validate_local_link(cached_path: &std::path::Path, path: &str) -> Result<PathBuf> {
+    use super::super::LocalPackageRegistry;
+
+    anyhow::ensure!(!path.trim().is_empty(), "Folder path cannot be empty");
+    let path = fs::canonicalize(path.trim()).context("Failed to access linked folder")?;
+    anyhow::ensure!(path.is_dir(), "{} is not a folder", path.display());
+    let original = LocalPackageRegistry::import_from_local_folder(cached_path)?;
+    let linked = LocalPackageRegistry::import_from_local_folder(&path)?;
+    anyhow::ensure!(
+        original.package_name() == linked.package_name(),
+        "Expected package {}, but this folder contains {}. Use a checkout with the same package.json name.",
+        original.package_name(),
+        linked.package_name()
+    );
+    Ok(path)
 }
 
 #[derive(Debug, Clone)]
@@ -263,4 +336,84 @@ pub fn rewrite_repos(store: &Store<Wry>, repos: &HashMap<String, GitRepo>) -> Re
     }
     store.save()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod local_link_tests {
+    use super::*;
+
+    struct Fixture(PathBuf);
+    impl Fixture {
+        fn new() -> Self {
+            let root =
+                std::env::temp_dir().join(format!("chord-local-link-{}", uuid::Uuid::new_v4()));
+            for folder in ["cached", "my checkout"] {
+                fs::create_dir_all(root.join(folder).join("chords")).unwrap();
+                fs::write(
+                    root.join(folder).join("package.json"),
+                    r#"{"name":"@test/chords"}"#,
+                )
+                .unwrap();
+            }
+            Self(root)
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn local_link_validates_identity_and_reads_edits_from_checkout() {
+        let fixture = Fixture::new();
+        let cached = fixture.0.join("cached");
+        let checkout = fixture.0.join("my checkout");
+        let path = validate_local_link(&cached, &format!(" {} ", checkout.display())).unwrap();
+        assert_eq!(path, fs::canonicalize(&checkout).unwrap());
+        for contents in ["first edit", "second edit"] {
+            fs::write(checkout.join("chords/macos.toml"), contents).unwrap();
+            let package =
+                super::super::super::LocalPackageRegistry::import_from_local_folder(&path).unwrap();
+            assert_eq!(package.root, path);
+            assert_eq!(
+                package.chords_files_contents[std::path::Path::new("chords/macos.toml")],
+                contents
+            );
+        }
+        fs::write(checkout.join("package.json"), r#"{"name":"@test/wrong"}"#).unwrap();
+        assert!(
+            validate_local_link(&cached, checkout.to_str().unwrap())
+                .unwrap_err()
+                .to_string()
+                .contains("Expected package")
+        );
+    }
+
+    #[test]
+    fn local_link_rejects_empty_missing_and_file_paths() {
+        let fixture = Fixture::new();
+        let cached = fixture.0.join("cached");
+        for path in [
+            String::new(),
+            "  ".into(),
+            fixture.0.join("missing").display().to_string(),
+            cached.join("package.json").display().to_string(),
+        ] {
+            assert!(validate_local_link(&cached, &path).is_err());
+        }
+    }
+
+    #[test]
+    fn local_link_is_optional_in_old_stores_and_persists_in_new_stores() {
+        let legacy = serde_json::json!({"owner":"test", "name":"chords", "slug":"test/chords", "url":"https://github.com/test/chords", "localAbspath":"/cache/chords", "headShortSha":null, "pinnedRev":"abc"});
+        let mut repo: GitRepo = serde_json::from_value(legacy).unwrap();
+        assert!(repo.linked_local_path.is_none());
+        repo.linked_local_path = Some(PathBuf::from("/my checkout"));
+        let restored: GitRepo =
+            serde_json::from_value(serde_json::to_value(&repo).unwrap()).unwrap();
+        assert_eq!(restored.linked_local_path, repo.linked_local_path);
+        assert_eq!(restored.local_abspath, repo.local_abspath);
+        assert_eq!(restored.pinned_rev, repo.pinned_rev);
+    }
 }

@@ -11,17 +11,31 @@ import {
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
-import { useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useDesktopAppManagerState } from '@chord/dev.improve.chord.lib.state';
 import { AppIcon } from '@chord/dev.improve.chord.routes.settings._components.app-icon';
 import { useState } from 'react';
 
 const LETTERS_ONLY_REGEX = /[^a-z]/gi;
 
 export function PlaceholderChordsCard() {
+	return (
+		<StateQueries queries={[useDesktopAppManagerState()]}>
+			{(desktopAppManagerData) => (
+				<PlaceholderChordsCardContent desktopAppManagerData={desktopAppManagerData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function PlaceholderChordsCardContent({
+	desktopAppManagerData,
+}: {
+	desktopAppManagerData: NonNullable<ReturnType<typeof useDesktopAppManagerState>['data']>
+}) {
 	const [input, setInput] = useState('');
 	const placeholderChords: any[] = [];
 	const filteredPlaceholders: any[] = [];
-	const { appsMetadata } = useDesktopAppManagerState();
+	const { appsMetadata } = desktopAppManagerData;
 
 	return (
 		<Card size="sm">

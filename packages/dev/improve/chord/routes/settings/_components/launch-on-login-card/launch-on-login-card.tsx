@@ -9,11 +9,27 @@ import {
 } from '@chord/dev.improve.chord.components.ui.card';
 import { Checkbox } from '@chord/dev.improve.chord.components.ui.checkbox';
 import { Label } from '@chord/dev.improve.chord.components.ui.label';
-import { usePermissionsState, useSettingsState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, usePermissionsState, useSettingsState } from '@chord/dev.improve.chord.lib.state';
 
 export function LaunchOnLoginCard() {
-	const permissions = usePermissionsState();
-	const settings = useSettingsState();
+	return (
+		<StateQueries queries={[usePermissionsState(), useSettingsState()]}>
+			{(permissionsData, settingsData) => (
+				<LaunchOnLoginCardContent permissionsData={permissionsData} settingsData={settingsData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function LaunchOnLoginCardContent({
+	permissionsData,
+	settingsData,
+}: {
+	permissionsData: NonNullable<ReturnType<typeof usePermissionsState>['data']>
+	settingsData: NonNullable<ReturnType<typeof useSettingsState>['data']>
+}) {
+	const permissions = permissionsData;
+	const settings = settingsData;
 	const toggleAutostartMutation = useMutation({
 		mutationFn: taurpc.toggleAutostart,
 	});

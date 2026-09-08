@@ -8,11 +8,25 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@chord/dev.improve.chord.components.ui.card';
-import { usePermissionsState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, usePermissionsState } from '@chord/dev.improve.chord.lib.state';
 import { Check } from 'lucide-react';
 
 export function PermissionsCard() {
-	const permissions = usePermissionsState();
+	return (
+		<StateQueries queries={[usePermissionsState()]}>
+			{(permissionsData) => (
+				<PermissionsCardContent permissionsData={permissionsData} />
+			)}
+		</StateQueries>
+	);
+}
+
+function PermissionsCardContent({
+	permissionsData,
+}: {
+	permissionsData: NonNullable<ReturnType<typeof usePermissionsState>['data']>
+}) {
+	const permissions = permissionsData;
 	const openAccessibilitySettingsMutation = useMutation({
 		mutationFn: taurpc.openAccessibilitySettings,
 	});

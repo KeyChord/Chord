@@ -111,6 +111,7 @@
     "@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
@@ -146,7 +147,7 @@
     "@tanstack/react-router-devtools": "workspace:packages/com/npmjs/tanstack__react-router-devtools",
     "@tanstack/router-plugin": "workspace:packages/com/npmjs/tanstack__router-plugin"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.2",
   "patchedDependencies": {
     "@bradleyhodges/sfsymbols-react@7.0.4": "patches/@bradleyhodges%2Fsfsymbols-react@7.0.4.patch"
   }

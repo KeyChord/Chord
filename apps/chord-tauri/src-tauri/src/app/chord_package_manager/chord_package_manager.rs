@@ -57,6 +57,72 @@ struct ChordInputEventContext {
     event: ChordInputEvent,
 }
 
+fn resolve_handler_args(
+    args: &[toml::Value],
+    chords_file: &ParsedChordsFile,
+    import_override: Option<&ChordsFileImportOverride>,
+) -> Result<Vec<toml::Value>> {
+    args.iter()
+        .map(|arg| {
+            if let Some(name) = arg.as_str().filter(|name| name.starts_with('$')) {
+                return import_override
+                    .and_then(|value| value.meta.get(name))
+                    .or_else(|| chords_file.meta.get(name))
+                    .cloned()
+                    .with_context(|| format!("missing arg {name}"));
+            }
+            Ok(arg.clone())
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod handler_args_tests {
+    use super::*;
+
+    #[test]
+    fn import_meta_overrides_handler_args() {
+        let base: ParsedChordsFile = r#"
+name = "JetBrains Base Chords"
+[meta]
+'$execPath' = "default-executable"
+[on.command]
+file = "jetbrains.js"
+args = ['$execPath', "literal", 42, true]
+"#
+        .parse()
+        .unwrap();
+        let rustrover: ParsedChordsFile = r#"
+name = "RustRover"
+[[import]]
+file = "base.toml"
+[import.override.meta]
+'$execPath' = "/Applications/RustRover.app/Contents/MacOS/rustrover"
+"#
+        .parse()
+        .unwrap();
+        let args = &base.handlers["command"].args;
+        let resolved = resolve_handler_args(args, &base, rustrover.imports[0].r#override.as_ref())
+            .unwrap();
+        assert_eq!(
+            resolved[0].as_str(),
+            Some("/Applications/RustRover.app/Contents/MacOS/rustrover")
+        );
+        assert_eq!(&resolved[1..], &args[1..]);
+        assert_eq!(
+            resolve_handler_args(args, &base, None).unwrap()[0].as_str(),
+            Some("default-executable")
+        );
+        let missing = vec![toml::Value::String("$missing".into())];
+        assert_eq!(
+            resolve_handler_args(&missing, &base, None)
+                .unwrap_err()
+                .to_string(),
+            "missing arg $missing"
+        );
+    }
+}
+
 fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
     packages
         .values()
@@ -318,21 +384,7 @@ impl ChordPackageManager {
         let mut chord_hints = chords_file.chord_hints.clone();
         let mut handlers = Vec::new();
         for (event, handler) in &chords_file.handlers {
-            let mut build_args = Vec::new();
-            for arg in &handler.args {
-                if let Some(arg) = arg.as_str() {
-                    if arg.starts_with('$') {
-                        let override_arg = r#override.as_ref().and_then(|v| v.meta.get(arg));
-                        let meta_value = override_arg
-                            .or(chords_file.meta.get(arg))
-                            .context(format!("missing arg {}", arg))?;
-                        // build_args.push(meta_value.clone());
-                        // continue;
-                    }
-                }
-
-                build_args.push(arg.clone());
-            }
+            let build_args = resolve_handler_args(&handler.args, chords_file, r#override.as_ref())?;
 
             let file = handler.file.clone();
             let raw = chords_file.raw.clone();

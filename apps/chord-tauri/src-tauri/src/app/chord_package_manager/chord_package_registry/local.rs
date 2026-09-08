@@ -15,6 +15,7 @@ use walkdir::WalkDir;
 
 pub const CHORD_SOURCES_STORE_PATH: &str = "chord-sources.json";
 pub const LOCAL_FOLDERS_KEY: &str = "localFolders";
+pub const LOCAL_MONOREPOS_KEY: &str = "localMonorepos";
 
 #[derive(Serialize, Type)]
 pub struct LocalChordPackage {
@@ -37,6 +38,49 @@ pub struct LocalPackageRegistry {
 }
 
 impl LocalPackageRegistry {
+    pub fn list_monorepos(&self) -> anyhow::Result<Vec<String>> {
+        let value = self.sources_store()?.get(LOCAL_MONOREPOS_KEY);
+        let mut paths: Vec<String> = value
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
+        paths.sort();
+        Ok(paths)
+    }
+
+    pub fn add_monorepo(&self, path: &str) -> anyhow::Result<()> {
+        let root = super::validate_monorepo_path(path)?.display().to_string();
+        let mut paths = self.list_monorepos()?;
+        if !paths.contains(&root) {
+            paths.push(root);
+            paths.sort();
+            self.write_monorepos(&paths)?;
+        }
+        Ok(())
+    }
+
+    pub fn remove_monorepo(&self, path: &str) -> anyhow::Result<()> {
+        // Use the saved path so a missing/moved checkout can still be unlinked.
+        let mut paths = self.list_monorepos()?;
+        paths.retain(|saved| saved != path);
+        self.write_monorepos(&paths)
+    }
+
+    fn write_monorepos(&self, paths: &[String]) -> anyhow::Result<()> {
+        let store = self.sources_store()?;
+        store.set(LOCAL_MONOREPOS_KEY, serde_json::to_value(paths)?);
+        store.save()?;
+        Ok(())
+    }
+
+    pub fn import_monorepos(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
+        let mut packages = HashMap::new();
+        for path in self.list_monorepos()? {
+            packages.extend(super::import_monorepo_packages(Path::new(&path))?);
+        }
+        Ok(packages)
+    }
+
     pub fn list_package_paths(&self) -> anyhow::Result<Vec<PathBuf>> {
         let mut packages = self
             .read_paths()?

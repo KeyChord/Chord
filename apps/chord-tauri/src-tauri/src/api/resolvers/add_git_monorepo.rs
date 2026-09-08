@@ -1,0 +1,20 @@
+use crate::api::{ApiImpl, AppResult};
+use crate::app::AppHandleExt;
+use crate::git::GitHubRepoRef;
+use crate::state::GitRepo;
+
+pub async fn add_git_monorepo(api: ApiImpl, repo: String) -> AppResult<GitRepo> {
+    let handle = api.handle()?;
+    let store = &handle
+        .app_state()
+        .chord_package_manager()
+        .registry
+        .git
+        .git_repos_store;
+    let repo_ref = GitHubRepoRef::parse(&repo)?;
+    let repo = store.add_monorepo(repo_ref)?;
+
+    let chord_pm = handle.app_state().chord_package_manager();
+    chord_pm.reload_all().await?;
+    Ok(repo)
+}

@@ -40,6 +40,38 @@ state store. `RUST_LOG` remains a startup override and takes precedence over the
 
 The project tool versions are declared in [`.prototools`](./.prototools). Rust is also pinned in [`rust-toolchain.toml`](./rust-toolchain.toml) because proto delegates Rust version selection to rustup.
 
+## Editing an installed chordpack locally
+
+In Settings → Chords, choose **Link Local Folder** on an installed chord repo and
+enter the absolute path to your local checkout. Its `package.json` name must match
+the installed package. Links also work for pinned chordpacks and persist across
+app restarts.
+
+Chord loads the linked folder in place. After editing chords or JavaScript, click
+**Reload** on the repo (or use the tray reload action) to reload configs and rebuild
+the JS runtime. Sync is disabled while linked. **Unlink** restores the cached
+version without changing your local files.
+
+## Chord monorepos
+
+In Settings → Chords → **Chord Monorepos**, add a GitHub repository or enter an
+absolute local monorepo path and click the link icon. A GitHub monorepo can also
+be linked to a local checkout using its link icon. Chord discovers immediate
+directories matching `packages/chords-*`; other directories and nested packages
+are ignored. Each matching folder is loaded as its own package, using its
+`package.json` name or, when absent, its folder name.
+
+Local links persist across restarts. **Reload** rescans the monorepo, including
+new or removed packages, and rebuilds the JS runtime. **Unlink** stops loading a
+standalone local monorepo or restores the cached GitHub source for a linked repo;
+it leaves local files intact.
+
+Packages with the same name are overridden in this order (last wins): cached
+GitHub sources, standalone local monorepos, locally linked GitHub sources, and
+individual local folders. All local sources therefore take precedence over
+remote GitHub packages. Paths and repo slugs are sorted within each group for
+consistent results. Duplicate package names within one monorepo are rejected.
+
 ## Stores
 
 There can be many owners of Observables (e.g. the AppHandle needs to `.manage` it so we can read the current state when initializing a window, and certain structs should be able to own it in order to modify it).

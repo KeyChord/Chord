@@ -1,20 +1,22 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.local-folders-card",
+	"name": "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card",
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#local-folders-card": "./local-folders-card.tsx"
+		"#chord-monorepos-card": "./chord-monorepos-card.tsx"
 	},
 	"exports": {
 		".": "./+.ts"
 	},
 	"dependencies": {
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/com.npmjs.sonner": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
+		"lucide-react": "^1.34.0",
 		"react": "^19.2.8"
 	},
 	"devDependencies": {

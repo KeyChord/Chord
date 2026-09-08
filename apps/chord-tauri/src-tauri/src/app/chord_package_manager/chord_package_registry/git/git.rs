@@ -22,21 +22,110 @@ impl GitChordPackageRegistry {
         self.git_repos_store.init()
     }
 
-    pub fn import_all_packages(&self) -> Result<HashMap<String, RawChordPackage>> {
-        let mut packages = HashMap::new();
+    pub fn import_packages(&self, linked: bool) -> Result<HashMap<String, RawChordPackage>> {
+        let repos = load_repos(self.git_repos_store.store()?.as_ref())?;
+        import_repo_packages(repos.values().collect(), linked)
+    }
+}
 
-        // TODO: this signature is bad
-        for repo in load_repos(self.git_repos_store.store()?.as_ref())?.values() {
-            if let Ok(package) =
-                LocalPackageRegistry::import_from_local_folder(repo.local_abspath.as_path())
-                    .inspect_err(|e| {
-                        log::warn!("skipping repo {} because of import error: {e}", repo.slug)
-                    })
-            {
-                packages.insert(package.package_name(), package);
-            }
+fn import_repo_packages(
+    mut repos: Vec<&GitRepo>,
+    linked: bool,
+) -> Result<HashMap<String, RawChordPackage>> {
+    let mut packages = HashMap::new();
+    // Stable precedence within a source tier, independent of HashMap iteration order.
+    repos.sort_by(|a, b| a.slug.cmp(&b.slug));
+    for repo in repos {
+        if repo.linked_local_path.is_some() != linked {
+            continue;
         }
+        let path = repo
+            .linked_local_path
+            .as_ref()
+            .unwrap_or(&repo.local_abspath);
+        if repo.is_monorepo {
+            packages.extend(super::super::import_monorepo_packages(path)?);
+        } else if linked {
+            anyhow::ensure!(
+                path.is_dir(),
+                "Linked folder for {} is unavailable: {}",
+                repo.slug,
+                path.display()
+            );
+            let package = LocalPackageRegistry::import_from_local_folder(path)?;
+            packages.insert(package.package_name(), package);
+        } else if let Ok(package) = LocalPackageRegistry::import_from_local_folder(path)
+            .inspect_err(|e| log::warn!("skipping repo {} because of import error: {e}", repo.slug))
+        {
+            packages.insert(package.package_name(), package);
+        }
+    }
+    Ok(packages)
+}
 
-        Ok(packages)
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    struct Fixture(PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn repo(slug: &str, root: &Path, linked: Option<&Path>, monorepo: bool) -> GitRepo {
+        serde_json::from_value(serde_json::json!({
+            "owner": "test", "name": slug, "slug": slug, "url": "https://github.com/test/example",
+            "localAbspath": root, "linkedLocalPath": linked, "isMonorepo": monorepo,
+            "headShortSha": null, "pinnedRev": null
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn monorepo_local_links_override_remote_packages_regardless_of_repo_order() {
+        let fixture = Fixture(
+            std::env::temp_dir().join(format!("chord-precedence-{}", uuid::Uuid::new_v4())),
+        );
+        let remote = fixture.0.join("remote");
+        let local = fixture.0.join("local");
+        let monorepo = fixture.0.join("monorepo");
+        let child = monorepo.join("packages/chords-shared");
+        for path in [&remote, &local, &child] {
+            fs::create_dir_all(path).unwrap();
+            fs::write(path.join("package.json"), r#"{"name":"@test/shared"}"#).unwrap();
+        }
+        let remote_repo = repo("z-remote", &remote, None, false);
+        let local_repo = repo("a-local", &remote, Some(&monorepo), true);
+        for repos in [
+            vec![&remote_repo, &local_repo],
+            vec![&local_repo, &remote_repo],
+        ] {
+            let mut packages = import_repo_packages(repos.clone(), false).unwrap();
+            assert_eq!(packages["@test/shared"].root, remote);
+            packages.extend(import_repo_packages(repos, true).unwrap());
+            assert_eq!(packages["@test/shared"].root, child);
+        }
+        // An explicitly linked single package also overrides a remote monorepo.
+        let remote_monorepo = repo("z-monorepo", &monorepo, None, true);
+        let local_single = repo("a-single", &remote, Some(&local), false);
+        let repos = vec![&local_single, &remote_monorepo];
+        let mut packages = import_repo_packages(repos.clone(), false).unwrap();
+        assert_eq!(packages["@test/shared"].root, child);
+        packages.extend(import_repo_packages(repos, true).unwrap());
+        assert_eq!(packages["@test/shared"].root, local);
+        // Unlinking restores the cached source.
+        let unlinked = repo("a-single", &remote, None, false);
+        assert!(
+            import_repo_packages(vec![&unlinked], true)
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(
+            import_repo_packages(vec![&unlinked], false).unwrap()["@test/shared"].root,
+            remote
+        );
     }
 }

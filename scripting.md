@@ -254,3 +254,19 @@ chord bun scripts/run.ts by-letters f     # from the chords-menu checkout
 ### Why Bun rather than a lighter runtime?
 
 Bun brings JavaScriptCore's JIT and Node/Bun APIs, including the Node-API loader used by NodeSwift add-ons. Bun has no official embedding API, so Chord embeds a lightly patched Bun runtime through the [`rbun`](https://github.com/KeyChord/rbun) crate and exposes the custom `chord` module to scripts.
+
+### Compact help ranges
+
+A help hint can end in a parenthesized letter or digit range:
+
+```toml
+[chords]
+'?-(a-z)' = { name = "Menu item by letter" }
+```
+
+After pressing `-`, the help panel shows one row with separate `A` and `Z`
+keycaps and a dash between them. The row replaces individual options in that
+range and highlights when any covered key is selected. Ranges are inclusive,
+ascending, and use lowercase letters (`a-z`) or digits (`0-9`). The prefix
+before the range is a normal key sequence. Hints describe options; they do not
+create executable chord bindings.
