@@ -64,7 +64,7 @@ The runtime integration lives in `src-tauri/src/bun_js/` and exposes the
 
 ```sh
 target/debug/chord bun ./script.ts
-target/debug/chord run-export ./script.ts export-name arg1 arg2
+target/debug/chord run ./script.ts export-name arg1 arg2
 ```
 
 ## Releases

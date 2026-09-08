@@ -4,6 +4,8 @@
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::PathBuf;
 
+mod cli_worker;
+
 #[derive(Debug, Parser)]
 #[command(name = "chord", about = "shortcuts reimagined")]
 struct Cli {
@@ -14,7 +16,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     /// Run a JavaScript/TypeScript file with Chord's embedded Bun runtime.
-    #[command(alias = "run", trailing_var_arg = true)]
+    #[command(visible_alias = "js", trailing_var_arg = true)]
     Bun {
         #[arg(value_name = "SCRIPT", value_hint = ValueHint::FilePath)]
         script: PathBuf,
@@ -33,7 +35,7 @@ enum Commands {
     },
     /// Call an exported function of a JavaScript/TypeScript file.
     #[command(trailing_var_arg = true)]
-    RunExport {
+    Run {
         #[arg(value_name = "FILE", value_hint = ValueHint::FilePath)]
         file: PathBuf,
         #[arg(value_name = "EXPORT")]
@@ -53,6 +55,8 @@ enum Commands {
         #[arg(value_name = "SEQUENCE", allow_hyphen_values = true)]
         sequence: String,
     },
+    /// Open the Chord UI.
+    Ui,
     /// Open Chord's settings.
     #[command(aliases = ["open-settings", "show-settings"])]
     Settings,
@@ -89,7 +93,7 @@ fn main() {
         Some(Commands::Exec { command }) => {
             exit_on_error(run_shell_cli(command));
         }
-        Some(Commands::RunExport { file, export, args }) => {
+        Some(Commands::Run { file, export, args }) => {
             if let Err(error) = run_export_cli(file, export, args) {
                 eprintln!("{error:#}");
                 std::process::exit(1);
@@ -100,6 +104,9 @@ fn main() {
         }
         Some(Commands::AppChord { sequence }) => {
             chords_lib::run_app_with_chord(sequence);
+        }
+        Some(Commands::Ui) => {
+            exit_on_error(forward_app_command("ui"));
         }
         Some(Commands::Settings) => {
             exit_on_error(forward_app_command("settings"));
@@ -211,29 +218,11 @@ fn forward_app_command(_command: &str) -> anyhow::Result<()> {
 }
 
 fn run_cli(script: PathBuf, args: Vec<String>) -> anyhow::Result<()> {
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(chords_lib::run_script_with_args(script, args))
-    })
-    .join()
-    .unwrap()
+    cli_worker::run(move || async move { chords_lib::run_script_with_args(script, args).await })
 }
 
 fn run_export_cli(file: PathBuf, export: String, args: Vec<String>) -> anyhow::Result<()> {
-    std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(chords_lib::run_script_export(file, export, args))
-    })
-    .join()
-    .unwrap()
+    cli_worker::run(move || async move { chords_lib::run_script_export(file, export, args).await })
 }
 
 #[cfg(test)]
@@ -243,12 +232,28 @@ mod tests {
 
     #[test]
     fn parses_bun_script_arguments() {
-        let cli = Cli::try_parse_from(["chord", "bun", "script.ts", "--flag", "value"]).unwrap();
-        let Some(Commands::Bun { script, args }) = cli.command else {
-            panic!("expected bun command");
+        for command in ["bun", "js"] {
+            let cli =
+                Cli::try_parse_from(["chord", command, "script.ts", "--flag", "value"]).unwrap();
+            let Some(Commands::Bun { script, args }) = cli.command else {
+                panic!("expected bun command");
+            };
+            assert_eq!(script.to_string_lossy(), "script.ts");
+            assert_eq!(args, ["--flag", "value"]);
+        }
+    }
+
+    #[test]
+    fn parses_run_export_arguments() {
+        let cli = Cli::try_parse_from(["chord", "run", "my script.ts", "main", "--flag", "value"])
+            .unwrap();
+        let Some(Commands::Run { file, export, args }) = cli.command else {
+            panic!("expected run command");
         };
-        assert_eq!(script.to_string_lossy(), "script.ts");
+        assert_eq!(file.to_string_lossy(), "my script.ts");
+        assert_eq!(export, "main");
         assert_eq!(args, ["--flag", "value"]);
+        assert!(Cli::try_parse_from(["chord", "run", "script.ts"]).is_err());
     }
 
     #[test]
@@ -276,6 +281,12 @@ mod tests {
             cli.command,
             Some(Commands::Sequence(arguments)) if arguments == ["fq"]
         ));
+    }
+
+    #[test]
+    fn parses_ui_command() {
+        let cli = Cli::try_parse_from(["chord", "ui"]).unwrap();
+        assert!(matches!(cli.command, Some(Commands::Ui)));
     }
 
     #[test]

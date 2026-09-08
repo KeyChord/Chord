@@ -39,9 +39,9 @@ export type Result<T, E> = {
 	ok: T,
 	err: E,
 };
-const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"getAppLogs":[],"getCurrentStates":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
+const ARGS_MAP = {"":{"addGitRepo":["repo"],"addLocalChordFolder":["path"],"getAppLogs":[],"getCurrentStates":[],"installCli":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshCliInstallation":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
 
-const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"getAppLogs":true,"getCurrentStates":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshPermissions":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
+const RESULT_MAP = {"":{"addGitRepo":true,"addLocalChordFolder":true,"getAppLogs":true,"getCurrentStates":true,"installCli":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshCliInstallation":true,"refreshPermissions":true,"relaunchApp":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
 
 export type Router = {
 	"": {
@@ -49,12 +49,14 @@ export type Router = {
 		addLocalChordFolder: (path: string) => Promise<LocalChordPackage>,
 		getAppLogs: () => Promise<AppLogEntry[]>,
 		getCurrentStates: () => Promise<string>,
+		installCli: () => Promise<null>,
 		listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>,
 		listLocalChordFolders: () => Promise<string[]>,
 		openAccessibilitySettings: () => Promise<void>,
 		openInputMonitoringSettings: () => Promise<void>,
 		pickLocalChordFolder: () => Promise<string | null>,
 		quitApp: () => Promise<null>,
+		refreshCliInstallation: () => Promise<null>,
 		refreshPermissions: () => Promise<[boolean, boolean]>,
 		relaunchApp: (bundleId: string) => Promise<null>,
 		removeGitRepo: (repo: string) => Promise<null>,
@@ -79,3 +81,4 @@ export const createTauRPCProxy = () => createProxy<Router>({
 
 // export const createTauRPCProxy = () => createProxy<Router>(ARGS_MAP)
 export type { InferCommandOutput, TauRpcResult }
+

@@ -114,6 +114,7 @@
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",

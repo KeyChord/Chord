@@ -43,8 +43,8 @@ mod tests {
     #[test]
     fn parses_command_arguments() {
         assert_eq!(
-            command_arguments("run-export 'my script.ts' main one").unwrap(),
-            ["run-export", "my script.ts", "main", "one"]
+            command_arguments("run 'my script.ts' main one").unwrap(),
+            ["run", "my script.ts", "main", "one"]
         );
         assert_eq!(command_arguments("chord help").unwrap(), ["help"]);
     }

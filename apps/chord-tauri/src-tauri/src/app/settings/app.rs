@@ -16,6 +16,9 @@ pub struct AppSettingsProvider {
 
 impl AppSingleton for AppSettings {
     fn init(&self) -> Result<()> {
+        if let Err(error) = self.refresh_cli_installation() {
+            log::warn!("Could not refresh command line installation: {error:#}");
+        }
         Ok(())
     }
 }

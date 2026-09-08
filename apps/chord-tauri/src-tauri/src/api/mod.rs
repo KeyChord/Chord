@@ -49,6 +49,8 @@ pub trait Api {
         sequence_template: String,
     ) -> AppResult<()>;
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
+    async fn install_cli() -> AppResult<()>;
+    async fn refresh_cli_installation() -> AppResult<()>;
     async fn toggle_autostart() -> AppResult<()>;
     async fn toggle_menu_bar_icon() -> AppResult<()>;
     async fn toggle_dock_icon() -> AppResult<()>;

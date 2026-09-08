@@ -119,7 +119,7 @@ fn parse_command(url: &str) -> Result<ScriptCommand> {
     let command = normalize_command(url)?;
 
     match command.as_str() {
-        "settings" | "open-settings" | "show-settings" => Ok(ScriptCommand::OpenSettings),
+        "ui" | "settings" | "open-settings" | "show-settings" => Ok(ScriptCommand::OpenSettings),
         "reload-config" | "reload-configs" => Ok(ScriptCommand::ReloadConfigs),
         _ => bail!("Unsupported chord URL command: {command}"),
     }
@@ -250,6 +250,14 @@ mod tests {
     fn parses_host_style_command() {
         assert_eq!(
             parse_command("chord://settings").unwrap(),
+            ScriptCommand::OpenSettings
+        );
+    }
+
+    #[test]
+    fn parses_ui_command() {
+        assert_eq!(
+            parse_command("chord:ui").unwrap(),
             ScriptCommand::OpenSettings
         );
     }

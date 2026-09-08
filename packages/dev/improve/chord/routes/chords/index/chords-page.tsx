@@ -64,7 +64,7 @@ function ChordKeyRow({
 	return (
 		<div
 			className={cn(
-				'flex items-center gap-3 transition-all',
+				'flex shrink-0 items-center gap-3 transition-all',
 				isDimmed ? 'opacity-35' : 'opacity-100',
 				'text-foreground/95',
 			)}
@@ -250,6 +250,11 @@ export function ChordsPage() {
 	}
 
 	const activeChords: Chord[] = [...activeAppChords, ...globalChords.map(c => c.chord)];
+	const hintSequences = Object.values(hintsByRawPattern).flatMap(hint =>
+		'keys' in hint.pattern
+			? [{ tokens: hint.pattern.keys.map(normalizeToken), description: hint.description }]
+			: [],
+	);
 
 	const normalizedBufferTokens = chordInputState.input.map(normalizeToken);
 	const normalizedActiveChordTokens = chordInputState.selectedInputEvent?.input.map(normalizeToken) ?? [];
@@ -282,7 +287,7 @@ export function ChordsPage() {
 		},
 		(_, columnIndex) => {
 			const prefixTokens = selectedTokens.slice(0, columnIndex);
-			const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(key => getPrettyKey(key)) : [];
+			const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? chord.trigger.keys.map(normalizeToken) : [];
 
 			const matchingChords = activeChords.filter(chord =>
 				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
@@ -292,16 +297,29 @@ export function ChordsPage() {
 					.map(chord => getChordKeys(chord)[columnIndex])
 					.filter((token): token is string => Boolean(token)),
 			);
+			// Explicit hints are options even when their handler uses a regex trigger.
+			const matchingHints = hintSequences.filter(hint =>
+				prefixTokens.every((token, tokenIndex) => hint.tokens[tokenIndex] === token),
+			);
+			for (const hint of matchingHints) {
+				const token = hint.tokens[columnIndex];
+				if (token) {
+					activeTokens.add(token);
+				}
+			}
 
 			const rows = sortTokens(activeTokens).map((token) => {
 				const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
+				const exactHint = matchingHints.findLast(
+					hint => hint.tokens[columnIndex] === token && hint.tokens.length === columnIndex + 1,
+				);
 				const exactChord = matchingChords.find(
 					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 				);
 
 				return {
 					token,
-					description: hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
+					description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
 				};
 			});
 
@@ -342,8 +360,8 @@ export function ChordsPage() {
 							{keyColumns.map(column => (
 								<div
 									key={column.id}
-									className="flex flex-col items-start justify-center"
-									style={{ gap: `${rowGap}px` }}
+									className="flex flex-col items-start overflow-y-auto px-1 py-1"
+									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px` }}
 								>
 									{SHOW_DEVELOPMENT_LABEL && column.id === 'column-0'
 										? (

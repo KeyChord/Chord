@@ -6,6 +6,8 @@ print_help() {
   cat <<'EOF'
 Usage:
   chord bun <script> [args...]
+  chord js <script> [args...]
+  chord run <file> <export> [args...]
   chord exec <shell-command>
   chord chord <sequence>
   chord <sequence>
@@ -13,8 +15,11 @@ Usage:
 
 Commands:
   bun <script> [args...]       Run a script with Chord's embedded Bun runtime
+  js <script> [args...]        Alias for bun
+  run <file> <export> [args...] Call an exported function
   exec <shell-command>        Run a shell command under Chord
   chord <sequence>            Execute a chord sequence
+  ui
   settings
   open-settings
   show-settings
@@ -27,6 +32,7 @@ Examples:
   chord exec 'open https://example.com'
   chord chord fq
   chord fq
+  chord ui
   chord settings
   chord reload-configs
 EOF
@@ -91,7 +97,7 @@ case "$command_name" in
     print_help
     exit 0
     ;;
-  bun)
+  bun|js|run)
     run_chord_executable "$@"
     ;;
   exec)
@@ -100,7 +106,7 @@ case "$command_name" in
   chord)
     run_chord_executable "$@"
     ;;
-  settings|open-settings|show-settings|reload-config|reload-configs)
+  ui|settings|open-settings|show-settings|reload-config|reload-configs)
     open_chord_url "chord:${command_name}"
     exit 0
     ;;

@@ -19,6 +19,8 @@ export interface AppPermissionsState {
 
 export interface AppSettingsState {
 	bundleIdsNeedingRelaunch: string[];
+	cliCommand: string;
+	isCliInstalled: boolean;
 	showMenuBarIcon: boolean;
 	showDockIcon: boolean;
 	isChordPanelHiddenByDefault: boolean;

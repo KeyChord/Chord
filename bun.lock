@@ -101,6 +101,7 @@
         "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
@@ -1248,6 +1249,21 @@
         "@types/react-dom": "^19.2.5",
       },
     },
+    "packages/dev/improve/chord/routes/settings/_components/command-line-card": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.command-line-card",
+      "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "react": "^19.2.8",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.5",
+      },
+    },
     "packages/dev/improve/chord/routes/settings/_components/launch-on-login-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card",
       "dependencies": {
@@ -1494,6 +1510,7 @@
       "name": "@chord/dev.improve.chord.routes.settings.general.index",
       "dependencies": {
         "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
@@ -1814,6 +1831,8 @@
     "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card": ["@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card@workspace:packages/dev/improve/chord/routes/settings/_components/apps-needing-relaunch-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": ["@chord/dev.improve.chord.routes.settings._components.chord-repos-card@workspace:packages/dev/improve/chord/routes/settings/_components/chord-repos-card"],
+
+    "@chord/dev.improve.chord.routes.settings._components.command-line-card": ["@chord/dev.improve.chord.routes.settings._components.command-line-card@workspace:packages/dev/improve/chord/routes/settings/_components/command-line-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": ["@chord/dev.improve.chord.routes.settings._components.launch-on-login-card@workspace:packages/dev/improve/chord/routes/settings/_components/launch-on-login-card"],
 

@@ -39,6 +39,7 @@ Chord registers the `chord:` URL scheme on macOS so scripts and launcher tools c
 
 ### Commands
 
+- `ui`
 - `settings`
 - `open-settings`
 - `show-settings`
@@ -48,6 +49,9 @@ Chord registers the `chord:` URL scheme on macOS so scripts and launcher tools c
 ### Examples
 
 ```sh
+# Open the Chord UI
+open --background 'chord:ui'
+
 # Open the settings window
 open --background 'chord:settings'
 
@@ -68,12 +72,14 @@ as a Chord child process.
 
 ### Commands
 
+- `ui`
 - `settings`
 - `open-settings`
 - `show-settings`
 - `reload-config`
 - `reload-configs`
-- `bun <script> [args...]`
+- `bun <script> [args...]` (alias: `js`)
+- `run <file> <export> [args...]`
 - `exec <shell-command>`
 - `chord <sequence>`
 - `<sequence>` (shorthand for `chord <sequence>`)
@@ -82,9 +88,12 @@ as a Chord child process.
 
 ```sh
 ./chord bun ./script.ts hello
+./chord js ./script.ts hello
+./chord run ./script.ts main hello
 ./chord exec 'open https://example.com'
 ./chord chord fq
 ./chord fq
+./chord ui
 ./chord settings
 ./chord reload-configs
 ```
@@ -176,7 +185,7 @@ export default function build(times = 1) {
 ```
 
 - `resolveNativeModulePath(import.meta, "beep")` returns the absolute path of `target/<Chord's triple>/beep/beep.node` for the calling module's package, including when the package is vendored inside another one. `resolvePackageFile(import.meta, "any/relative/path")` does the same for arbitrary package files.
-- Handlers run on Chord's JavaScript worker thread, not the main thread. The Accessibility client API can be called there. Native UI APIs that require the main thread need appropriate dispatching; avoid synchronously hopping to a main thread that is not running a UI loop when exercising the handler through the CLI.
+- Handlers run on Chord's JavaScript worker thread. On macOS, both the desktop app and the `bun` / `run` CLI commands service the main run loop, so native add-ons can use Swift's `@MainActor`. Export an async NodeSwift function and use `try await MainActor.run { ... }` for main-thread operations. NodeSwift returns a JavaScript Promise; return or await that Promise from your handler so Chord waits for completion and reports errors. Keep NodeAPI values on `@NodeActor`, passing Swift values across to `@MainActor`. The CLI services main-thread work without creating the desktop UI; app-only `chord` APIs still require the app.
 - A thrown Swift error is reported as a JavaScript handler error. A crash in native code (`fatalError`, a bad pointer, `exit()`) takes Chord down with it—there is no separate process—so keep the exported surface small and validate inputs.
 - Once opened, an add-on stays loaded until Chord quits; reloading packages picks up changed JavaScript, but a rebuilt `.node` file needs a restart.
 - `print` output goes to Chord's stdout.

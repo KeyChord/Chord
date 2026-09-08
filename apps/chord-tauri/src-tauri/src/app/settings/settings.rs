@@ -15,6 +15,24 @@ pub struct AppSettings {
 }
 
 impl AppSettings {
+    pub fn refresh_cli_installation(&self) -> anyhow::Result<()> {
+        let executable = std::env::current_exe()?;
+        self.observable.try_set_state(|mut state| {
+            state.is_cli_installed = super::cli::is_installed(
+                &std::path::Path::new("/usr/local/bin").join(&state.cli_command),
+                &executable,
+            )?;
+            Ok(state)
+        })
+    }
+
+    pub fn install_cli(&self) -> anyhow::Result<()> {
+        let state = self.observable.get_state()?;
+        let destination = std::path::Path::new("/usr/local/bin").join(&state.cli_command);
+        super::cli::install(&std::env::current_exe()?, &destination)?;
+        self.refresh_cli_installation()
+    }
+
     pub fn apply_all(&self) -> anyhow::Result<()> {
         let state = self.observable.get_state()?;
         self.apply_state(&state)
@@ -79,6 +97,8 @@ impl AppSettings {
         let defaults = AppSettingsState::default();
 
         Ok(AppSettingsState {
+            cli_command: defaults.cli_command,
+            is_cli_installed: defaults.is_cli_installed,
             bundle_ids_needing_relaunch: defaults.bundle_ids_needing_relaunch,
             show_menu_bar_icon: Self::read_bool_setting(
                 handle,
