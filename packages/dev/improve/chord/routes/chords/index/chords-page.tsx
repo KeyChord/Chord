@@ -10,17 +10,11 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 	String.fromCharCode('A'.charCodeAt(0) + index));
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
-const INDICATOR_TRANSITION_MS = 240;
-const HIDDEN_X_OFFSET_PX = 40;
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 
 function clamp(value: number, min: number, max: number) {
 	return Math.min(Math.max(value, min), max);
-}
-
-function easeOutCubic(value: number) {
-	return 1 - (1 - value) ** 3;
 }
 
 function normalizePrettyKey(token: string) {
@@ -66,7 +60,7 @@ function ChordKeyRow({
 	return (
 		<div
 			className={cn(
-				'flex shrink-0 items-center gap-3 transition-all',
+				'flex shrink-0 items-center gap-3',
 				isDimmed ? 'opacity-35' : 'opacity-100',
 				'text-foreground/95',
 			)}
@@ -129,12 +123,7 @@ function ChordsPageContent({
 
 	const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight);
 	const [surfaceVersion, setSurfaceVersion] = useState(0);
-	const [indicatorProgress, setIndicatorProgress] = useState(() =>
-		chordPanelState.isVisible ? 1 : 0,
-	);
 	const surfaceRef = useRef<HTMLDivElement>(null);
-	const animationFrameRef = useRef<number | null>(null);
-	const indicatorProgressRef = useRef(indicatorProgress);
 
 	const emitSurfaceRect = () => {
 		const surface = surfaceRef.current;
@@ -151,10 +140,6 @@ function ChordsPageContent({
 			radius: NATIVE_SURFACE_RADIUS,
 		});
 	};
-
-	useEffect(() => {
-		indicatorProgressRef.current = indicatorProgress;
-	}, [indicatorProgress]);
 
 	useEffect(() => {
 		const handleResize = () => {
@@ -180,52 +165,6 @@ function ChordsPageContent({
 	useEffect(() => {
 		void emit('chorder-window-ready');
 	}, []);
-
-	useEffect(() => {
-		if (animationFrameRef.current !== null) {
-			window.cancelAnimationFrame(animationFrameRef.current);
-			animationFrameRef.current = null;
-		}
-
-		const startProgress = indicatorProgressRef.current;
-		const targetProgress = chordPanelState.isVisible ? 1 : 0;
-		if (Math.abs(targetProgress - startProgress) < 0.001) {
-			animationFrameRef.current = window.requestAnimationFrame(() => {
-				indicatorProgressRef.current = targetProgress;
-				setIndicatorProgress(targetProgress);
-				animationFrameRef.current = null;
-			});
-			return;
-		}
-
-		const startedAt = performance.now();
-
-		const tick = (now: number) => {
-			const elapsed = now - startedAt;
-			const t = clamp(elapsed / INDICATOR_TRANSITION_MS, 0, 1);
-			const nextProgress
-				= startProgress + (targetProgress - startProgress) * easeOutCubic(t);
-
-			indicatorProgressRef.current = nextProgress;
-			setIndicatorProgress(nextProgress);
-
-			if (t < 1) {
-				animationFrameRef.current = window.requestAnimationFrame(tick);
-			}
-			else {
-				animationFrameRef.current = null;
-			}
-		};
-
-		animationFrameRef.current = window.requestAnimationFrame(tick);
-
-		return () => {
-			if (animationFrameRef.current !== null) {
-				window.cancelAnimationFrame(animationFrameRef.current);
-				animationFrameRef.current = null;
-			}
-		};
-	}, [chordPanelState.isVisible]);
 
 	useLayoutEffect(() => {
 		if (surfaceVersion === 0) {
@@ -401,10 +340,7 @@ function ChordsPageContent({
 
 	useLayoutEffect(() => {
 		emitSurfaceRect();
-	}, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize, indicatorProgress]);
-
-	const hiddenFraction = 1 - indicatorProgress;
-	const indicatorTransform = `translateX(calc(-${hiddenFraction * 100}% - ${hiddenFraction * HIDDEN_X_OFFSET_PX}px))`;
+	}, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize, chordPanelState.isVisible]);
 
 	return (
 		<div className="relative size-full bg-transparent">
@@ -418,8 +354,9 @@ function ChordsPageContent({
 						'dark:border-white/10 dark:bg-zinc-950/24 dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]',
 					)}
 					style={{
-						transform: indicatorTransform,
-						opacity: indicatorProgress,
+						// Move the native vibrancy surface offscreen too when toggled off.
+						transform: chordPanelState.isVisible ? undefined : 'translateX(calc(-100% - 40px))',
+						opacity: chordPanelState.isVisible ? 1 : 0,
 					}}
 				>
 					<div className="relative flex items-start">

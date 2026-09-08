@@ -335,7 +335,7 @@ impl ChordModePanel {
         Ok(true)
     }
 
-    /// This only changes the state so the frontend gets a chance to animate it.
+    /// Toggle frontend visibility without changing the native window ordering.
     pub fn toggle(&self) -> Result<()> {
         self.observable.set_state(|prev| ChordPanelState {
             is_visible: !prev.is_visible,

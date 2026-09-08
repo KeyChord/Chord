@@ -4,7 +4,7 @@ import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
-import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
+import { ChordReposCard, MonorepoPackagePicker } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { Link } from "lucide-react";
 import { useState } from "react";
 
@@ -24,7 +24,10 @@ export function ChordMonoreposCard() {
   });
   const reloadMutation = useMutation({
     mutationFn: taurpc.reloadChords,
-    onSuccess: () => toast.success("Chords reloaded."),
+    onSuccess: () => {
+      toast.success("Chords reloaded.");
+      return queryClient.invalidateQueries({ queryKey: ["monorepo-packages"] });
+    },
   });
   const pending = addMutation.isPending || removeMutation.isPending || reloadMutation.isPending;
   const error =
@@ -68,7 +71,7 @@ export function ChordMonoreposCard() {
           </Button>
         </form>
         <p className="text-xs text-muted-foreground">
-          Link the monorepo root. Reload after editing files or adding and removing packages.
+          Link the monorepo root, then select packages below. Reload after editing files or adding and removing packages.
         </p>
         {localMonorepos.isLoading && (
           <p className="text-sm text-muted-foreground">Loading local monorepos...</p>
@@ -84,6 +87,7 @@ export function ChordMonoreposCard() {
             <div className="min-w-0 space-y-1">
               <Badge variant="secondary">Linked locally</Badge>
               <p className="break-all text-xs text-muted-foreground">{folder}</p>
+              <MonorepoPackagePicker source={folder} disabled={pending} />
             </div>
             <div className="flex gap-2">
               <Button

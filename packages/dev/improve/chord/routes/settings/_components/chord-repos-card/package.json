@@ -3,7 +3,8 @@
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#chord-repos-card": "./chord-repos-card.tsx"
+		"#chord-repos-card": "./chord-repos-card.tsx",
+		"#monorepo-package-picker": "./monorepo-package-picker.tsx"
 	},
 	"exports": {
 		".": "./+.ts"

@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::app::state::AppSingleton;
 use crate::models::RawChordPackage;
 use anyhow::Context;
@@ -38,6 +39,54 @@ pub struct LocalPackageRegistry {
 }
 
 impl LocalPackageRegistry {
+    pub fn monorepo_selections(&self) -> anyhow::Result<HashMap<String, Vec<String>>> {
+        self.sources_store()?
+            .get("monorepoSelections")
+            .map(serde_json::from_value)
+            .transpose()
+            .map(|value| value.unwrap_or_default())
+            .context("Failed to read monorepo package selections")
+    }
+
+    pub fn monorepo_root(&self, source: &str) -> anyhow::Result<PathBuf> {
+        if self.list_monorepos()?.iter().any(|path| path == source) {
+            return Ok(PathBuf::from(source));
+        }
+        let store = self
+            .handle
+            .app_state()
+            .chord_package_manager()
+            .registry
+            .git
+            .git_repos_store
+            .store()?;
+        let repos = super::git::load_repos(&store)?;
+        let repo = repos
+            .get(source)
+            .filter(|repo| repo.is_monorepo)
+            .context("Monorepo is not linked")?;
+        Ok(repo
+            .linked_local_path
+            .as_ref()
+            .unwrap_or(&repo.local_abspath)
+            .clone())
+    }
+
+    pub fn set_monorepo_packages(&self, source: &str, names: Vec<String>) -> anyhow::Result<()> {
+        let root = self.monorepo_root(source)?;
+        let available = super::import_monorepo_packages(&root)?;
+        anyhow::ensure!(
+            names.iter().all(|name| available.contains_key(name)),
+            "Unknown monorepo package"
+        );
+        let mut selections = self.monorepo_selections()?;
+        selections.insert(source.to_owned(), names);
+        let store = self.sources_store()?;
+        store.set("monorepoSelections", serde_json::to_value(selections)?);
+        store.save()?;
+        Ok(())
+    }
+
     pub fn list_monorepos(&self) -> anyhow::Result<Vec<String>> {
         let value = self.sources_store()?.get(LOCAL_MONOREPOS_KEY);
         let mut paths: Vec<String> = value
@@ -75,8 +124,12 @@ impl LocalPackageRegistry {
 
     pub fn import_monorepos(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
+        let selections = self.monorepo_selections()?;
         for path in self.list_monorepos()? {
-            packages.extend(super::import_monorepo_packages(Path::new(&path))?);
+            packages.extend(super::import_selected_monorepo_packages(
+                Path::new(&path),
+                selections.get(&path).map(Vec::as_slice).unwrap_or_default(),
+            )?);
         }
         Ok(packages)
     }

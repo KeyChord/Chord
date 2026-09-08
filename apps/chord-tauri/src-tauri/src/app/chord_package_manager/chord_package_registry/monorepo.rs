@@ -52,6 +52,19 @@ pub fn import_monorepo_packages(root: &Path) -> Result<HashMap<String, RawChordP
     Ok(packages)
 }
 
+/// Missing selections deliberately mean no packages, including for older saved sources.
+pub fn import_selected_monorepo_packages(
+    root: &Path,
+    selected: &[String],
+) -> Result<HashMap<String, RawChordPackage>> {
+    if selected.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let mut packages = import_monorepo_packages(root)?;
+    packages.retain(|name, _| selected.contains(name));
+    Ok(packages)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,6 +130,43 @@ mod tests {
         let packages = import_monorepo_packages(&fixture.0).unwrap();
         assert!(!packages.contains_key("@test/one"));
         assert!(packages.contains_key("@test/two"));
+    }
+
+    #[test]
+    fn monorepo_requires_selection_and_does_not_enable_new_packages() {
+        let fixture = Fixture::new();
+        let path = fixture.package("chords-one", "@test/one");
+        assert!(
+            import_selected_monorepo_packages(&fixture.0, &[])
+                .unwrap()
+                .is_empty()
+        );
+        let selected = vec!["@test/one".to_owned()];
+        assert_eq!(
+            import_selected_monorepo_packages(&fixture.0, &selected)
+                .unwrap()
+                .len(),
+            1
+        );
+        fixture.package("chords-two", "@test/two");
+        fs::write(path.join("chords/macos.toml"), "edited").unwrap();
+        let packages = import_selected_monorepo_packages(&fixture.0, &selected).unwrap();
+        assert_eq!(packages.len(), 1);
+        assert_eq!(
+            packages["@test/one"].chords_files_contents[Path::new("chords/macos.toml")],
+            "edited"
+        );
+        fs::remove_dir_all(path).unwrap();
+        assert!(
+            import_selected_monorepo_packages(&fixture.0, &selected)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            import_selected_monorepo_packages(&fixture.0, &[])
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

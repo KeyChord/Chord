@@ -41,9 +41,9 @@ export type Result<T, E> = {
 	ok: T,
 	err: E,
 };
-const ARGS_MAP = {"":{"addGitMonorepo":["repo"],"addGitRepo":["repo"],"addLocalChordFolder":["path"],"addLocalChordMonorepo":["path"],"getAppLogs":[],"getCurrentStates":[],"installCli":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"listLocalChordMonorepos":[],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshCliInstallation":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"reloadChords":[],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removeLocalChordMonorepo":["path"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"setGitRepoLocalLink":["repo","path"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
+const ARGS_MAP = {"":{"addGitMonorepo":["repo"],"addGitRepo":["repo"],"addLocalChordFolder":["path"],"addLocalChordMonorepo":["path"],"getAppLogs":[],"getCurrentStates":[],"installCli":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"listLocalChordMonorepos":[],"listMonorepoPackages":["source"],"openAccessibilitySettings":[],"openInputMonitoringSettings":[],"pickLocalChordFolder":[],"quitApp":[],"refreshCliInstallation":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"reloadChords":[],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removeLocalChordMonorepo":["path"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"setGitRepoLocalLink":["repo","path"],"setMonorepoPackages":["source","names"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"]}};
 
-const RESULT_MAP = {"":{"addGitMonorepo":true,"addGitRepo":true,"addLocalChordFolder":true,"addLocalChordMonorepo":true,"getAppLogs":true,"getCurrentStates":true,"installCli":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"listLocalChordMonorepos":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshCliInstallation":true,"refreshPermissions":true,"relaunchApp":true,"reloadChords":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removeLocalChordMonorepo":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"setGitRepoLocalLink":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
+const RESULT_MAP = {"":{"addGitMonorepo":true,"addGitRepo":true,"addLocalChordFolder":true,"addLocalChordMonorepo":true,"getAppLogs":true,"getCurrentStates":true,"installCli":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"listLocalChordMonorepos":true,"listMonorepoPackages":true,"openAccessibilitySettings":false,"openInputMonitoringSettings":false,"pickLocalChordFolder":true,"quitApp":true,"refreshCliInstallation":true,"refreshPermissions":true,"relaunchApp":true,"reloadChords":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removeLocalChordMonorepo":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"setGitRepoLocalLink":true,"setMonorepoPackages":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true}};
 
 export type Router = {
 	"": {
@@ -57,6 +57,7 @@ export type Router = {
 		listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>,
 		listLocalChordFolders: () => Promise<string[]>,
 		listLocalChordMonorepos: () => Promise<string[]>,
+		listMonorepoPackages: (source: string) => Promise<([string, boolean])[]>,
 		openAccessibilitySettings: () => Promise<void>,
 		openInputMonitoringSettings: () => Promise<void>,
 		pickLocalChordFolder: () => Promise<string | null>,
@@ -72,6 +73,7 @@ export type Router = {
 		resetDefaultChords: () => Promise<null>,
 		runChordCommand: (command: string) => Promise<ChordCommandOutput>,
 		setGitRepoLocalLink: (repo: string, path: string | null) => Promise<GitRepo>,
+		setMonorepoPackages: (source: string, names: string[]) => Promise<null>,
 		setPlaceholderChordBinding: (filePath: string, sequenceTemplate: string, sequence: string) => Promise<null>,
 		syncGitRepo: (repo: string) => Promise<GitRepo>,
 		toggleAutostart: () => Promise<null>,

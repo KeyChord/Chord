@@ -1,5 +1,6 @@
+import { MonorepoPackagePicker } from "#monorepo-package-picker";
 import { toast } from "@chord/com.npmjs.sonner";
-import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
+import { useMutation, useQueryClient } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
@@ -56,7 +57,7 @@ function ChordReposCardContent({
             <CardTitle>{monorepos ? "Chord Monorepos" : "Chord Repos"}</CardTitle>
             <CardDescription>
               {monorepos
-                ? "Load packages from packages/chords-* in a GitHub repo or local folder. Local packages override matching GitHub packages."
+                ? "Choose packages from packages/chords-* in a GitHub repo or local folder. Local packages override matching GitHub packages."
                 : "Added GitHub repos are cloned into the app cache. Locally linked packages take precedence."}
             </CardDescription>
           </div>
@@ -91,18 +92,23 @@ function GitRepoRow({
     isMonorepo?: boolean;
   };
 }) {
+  const queryClient = useQueryClient();
   const [isLinking, setIsLinking] = useState(false);
   const [folderPath, setFolderPath] = useState("");
   const linkMutation = useMutation({
     mutationFn: (path: string | null) => taurpc.setGitRepoLocalLink(repo.slug, path),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["monorepo-packages", repo.slug] });
       setIsLinking(false);
       setFolderPath("");
     },
   });
   const reloadMutation = useMutation({
     mutationFn: taurpc.reloadChords,
-    onSuccess: () => toast.success("Chords reloaded."),
+    onSuccess: () => {
+      toast.success("Chords reloaded.");
+      return queryClient.invalidateQueries({ queryKey: ["monorepo-packages", repo.slug] });
+    },
   });
   const isPending = linkMutation.isPending || reloadMutation.isPending;
   const error = linkMutation.error ?? reloadMutation.error;
@@ -171,6 +177,7 @@ function GitRepoRow({
           <RepoActionsMenuButton repo={repo} />
         </div>
       </div>
+      {repo.isMonorepo && <MonorepoPackagePicker source={repo.slug} disabled={isPending} />}
       {isLinking && !repo.linkedLocalPath && (
         <form
           className="mt-3 space-y-3"

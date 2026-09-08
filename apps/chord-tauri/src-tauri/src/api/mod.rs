@@ -28,6 +28,8 @@ pub trait Api {
     async fn refresh_permissions() -> AppResult<(bool, bool)>;
     async fn add_git_repo(repo: String) -> AppResult<GitRepo>;
     async fn add_git_monorepo(repo: String) -> AppResult<GitRepo>;
+    async fn list_monorepo_packages(source: String) -> AppResult<Vec<(String, bool)>>;
+    async fn set_monorepo_packages(source: String, names: Vec<String>) -> AppResult<()>;
     async fn list_local_chord_monorepos() -> AppResult<Vec<String>>;
     async fn add_local_chord_monorepo(path: String) -> AppResult<()>;
     async fn remove_local_chord_monorepo(path: String) -> AppResult<()>;
