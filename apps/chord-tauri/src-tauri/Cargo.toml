@@ -12,6 +12,11 @@ members = [
 	"crates/taurpc_macros",
 ]
 
+# Production code propagates errors rather than panicking; a panic in a main-thread
+# AppKit callback takes down the whole app. Does not fire in `#[cfg(test)]` code.
+[lints.clippy]
+unwrap_used = "warn"
+
 [lib]
 # The `_lib` suffix may seem redundant, but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.

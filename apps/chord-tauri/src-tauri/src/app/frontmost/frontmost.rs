@@ -17,17 +17,22 @@ pub(super) struct FrontmostTracker {
 
 #[cfg(target_os = "macos")]
 impl frontmost::app::FrontmostApp for FrontmostTracker {
+    /// Runs on the AppKit main thread from an NSWorkspace notification callback, so it must
+    /// never panic: unwinding out of an Objective-C callback is undefined behavior.
     fn set_frontmost(&mut self, new_value: Option<String>) {
         let frontmost = self.handle.app_state().frontmost();
-        frontmost.set_frontmost(new_value);
+        if let Err(e) = frontmost.set_frontmost(new_value) {
+            log::error!("failed to set frontmost app: {e}");
+        }
     }
 
+    /// See [`Self::set_frontmost`] — must never panic.
     fn update(&mut self) {
         let frontmost = self.handle.app_state().frontmost();
-        println!(
-            "Application activated: {:?}",
-            frontmost.frontmost().unwrap()
-        );
+        match frontmost.frontmost() {
+            Ok(app) => log::debug!("Application activated: {app:?}"),
+            Err(e) => log::error!("failed to read frontmost app: {e}"),
+        }
     }
 }
 

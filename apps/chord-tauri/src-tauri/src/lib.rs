@@ -54,10 +54,15 @@ pub fn run_app_with_chord(sequence: String) {
 
 fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliAppCommand>) {
     std::panic::set_hook(Box::new(|info| {
+        use std::io::Write;
+
         let bt = std::backtrace::Backtrace::force_capture();
 
-        eprintln!("PANIC: {info}");
-        eprintln!("{bt}");
+        // Deliberately fallible: `eprintln!` panics if stderr is broken (closed terminal,
+        // EPIPE/EBADF), and panicking inside the panic hook aborts the process.
+        let mut stderr = std::io::stderr();
+        let _ = writeln!(stderr, "PANIC: {info}");
+        let _ = writeln!(stderr, "{bt}");
 
         log::error!("PANIC: {info}");
         log::error!("{bt}");

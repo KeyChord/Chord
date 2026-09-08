@@ -190,6 +190,9 @@ impl ChordInputManager {
                     self.run_task(task)?;
                 }
             }
+            KeyEvent::Press(Key(KeyMappingCode::Escape)) => {
+                self.clear_key_buffer()?;
+            }
             KeyEvent::Press(key) => {
                 // Ignore space presses
                 if key == &Key(KeyMappingCode::Space) {
@@ -199,7 +202,7 @@ impl ChordInputManager {
                 let is_shift_pressed = self.handle.app_state().keyboard().state().is_shift_pressed();
                 if is_shift_pressed {
                     if Self::should_clear_key_buffer_on_shifted_press(key) {
-                        self.handle_shift_backspace_press()?;
+                        self.clear_key_buffer()?;
                     } else {
                         self.handle_shifted_key_press(key)?;
                     }
@@ -298,8 +301,7 @@ impl ChordInputManager {
         key == &Key(KeyMappingCode::Backspace)
     }
 
-    fn handle_shift_backspace_press(&self) -> Result<()> {
-        let state = self.observable.get_state()?;
+    fn clear_key_buffer(&self) -> Result<()> {
         self.observable
             .set_state(|state| ChordInputState { input: vec![], selected_input_event: None, pressed_input_event: None, ..state})?;
         Ok(())

@@ -236,7 +236,10 @@ impl ChordModePanel {
                 NSSize::new(rect.width + rect.radius, rect.height),
             );
             let vibrancy_view = NSVisualEffectViewTagged::initWithFrame(
-                MainThreadMarker::new().unwrap().alloc(),
+                // Guaranteed by `run_on_main_thread`.
+                MainThreadMarker::new()
+                    .expect("run_on_main_thread closure not on main thread")
+                    .alloc(),
                 frame,
                 NATIVE_SURFACE_TAG,
             );

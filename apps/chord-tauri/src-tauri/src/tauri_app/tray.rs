@@ -58,7 +58,10 @@ pub fn create_tray(handle: AppHandle) -> tauri::Result<()> {
                 let chord_mode_manager = handle.app_state().chord_mode_manager();
                 match chord_mode_manager.panel.toggle_inspector() {
                     Ok(is_open) => {
-                        let menu = handle.menu().unwrap();
+                        let Some(menu) = handle.menu() else {
+                            log::error!("Failed to update inspector menu item: no menu set");
+                            return;
+                        };
                         if let Some(item) = menu.get(OPEN_INSPECTOR_MENU_ID) {
                             if let Some(text_item) = item.as_menuitem() {
                                 let _ = text_item.set_text(if is_open {

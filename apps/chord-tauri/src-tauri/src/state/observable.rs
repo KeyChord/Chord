@@ -124,7 +124,10 @@ macro_rules! define_observable {
             where
                 T: ::core::ops::FnOnce(Self::State) -> Self::State
             {
-                let mutex = self.mutex.read().unwrap();
+                let mutex = self.mutex.read()
+                    .map_err(|_| ::anyhow::anyhow!(
+                        "{} observable lock poisoned", Self::ID
+                    ))?;
                 let prev_state = self.state.get()?;
                 let next_state = callback(prev_state);
                 self.state.set(next_state)?;
@@ -137,7 +140,10 @@ macro_rules! define_observable {
             where
                 T: ::core::ops::FnOnce(Self::State) -> ::anyhow::Result<Self::State>
             {
-                let mutex = self.mutex.read().unwrap();
+                let mutex = self.mutex.read()
+                    .map_err(|_| ::anyhow::anyhow!(
+                        "{} observable lock poisoned", Self::ID
+                    ))?;
                 let prev_state = self.state.get()?;
                 let next_state = callback(prev_state)?;
                 self.state.set(next_state)?;

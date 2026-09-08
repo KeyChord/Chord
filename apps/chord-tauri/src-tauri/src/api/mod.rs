@@ -1,3 +1,7 @@
+// `taurpc_api` expands to code containing `unwrap()` calls, attributed to the trait
+// declarations below; the hand-written source in this module contains none.
+#![allow(clippy::unwrap_used)]
+
 use crate::app::chord_package_manager::LocalChordPackage;
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::logging::AppLogEntry;
