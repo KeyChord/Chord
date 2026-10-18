@@ -1,14 +1,19 @@
 # JavaScript
 
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
 ## Recommended Setup
 
-TODO
+A chord package is a folder with chord files in `chords/` and, optionally, JavaScript handlers. To start one, follow the quick start in [create-chord-package](https://github.com/KeyChord/create-chord-package). Packages build their handlers with [`@keychord/config`](https://github.com/KeyChord/config) and get typings for the `chord` module from [`@keychord/types`](https://github.com/KeyChord/types-monorepo). The packages in [KeyChord/chords](https://github.com/KeyChord/chords) are working examples.
+
+While you work on a package, load its folder in **Settings → Chords → Local Folders**, or use **Link Local Folder** on an installed repo, and reload with `0,r` after each build.
 
 ## Recommended Packages
 
 - [bplist-lossless](https://github.com/leonsilicon/bplist-lossless) - A binary plist parser specifically tailored for edits by avoiding loss of precision during parsing and re-serialization.
 - [doctor-json](https://github.com/privatenumber/doctor-json) - A JSON editor that preserves all existing formatting/comments
-- [keycode-ts2](https://github.com/leonsilicon/keycode-ts2) - A TypeScript port of the [Rust `keycode` crate](https://crates.io/crates/keycode) which uses the Chromium keycode names as the source of truth (_Chords_ uses these keycode names as the source of truth).
+- [keycode-ts2](https://github.com/KeyChord/keycode-ts) - A TypeScript port of the [Rust `keycode` crate](https://crates.io/crates/keycode) which uses the Chromium keycode names as the source of truth (_Chords_ uses these keycode names as the source of truth).
 
 ## Chord events and persistent return values
 
@@ -36,8 +41,6 @@ Complete built-in commands with the normal chord completion controls or the CLI:
 The selected layout persists across app launches. The compact floating layout fits its
 contents near the bottom center of the display, with keys above the resolved action description.
 Completed chords remain visible until you start another chord or leave chord mode.
-
-These replace the former backslash Settings, Reload, and Quit sequences.
 
 The core file maps chords to native app operations using `builtin` actions:
 
@@ -249,9 +252,31 @@ Chord deliberately sends `@keypress` for every key, including Backspace, even th
 
 ## The built-in `chord` module
 
-The built-in `chord` module is intentionally kept minimal.
+The built-in `chord` module is intentionally kept minimal. Handlers import it with `import { … } from "chord"`.
 
 ```ts
+// Simulated keys and shortcuts, written like a chord file's `shortcut` (for example "cmd+shift+p").
+export function tap(shortcut: string): void;
+export function press(shortcut: string): void;
+export function release(shortcut: string): void;
+
+// Called whenever an app with this bundle ID launches or quits.
+export function onAppLaunch(
+  bundleId: string,
+  callback: (app: { pid: number; bundleId: string }) => unknown,
+): void;
+export function onAppTerminate(
+  bundleId: string,
+  callback: (app: { pid: number; bundleId: string }) => unknown,
+): () => void; // removes the callback
+
+// A shortcut from Chord's global hotkey pool, assigned to this app and ID (see the readme).
+export function registerGlobalHotkey(bundleId: string, hotkeyId: string): string | undefined;
+export function getGlobalHotkey(bundleId: string, hotkeyId: string): string | undefined;
+
+// Runs a program as root after macOS asks for an administrator password. Output is discarded.
+export function runSudoCommand(program: string, args: string[]): Promise<void>;
+
 export class Applescript {
   constructor(source: string);
   constructor(fn: (...args: unknown[]) => unknown, ...args: unknown[]);
@@ -303,7 +328,9 @@ interface ImportMeta {
 }
 ```
 
-This marks or clears an app in the settings UI and gives the user a one-click relaunch button.
+`setAppNeedsRelaunch` marks or clears an app in the settings UI and gives the user a one-click relaunch button.
+
+`tap`, `press`, `release`, the global hotkey functions, `setAppNeedsRelaunch`, `onAppLaunch`, and `onAppTerminate` need the running app; under `chord bun` they throw. `registerGlobalHotkey` returns the existing assignment when there is one, and `undefined` when the pool is used up.
 
 `Applescript` uses the macOS `OSAKit` framework via the Rust `osakit` crate. Call `compile()` before `execute()`.
 When constructed with a string it runs AppleScript source directly. When constructed with a function, Chord serializes the trailing args, uses `fn.toString()`, wraps it as JXA, and executes it as `JavaScript` in OSAKit.
@@ -394,20 +421,19 @@ open --background 'chord:reload-config'
 
 ## CLI
 
-This repo also includes a small `chord` CLI wrapper. It delegates dynamic commands to the compiled
-Chord executable rather than putting command payloads in the public URL scheme. Chord sequences
-execute in the running app (launching it in the background when needed) so they use its loaded
-packages and frontmost-app context; `bun` uses Chord's embedded runtime, and `exec` runs the command
-as a Chord child process.
+The Chord app's executable doubles as a `chord` CLI. To put it on your `PATH`, open
+**Settings → General → Command Line** and click **Add chord to PATH**, which links
+`/usr/local/bin/chord` to the app (macOS may ask for your password). Development builds use the
+name `chordd`. Run `chord --help` for the full list.
+
+Chord sequences execute in the running app (launching it in the background when needed) so they
+use its loaded packages and frontmost-app context; `bun` uses Chord's embedded runtime, and `exec`
+runs the command as a Chord child process.
 
 ### Commands
 
-- `ui`
-- `settings`
-- `open-settings`
-- `show-settings`
-- `reload-config`
-- `reload-configs`
+- `ui`, `settings` (aliases: `open-settings`, `show-settings`)
+- `reload-configs` (alias: `reload-config`)
 - `bun <script> [args...]` (alias: `js`)
 - `run <file> <export> [args...]`
 - `exec <shell-command>`
@@ -417,25 +443,22 @@ as a Chord child process.
 ### Examples
 
 ```sh
-./chord bun ./script.ts hello
-./chord js ./script.ts hello
-./chord run ./script.ts main hello
-./chord exec 'open https://example.com'
-./chord chord fq
-./chord fq
-./chord ui
-./chord settings
-./chord reload-configs
+chord bun ./script.ts hello
+chord js ./script.ts hello
+chord run ./script.ts main hello
+chord exec 'open https://example.com'
+chord chord fq
+chord fq
+chord ui
+chord settings
+chord reload-configs
 ```
 
-If you want to run it as `chord` from anywhere, add the repo copy to your `PATH` or symlink it into a directory that is already on your `PATH`.
-
-The wrapper finds a development/release build in `src-tauri/target`, then checks the standard
-`/Applications` locations. Set `CHORD_EXECUTABLE` when the binary lives somewhere else.
-
-The static settings/reload commands depend on macOS recognizing the bundled Chord app as the
-handler for the `chord:` URL scheme, so the app bundle needs to be built and launched at least once
-first.
+In a Chord checkout, `apps/chord-tauri/chord` is a shell wrapper for the same commands. It looks for
+a build in `apps/chord-tauri/src-tauri/target`, then in the standard `/Applications` locations; set
+`CHORD_EXECUTABLE` when the binary lives somewhere else. Its `ui`, `settings`, and `reload-configs`
+commands go through the `chord:` URL scheme, so the app bundle must have been launched at least
+once.
 
 # Native code
 
@@ -567,11 +590,13 @@ Any other build system works too: Chord imports the package's JavaScript from di
 
 ## Testing without the app
 
-A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available. Test scripts should import the generated handler from `js/` so its native imports have been processed by the plugin:
+A Chord build's CLI runs a script on the same embedded Bun, with the `chord` module available. Functions that need the running app (see [the built-in `chord` module](#the-built-in-chord-module)) throw in this mode. `chords-menu` has such a script, which imports the handler and calls it once:
 
 ```sh
-chord bun scripts/run.ts by-letters f     # from the chords-menu checkout
+chord bun scripts/run.ts BY_LETTERS f     # from the chords-menu package folder
 ```
+
+Package tests run under `bun test` with the `chord` module mocked by [`@keychord/chordtest`](https://github.com/KeyChord/chords/tree/main/@keychord/chordtest).
 
 ## Troubleshooting
 

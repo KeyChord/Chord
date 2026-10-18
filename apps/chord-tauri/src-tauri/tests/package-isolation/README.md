@@ -1,5 +1,8 @@
 # Package crash isolation
 
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
 Package imports, handler factories, actions, timers, and lifecycle callbacks run in
 one supervised child process per installed package. Workers have separate process
 groups, so a package job-control signal cannot target the GUI's process group. Native add-ons run in that same
@@ -48,7 +51,7 @@ ordinary exceptions, cancellation, removed handlers, and shutdown without respaw
 
 The original NodeSwift 1.5.1 missing-queue abort has a separate regression.
 Build its two deliberately unsafe fixtures against an existing NodeSwift 1.5.1
-SwiftPM cache, such as the tray package's debug build:
+SwiftPM cache, such as the one `chords-menu` creates when it builds:
 
     bun apps/chord-tauri/src-tauri/tests/package-isolation/build-legacy-probes.ts \
       ../chords/@keychord/chords-menu/node_modules/.cache/chord/native/swiftpm

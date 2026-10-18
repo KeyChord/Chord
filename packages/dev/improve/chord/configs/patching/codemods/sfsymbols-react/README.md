@@ -1,5 +1,8 @@
 # sfsymbols-react remove Next.js dependency patch
 
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
 Chord now uses SF Symbols 8.1.3, which no longer declares Next.js as a dependency.
 The Bun patch and its `patchedDependencies` entry have been removed. This codemod
 and its fixtures remain available for older versions that need the patch.

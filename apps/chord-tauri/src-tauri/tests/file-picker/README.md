@@ -1,5 +1,8 @@
 # Native file-picker listener
 
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
 The fixture and production listener are Rust, using typed Apple framework
 bindings. From the repository root, compile them and check AppKit's
 nonlocalized Open/Save identifiers:

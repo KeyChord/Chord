@@ -1,3 +1,6 @@
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
 Run this macOS regression check from `src-tauri`:
 
 ```sh

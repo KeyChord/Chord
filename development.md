@@ -1,5 +1,36 @@
 # Development
 
+> [!NOTE]
+> This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
+
+This guide is for building _Chord_ from source. To just use it, download the app as described in the [readme](./readme.md#installation).
+
+## Building from source
+
+_Chord_ builds on macOS. It links against a patched Bun from [rbun](https://github.com/KeyChord/rbun), which has to be checked out next to this repo, with its Bun submodule:
+
+```sh
+mkdir KeyChord && cd KeyChord
+git clone https://github.com/KeyChord/Chord
+git clone --recurse-submodules https://github.com/KeyChord/rbun
+```
+
+[KeyChord/chords](https://github.com/KeyChord/chords) is optional. When it is checked out next to `Chord`, development builds read Chord's core `0` bindings from it (see [Editing an installed chordpack locally](#editing-an-installed-chordpack-locally)).
+
+Then install the toolchain (see [Toolchain](#toolchain)), build Bun once, and start the app:
+
+```sh
+cd Chord
+proto install
+bun install --frozen-lockfile
+# one-time: build Bun and libbun_embed.dylib in the rbun checkout (~20 min cold);
+# install the prerequisites from rbun's README first
+(cd ../rbun && bun install && bun run _build-bun)
+bun run dev
+```
+
+`bun run dev` signs the development app with a certificate-backed code-signing identity and does not fall back to ad-hoc signing. If you are not on the maintainer's machine, set `CHORD_DEV_SIGNING_IDENTITY` to one of your identities (list them with `security find-identity -v -p codesigning`; a free Apple Development certificate from Xcode works). The development app is called **Chord (Development)** and needs its own Accessibility grant.
+
 ## Version control
 
 Chord uses Jujutsu (`jj`) in a colocated Git checkout, following Haniverse's
@@ -80,11 +111,8 @@ proto install
 bun install --frozen-lockfile
 ```
 
-Start the desktop app with:
-
-```sh
-bun run dev
-```
+Start the desktop app with `bun run dev`, after building rbun's Bun once as shown in
+[Building from source](#building-from-source).
 
 On macOS, the development runner builds with Tauri and uses Cargo's runner hook
 to launch a signed, immutable `.app` snapshot through Launch Services. The executable
@@ -286,8 +314,10 @@ absolute local monorepo path and click the link icon. A GitHub monorepo can also
 be linked to a local checkout using its link icon. **Add Repo** automatically
 detects a monorepo when it contains `chords-*` directories. Chord discovers these
 folders directly below the root or nested in other folders; no `packages/`
-directory is required. Each matching folder is loaded as its own package, using
-its `package.json` name or, when absent, its folder name. A matching folder must
+directory is required. Each matching folder is its own package, named by
+its `package.json` name or, when absent, its folder name. Only the packages ticked
+under **Packages to use** in the monorepo's entry are loaded; `@keychord/chords-chord`
+is always ticked, and an empty selection loads nothing. A matching folder must
 contain `package.json` or a `chords/`, `js/`, or `bin/` directory; empty folders
 and leftover build folders are ignored. Discovery stops at each package and
 skips hidden directories (including `.git`, `.jj`, `.moon`, and `.build`),
@@ -304,7 +334,9 @@ Packages with the same name are overridden in this order (last wins): default
 config packages, cached GitHub sources, standalone local monorepos, locally
 linked GitHub sources, and individual local folders. All local sources therefore
 take precedence over remote GitHub packages. Paths and repo slugs are sorted within each group for
-consistent results. Duplicate package names within one monorepo are rejected.
+consistent results, so a GitHub monorepo such as `KeyChord/chords` does not replace the default
+chordpack's pinned `KeyChord/chords-menu` or `KeyChord/chords-com.apple`; remove those repos to use
+the monorepo's copies. Duplicate package names within one monorepo are rejected.
 
 ## Stores
 
@@ -319,13 +351,14 @@ Node-API add-ons with `process.dlopen`. The build links `libbun_embed.dylib`
 from the rbun checkout, so build it once:
 
 ```sh
-# one-time: build Bun and libbun_embed.dylib in the rbun checkout (~20 min cold)
-(cd ../rbun && bun install && bun dev/improve/rbun/configs/bun/build/_build-bun.ts)
+# one-time: build Bun and libbun_embed.dylib in the rbun checkout (~20 min cold);
+# install the prerequisites from rbun's README first
+(cd ../rbun && bun install && bun run _build-bun)
 
 bun run dev
 ```
 
-The runtime integration lives in `src-tauri/src/bun_js/` and exposes the
+The runtime integration lives in `apps/chord-tauri/src-tauri/src/bun_js/` and exposes the
 `chord` module to packages. The desktop app supervises one child process per
 installed JavaScript package; it never executes package JavaScript or loads
 package native add-ons in the GUI process. The hidden `__package-worker` CLI
@@ -338,15 +371,15 @@ use exponential backoff from 250 ms to 30 seconds, resetting after a healthy min
 The CLI uses the same embedded runtime:
 
 ```sh
-target/debug/chord bun ./script.ts
-target/debug/chord run ./script.ts export-name arg1 arg2
+apps/chord-tauri/src-tauri/target/debug/chord bun ./script.ts
+apps/chord-tauri/src-tauri/target/debug/chord run ./script.ts export-name arg1 arg2
 ```
 
 ## Releases
 
 Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
-which builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling release of the
-same name. [`beta`](https://github.com/KeyChord/Chord/releases/tag/beta) is a prerelease;
+which builds the app and uploads the DMGs to the rolling release of the same name (Apple Silicon, plus
+Intel when a matching Intel Bun build exists; see below). `beta` is published as a prerelease;
 [`prod`](https://github.com/KeyChord/Chord/releases/tag/prod) is marked as the repository's latest
 release, so `https://github.com/KeyChord/Chord/releases/latest` always serves production. Beta uses
 the `com.leonsilicon.chord.beta` application identifier, while local development uses
@@ -385,7 +418,7 @@ its secret, so the workflow still produces an ad-hoc signed build if one is ever
 | --- | --- |
 | `APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64`, `APPLE_DEVELOPER_CERTIFICATE_PASSWORD` | Signs with a Developer ID certificate instead of ad-hoc |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarizes and staples the bundle |
-| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater artifact the in-app updater consumes |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater archive (`Chord-<arch>.app.tar.gz` and its `.sig`) |
 
 The updater artifact is only built when `TAURI_SIGNING_PRIVATE_KEY` is set: Tauri fails the build if
 an updater bundle is requested while `plugins.updater.pubkey` is configured without a private key.
