@@ -1,4 +1,9 @@
-import type { GlobalShortcutMappingInfo } from '#bindings';
+import type {
+	ChordsFileProblem,
+	GlobalShortcutMappingInfo,
+	PersonalPackageFiles,
+	PersonalPackages,
+} from '#bindings';
 import {
 	createTauRPCProxy,
 
@@ -7,5 +12,8 @@ import {
 export const taurpc = createTauRPCProxy();
 
 export type {
+	ChordsFileProblem,
 	GlobalShortcutMappingInfo,
+	PersonalPackageFiles,
+	PersonalPackages,
 };

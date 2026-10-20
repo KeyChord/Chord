@@ -25,6 +25,10 @@ pub struct ChordPackageManagerProvider {
 impl AppSingleton for ChordPackageManager {
     fn init(&self) -> Result<()> {
         self.init_core_package()?;
+        // Optional: Chord still runs when the home folder can't be written.
+        if let Err(error) = self.registry.personal.ensure_default_package() {
+            log::warn!("Failed to create the default personal chord package: {error:#}");
+        }
         self.registry.git.init()
     }
 }

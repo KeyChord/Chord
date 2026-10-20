@@ -29,6 +29,10 @@ pub struct ParsedChordsFile {
 
     pub imports: Vec<ChordsFileImport>,
 
+    /// File names of bare executables, which macOS reports without a bundle identifier, that
+    /// this app's chords file applies to (see `app/desktop_app/app_identity.rs`).
+    pub executables: Vec<String>,
+
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
 
@@ -48,6 +52,7 @@ pub struct CompiledChordsFile {
     pub pathslug: FilePathslug,
     pub meta: HashMap<String, TomlValue>,
     pub handlers: Vec<CompiledChordsFileHandler>,
+    pub executables: Vec<String>,
     pub chords: Vec<Chord>,
     pub chord_hints: Vec<ChordHint>,
 }
@@ -156,6 +161,27 @@ impl ParsedChordsFile {
             }
         }
         Ok(handlers)
+    }
+
+    fn parse_executables(table: &Table) -> Result<Vec<String>> {
+        let Some(value) = table.get("executables") else {
+            return Ok(Vec::new());
+        };
+        value
+            .as_array()
+            .context("executables must be an array of executable file names")?
+            .iter()
+            .map(|name| {
+                let name = name
+                    .as_str()
+                    .context("executables must be an array of executable file names")?;
+                anyhow::ensure!(
+                    !name.trim().is_empty() && !name.contains('/'),
+                    "executables must name files, not paths: {name:?}"
+                );
+                Ok(name.to_string())
+            })
+            .collect()
     }
 
     fn parse_imports(table: &Table) -> Result<Vec<ChordsFileImport>> {
@@ -405,6 +431,7 @@ impl ParsedChordsFile {
         let meta = Self::parse_meta(root)?;
         let handlers = Self::parse_handlers(root)?;
         let imports = Self::parse_imports(root)?;
+        let executables = Self::parse_executables(root)?;
 
         let mut chords = Vec::new();
         let mut chord_hints = Vec::new();
@@ -480,6 +507,7 @@ impl ParsedChordsFile {
             meta,
             handlers,
             imports,
+            executables,
             chords,
             chord_hints,
         })
@@ -489,6 +517,29 @@ impl ParsedChordsFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn app_files_declare_bare_executables_by_file_name() {
+        let file: ParsedChordsFile = "name = 'LiveSplit One'\nexecutables = ['LiveSplit One']"
+            .parse()
+            .unwrap();
+        assert_eq!(file.executables, ["LiveSplit One"]);
+        let file: ParsedChordsFile = "name = 'none'".parse().unwrap();
+        assert!(file.executables.is_empty());
+        for invalid in [
+            "executables = 'LiveSplit One'",
+            "executables = [1]",
+            "executables = ['']",
+            "executables = ['/Applications/LiveSplit One']",
+        ] {
+            assert!(
+                format!("name = 'invalid'\n{invalid}")
+                    .parse::<ParsedChordsFile>()
+                    .is_err(),
+                "{invalid}"
+            );
+        }
+    }
 
     #[test]
     fn core_hints_can_describe_repeat_counts_and_global_keys() {

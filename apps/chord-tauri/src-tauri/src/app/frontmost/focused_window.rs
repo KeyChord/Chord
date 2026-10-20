@@ -2,28 +2,30 @@
 //! running, so every repetition and loop iteration acts on the same window even after
 //! the run itself (or the user) moves focus elsewhere.
 
-/// The focused, else main, window of `bundle_id`, or of the focused application when
-/// absent, as a Core Graphics window number. `None` when no window can be identified.
+use tauri::AppHandle;
+
+/// The focused, else main, window of `app_id`, or of the focused application when absent,
+/// as a Core Graphics window number. `None` when no window can be identified.
 #[cfg(target_os = "macos")]
-pub fn focused_window_id(bundle_id: Option<&str>) -> Option<u32> {
-    macos::focused_window_id(bundle_id)
+pub fn focused_window_id(handle: &AppHandle, app_id: Option<&str>) -> Option<u32> {
+    macos::focused_window_id(handle, app_id)
 }
 
 #[cfg(not(target_os = "macos"))]
-pub fn focused_window_id(_bundle_id: Option<&str>) -> Option<u32> {
+pub fn focused_window_id(_handle: &AppHandle, _app_id: Option<&str>) -> Option<u32> {
     None
 }
 
 #[cfg(target_os = "macos")]
 mod macos {
+    use crate::app::desktop_app::running_apps_with_id;
     use objc2::rc::autoreleasepool;
-    use objc2_app_kit::NSRunningApplication;
     use objc2_application_services::{AXError, AXUIElement};
     use objc2_core_foundation::{CFRetained, CFString, CFType, ConcreteType};
-    use objc2_foundation::NSString;
     use std::ffi::c_void;
     use std::ptr::NonNull;
     use std::sync::OnceLock;
+    use tauri::AppHandle;
 
     /// A busy application may still answer; one that takes longer has no target window.
     const MESSAGING_TIMEOUT_SECONDS: f32 = 1.0;
@@ -59,14 +61,13 @@ mod macos {
         }
     }
 
-    fn application(bundle_id: Option<&str>) -> Option<CFRetained<AXUIElement>> {
-        let application = match bundle_id {
-            // Window handlers resolve a bundle ID to its first running instance as well.
-            Some(bundle_id) => {
-                let apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(
-                    &NSString::from_str(bundle_id),
-                );
-                let pid = apps.iter().next()?.processIdentifier();
+    fn application(handle: &AppHandle, app_id: Option<&str>) -> Option<CFRetained<AXUIElement>> {
+        let application = match app_id {
+            // Window handlers resolve an app ID to its first running instance as well.
+            Some(app_id) => {
+                let pid = running_apps_with_id(handle, app_id)
+                    .first()?
+                    .processIdentifier();
                 unsafe { AXUIElement::new_application(pid) }
             }
             // AX is a fresh query; NSWorkspace.frontmostApplication can be stale off the
@@ -81,10 +82,10 @@ mod macos {
         Some(application)
     }
 
-    pub(super) fn focused_window_id(bundle_id: Option<&str>) -> Option<u32> {
+    pub(super) fn focused_window_id(handle: &AppHandle, app_id: Option<&str>) -> Option<u32> {
         let get_window = window_number_getter()?;
         autoreleasepool(|_| {
-            let application = application(bundle_id)?;
+            let application = application(handle, app_id)?;
             let window = attribute::<AXUIElement>(&application, "AXFocusedWindow")
                 .or_else(|| attribute(&application, "AXMainWindow"))?;
             let mut id = 0;

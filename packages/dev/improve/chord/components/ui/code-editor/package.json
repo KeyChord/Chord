@@ -1,0 +1,27 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.code-editor",
+	"type": "module",
+	"private": true,
+	"imports": {
+		"#code-editor": "./code-editor.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@chord/com.npmjs.utils-cn": "workspace:*",
+		"@codemirror/commands": "6.11.1",
+		"@codemirror/language": "6.13.1",
+		"@codemirror/legacy-modes": "6.5.5",
+		"@codemirror/lint": "6.9.7",
+		"@codemirror/search": "6.7.2",
+		"@codemirror/state": "6.7.6",
+		"@codemirror/view": "6.43.14",
+		"@lezer/highlight": "1.2.5",
+		"react": "^19.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0"
+	}
+}

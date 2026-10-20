@@ -1,5 +1,5 @@
 proto = "0.61.1"
-bun = "1.4.2"
+bun = "1.4.4"
 rust = "1.98.0"
 
 [settings]

@@ -2,7 +2,7 @@
 // declarations below; the hand-written source in this module contains none.
 #![allow(clippy::unwrap_used)]
 
-use crate::app::chord_package_manager::LocalChordPackage;
+use crate::app::chord_package_manager::{ChordsFileProblem, LocalChordPackage, PersonalPackages};
 use crate::app::global_hotkey_store::GlobalShortcutMappingInfo;
 use crate::logging::AppLogEntry;
 use crate::models::ChordMacroName;
@@ -53,6 +53,18 @@ pub trait Api {
     async fn list_local_chord_folders() -> AppResult<Vec<String>>;
     async fn pick_local_chord_folder() -> AppResult<Option<String>>;
     async fn add_local_chord_folder(path: String) -> AppResult<LocalChordPackage>;
+    async fn list_personal_packages() -> AppResult<PersonalPackages>;
+    async fn create_personal_package(dirname: String) -> AppResult<()>;
+    async fn open_personal_package(dirname: Option<String>) -> AppResult<()>;
+    async fn read_personal_chords_file(dirname: String, pathslug: String) -> AppResult<String>;
+    async fn save_personal_chords_file(
+        dirname: String,
+        pathslug: String,
+        contents: String,
+        expected: Option<String>,
+    ) -> AppResult<()>;
+    async fn delete_personal_chords_file(dirname: String, pathslug: String) -> AppResult<()>;
+    async fn check_chords_file(contents: String) -> AppResult<Option<ChordsFileProblem>>;
     async fn list_global_shortcut_mappings() -> AppResult<Vec<GlobalShortcutMappingInfo>>;
     async fn remove_global_shortcut_mapping(shortcut: String) -> AppResult<()>;
     async fn update_global_shortcut_mapping(

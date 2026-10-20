@@ -103,6 +103,7 @@ objc2-app-kit = { version = "0.3.2", features = [ "block2" ] }
 objc2-foundation = { version = "0.3.2", features = [ "block2" ] }
 objc2-core-foundation = "0.3.2"
 objc2-core-graphics = "0.3.2"
+objc2-security = { version = "0.3.2", default-features = false, features = ["std", "bitflags", "CSCommon", "SecCode", "SecStaticCode"] }
 objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "hid", "hidsystem", "libc"] }
 objc2-application-services = { version = "0.3.2", default-features = false, features = ["std", "HIServices", "AXUIElement", "AXError", "libc"] }
 macos-accessibility-client = "0.0.2"

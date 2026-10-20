@@ -270,6 +270,14 @@ pub fn get_app_windows(bundle_id: &str) -> Result<Vec<NativeWindow>> {
     anyhow::bail!("window-targeted mouse input is only supported on macOS");
 }
 
+/// List the on-screen normal windows owned by these processes.
+pub fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {
+    #[cfg(target_os = "macos")]
+    return macos::get_process_windows(pids);
+    #[cfg(not(target_os = "macos"))]
+    anyhow::bail!("window-targeted mouse input is only supported on macOS");
+}
+
 /// Send one or two button down/up pairs to one window, off the UI/JS thread.
 pub fn click(options: &ClickOptions) -> Result<()> {
     options.validate()?;
@@ -387,11 +395,19 @@ mod macos {
     }
 
     pub(super) fn get_app_windows(bundle_id: &str) -> Result<Vec<NativeWindow>> {
+        let pids: Vec<_> = autoreleasepool(|_| {
+            NSRunningApplication::runningApplicationsWithBundleIdentifier(&NSString::from_str(
+                bundle_id,
+            ))
+            .iter()
+            .map(|app| app.processIdentifier())
+            .collect()
+        });
+        get_process_windows(&pids)
+    }
+
+    pub(super) fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {
         autoreleasepool(|_| {
-            let apps = NSRunningApplication::runningApplicationsWithBundleIdentifier(
-                &NSString::from_str(bundle_id),
-            );
-            let pids: Vec<_> = apps.iter().map(|app| app.processIdentifier()).collect();
             Ok(windows()?
                 .into_iter()
                 .filter(|window| pids.contains(&window.process_id))

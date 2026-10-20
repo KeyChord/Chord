@@ -40,7 +40,8 @@ function SettingsChordsPageContent({
 }: {
 	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
 }) {
-  const { packages } = chordPackageManagerData;
+  const { packages, personalPackages } = chordPackageManagerData;
+  const personalNames = new Set(personalPackages.map((state) => state.name));
 
   return (
     <div className="space-y-4">
@@ -86,7 +87,10 @@ function SettingsChordsPageContent({
                       variant="ghost"
                       className="flex w-full items-center justify-between rounded-none border-0 p-3 h-auto hover:bg-muted/50"
                     >
-                      <span className="font-medium">{pkg.name}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="font-medium">{pkg.name}</span>
+                        {personalNames.has(pkg.name) && <Badge variant="secondary">My Chords</Badge>}
+                      </span>
                       <ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                     </Button>
                   </CollapsibleTrigger>

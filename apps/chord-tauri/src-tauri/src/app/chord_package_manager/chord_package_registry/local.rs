@@ -47,6 +47,12 @@ pub(super) fn read_package_source(path: &Path, remaining: &mut u64) -> anyhow::R
     Ok(String::from_utf8(contents)?)
 }
 
+/// Hidden entries below a source folder, such as the `.DS_Store` files Finder leaves behind,
+/// are never package sources.
+pub(super) fn is_hidden_entry(entry: &walkdir::DirEntry) -> bool {
+    entry.depth() > 0 && entry.file_name().to_string_lossy().starts_with('.')
+}
+
 #[cfg(test)]
 mod package_read_tests {
     use super::*;
@@ -359,7 +365,10 @@ impl LocalPackageRegistry {
                 continue;
             }
 
-            for entry in WalkDir::new(&dir_path) {
+            for entry in WalkDir::new(&dir_path)
+                .into_iter()
+                .filter_entry(|entry| !is_hidden_entry(entry))
+            {
                 let entry = entry?;
                 entries += 1;
                 anyhow::ensure!(

@@ -297,6 +297,13 @@ pub(crate) fn handle_host_request(
                 .set_app_needs_relaunch(&bundle_id, needs_relaunch)?;
             Ok(Json::Null)
         }
+        HostRequest::AppProcessIds { app_id } => {
+            let pids: Vec<i32> = crate::app::desktop_app::running_apps_with_id(handle, &app_id)
+                .iter()
+                .map(|app| app.processIdentifier())
+                .collect();
+            Ok(serde_json::to_value(pids)?)
+        }
     }
 }
 
@@ -372,8 +379,19 @@ fn set_app_needs_relaunch(ctx: Ctx, bundle_id: String, needs_relaunch: bool) -> 
 }
 
 fn get_app_windows<'js>(ctx: Ctx<'js>, bundle_id: String) -> rbun::Result<Value<'js>> {
-    let windows = crate::native_input::get_app_windows(&bundle_id)
-        .or_throw_msg(&ctx, "failed to enumerate application windows")?;
+    let has_host = ctx
+        .userdata::<AppUserData>()
+        .is_some_and(|data| data.package.is_some());
+    let windows = if has_host && !bundle_id.trim().is_empty() {
+        // Only Chord knows which bare executables chords files claim (see app_identity.rs).
+        let pids = host_call(&ctx, HostRequest::AppProcessIds { app_id: bundle_id })?;
+        let pids: Vec<i32> =
+            serde_json::from_value(pids).or_throw_msg(&ctx, "invalid application process IDs")?;
+        crate::native_input::get_process_windows(&pids)
+    } else {
+        crate::native_input::get_app_windows(&bundle_id)
+    }
+    .or_throw_msg(&ctx, "failed to enumerate application windows")?;
     rbun::serde::to_value(ctx.clone(), windows)
         .or_throw_msg(&ctx, "failed to convert application windows")
 }

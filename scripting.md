@@ -250,6 +250,24 @@ The snapshot extends Bun's `Event`, with read-only keyboard fields, `view: null`
 
 Chord deliberately sends `@keypress` for every key, including Backspace, even though the browser's legacy `keypress` event has narrower behavior. Normal buffer edits and completion controls still apply; keyboard callbacks observe the resulting buffer.
 
+### App IDs
+
+An app's chords live in `chords/<app ID, with dots as folders>/macos.toml`. `this.focusedAppId`, `onAppLaunch`, `onAppTerminate`, the global hotkey functions, and `getAppWindows` use the same app ID, which is normally the app's bundle identifier. An app shipped as a bare executable, without an `.app` bundle, has none, so Chord uses, in order:
+
+1. a `CFBundleIdentifier` embedded in the executable's `__TEXT,__info_plist` section;
+2. the identifier of a certificate (not ad-hoc) code signature;
+3. the app ID of a chords file that claims the executable's file name in `executables`.
+
+Ad-hoc signing identifiers are ignored. The linker derives them from the link-time file name, so they change between builds (Cargo appends a hash) or collide (every Go binary is `a.out`). Claim such an executable from the chords file of the app ID its `.app` bundle uses, so the same file covers both:
+
+```toml
+# chords/org/livesplit/one/macos.toml
+name = 'LiveSplit One'
+executables = ['LiveSplit One']
+```
+
+`executables` lists file names, not paths. Only app chords files can claim executables, and when packages claim the same file name, the higher-priority package wins. Chord cannot relaunch a bare executable with `setAppNeedsRelaunch`'s button, because Launch Services opens one in Terminal.
+
 ## The built-in `chord` module
 
 The built-in `chord` module is intentionally kept minimal. Handlers import it with `import { … } from "chord"`.
@@ -260,7 +278,7 @@ export function tap(shortcut: string): void;
 export function press(shortcut: string): void;
 export function release(shortcut: string): void;
 
-// Called whenever an app with this bundle ID launches or quits.
+// Called whenever an app with this app ID (normally its bundle ID; see "App IDs") launches or quits.
 export function onAppLaunch(
   bundleId: string,
   callback: (app: { pid: number; bundleId: string }) => unknown,

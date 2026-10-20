@@ -53,6 +53,7 @@
     "@chord/dev.improve.chord.components.ui.chart": "workspace:*",
     "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
     "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
     "@chord/dev.improve.chord.components.ui.combobox": "workspace:*",
     "@chord/dev.improve.chord.components.ui.command": "workspace:*",
     "@chord/dev.improve.chord.components.ui.context-menu": "workspace:*",
@@ -134,7 +135,8 @@
     "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
     "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
     "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-    "@chord/dev.improve.chord.routes.settings.macros.index": "workspace:*"
+    "@chord/dev.improve.chord.routes.settings.macros.index": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings.personal.index": "workspace:*"
   },
   "devDependencies": {
     "vite-plus": "^1.2.0"
@@ -148,5 +150,5 @@
     "@tanstack/react-router-devtools": "workspace:packages/com/npmjs/tanstack__react-router-devtools",
     "@tanstack/router-plugin": "workspace:packages/com/npmjs/tanstack__router-plugin"
   },
-  "packageManager": "bun@1.4.2"
+  "packageManager": "bun@1.4.4"
 }

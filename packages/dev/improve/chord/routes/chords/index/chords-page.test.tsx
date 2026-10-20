@@ -18,7 +18,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordPanelData: { isVisible: true, layout },
       keyboardData: { isCapsPressed: false, isShiftPressed: false },
       frontmostData: { filePickerActive: false },
-      chordPackageManagerData: { packages: [] },
+      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [] },
       chordExecutionData: { loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" },
       chordMacrosData: {
         entries: [
@@ -51,7 +51,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordPanelData: { isVisible: true, layout },
       keyboardData: { isCapsPressed: false, isShiftPressed: false },
       frontmostData: { filePickerActive: false },
-      chordPackageManagerData: { packages: [] },
+      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [] },
       chordExecutionData: { loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" },
       chordMacrosData: { entries: [] },
     };
@@ -77,7 +77,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
           globalChords: [],
           compiledChordsFiles: {
             [path]: {
-              name, pathslug: path, meta: {}, handlers: [],
+              name, pathslug: path, meta: {}, handlers: [], executables: [],
               chords: [{ rawTrigger: "gh", trigger: { keys: ["KeyG", "KeyH"] }, name, index: 0, actions: [] }],
               chordHints: [{ rawPattern: "gh", pattern: { keys: ["KeyG", "KeyH"] }, description: name }],
             },
@@ -89,7 +89,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         chordPanelData={{ isVisible: true, layout }}
         keyboardData={{ isCapsPressed: false, isShiftPressed: false }}
         frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive }}
-        chordPackageManagerData={{ packages: [packageFor("dev.fixture", "Host navigation"), packageFor("com.apple.finder", "Finder navigation")] }}
+        chordPackageManagerData={{ errors: {}, personalPackages: [], packages: [packageFor("dev.fixture", "Host navigation"), packageFor("com.apple.finder", "Finder navigation")] }}
         chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
         chordMacrosData={{ entries: [] }}
       />);
@@ -105,13 +105,13 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordPanelData={{ isVisible: true, layout }}
       keyboardData={{ isCapsPressed: false, isShiftPressed: false }}
       frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
-      chordPackageManagerData={{ packages: [{
+      chordPackageManagerData={{ errors: {}, personalPackages: [], packages: [{
         name: "@fixture/test",
         rawChordsFiles: {},
         globalChords: [],
         compiledChordsFiles: {
           [path]: {
-            name: "fixture", pathslug: path, meta: {}, handlers: [],
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [],
             chords: [{ rawTrigger: "/w]", trigger: { keys: ["Slash", "KeyW", "BracketRight"] }, name: "Close tab", index: 0, actions: [] }],
             chordHints: [],
           },
@@ -134,7 +134,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordPanelData={{ isVisible: true, layout }}
       keyboardData={{ isCapsPressed: false, isShiftPressed: false }}
       frontmostData={{ filePickerActive: false }}
-      chordPackageManagerData={{ packages: [] }}
+      chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [] }}
       chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
       chordMacrosData={{ entries: [] }}
     />);

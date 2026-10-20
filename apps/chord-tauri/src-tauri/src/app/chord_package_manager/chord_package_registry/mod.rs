@@ -8,5 +8,7 @@ mod local;
 pub use local::*;
 mod monorepo;
 pub use monorepo::*;
+mod personal;
+pub use personal::*;
 mod registry;
 pub use registry::*;

@@ -70,6 +70,10 @@ pub enum HostRequest {
         bundle_id: String,
         needs_relaunch: bool,
     },
+    /// Chord resolves app IDs, including those of bare executables that chords files claim.
+    AppProcessIds {
+        app_id: String,
+    },
 }
 
 // Ordinary handler arguments avoid a second text encoding/parser. TOML remains

@@ -589,6 +589,7 @@ mod tests {
             pathslug: path.clone(),
             meta: parsed.meta,
             handlers,
+            executables: parsed.executables,
             chords: parsed.chords,
             chord_hints: parsed.chord_hints,
         };

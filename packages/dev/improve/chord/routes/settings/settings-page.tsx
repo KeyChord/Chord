@@ -26,6 +26,7 @@ import {
   SlidersHorizontal,
   Terminal,
   TriangleAlert,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -42,6 +43,11 @@ const navigationGroups = [
         label: "Chords",
         to: "/settings/chords",
         icon: Keyboard,
+      },
+      {
+        label: "My Chords",
+        to: "/settings/personal",
+        icon: UserRound,
       },
       {
         label: "Browse",

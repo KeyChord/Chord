@@ -34,6 +34,21 @@ pub struct ChordReference {
     pub chord: Chord,
 }
 
+/// The app a chords file applies to: `chords/com/spotify/client/macos.toml` applies to
+/// `com.spotify.client`. Root and bundled (`chords/@scope/…`) files apply to no app.
+pub fn chords_file_app_id(pathslug: &Path) -> Option<String> {
+    if pathslug.file_name()? != "macos.toml" {
+        return None;
+    }
+    let app_id = pathslug
+        .parent()?
+        .strip_prefix("chords")
+        .ok()?
+        .to_str()?
+        .replace('/', ".");
+    (!app_id.is_empty() && !app_id.starts_with('@')).then_some(app_id)
+}
+
 impl ChordPackage {
     pub fn matching_app_chords(&self, event: &ChordInputEvent) -> Vec<ChordReference> {
         let Some(app_id) = &event.application_id else {

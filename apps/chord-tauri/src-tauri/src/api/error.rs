@@ -16,4 +16,12 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
+impl AppError {
+    /// Keeps the whole context chain, such as the line and column of a TOML parse error, for
+    /// messages the user acts on.
+    pub fn detailed(error: anyhow::Error) -> Self {
+        AppError::Message(format!("{error:#}"))
+    }
+}
+
 pub type AppResult<T> = Result<T, AppError>;

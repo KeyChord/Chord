@@ -211,6 +211,7 @@ export interface CompiledChordsFile {
 	pathslug: FilePathslug;
 	meta: Record<string, TomlValue>;
 	handlers: CompiledChordsFileHandler[];
+	executables: string[];
 	chords: Chord[];
 	chordHints: ChordHint[];
 }
@@ -230,8 +231,27 @@ export interface ChordPackage {
 	globalChords: ChordReference[];
 }
 
+/** One folder in `~/.chord/packages`, as the last reload saw it. */
+export interface PersonalPackageState {
+	dirname: string;
+	/** The name the package loaded under: its `package.json` name, else the folder name. */
+	name?: string;
+	/**
+	 * Why the folder could not be loaded at all. Problems in single files are reported with
+	 * the other packages' load errors, under `name`.
+	 */
+	error?: string;
+}
+
 export interface ChordPackageManagerState {
 	packages: ChordPackage[];
+	/**
+	 * Problems from the last reload, by package name. Files that failed are left out of their
+	 * package, which otherwise stays loaded.
+	 */
+	errors: Record<string, string[]>;
+	/** The folders in `~/.chord/packages`, in priority order. */
+	personalPackages: PersonalPackageState[];
 }
 
 export interface ChordPackageStoreEntry {
@@ -327,6 +347,11 @@ export interface ParsedChordsFile {
 	meta: Record<string, TomlValue>;
 	handlers: Record<string, ChordsFileHandler>;
 	imports: ChordsFileImport[];
+	/**
+	 * File names of bare executables, which macOS reports without a bundle identifier, that
+	 * this app's chords file applies to (see `app/desktop_app/app_identity.rs`).
+	 */
+	executables: string[];
 	chords: Chord[];
 	chordHints: ChordHint[];
 	/**

@@ -53,6 +53,7 @@ fn compile_core_contents(contents: &str) -> Result<ChordPackage> {
         pathslug: path.clone(),
         meta: parsed.meta,
         handlers: vec![],
+        executables: parsed.executables,
         chords: parsed.chords,
         chord_hints: parsed.chord_hints,
     };

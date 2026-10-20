@@ -432,6 +432,7 @@ impl ChordInputManager {
             .input_event
             .as_ref()
             .map(|event| event.application_id.clone());
+        let window_handle = handle.clone();
         self.task_queue.enqueue(async move {
             let mut loop_run = loop_run;
             // Select the target window outside the handlers, once per run, off the
@@ -442,7 +443,10 @@ impl ChordInputManager {
                     loop_run.as_mut().map(|(_, plan, _)| plan),
                     || async move {
                         tauri::async_runtime::spawn_blocking(move || {
-                            crate::app::frontmost::focused_window_id(app_id.as_deref())
+                            crate::app::frontmost::focused_window_id(
+                                &window_handle,
+                                app_id.as_deref(),
+                            )
                         })
                         .await
                         .ok()

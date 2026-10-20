@@ -1,6 +1,8 @@
 #![allow(unused)]
 mod app;
 pub use app::*;
+mod app_identity;
+pub use app_identity::*;
 mod desktop_app;
 pub use desktop_app::*;
 

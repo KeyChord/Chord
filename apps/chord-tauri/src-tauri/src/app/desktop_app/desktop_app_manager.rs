@@ -99,13 +99,19 @@ impl DesktopAppManager {
 #[serde(rename_all = "camelCase")]
 pub struct ObservedApp {
     pub pid: i32,
+    /// The app ID: a bundle ID, or the ID of a bare executable (see `app_identity.rs`). The
+    /// field keeps its name for the `onAppLaunch`/`onAppTerminate` payload.
     pub bundle_id: String,
 }
 
 pub fn init_app_lifecycle(handle: AppHandle) {
     #[cfg(target_os = "macos")]
-    if let Err(error) = handle.run_on_main_thread(init_macos_observers) {
-        log::error!("Failed to initialize app lifecycle observers: {error}");
+    {
+        let observer_handle = handle.clone();
+        if let Err(error) = handle.run_on_main_thread(move || init_macos_observers(observer_handle))
+        {
+            log::error!("Failed to initialize app lifecycle observers: {error}");
+        }
     }
 }
 
@@ -120,6 +126,7 @@ pub fn dispatch_app_terminate(app: ObservedApp) {
 #[cfg(target_os = "macos")]
 mod macos {
     use super::{ObservedApp, dispatch_app_launch, dispatch_app_terminate};
+    use crate::app::desktop_app::AppIdentity;
     use block2::RcBlock;
     use core::ptr::NonNull;
     use objc2::MainThreadMarker;
@@ -131,10 +138,11 @@ mod macos {
     };
     use objc2_foundation::NSNotification;
     use std::sync::OnceLock;
+    use tauri::AppHandle;
 
     static OBSERVERS_INITIALIZED: OnceLock<()> = OnceLock::new();
 
-    pub fn init_macos_observers() {
+    pub fn init_macos_observers(handle: AppHandle) {
         if OBSERVERS_INITIALIZED.set(()).is_err() {
             return;
         }
@@ -145,13 +153,14 @@ mod macos {
         let workspace = NSWorkspace::sharedWorkspace();
         let center = workspace.notificationCenter();
 
-        let launch_block = Box::leak(Box::new(RcBlock::new(|notification| {
-            if let Some(app) = observed_app_from_notification(notification) {
+        let launch_handle = handle.clone();
+        let launch_block = Box::leak(Box::new(RcBlock::new(move |notification| {
+            if let Some(app) = observed_app_from_notification(&launch_handle, notification) {
                 dispatch_app_launch(app);
             }
         })));
-        let terminate_block = Box::leak(Box::new(RcBlock::new(|notification| {
-            if let Some(app) = observed_app_from_notification(notification) {
+        let terminate_block = Box::leak(Box::new(RcBlock::new(move |notification| {
+            if let Some(app) = observed_app_from_notification(&handle, notification) {
                 dispatch_app_terminate(app);
             }
         })));
@@ -178,6 +187,7 @@ mod macos {
     }
 
     fn observed_app_from_notification(
+        handle: &AppHandle,
         notification: NonNull<NSNotification>,
     ) -> Option<ObservedApp> {
         let notification = unsafe { notification.as_ref() };
@@ -195,10 +205,6 @@ mod macos {
             return None;
         };
 
-        let Some(bundle_id) = app.bundleIdentifier() else {
-            return None;
-        };
-
         let pid = app.processIdentifier();
         if pid <= 0 {
             return None;
@@ -206,7 +212,7 @@ mod macos {
 
         Some(ObservedApp {
             pid,
-            bundle_id: bundle_id.to_string(),
+            bundle_id: AppIdentity::of(&app).resolve(handle)?,
         })
     }
 }

@@ -1,6 +1,10 @@
 use crate::app::AppHandleExt;
-use crate::app::chord_package_manager::chord_package_registry::ChordPackageRegistry;
-use crate::app::chord_package_manager::{ChordJsPackage, ChordPackage, ChordReference};
+use crate::app::chord_package_manager::chord_package_registry::{
+    ChordPackageRegistry, ImportedPackages,
+};
+use crate::app::chord_package_manager::{
+    ChordJsPackage, ChordPackage, ChordReference, chords_file_app_id,
+};
 use crate::app::state::AppSingleton;
 use crate::models::{
     ChordEventTrigger, ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile,
@@ -45,6 +49,11 @@ pub struct ChordPackageManager {
 
     #[inject(Mutex::new(None))]
     last_reload_error: Mutex<Option<String>>,
+
+    /// App IDs that chords files claim for bare executables through `executables`, keyed by
+    /// executable file name.
+    #[inject(RwLock::new(HashMap::new()))]
+    executable_app_ids: RwLock<HashMap<String, String>>,
 
     observable: ChordPackageManagerObservable,
     handle: AppHandle,
@@ -119,6 +128,43 @@ file = "base.toml"
             "missing arg $missing"
         );
     }
+}
+
+/// Claims follow package priority; a later package cannot take over an executable.
+fn executable_app_ids<'a>(
+    packages: impl IntoIterator<Item = &'a ChordPackage>,
+) -> HashMap<String, String> {
+    let mut app_ids = HashMap::<String, String>::new();
+    for package in packages {
+        let mut files: Vec<_> = package.compiled_chords_files.values().collect();
+        files.sort_by(|a, b| a.pathslug.cmp(&b.pathslug));
+        for file in files {
+            if file.executables.is_empty() {
+                continue;
+            }
+            let Some(app_id) = chords_file_app_id(&file.pathslug) else {
+                log::warn!(
+                    "ignoring executables in {} from {}: only app chords files can claim executables",
+                    file.pathslug.display(),
+                    package.name
+                );
+                continue;
+            };
+            for executable in &file.executables {
+                match app_ids.get(executable) {
+                    Some(existing) if existing != &app_id => log::warn!(
+                        "executable {executable:?} is claimed by {existing} and {app_id} ({}); using {existing}",
+                        package.name
+                    ),
+                    Some(_) => {}
+                    None => {
+                        app_ids.insert(executable.clone(), app_id.clone());
+                    }
+                }
+            }
+        }
+    }
+    app_ids
 }
 
 fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
@@ -375,7 +421,11 @@ impl ChordPackageManager {
         let package = super::chord_package_registry::core::load_core_package()?;
         let (hints, halt_template) = super::chord_package_registry::core::meta_configuration(&package)?;
         self.packages.write().insert(package.name.clone(), package.clone());
-        self.observable.set_state(|_| ChordPackageManagerState { packages: vec![package] })?;
+        self.update_executable_app_ids();
+        self.observable.set_state(|_| ChordPackageManagerState {
+            packages: vec![package],
+            ..Default::default()
+        })?;
         self.handle.app_state().chord_mode_manager().configure_meta_commands(hints, halt_template)
     }
 
@@ -439,7 +489,10 @@ impl ChordPackageManager {
 
     async fn reload_once(&self, required_packages: &[String]) -> Result<()> {
         self.handle.app_state().chord_mode_manager().stop_loops()?;
-        let raw_chord_packages = self.registry.import_all_packages()?;
+        let ImportedPackages {
+            packages: raw_chord_packages,
+            personal: personal_packages,
+        } = self.registry.import_all_packages()?;
         let previous_roots = self.package_roots.read().clone();
 
         let next_roots = raw_chord_packages
@@ -450,6 +503,18 @@ impl ChordPackageManager {
         let mut loading_roots = previous_roots.clone();
         loading_roots.extend(next_roots.clone());
         *self.package_roots.write() = loading_roots;
+
+        // Packages earlier in the order win within each scope, so personal packages come first,
+        // in their own priority order.
+        let personal_ranks = personal_packages
+            .iter()
+            .filter_map(|state| state.name.clone())
+            .enumerate()
+            .map(|(rank, name)| (name, rank))
+            .collect::<HashMap<_, _>>();
+        let mut raw_chord_packages = raw_chord_packages.into_iter().collect::<Vec<_>>();
+        raw_chord_packages
+            .sort_by_key(|(name, _)| personal_ranks.get(name).copied().unwrap_or(usize::MAX));
 
         let mut chord_packages = OrderMap::new();
         let mut package_errors = HashMap::new();
@@ -481,9 +546,13 @@ impl ChordPackageManager {
 
         *self.packages.write() = chord_packages;
         *self.package_roots.write() = next_roots;
+        self.update_executable_app_ids();
         self.handle.app_state().chord_mode_manager().configure_meta_commands(hints, halt_template)?;
+        package_errors.retain(|_, errors| !errors.is_empty());
         let observable_result = self.observable.set_state(|_| ChordPackageManagerState {
             packages: observable_packages,
+            errors: package_errors,
+            personal_packages,
         });
 
         if let Err(error) =
@@ -498,6 +567,21 @@ impl ChordPackageManager {
 
     pub fn get_package_by_name(&self, package_name: &str) -> Option<ChordPackage> {
         self.packages.read().get(package_name).cloned()
+    }
+
+    /// The app ID a loaded chords file claims for a bare executable with this file name.
+    pub fn app_id_for_executable(&self, executable_name: &str) -> Option<String> {
+        self.executable_app_ids.read().get(executable_name).cloned()
+    }
+
+    /// Rebuilds the executable claims, then re-resolves the frontmost app, which may be a bare
+    /// executable that a changed package now claims.
+    fn update_executable_app_ids(&self) {
+        let app_ids = executable_app_ids(self.packages.read().values());
+        *self.executable_app_ids.write() = app_ids;
+        if let Err(error) = self.handle.app_state().frontmost().refresh() {
+            log::error!("failed to re-resolve the frontmost app: {error:#}");
+        }
     }
 
     /// On-disk root of a package whose JS has been loaded (see `package_roots`).
@@ -756,6 +840,7 @@ impl ChordPackageManager {
             pathslug,
             meta: chords_file.meta.clone(),
             handlers,
+            executables: chords_file.executables.clone(),
             chords,
             chord_hints,
         })
@@ -828,6 +913,100 @@ fn collect_matching_chord_contexts<'a>(
 }
 
 #[cfg(test)]
+mod executable_app_ids_tests {
+    use super::*;
+
+    fn package(name: &str, files: &[(&str, &str)]) -> ChordPackage {
+        let compiled_chords_files = files
+            .iter()
+            .map(|(path, contents)| {
+                let parsed: ParsedChordsFile = contents.parse().unwrap();
+                let path = PathBuf::from(path);
+                let file = CompiledChordsFile {
+                    name: parsed.name,
+                    pathslug: path.clone(),
+                    meta: parsed.meta,
+                    handlers: vec![],
+                    executables: parsed.executables,
+                    chords: parsed.chords,
+                    chord_hints: parsed.chord_hints,
+                };
+                (path, file)
+            })
+            .collect();
+        ChordPackage {
+            name: name.into(),
+            js_package: None,
+            raw_chords_files: HashMap::new(),
+            compiled_chords_files,
+            global_chords: vec![],
+        }
+    }
+
+    #[test]
+    fn app_chords_files_claim_executables_in_package_priority_order() {
+        let livesplit = package(
+            "livesplit",
+            &[(
+                "chords/org/livesplit/one/macos.toml",
+                "name = 'LiveSplit One'\nexecutables = ['LiveSplit One', 'LiveSplit One Nightly']",
+            )],
+        );
+        let later = package(
+            "later",
+            &[
+                (
+                    "chords/dev/other/macos.toml",
+                    "name = 'Other'\nexecutables = ['LiveSplit One']",
+                ),
+                // Root and bundled files apply to no app, so they cannot claim executables.
+                (
+                    "chords/macos.toml",
+                    "name = 'Global'\nexecutables = ['Global Tool']",
+                ),
+                (
+                    "chords/@scope/pkg/chords/dev/tool/macos.toml",
+                    "name = 'Bundled'\nexecutables = ['Bundled Tool']",
+                ),
+            ],
+        );
+        let app_ids = executable_app_ids([&livesplit, &later]);
+        assert_eq!(
+            app_ids,
+            HashMap::from([
+                ("LiveSplit One".into(), "org.livesplit.one".into()),
+                ("LiveSplit One Nightly".into(), "org.livesplit.one".into()),
+            ])
+        );
+        assert_eq!(
+            executable_app_ids([&later, &livesplit])
+                .get("LiveSplit One")
+                .map(String::as_str),
+            Some("dev.other")
+        );
+    }
+
+    #[test]
+    fn chords_file_app_ids_mirror_app_chord_matching() {
+        assert_eq!(
+            chords_file_app_id(Path::new("chords/com/spotify/client/macos.toml")).as_deref(),
+            Some("com.spotify.client")
+        );
+        assert_eq!(
+            chords_file_app_id(Path::new("chords/livesplit_one/macos.toml")).as_deref(),
+            Some("livesplit_one")
+        );
+        for path in [
+            "chords/macos.toml",
+            "chords/@scope/pkg/chords/com/x/macos.toml",
+            "chords/com/x/shared.toml",
+        ] {
+            assert_eq!(chords_file_app_id(Path::new(path)), None, "{path}");
+        }
+    }
+}
+
+#[cfg(test)]
 mod file_picker_tests {
     use super::*;
     use crate::models::Key;
@@ -844,6 +1023,7 @@ mod file_picker_tests {
             chords: parsed.chords,
             chord_hints: parsed.chord_hints,
             handlers: vec![],
+            executables: parsed.executables,
         };
         ChordPackage {
             name: name.into(),
