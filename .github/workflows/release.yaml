@@ -139,7 +139,7 @@ jobs:
           gh release download "$tag" -R KeyChord/rbun --pattern "$asset" --dir "$dir" --clobber
           mv "$dir/$asset" "$dir/libbun_embed.dylib"
           lipo -info "$dir/libbun_embed.dylib"
-          lipo -verify_arch "${{ matrix.macho_arch }}" "$dir/libbun_embed.dylib"
+          lipo "$dir/libbun_embed.dylib" -verify_arch "${{ matrix.macho_arch }}"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
