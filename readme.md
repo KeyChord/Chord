@@ -9,13 +9,13 @@
 1. Download `Chord-aarch64.dmg` from the [latest release](https://github.com/KeyChord/Chord/releases/latest). It is signed and notarized.
 2. Open the DMG, drag **Chord** into `Applications`, and launch it.
 
-## Setup
+# Setup
 
-### Permissions
+## Permissions
 
 Chord requires macOS _Accessibility Permissions_ so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
 
-### Chord Mode
+## Chord Mode
 
 Once you enter _Chord Mode_, it stays active as long as <kbd>␣</kbd> is held down.
 
@@ -23,7 +23,7 @@ _Only <kbd>␣</kbd> needs to stay pressed; you should release <kbd>⇪</kbd> af
 
 In _Chord Mode_, any keys you type will be intercepted by Chord as input. These key events won't be passed to the focused application.
 
-### Triggering a Chord
+## Triggering a Chord
 
 > Chords can only be triggered in _Chord Mode_, so make sure to keep <kbd>␣</kbd> held down!
 
@@ -33,7 +33,7 @@ For example, typing <kbd>0</kbd><kbd>,</kbd><kbd>⇪</kbd> opens Chord's setting
 
 Once you're done, you can release <kbd>␣</kbd> to exit _Chord Mode_.
 
-#### Auto-trigger
+### Auto-trigger
 
 For sending one-off chords, you can release <kbd>␣</kbd> right after typing out the chord to execute it.
 
@@ -41,29 +41,30 @@ For example, instead of pressing <kbd>⇪</kbd>, you can also type <kbd>0</kbd><
 
 <details>
     <summary>Are you a <code>vim</code> user?</summary>
-    For <code>vim</code> users, it might help to treat _Chord Mode_ as somewhat analagous to <code>vim</code>'s _Normal Mode_, with the main difference that it's [a lot easier to exit](https://stackoverflow.com/questions/11828270/how-do-i-exit-vim): just lift up <kbd>␣</kbd>!
+    For <code>vim</code> users, it might help to treat <em>Chord Mode</em> as somewhat analagous to <code>vim</code>'s <em>Normal Mode</em>, with the main difference that it's <a href="https://stackoverflow.com/questions/11828270/how-do-i-exit-vim">a lot easier to exit</a>: just lift up <kbd>␣</kbd>!
 </details>
 
-## Configuration
+# Configuration
 
-### Chord Files
+## Chord Files
 
 All chords are defined in configuration files called _chord files._
 
-A _chord file_ contains chords for a single application and platform, inferred by its path.
+A _chord file_ contains chords for a single application and platform, which is determined by its path.
 
-#### _Chord File_ Example - Finder
+### _Chord File_ Example - Finder
 
-A _chord file_ for macOS Finder would live at:
-
+A _chord file_ for macOS Finder would live at:\
 `chords/com/apple/Finder/macos.toml`
 
 <details>
     <summary>Why do chord files end in <code>.toml</code>?</summary>
-    Chord files are written with a standardized configuration format called [TOML](https://toml.io/en/v1.1.0). You won't need to spend time learning it, as it's very simple and intuitive.
+    Chord files are written with a standardized configuration format called <a href="https://toml.io/en/v1.1.0">TOML</a>. 
+
+    You likely don't need to spend time learning it, as TOML is quite simple and intuitive.
 </details>
 
-### Chord Packages
+## Chord Packages
 
 All _chord files_ live under a top-level `chords/` folder, which itself is part of a _chord package_ that contains both _chord files_ and scripts the chords might use.
 
@@ -71,7 +72,7 @@ Your default _chord package_ is located in `~/.chord/packages/default`.
 
 By adding _chord files_ to this package, you can create your own chords!
 
-#### _Chord Package_ Example - Finder 
+### _Chord Package_ Example - Finder 
 
 If you create the following file in your _chord package:_
 
@@ -104,22 +105,26 @@ name = "Finder"
 > Note that anything after a `#` in _chord files_ is a comment used purely for documentation and is ignored by the configuration file.
 
 You'll then be able to type:
-1. <kbd>/</kbd><kbd>f</kbd><kbd>⇪</kbd> to open Finder
+1. <kbd>/</kbd><kbd>f</kbd><kbd>⇪</kbd> to open Finder,
 2. <kbd>g</kbd><kbd>h</kbd><kbd>⇪</kbd> to open your home directory!
 
-### Pre-Made Chord Packages
+## Pre-Made Chord Packages
 
 Instead of defining your own chords for every app, Chord provides pre-made chord packages you can use!
 
 Chord's compiled chords contain certain conventions:
 
-- Navigation: `n/e/s/w` (north, east, south, west)
-- Movement: `l/r/u/d` (left, right, up, down)
-- Position & Order: `f/k/a/z` (front, back, first, last)
+- Navigation: <kbd>n</kbd><kbd>e</kbd><kbd>s</kbd><kbd>w</kbd> (north, east, south, west)
+- Movement: <kbd>l</kbd><kbd>r</kbd><kbd>u</kbd><kbd>d</kbd> (left, right, up, down)
+- Position & Order: <kbd>f</kbd><kbd>k</kbd><kbd>a</kbd><kbd>z</kbd> (front, back, first, last)
 
 > For a full list of these conventions, see the [KeyChords/chords](https://github.com/KeyChord/chords) repo!
 
-### Chord Scripts
+### Installing Chord Packages
+
+TODO
+
+## Chord Scripts
 
 In addition to simulating shortcuts and executing shell commands, chords can also run scripts!
 
