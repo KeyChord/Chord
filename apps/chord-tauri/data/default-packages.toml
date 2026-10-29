@@ -1,4 +1,4 @@
-name = "Chord's default chordpack"
+# Packages Chord installs, at these revisions, on first launch and when chords are reset.
 
 [packages."@keychord/chords-chord"]
 git = "https://github.com/KeyChord/chords-chord"

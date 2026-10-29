@@ -12,7 +12,7 @@ use crate::app::permissions::{AppPermissions, AppPermissionsProvider};
 use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChordStoreProvider};
 use crate::app::settings::{AppSettings, AppSettingsProvider};
 use crate::app::{AppHandleExt, AppSingleton};
-use crate::chordpack::load_default_chordpack;
+use crate::default_packages::load_default_packages;
 use crate::lock_file::AppLockFile;
 use crate::state::{
     AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordExecutionObservable,
@@ -189,15 +189,15 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
 
     if cfg!(debug_assertions) || is_first_run {
         log::debug!(
-            "Syncing default chordpack (development: {}, first run: {})",
+            "Syncing default packages (development: {}, first run: {})",
             cfg!(debug_assertions),
             is_first_run
         );
-        let sync_result = load_default_chordpack()
-            .and_then(|default_chordpack| store.ensure_pinned_repos(default_chordpack));
+        let sync_result = load_default_packages()
+            .and_then(|default_packages| store.ensure_pinned_repos(default_packages));
         if let Err(error) = sync_result {
             log::error!(
-                "Failed to sync the default chordpack; loading the existing active repositories: {error:#}"
+                "Failed to sync the default packages; loading the existing active repositories: {error:#}"
             );
         }
     }

@@ -1,0 +1,8 @@
+[
+	"@keychord/chords-chromium",
+	"@keychord/chords-vscode",
+	"@keychord/chords-jetbrains",
+	"@keychord/chords-terminal",
+	"@keychord/chords-warp",
+	"@keychord/chords-aerospace"
+]

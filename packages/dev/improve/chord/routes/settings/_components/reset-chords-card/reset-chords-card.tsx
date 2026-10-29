@@ -26,7 +26,7 @@ export function ResetChordsCard() {
 	const resetDefaultChordsMutation = useMutation({
 		mutationFn: taurpc.resetDefaultChords,
 		onSuccess: () => {
-			toast.success('Reset managed chord repos to the default chordpack.');
+			toast.success('Reset managed chord repos to the default packages.');
 		},
 	});
 
@@ -35,7 +35,7 @@ export function ResetChordsCard() {
 			<CardHeader>
 				<CardTitle>Reset Chords</CardTitle>
 				<CardDescription>
-					Replaces the managed git repo set with the bundled default chordpack. Local chord
+					Replaces the managed git repo set with the bundled default packages. Local chord
 					folders stay configured.
 				</CardDescription>
 			</CardHeader>
@@ -43,7 +43,7 @@ export function ResetChordsCard() {
 				<p className="text-sm text-muted-foreground">
 					Use this to get back to the pinned default repos from
 					{' '}
-					<code>data/chordpack.toml</code>
+					<code>data/default-packages.toml</code>
 					.
 				</p>
 			</CardContent>
@@ -58,7 +58,7 @@ export function ResetChordsCard() {
 						<AlertDialogHeader>
 							<AlertDialogTitle>Reset managed chord repos?</AlertDialogTitle>
 							<AlertDialogDescription>
-								This replaces the active managed repo set with the default pinned chordpack.
+								This replaces the active managed repo set with the pinned default packages.
 								Cached revisions are retained for reuse.
 							</AlertDialogDescription>
 						</AlertDialogHeader>

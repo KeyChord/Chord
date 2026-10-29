@@ -14,7 +14,8 @@
     "build": "bun --filter chord-tauri build",
     "build-dmg": "bun --filter chord-tauri build-dmg",
     "lint": "vp lint --fix apps/chord-tauri packages/dev/improve/chord",
-    "gen-types": "bun --filter chord-tauri gen-types"
+    "gen-types": "bun --filter chord-tauri gen-types",
+    "gen-official-chord-repos": "bun --filter @chord/dev.improve.chord.data.official-chord-repos gen"
   },
   "dependencies": {
     "@chord/com.npmjs.cmdk": "workspace:*",

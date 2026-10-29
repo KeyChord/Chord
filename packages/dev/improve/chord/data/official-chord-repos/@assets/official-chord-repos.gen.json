@@ -1,0 +1,56 @@
+[
+	{
+		"packageName": "@keychord/chords-chromium",
+		"displayName": "Chromium Chords",
+		"description": "Chords for Google Chrome and other Chromium-based browsers, including Brave, Edge, Opera and Vivaldi.",
+		"categories": [
+			"Browsers"
+		],
+		"url": "https://github.com/KeyChord/chords-chromium"
+	},
+	{
+		"packageName": "@keychord/chords-vscode",
+		"displayName": "VSCode Chords",
+		"description": "Chords for VSCode and its forks, including Cursor.",
+		"categories": [
+			"Editors"
+		],
+		"url": "https://github.com/KeyChord/chords-vscode"
+	},
+	{
+		"packageName": "@keychord/chords-jetbrains",
+		"displayName": "JetBrains Chords",
+		"description": "Chords for JetBrains IDEs, including IntelliJ IDEA, PyCharm, GoLand, WebStorm and RustRover.",
+		"categories": [
+			"Editors"
+		],
+		"url": "https://github.com/KeyChord/chords-jetbrains"
+	},
+	{
+		"packageName": "@keychord/chords-terminal",
+		"displayName": "Terminal Chords",
+		"description": "Tab chords for basic terminals: Terminal, iTerm2, Ghostty, WezTerm, Alacritty and Hyper.",
+		"categories": [
+			"Terminals"
+		],
+		"url": "https://github.com/KeyChord/chords-terminal"
+	},
+	{
+		"packageName": "@keychord/chords-warp",
+		"displayName": "Warp Chords",
+		"description": "Chords for the Warp terminal.",
+		"categories": [
+			"Terminals"
+		],
+		"url": "https://github.com/KeyChord/chords-warp"
+	},
+	{
+		"packageName": "@keychord/chords-aerospace",
+		"displayName": "AeroSpace Chords",
+		"description": "Global chords that run commands for the AeroSpace tiling window manager.",
+		"categories": [
+			"Window Management"
+		],
+		"url": "https://github.com/KeyChord/chords-aerospace"
+	}
+]

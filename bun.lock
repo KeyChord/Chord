@@ -1087,6 +1087,10 @@
     },
     "packages/dev/improve/chord/data/official-chord-repos": {
       "name": "@chord/dev.improve.chord.data.official-chord-repos",
+      "devDependencies": {
+        "@chord/dev.improve.chord.lib.github": "workspace:*",
+        "@types/bun": "^1.4.3",
+      },
     },
     "packages/dev/improve/chord/lib/chord-files": {
       "name": "@chord/dev.improve.chord.lib.chord-files",
@@ -1500,21 +1504,24 @@
         "@chord/com.npmjs.sonner": "workspace:*",
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
+        "@tauri-apps/plugin-opener": "^2.7.2",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
       "devDependencies": {
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
+        "react-dom": "^19.3.1",
       },
     },
     "packages/dev/improve/chord/routes/settings/chords/index": {

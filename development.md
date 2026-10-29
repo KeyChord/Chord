@@ -15,7 +15,7 @@ git clone https://github.com/KeyChord/Chord
 git clone --recurse-submodules https://github.com/KeyChord/rbun
 ```
 
-[KeyChord/chords](https://github.com/KeyChord/chords) is optional. When it is checked out next to `Chord`, development builds read Chord's core `0` bindings from it (see [Editing an installed chordpack locally](#editing-an-installed-chordpack-locally)).
+[KeyChord/chords](https://github.com/KeyChord/chords) is optional. When it is checked out next to `Chord`, development builds read Chord's core `0` bindings from it (see [Editing an installed package locally](#editing-an-installed-package-locally)).
 
 Then install the toolchain (see [Toolchain](#toolchain)), build Bun once, and start the app:
 
@@ -288,7 +288,7 @@ Finder bindings that explicitly launch or script Finder retain that behavior.
 See the [native fixture](apps/chord-tauri/src-tauri/tests/file-picker/README.md)
 for listener validation and `cargo test --lib file_picker_tests` for scope tests.
 
-## Editing an installed chordpack locally
+## Editing an installed package locally
 
 Chord's core `0` bindings live in the sibling checkout at
 `../chords/@keychord/chords-chord/chords/com/leonsilicon/chord/macos.toml`.
@@ -299,7 +299,7 @@ always loaded globally and cannot be disabled or replaced by another package sou
 
 In Settings → Chords, choose **Link Local Folder** on an installed chord repo and
 enter the absolute path to your local checkout. Its `package.json` name must match
-the installed package. Links also work for pinned chordpacks and persist across
+the installed package. Links also work for pinned default packages and persist across
 app restarts.
 
 Chord loads the linked folder in place. After editing chords or JavaScript, click
@@ -334,9 +334,22 @@ Packages with the same name are overridden in this order (last wins): default
 config packages, cached GitHub sources, standalone local monorepos, locally
 linked GitHub sources, and individual local folders. All local sources therefore
 take precedence over remote GitHub packages. Paths and repo slugs are sorted within each group for
-consistent results, so a GitHub monorepo such as `KeyChord/chords` does not replace the default
-chordpack's pinned `KeyChord/chords-menu` or `KeyChord/chords-com.apple`; remove those repos to use
+consistent results, so a GitHub monorepo such as `KeyChord/chords` does not replace the pinned
+default `KeyChord/chords-menu` or `KeyChord/chords-com.apple` repos; remove those repos to use
 the monorepo's copies. Duplicate package names within one monorepo are rejected.
+
+## Browse catalog
+
+Settings → Browse lists only the official packages named in
+`packages/dev/improve/chord/data/official-chord-repos/@assets/official-chord-packages.json`.
+Each listing's name, description, categories and repo URL come from the `displayName`,
+`description`, `categories` and `repository.url` fields of the package's `package.json` in the
+sibling `../chords` checkout. After changing that list or those fields, run
+`bun run gen-official-chord-repos` and commit the regenerated `official-chord-repos.gen.json`;
+a test fails while it is out of date (and is skipped without the sibling checkout).
+Community packages are not listed: Browse links to a GitHub search for the `chordpack` topic.
+The chords monorepo's mirror sync adds that topic to every official `chords-*` mirror, and
+community authors add it to their own repos.
 
 ## Stores
 
