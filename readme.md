@@ -11,15 +11,17 @@
 
 ## Setup
 
-Chord requires macOS _Accessibility Permissions_ so it can detect when you press `Caps Lock` + `Space`, which activates _Chord Mode_.
+### Permissions
+
+Chord requires macOS _Accessibility Permissions_ so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
 
 ### Chord Mode
 
 Once you enter _Chord Mode_, it stays active as long as `Space` is held down.
 
-> Only `Space` needs to be pressed; you can release `Caps Lock`.
+_Only `Space` needs to be pressed; you should release `Caps Lock` after pressing `Space`._
 
-In _Chord Mode_, keys you type will be interpreted as chord inputs and won't be passed through to the focused application.
+In _Chord Mode_, any keys you type will be intercepted by Chord as input. These key events won't be passed to the focused application.
 
 ### Triggering a Chord
 
@@ -27,7 +29,9 @@ Chords can only be triggered in _Chord Mode_, so make sure to keep `Space` held 
 
 Then, type out the chord's letters and press `Caps Lock` to trigger it.
 
-> As an example, with `Space` held down, typing `0,<caps>` opens Chord's settings window.
+> For example, with `Space` held down, you can type:
+> <kbd>0</kbd> <kbd>,</kbd> <kbd>⇪</kbd>
+> and it'll open Chord's settings window.
 
 Once you're done, you can release `Space` to exit _Chord Mode_.
 

@@ -725,7 +725,6 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-fs",
  "tauri-plugin-log",
- "tauri-plugin-macos-permissions",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
@@ -6265,21 +6264,6 @@ dependencies = [
  "tauri-plugin",
  "thiserror 2.0.21",
  "time",
-]
-
-[[package]]
-name = "tauri-plugin-macos-permissions"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5607e0707d37d7b20e287cf0ce396d1efebe7b833b8e9cbd2ea4257091d9c604"
-dependencies = [
- "macos-accessibility-client 0.0.1",
- "objc2",
- "objc2-foundation",
- "serde",
- "tauri",
- "tauri-plugin",
- "thiserror 2.0.21",
 ]
 
 [[package]]

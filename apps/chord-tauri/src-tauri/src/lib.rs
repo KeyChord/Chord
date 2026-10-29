@@ -201,7 +201,6 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
                     .build()
             }
         })
-        .plugin(tauri_plugin_macos_permissions::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
