@@ -1,7 +1,7 @@
 {
 	"name": "@chord/dev.improve.chord.components.ui.label",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"imports": {
 		"#label": "./label.tsx"
 	},
@@ -9,8 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/com.npmjs.utils-cn": "workspace:*",
-		"radix-ui": "^1.8.1",
+		"@heroui/react": "^3.2.7",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

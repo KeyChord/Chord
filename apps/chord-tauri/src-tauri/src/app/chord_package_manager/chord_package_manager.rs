@@ -418,7 +418,9 @@ file = 42
 
 impl ChordPackageManager {
     pub(super) fn init_core_package(&self) -> Result<()> {
-        let package = super::chord_package_registry::core::load_core_package()?;
+        let package = super::chord_package_registry::core::load_core_package(
+            &self.registry.local.package_store()?,
+        )?;
         let (hints, halt_template) = super::chord_package_registry::core::meta_configuration(&package)?;
         self.packages.write().insert(package.name.clone(), package.clone());
         self.update_executable_app_ids();
@@ -480,6 +482,72 @@ impl ChordPackageManager {
         result
     }
 
+    /// Changes every package before a single reload, so bulk approval does not reload once per
+    /// package.
+    pub async fn set_package_approvals(&self, identities: &[String], approved: bool) -> Result<()> {
+        let _reload_guard = self.reload_lock.lock().await;
+        let available = self.observable.get_state()?.third_party_packages;
+        let packages = identities
+            .iter()
+            .map(|identity| {
+                available
+                    .iter()
+                    .find(|package| &package.identity == identity)
+                    .context("Package is no longer available. Reload Chord and review it again.")
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let targets = packages
+            .iter()
+            .map(|package| (Path::new(&package.path), package.identity.as_str()))
+            .collect::<Vec<_>>();
+        self.registry.trust.set_approvals(&targets, approved)?;
+        if !approved {
+            // Revoke before reading any sources: even a failed reload must not leave the
+            // package's old shortcuts, lifecycle callbacks, or supervised workers active.
+            if let Err(error) = self.handle.app_state().chord_mode_manager().stop_loops() {
+                // Cancellation happens before publishing the loop state; keep revoking even
+                // if the UI could not be notified.
+                log::warn!("Failed to publish stopped loops while revoking approval: {error:#}");
+            }
+            for package in &packages {
+                {
+                    let mut loaded = self.packages.write();
+                    if let Some(mut removed) = loaded.remove(&package.name) {
+                        if package.name == CORE_CHORD_PACKAGE {
+                            // Keep the already compiled protected bindings without reading disk:
+                            // revoking an override must still work if its sources disappeared.
+                            removed.js_package = None;
+                            removed
+                                .compiled_chords_files
+                                .retain(|path, _| is_core_chords_file(&package.name, path));
+                            removed
+                                .raw_chords_files
+                                .retain(|path, _| is_core_chords_file(&package.name, path));
+                            removed.global_chords.retain(|chord| {
+                                is_core_chords_file(&package.name, &chord.chords_file_pathslug)
+                            });
+                            loaded.insert(removed.name.clone(), removed);
+                        }
+                    }
+                }
+                self.package_roots.write().remove(&package.name);
+            }
+            let retained = handler_ids(&self.packages.read());
+            bun_handlers::retain_runtime_registrations(self.handle.clone(), retained).await?;
+            self.update_executable_app_ids();
+            self.observable.set_state(|mut state| {
+                state.packages = self.packages.read().values().cloned().collect();
+                for entry in &mut state.third_party_packages {
+                    if identities.contains(&entry.identity) {
+                        entry.approved = false;
+                    }
+                }
+                state
+            })?;
+        }
+        self.reload_once(&[]).await
+    }
+
     fn last_reload_result(&self) -> Result<()> {
         match self.last_reload_error.lock().clone() {
             Some(error) => Err(anyhow::anyhow!(error)),
@@ -492,6 +560,7 @@ impl ChordPackageManager {
         let ImportedPackages {
             packages: raw_chord_packages,
             personal: personal_packages,
+            third_party: third_party_packages,
         } = self.registry.import_all_packages()?;
         let previous_roots = self.package_roots.read().clone();
 
@@ -537,7 +606,19 @@ impl ChordPackageManager {
 
         // Ordinary reloads retain usable files from partially broken packages. A newly
         // selected package must load completely before its selection can be accepted.
-        ensure_selected_packages_loaded(required_packages, &package_errors)?;
+        // Selecting a source is distinct from trusting its executable code. Keep newly
+        // selected third-party packages visible for approval without compiling them.
+        let required = required_packages
+            .iter()
+            .filter(|name| {
+                package_errors.contains_key(*name)
+                    || !third_party_packages
+                        .iter()
+                        .any(|package| &package.name == *name && !package.approved)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        ensure_selected_packages_loaded(&required, &package_errors)?;
         let core = chord_packages.get(CORE_CHORD_PACKAGE).context("Chord's core package must remain loaded")?;
         let (hints, halt_template) = super::chord_package_registry::core::meta_configuration(core)?;
 
@@ -553,6 +634,7 @@ impl ChordPackageManager {
             packages: observable_packages,
             errors: package_errors,
             personal_packages,
+            third_party_packages,
         });
 
         if let Err(error) =
@@ -595,7 +677,7 @@ impl ChordPackageManager {
         self.package_roots
             .read()
             .iter()
-            .filter(|(_, root)| path.starts_with(root))
+            .filter(|(_, root)| super::package_module_relative_path(root, path).is_some())
             .max_by_key(|(_, root)| root.as_os_str().len())
             .map(|(name, root)| (name.clone(), root.clone()))
     }
@@ -607,6 +689,10 @@ impl ChordPackageManager {
         let name = raw_chord_package.package_name();
         log::debug!("loading package {}", name);
         let root = raw_chord_package.root.clone();
+        anyhow::ensure!(
+            self.registry.local.package_store()?.contains(&root),
+            "Package {name} must load from ~/.chord/packages"
+        );
 
         let mut raw_chords_files = HashMap::new();
         let mut compiled_chords_files = HashMap::new();

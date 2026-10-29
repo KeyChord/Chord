@@ -1,0 +1,32 @@
+{
+  "name": "@chord/dev.improve.chord.routes.settings._components.personal-chords",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#personal-chords-file": "./personal-chords-file.ts",
+    "#personal-chords": "./personal-chords.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1",
+    "@chord/dev.improve.chord.components.ui.select": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react-dom": "^19.3.1"
+  }
+}

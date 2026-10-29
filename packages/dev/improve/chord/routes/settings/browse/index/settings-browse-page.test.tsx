@@ -4,7 +4,7 @@ import { renderToString } from 'react-dom/server';
 
 // Mutations never run during server rendering; TauRPC needs the browser's Proxy constructor.
 const previousWindow = globalThis.window;
-globalThis.window = { Proxy } as unknown as Window & typeof globalThis;
+globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { SettingsBrowsePageContent } = await import('#settings-browse-page');
 afterAll(() => {
 	globalThis.window = previousWindow;
@@ -87,6 +87,6 @@ test('install all is disabled once every repo is installed', () => {
 test('community packages are behind a trust warning, not a direct link', () => {
 	const html = render({});
 	expect(html).toContain('>Community chord packages</h3>');
-	expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>(?:(?!<button).)*?Search GitHub<\/button>/);
+	expect(html).toMatch(/<button[^>]*aria-expanded="false"[^>]*>(?:(?!<button).)*?Search GitHub<\/button>/);
 	expect(html).not.toContain('topic%3Achordpack');
 });

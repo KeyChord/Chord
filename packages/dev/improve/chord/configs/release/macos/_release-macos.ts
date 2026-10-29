@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+/* eslint-disable no-console -- This release CLI writes progress and usage to stdout. */
 /**
  * macOS release pipeline for the full-power build.
  *
@@ -18,19 +19,27 @@ import { $ } from "bun";
 import fs from "node:fs";
 import path from "node:path";
 
+if (process.argv.slice(2).some((arg) => arg === "--help" || arg === "-h")) {
+  console.log("Usage: vpx _release-macos\n\nBuild, sign and package the production macOS app.");
+  process.exit(0);
+}
+
 const repoRoot = path.resolve(import.meta.dir, "../../../../../../..");
 const appDir = path.join(repoRoot, "apps/chord-tauri");
 const srcTauri = path.join(appDir, "src-tauri");
 const config = await Bun.file(path.join(srcTauri, "tauri.conf.json")).json();
 const identity: string | undefined =
-	process.env.APPLE_SIGNING_IDENTITY ?? config.bundle?.macOS?.signingIdentity;
+  process.env.APPLE_SIGNING_IDENTITY ?? config.bundle?.macOS?.signingIdentity;
 if (!identity) {
-	throw new Error("no signing identity: set APPLE_SIGNING_IDENTITY or bundle.macOS.signingIdentity");
+  throw new Error(
+    "no signing identity: set APPLE_SIGNING_IDENTITY or bundle.macOS.signingIdentity",
+  );
 }
 const productName: string = config.productName ?? "Chord";
 const timestampArgs = process.env.CODESIGN_NO_TIMESTAMP ? [] : ["--timestamp"];
 
-await $`bun tauri build --bundles app`.cwd(appDir);
+const tauriScript = path.join(appDir, "_tauri.ts");
+await $`${process.execPath} ${tauriScript} build --bundles app`.cwd(appDir);
 
 const bundleDir = path.join(srcTauri, "target/release/bundle/macos");
 const app = path.join(bundleDir, `${productName}.app`);
@@ -38,7 +47,7 @@ const app = path.join(bundleDir, `${productName}.app`);
 // `bundle.macOS.frameworks` and signs it, the app's rpath points at Contents/Frameworks.
 const bunRuntime = path.join(app, "Contents/Frameworks/libbun_embed.dylib");
 if (!(await Bun.file(bunRuntime).exists())) {
-	throw new Error(`embedded Bun runtime missing from bundle: ${bunRuntime}`);
+  throw new Error(`embedded Bun runtime missing from bundle: ${bunRuntime}`);
 }
 
 console.log("re-signing app bundle with Entitlements.plist");
@@ -57,18 +66,18 @@ const updaterArchive = path.join(outDir, `${productName}.app.tar.gz`);
 console.log(`creating updater artifact ${updaterArchive}`);
 await $`tar -czf ${updaterArchive} -C ${bundleDir} ${productName}.app`;
 if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
-	await $`bun tauri signer sign ${updaterArchive}`.cwd(appDir);
+  await $`${process.execPath} ${tauriScript} signer sign ${updaterArchive}`.cwd(appDir);
 } else {
-	console.log("TAURI_SIGNING_PRIVATE_KEY not set; updater artifact left unsigned");
+  console.log("TAURI_SIGNING_PRIVATE_KEY not set; updater artifact left unsigned");
 }
 
 if (process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID) {
-	console.log("notarizing");
-	await $`xcrun notarytool submit ${dmg} --apple-id ${process.env.APPLE_ID} --password ${process.env.APPLE_PASSWORD} --team-id ${process.env.APPLE_TEAM_ID} --wait`;
-	await $`xcrun stapler staple ${app}`;
-	await $`xcrun stapler staple ${dmg}`;
+  console.log("notarizing");
+  await $`xcrun notarytool submit ${dmg} --apple-id ${process.env.APPLE_ID} --password ${process.env.APPLE_PASSWORD} --team-id ${process.env.APPLE_TEAM_ID} --wait`;
+  await $`xcrun stapler staple ${app}`;
+  await $`xcrun stapler staple ${dmg}`;
 } else {
-	console.log("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not set; skipping notarization");
+  console.log("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not set; skipping notarization");
 }
 
 console.log(`done: ${outDir}`);

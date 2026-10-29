@@ -4,7 +4,7 @@
 	"version": "0.0.0",
 	"private": true,
 	"bin": {
-		"release-macos": "./_release-macos.ts"
+		"_release-macos": "./_release-macos.ts"
 	},
 	"exports": {
 		".": "./+.ts"

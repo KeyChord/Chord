@@ -253,6 +253,15 @@ export interface PersonalPackageState {
 	error?: string;
 }
 
+/** Approval belongs to a location, never to a package's self-reported name. */
+export interface ThirdPartyPackage {
+	name: string;
+	path: string;
+	/** Includes the resolved target so replacing a symlink requires approval again. */
+	identity: string;
+	approved: boolean;
+}
+
 export interface ChordPackageManagerState {
 	packages: ChordPackage[];
 	/**
@@ -262,6 +271,8 @@ export interface ChordPackageManagerState {
 	errors: Record<string, string[]>;
 	/** The folders in `~/.chord/packages`, in priority order. */
 	personalPackages: PersonalPackageState[];
+	/** Packages outside the official namespace, including those blocked pending approval. */
+	thirdPartyPackages: ThirdPartyPackage[];
 }
 
 export interface ChordPackageStoreEntry {

@@ -1,3 +1,4 @@
+use super::super::PackageStore;
 use crate::app::state::AppSingleton;
 use crate::git::{
     GitHubRepoRef, materialize_repo_at_revision, materialize_repo_head, repo_head_sha,
@@ -27,39 +28,25 @@ impl GitReposStore {
 
         let mut changed = false;
         for repo in repos.values_mut() {
-            let repo_ref = GitHubRepoRef {
-                owner: repo.owner.clone(),
-                name: repo.name.clone(),
-            };
-            let Ok(resolved_rev) = repo_head_sha(&repo.local_abspath) else {
+            let Ok(resolved_rev) = stored_checkout_revision(repo, &repos_root) else {
                 log::warn!(
                     "Unable to resolve cached HEAD for {}; leaving its stored path unchanged",
                     repo.slug
                 );
                 continue;
             };
-            let expected_path = repo_ref.local_abspath(&repos_root, &resolved_rev);
-            if repo.local_abspath != expected_path {
-                if repo.local_abspath.exists() && !expected_path.exists() {
-                    log::info!(
-                        "Moving repo {} from {} to {}",
-                        repo.slug,
-                        repo.local_abspath.display(),
-                        expected_path.display()
+            match migrate_checkout(repo, &repos_root, &resolved_rev) {
+                Ok(migrated) => changed |= migrated,
+                Err(error) => {
+                    log::error!(
+                        "Cannot migrate {} into ~/.chord/packages: {error:#}",
+                        repo.slug
                     );
-                    if let Some(parent) = expected_path.parent() {
-                        let _ = fs::create_dir_all(parent);
-                    }
-                    if let Err(e) = fs::rename(&repo.local_abspath, &expected_path) {
-                        log::error!("Failed to move repo {}: {}", repo.slug, e);
-                    }
+                    continue;
                 }
-                repo.local_abspath = expected_path;
-                changed = true;
             }
-            repo.head_short_sha = Some(resolved_rev.chars().take(7).collect());
             let was_monorepo = repo.is_monorepo;
-            if let Err(error) = detect_monorepo(repo) {
+            if let Err(error) = detect_monorepo(&PackageStore::for_app(&self.handle)?, repo) {
                 log::warn!("Unable to detect packages in {}: {error}", repo.slug);
             }
             changed |= repo.is_monorepo != was_monorepo;
@@ -132,24 +119,39 @@ impl GitReposStore {
     }
 
     pub fn github_repos_dir(&self) -> Result<PathBuf> {
-        Ok(self.app_cache_dir()?.join("repos/github.com"))
+        Ok(PackageStore::for_app(&self.handle)?.github_dir())
     }
 
     pub fn add_repo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
-        if let Some(repo) = self.observable.get_state()?.repos.get(&repo_ref.slug()) {
-            if repo.linked_local_path.is_some() || repo.is_monorepo {
-                return Ok(repo.clone());
-            }
+        let repo_ref = GitHubRepoRef::parse(&repo_ref.slug())?;
+        ensure_official_install(&repo_ref)?;
+        if let Some(repo) = self
+            .observable
+            .get_state()?
+            .repos
+            .values()
+            .find(|repo| repo.slug.eq_ignore_ascii_case(&repo_ref.slug()))
+        {
+            // Adding an already installed package is idempotent, including pinned versions.
+            return Ok(repo.clone());
         }
         let repos_root = self.github_repos_dir()?;
         let mut repo = materialize_repo_head(&repo_ref, &repos_root)?;
-        detect_monorepo(&mut repo)?;
+        detect_monorepo(&PackageStore::for_app(&self.handle)?, &mut repo)?;
         self.upsert(repo.clone())?;
         Ok(repo)
     }
 
     pub fn add_monorepo(&self, repo_ref: GitHubRepoRef) -> Result<GitRepo> {
-        if let Some(existing) = self.observable.get_state()?.repos.get(&repo_ref.slug()) {
+        let repo_ref = GitHubRepoRef::parse(&repo_ref.slug())?;
+        ensure_official_install(&repo_ref)?;
+        if let Some(existing) = self
+            .observable
+            .get_state()?
+            .repos
+            .values()
+            .find(|repo| repo.slug.eq_ignore_ascii_case(&repo_ref.slug()))
+        {
             anyhow::ensure!(
                 existing.is_monorepo,
                 "This repository is already added as a single package. Remove it before adding it as a monorepo."
@@ -157,7 +159,10 @@ impl GitReposStore {
             return Ok(existing.clone());
         }
         let mut repo = materialize_repo_head(&repo_ref, &self.github_repos_dir()?)?;
-        super::super::validate_monorepo_path(&repo.local_abspath.to_string_lossy())?;
+        super::super::validate_monorepo_path(
+            &PackageStore::for_app(&self.handle)?,
+            &repo.local_abspath.to_string_lossy(),
+        )?;
         repo.is_monorepo = true;
         self.upsert(repo.clone())?;
         Ok(repo)
@@ -183,7 +188,7 @@ impl GitReposStore {
 
         let mut repo = materialize_repo_head(&repo_ref, &repos_root)?;
         repo.is_monorepo = current_repo.is_monorepo;
-        detect_monorepo(&mut repo)?;
+        detect_monorepo(&PackageStore::for_app(&self.handle)?, &mut repo)?;
         self.upsert(repo.clone())?;
         Ok(repo)
     }
@@ -197,11 +202,13 @@ impl GitReposStore {
             .collect::<HashSet<_>>();
 
         let mut next_repos = HashMap::with_capacity(repos.len());
-        for spec in repos {
+        for mut spec in repos {
+            spec.repo_ref = GitHubRepoRef::parse(&spec.repo_ref.slug())?;
+            spec.rev = crate::git::normalize_revision(&spec.rev)?;
             let repo_path = spec.repo_ref.local_abspath(&repos_root, &spec.rev);
             materialize_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let mut repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
-            detect_monorepo(&mut repo)?;
+            detect_monorepo(&PackageStore::for_app(&self.handle)?, &mut repo)?;
             next_repos.insert(repo.slug.clone(), repo);
         }
 
@@ -226,7 +233,9 @@ impl GitReposStore {
         let state = self.observable.get_state()?;
         let mut current_repos = state.repos.clone();
 
-        for spec in repos {
+        for mut spec in repos {
+            spec.repo_ref = GitHubRepoRef::parse(&spec.repo_ref.slug())?;
+            spec.rev = crate::git::normalize_revision(&spec.rev)?;
             let repo_path = spec.repo_ref.local_abspath(&repos_root, &spec.rev);
             materialize_repo_at_revision(&spec.repo_ref, &repo_path, &spec.rev)?;
             let mut repo = spec.repo_ref.into_pinned_repo(&repos_root, spec.rev);
@@ -236,7 +245,7 @@ impl GitReposStore {
             repo.is_monorepo = current_repos
                 .get(&repo.slug)
                 .is_some_and(|previous| previous.is_monorepo);
-            detect_monorepo(&mut repo)?;
+            detect_monorepo(&PackageStore::for_app(&self.handle)?, &mut repo)?;
             current_repos.insert(repo.slug.clone(), repo);
         }
 
@@ -262,9 +271,16 @@ impl GitReposStore {
         repo.linked_local_path = path
             .map(|path| {
                 if repo.is_monorepo {
-                    super::super::validate_monorepo_path(&path)
+                    super::super::validate_monorepo_path(
+                        &PackageStore::for_app(&self.handle)?,
+                        &path,
+                    )
                 } else {
-                    validate_local_link(&repo.local_abspath, &path)
+                    validate_local_link(
+                        &PackageStore::for_app(&self.handle)?,
+                        &repo.local_abspath,
+                        &path,
+                    )
                 }
             })
             .transpose()?;
@@ -273,9 +289,76 @@ impl GitReposStore {
     }
 }
 
+fn ensure_official_install(repo: &GitHubRepoRef) -> Result<()> {
+    anyhow::ensure!(super::git::is_official_repo(&repo.slug()),
+        "Third-party packages must be downloaded and extracted manually into ~/.chord/packages/<name>. Quit and restart Chord, then approve the package in the Chords tab. Only install packages from people you trust or after auditing their code.");
+    Ok(())
+}
+
+#[cfg(test)]
+mod installation_trust_tests {
+    use super::*;
+
+    #[test]
+    fn third_party_repositories_require_manual_installation_before_any_download() {
+        for source in ["someone/chords-test", "https://github.com/not-keychord/chords-menu"] {
+            let error = ensure_official_install(&GitHubRepoRef::parse(source).unwrap()).unwrap_err().to_string();
+            assert!(error.contains("~/.chord/packages/<name>"));
+            assert!(error.contains("Quit and restart Chord"));
+            assert!(error.contains("approve the package in the Chords tab"));
+        }
+        ensure_official_install(&GitHubRepoRef::parse("KeyChord/chords-menu").unwrap()).unwrap();
+    }
+}
+
+pub(crate) fn stored_checkout_revision(repo: &GitRepo, root: &std::path::Path) -> Result<String> {
+    if let Ok(revision) = repo_head_sha(&repo.local_abspath) {
+        return Ok(revision);
+    }
+    // Recover if the app stopped after moving a checkout but before saving repos.json.
+    let revision = repo
+        .pinned_rev
+        .as_deref()
+        .or_else(|| {
+            repo.local_abspath
+                .file_name()
+                .and_then(|name| name.to_str())
+        })
+        .context("Repository has no recoverable revision")?;
+    let revision = crate::git::normalize_revision(revision)?;
+    let reference = GitHubRepoRef::parse(&format!("{}/{}", repo.owner, repo.name))?;
+    crate::git::verify_repo_at_revision(&reference.local_abspath(root, &revision), &revision)?;
+    Ok(revision)
+}
+
+pub(crate) fn migrate_checkout(
+    repo: &mut GitRepo,
+    root: &std::path::Path,
+    revision: &str,
+) -> Result<bool> {
+    let revision = crate::git::normalize_revision(revision)?;
+    let reference = GitHubRepoRef::parse(&format!("{}/{}", repo.owner, repo.name))?;
+    let expected = reference.local_abspath(root, &revision);
+    let changed = repo.local_abspath != expected;
+    if changed {
+        if expected.exists() {
+            crate::git::verify_repo_at_revision(&expected, &revision)?;
+        } else {
+            super::super::package_store::migrate_directory(&repo.local_abspath, &expected)?;
+        }
+        repo.local_abspath = expected;
+    }
+    let short = Some(revision.chars().take(7).collect());
+    let changed = changed || repo.head_short_sha != short;
+    repo.head_short_sha = short;
+    Ok(changed)
+}
+
 fn ensure_repo_removable(slug: &str) -> Result<()> {
-    anyhow::ensure!(!slug.eq_ignore_ascii_case(crate::models::CORE_CHORD_REPO),
-        "Chord's core bindings are required and cannot be removed");
+    anyhow::ensure!(
+        !slug.eq_ignore_ascii_case(crate::models::CORE_CHORD_REPO),
+        "Chord's core bindings are required and cannot be removed"
+    );
     Ok(())
 }
 
@@ -285,33 +368,39 @@ mod core_protection_tests {
 
     #[test]
     fn core_repo_cannot_be_removed_but_other_pinned_repos_can() {
-        for slug in ["KeyChord/chords-chord", "keychord/chords-chord", "KEYCHORD/CHORDS-CHORD"] {
+        for slug in [
+            "KeyChord/chords-chord",
+            "keychord/chords-chord",
+            "KEYCHORD/CHORDS-CHORD",
+        ] {
             assert!(ensure_repo_removable(slug).is_err());
         }
         ensure_repo_removable("KeyChord/chords-os").unwrap();
     }
 }
 
-fn detect_monorepo(repo: &mut GitRepo) -> Result<()> {
+fn detect_monorepo(store: &PackageStore, repo: &mut GitRepo) -> Result<()> {
     // A standalone package owns its root chords/ tree, including any vendored packages.
     if repo.is_monorepo
         || (!repo.local_abspath.join("chords").is_dir()
             && !super::super::discover_monorepo_packages(&repo.local_abspath)?.is_empty())
     {
-        super::super::validate_monorepo_path(&repo.local_abspath.to_string_lossy())?;
+        super::super::validate_monorepo_path(store, &repo.local_abspath.to_string_lossy())?;
         repo.is_monorepo = true;
     }
     Ok(())
 }
 
-fn validate_local_link(cached_path: &std::path::Path, path: &str) -> Result<PathBuf> {
-    use super::super::LocalPackageRegistry;
-
+fn validate_local_link(
+    store: &PackageStore,
+    cached_path: &std::path::Path,
+    path: &str,
+) -> Result<PathBuf> {
     anyhow::ensure!(!path.trim().is_empty(), "Folder path cannot be empty");
     let path = fs::canonicalize(path.trim()).context("Failed to access linked folder")?;
     anyhow::ensure!(path.is_dir(), "{} is not a folder", path.display());
-    let original = LocalPackageRegistry::import_from_local_folder(cached_path)?;
-    let linked = LocalPackageRegistry::import_from_local_folder(&path)?;
+    let original = store.import_package(cached_path)?;
+    let linked = store.import_package(&path)?;
     anyhow::ensure!(
         original.package_name() == linked.package_name(),
         "Expected package {}, but this folder contains {}. Use a checkout with the same package.json name.",
@@ -382,6 +471,9 @@ mod local_link_tests {
 
     struct Fixture(PathBuf);
     impl Fixture {
+        fn store(&self) -> PackageStore {
+            PackageStore::new(self.0.join(".store"))
+        }
         fn new() -> Self {
             let root =
                 std::env::temp_dir().join(format!("chord-local-link-{}", uuid::Uuid::new_v4()));
@@ -424,14 +516,14 @@ mod local_link_tests {
         ] {
             let path = root.join(folder);
             fs::create_dir_all(path.join("chords")).unwrap();
-            detect_monorepo(&mut repo).unwrap();
+            detect_monorepo(&fixture.store(), &mut repo).unwrap();
             assert!(repo.is_monorepo);
             fs::remove_dir_all(path).unwrap();
             repo.is_monorepo = false;
         }
         fs::create_dir_all(root.join("utility")).unwrap();
         fs::create_dir_all(root.join("node_modules/chords-dependency")).unwrap();
-        detect_monorepo(&mut repo).unwrap();
+        detect_monorepo(&fixture.store(), &mut repo).unwrap();
         assert!(!repo.is_monorepo);
     }
 
@@ -441,7 +533,7 @@ mod local_link_tests {
         let root = fixture.0.join("cached");
         fs::create_dir_all(root.join("chords/@test/chords-vendored")).unwrap();
         let mut repo = test_repo(root);
-        detect_monorepo(&mut repo).unwrap();
+        detect_monorepo(&fixture.store(), &mut repo).unwrap();
         assert!(!repo.is_monorepo);
     }
 
@@ -455,7 +547,7 @@ mod local_link_tests {
             fs::write(path.join("package.json"), r#"{"name":"@test/duplicate"}"#).unwrap();
         }
         let mut repo = test_repo(root);
-        assert!(detect_monorepo(&mut repo).is_err());
+        assert!(detect_monorepo(&fixture.store(), &mut repo).is_err());
         assert!(!repo.is_monorepo);
     }
 
@@ -464,7 +556,12 @@ mod local_link_tests {
         let fixture = Fixture::new();
         let cached = fixture.0.join("cached");
         let checkout = fixture.0.join("my checkout");
-        let path = validate_local_link(&cached, &format!(" {} ", checkout.display())).unwrap();
+        let path = validate_local_link(
+            &fixture.store(),
+            &cached,
+            &format!(" {} ", checkout.display()),
+        )
+        .unwrap();
         assert_eq!(path, fs::canonicalize(&checkout).unwrap());
         for contents in ["first edit", "second edit"] {
             fs::write(checkout.join("chords/macos.toml"), contents).unwrap();
@@ -478,7 +575,7 @@ mod local_link_tests {
         }
         fs::write(checkout.join("package.json"), r#"{"name":"@test/wrong"}"#).unwrap();
         assert!(
-            validate_local_link(&cached, checkout.to_str().unwrap())
+            validate_local_link(&fixture.store(), &cached, checkout.to_str().unwrap())
                 .unwrap_err()
                 .to_string()
                 .contains("Expected package")
@@ -495,7 +592,7 @@ mod local_link_tests {
             fixture.0.join("missing").display().to_string(),
             cached.join("package.json").display().to_string(),
         ] {
-            assert!(validate_local_link(&cached, &path).is_err());
+            assert!(validate_local_link(&fixture.store(), &cached, &path).is_err());
         }
     }
 

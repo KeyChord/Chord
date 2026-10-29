@@ -9,7 +9,6 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/com.npmjs.sonner": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
@@ -24,7 +23,8 @@
 		"@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
 		"@tauri-apps/plugin-opener": "^2.7.2",
 		"lucide-react": "^1.57.0",
-		"react": "^19.3.1"
+		"react": "^19.3.1",
+		"@chord/dev.improve.chord.components.ui.toast": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/react": "^19.3.0",

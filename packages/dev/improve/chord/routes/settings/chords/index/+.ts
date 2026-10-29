@@ -1,1 +1,1 @@
-export { SettingsChordsPage } from '#settings-chords-page';
+export { SettingsChordsPage } from "#settings-chords-page";

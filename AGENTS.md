@@ -29,7 +29,7 @@ This repo is a Bun workspace monorepo that follows the [flatcap](https://github.
 - `packages/dev/improve/chord/api/**`, `hooks/**`, `lib/**`, and `data/**` — narrowly scoped shared packages.
 - `packages/dev/improve/chord/configs/**` — tooling packages (e.g. patching codemods)
 
-Run app commands from the repo root with `bun run dev`, `bun run build`, etc., or `cd apps/chord-tauri` for direct access.
+Run app commands from the repo root with `vpx _dev`, `vpx _build`, etc. Project commands are executable `_*.ts` files, registered under matching underscore-prefixed names in their workspace package's `bin` field. Expose the owning package as a root dependency so `vpx _*` works from the repo root. Keep command logic out of `package.json` scripts.
 
 ## Flatcap packages
 

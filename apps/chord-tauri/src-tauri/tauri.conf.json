@@ -4,9 +4,9 @@
 	"version": "0.1.0",
 	"identifier": "com.leonsilicon.chord",
 	"build": {
-		"beforeDevCommand": "bun run vite-dev",
+		"beforeDevCommand": "bun ./_vite-dev.ts",
 		"devUrl": "http://localhost:1420",
-		"beforeBuildCommand": "bun run build",
+		"beforeBuildCommand": "bun ./_build.ts",
 		"frontendDist": "../dist"
 	},
 	"plugins": {

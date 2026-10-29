@@ -1,33 +1,28 @@
-'use client';
-
-import { Collapsible as CollapsiblePrimitive } from 'radix-ui';
+import { Disclosure } from "@heroui/react/disclosure";
+import type { ComponentProps } from "react";
 
 function Collapsible({
-	...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
-	return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />;
+  open,
+  defaultOpen,
+  onOpenChange,
+  ...props
+}: Omit<
+  ComponentProps<typeof Disclosure>,
+  "isExpanded" | "defaultExpanded" | "onExpandedChange"
+> & {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  return (
+    <Disclosure
+      {...props}
+      isExpanded={open}
+      defaultExpanded={defaultOpen}
+      onExpandedChange={onOpenChange}
+    />
+  );
 }
-
-function CollapsibleTrigger({
-	...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleTrigger>) {
-	return (
-		<CollapsiblePrimitive.CollapsibleTrigger
-			data-slot="collapsible-trigger"
-			{...props}
-		/>
-	);
-}
-
-function CollapsibleContent({
-	...props
-}: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {
-	return (
-		<CollapsiblePrimitive.CollapsibleContent
-			data-slot="collapsible-content"
-			{...props}
-		/>
-	);
-}
-
-export { Collapsible, CollapsibleContent, CollapsibleTrigger };
+const CollapsibleTrigger = Disclosure.Trigger;
+const CollapsibleContent = Disclosure.Content;
+export { Collapsible, CollapsibleTrigger, CollapsibleContent };

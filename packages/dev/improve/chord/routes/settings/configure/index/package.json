@@ -9,7 +9,6 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

@@ -1,7 +1,7 @@
 {
 	"name": "@chord/dev.improve.chord.components.ui.collapsible",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"imports": {
 		"#collapsible": "./collapsible.tsx"
 	},
@@ -9,7 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"radix-ui": "^1.8.1",
+		"@heroui/react": "^3.2.7",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

@@ -1,4 +1,4 @@
-use crate::app::chord_package_manager::{ChordPackage, PersonalPackageState};
+use crate::app::chord_package_manager::{ChordPackage, PersonalPackageState, ThirdPartyPackage};
 use crate::define_observable;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -19,6 +19,8 @@ pub struct ChordPackageManagerState {
     pub errors: HashMap<String, Vec<String>>,
     /// The folders in `~/.chord/packages`, in priority order.
     pub personal_packages: Vec<PersonalPackageState>,
+    /// Packages outside the official namespace, including those blocked pending approval.
+    pub third_party_packages: Vec<ThirdPartyPackage>,
 }
 
 define_observable! {

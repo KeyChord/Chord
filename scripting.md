@@ -420,6 +420,10 @@ Chord registers the `chord:` URL scheme on macOS so scripts and launcher tools c
 - `show-settings`
 - `reload-config`
 - `reload-configs`
+- `add-package?repo=<owner/name>` — installs a package from the official Browse
+  catalog, opens Settings → Browse, and reloads packages. Existing installations
+  keep their selected version. Links received during startup wait for the initial
+  package load. Other repositories must be added through Settings → Chords.
 
 ### Examples
 
@@ -435,6 +439,9 @@ open --background 'chord://settings'
 
 # Reload chord configs
 open --background 'chord:reload-config'
+
+# Install an official package from the website or a launcher
+open 'chord://add-package?repo=KeyChord%2Fchords-vscode'
 ```
 
 ## CLI

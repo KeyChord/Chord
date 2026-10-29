@@ -1,7 +1,7 @@
 {
 	"name": "@chord/dev.improve.chord.components.ui.dialog",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"imports": {
 		"#dialog": "./dialog.tsx"
 	},
@@ -9,10 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/com.npmjs.utils-cn": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"lucide-react": "^1.57.0",
-		"radix-ui": "^1.8.1",
+		"@heroui/react": "^3.2.7",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

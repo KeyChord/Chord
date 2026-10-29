@@ -1,5 +1,5 @@
 import { MonorepoPackagePicker } from "#monorepo-package-picker";
-import { toast } from "@chord/com.npmjs.sonner";
+import { toast } from "@chord/dev.improve.chord.components.ui.toast";
 import { useMutation, useQueryClient } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
 } from "@chord/dev.improve.chord.components.ui.dropdown-menu";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import { StateQueries, useGitRepoStoreState } from "@chord/dev.improve.chord.lib.state";
@@ -26,24 +25,32 @@ import { Ellipsis, Link, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-export function ChordReposCard({ monorepos = false, children }: { monorepos?: boolean; children?: ReactNode }) {
-	return (
-		<StateQueries queries={[useGitRepoStoreState()]}>
-			{(gitRepoStoreData) => (
-				<ChordReposCardContent monorepos={monorepos} gitRepoStoreData={gitRepoStoreData}>{children}</ChordReposCardContent>
-			)}
-		</StateQueries>
-	);
+export function ChordReposCard({
+  monorepos = false,
+  children,
+}: {
+  monorepos?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <StateQueries queries={[useGitRepoStoreState()]}>
+      {(gitRepoStoreData) => (
+        <ChordReposCardContent monorepos={monorepos} gitRepoStoreData={gitRepoStoreData}>
+          {children}
+        </ChordReposCardContent>
+      )}
+    </StateQueries>
+  );
 }
 
 function ChordReposCardContent({
-	monorepos = false,
-	children,
-	gitRepoStoreData,
+  monorepos = false,
+  children,
+  gitRepoStoreData,
 }: {
-	monorepos?: boolean
-	children?: ReactNode
-	gitRepoStoreData: NonNullable<ReturnType<typeof useGitRepoStoreState>['data']>
+  monorepos?: boolean;
+  children?: ReactNode;
+  gitRepoStoreData: NonNullable<ReturnType<typeof useGitRepoStoreState>["data"]>;
 }) {
   const { repos } = gitRepoStoreData;
   const visibleRepos = Object.values(repos).filter(
@@ -240,18 +247,17 @@ function RepoActionsMenuButton({ repo }: { repo: { slug: string } }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label={`More actions for ${repo.slug}`}
-          title="More actions"
-          disabled={removeGitRepoMutation.isPending}
-        >
-          <Ellipsis />
-        </Button>
-      </DropdownMenuTrigger>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={`More actions for ${repo.slug}`}
+        title="More actions"
+        disabled={removeGitRepoMutation.isPending}
+      >
+        <Ellipsis />
+      </Button>
+
       <DropdownMenuContent align="end" className="w-40">
         <DropdownMenuItem
           variant="destructive"

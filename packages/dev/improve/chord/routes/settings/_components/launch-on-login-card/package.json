@@ -1,7 +1,7 @@
 {
 	"name": "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"imports": {
 		"#launch-on-login-card": "./launch-on-login-card.tsx"
 	},
@@ -12,9 +12,11 @@
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.label": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.popover": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.switch": "workspace:*",
 		"@chord/dev.improve.chord.lib.state": "workspace:*",
+		"lucide-react": "^1.57.0",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

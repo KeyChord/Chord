@@ -1,0 +1,27 @@
+{
+  "name": "@chord/dev.improve.chord.configs.e2e.macos",
+  "version": "0.0.0",
+  "private": true,
+  "bin": {
+    "_e2e-macos": "./_e2e-macos.ts"
+  },
+  "type": "module",
+  "imports": {
+    "#chord-app": "./chord-app.ts",
+    "#golden": "./golden.ts",
+    "#guest": "./guest.ts",
+    "#keysyms": "./keysyms.ts",
+    "#png": "./png.ts",
+    "#session": "./session.ts",
+    "#tart": "./tart.ts",
+    "#vm": "./vm.ts",
+    "#vnc": "./vnc.ts",
+    "#wait": "./wait.ts"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.3"
+  }
+}

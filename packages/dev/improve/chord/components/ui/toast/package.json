@@ -1,0 +1,19 @@
+{
+	"name": "@chord/dev.improve.chord.components.ui.toast",
+	"private": true,
+	"type": "module",
+	"imports": {
+		"#toast": "./toast.tsx"
+	},
+	"exports": {
+		".": "./+.ts"
+	},
+	"dependencies": {
+		"@heroui/react": "^3.2.7",
+		"react": "^19.3.1"
+	},
+	"devDependencies": {
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0"
+	}
+}

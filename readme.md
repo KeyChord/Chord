@@ -122,7 +122,19 @@ Chord's compiled chords contain certain conventions:
 
 ### Installing Chord Packages
 
-TODO
+Open **Browse** in Chord's settings and choose **Install** for an official package. Official packages are loaded through `~/.chord/packages/@keychord/`.
+
+### Installing Third-Party Chord Packages
+
+> **WARNING:** Since Chord scripts can run arbitrary code (necessary for macOS scripting), you should ONLY install chord packages from people you trust or after auditing code.
+
+To install a third-party package, first manually download and extract it into a `~/.chord/packages/<name>` folder.
+
+Then, you need to quit and restart Chord, and manually approve it in the Chords tab.
+
+In **Chords → Packages → Third-Party Packages**, choose **Review & Approve…**, review the package path and warning, then choose **Approve and Enable**. Until you approve it, Chord does not enable any of its chords or load its handlers. Approval persists across restarts; use **Revoke Approval** under **Approved packages** to disable it again.
+
+Official packages live under `~/.chord/packages/@keychord/` and do not require this approval. Every package outside that folder is untrusted by default, even if its `package.json` claims an `@keychord` name. Chord approves personal packages when you create them through **My Chords**; existing folders require approval.
 
 ## Chord Scripts
 

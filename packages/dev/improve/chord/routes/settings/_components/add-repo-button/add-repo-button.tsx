@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { toast } from "@chord/com.npmjs.sonner";
+import { toast } from "@chord/dev.improve.chord.components.ui.toast";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
@@ -12,7 +12,7 @@ export function AddRepoButton({ monorepo = false }: { monorepo?: boolean }) {
     mutationFn: monorepo ? taurpc.addGitMonorepo : taurpc.addGitRepo,
     onSuccess: () => setRepoInput(""),
     onError: (error) => {
-      toast.error(
+      toast.danger(
         typeof error === "object" && "Message" in error ? String(error.Message) : String(error),
       );
     },
@@ -22,7 +22,7 @@ export function AddRepoButton({ monorepo = false }: { monorepo?: boolean }) {
     event.preventDefault();
 
     if (!repoInput.trim()) {
-      toast.error("Enter a GitHub repo like owner/name or https://github.com/owner/name.");
+      toast.danger("Enter a GitHub repo like owner/name or https://github.com/owner/name.");
       return;
     }
 

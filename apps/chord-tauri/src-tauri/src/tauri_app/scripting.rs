@@ -1,24 +1,42 @@
 use crate::app::AppHandleExt;
+use crate::git::GitHubRepoRef;
 use crate::tauri_app::play_failure_sound;
 use anyhow::{Context, Result, bail};
 use std::sync::{Mutex, OnceLock};
 use tauri::AppHandle;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static PENDING_CHORDS: Mutex<PendingChords> = Mutex::new(PendingChords {
     ready: false,
     sequences: Vec::new(),
+    packages: Vec::new(),
 });
 
+#[derive(Default)]
 struct PendingChords {
     ready: bool,
     sequences: Vec<String>,
+    packages: Vec<GitHubRepoRef>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+impl PendingChords {
+    fn add_package(&mut self, repo: GitHubRepoRef) -> Option<GitHubRepoRef> {
+        if self.ready {
+            return Some(repo);
+        }
+        if !self.packages.contains(&repo) {
+            self.packages.push(repo);
+        }
+        None
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ScriptCommand {
     OpenSettings,
     ReloadConfigs,
+    AddPackage(GitHubRepoRef),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +64,16 @@ pub fn handle_url(url: &str) -> Result<()> {
             settings.ui.open()?
         }
         ScriptCommand::ReloadConfigs => reload_configs(handle),
+        ScriptCommand::AddPackage(repo) => {
+            handle.app_state().settings().ui.open_package_browser()?;
+            let ready_repo = PENDING_CHORDS
+                .lock()
+                .map_err(|_| anyhow::anyhow!("pending chord queue is poisoned"))?
+                .add_package(repo);
+            if let Some(repo) = ready_repo {
+                install_package(handle, repo);
+            }
+        }
     }
 
     Ok(())
@@ -85,13 +113,16 @@ fn execute_or_queue_chord(handle: &AppHandle, sequence: String) -> Result<()> {
 }
 
 pub fn mark_chord_packages_ready(handle: &AppHandle) {
-    let sequences = {
+    let (sequences, packages) = {
         let Ok(mut pending) = PENDING_CHORDS.lock() else {
             log::error!("Pending chord queue is poisoned");
             return;
         };
         pending.ready = true;
-        std::mem::take(&mut pending.sequences)
+        (
+            std::mem::take(&mut pending.sequences),
+            std::mem::take(&mut pending.packages),
+        )
     };
 
     for sequence in sequences {
@@ -104,6 +135,44 @@ pub fn mark_chord_packages_ready(handle: &AppHandle) {
             play_failure_sound(handle);
         }
     }
+    for repo in packages {
+        install_package(handle.clone(), repo);
+    }
+}
+
+fn install_package(handle: AppHandle, repo: GitHubRepoRef) {
+    tauri::async_runtime::spawn(async move {
+        let install_handle = handle.clone();
+        let slug = repo.slug();
+        let result = async {
+            // Git downloads must not block the native URL-event/main thread or Tokio workers.
+            tauri::async_runtime::spawn_blocking(move || {
+                install_handle
+                    .app_state()
+                    .chord_package_manager()
+                    .registry
+                    .git
+                    .git_repos_store
+                    .add_repo(repo)
+            })
+            .await??;
+            handle
+                .app_state()
+                .chord_package_manager()
+                .reload_all()
+                .await
+        }
+        .await;
+        if let Err(error) = result {
+            log::error!("Failed to add {slug} from a deep link: {error:#}");
+            handle
+                .dialog()
+                .message(format!("Could not add {slug} to Chord.\n\n{error:#}"))
+                .title("Add to Chord")
+                .kind(MessageDialogKind::Error)
+                .show(|_| {});
+        }
+    });
 }
 
 pub fn reload_configs(handle: AppHandle) {
@@ -121,6 +190,26 @@ fn parse_command(url: &str) -> Result<ScriptCommand> {
     match command.as_str() {
         "ui" | "settings" | "open-settings" | "show-settings" => Ok(ScriptCommand::OpenSettings),
         "reload-config" | "reload-configs" => Ok(ScriptCommand::ReloadConfigs),
+        "add-package" => {
+            let parsed = tauri::Url::parse(url).context("Invalid Add to Chord URL")?;
+            let mut repos = parsed.query_pairs().filter(|(key, _)| key == "repo");
+            let (_, repo) = repos
+                .next()
+                .context("Add to Chord requires a repo parameter")?;
+            anyhow::ensure!(repos.next().is_none(), "Specify exactly one repo parameter");
+            let requested = GitHubRepoRef::parse(&repo)?;
+            // These links install executable code. Limit unattended web installs to the same
+            // official catalog the app and website display; other repos use Add Repo in-app.
+            let official: Vec<serde_json::Value> = serde_json::from_str(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../../packages/dev/improve/chord/data/official-chord-repos/@assets/official-chord-repos.gen.json"
+            )))?;
+            let reference = official.iter().filter_map(|entry| entry["url"].as_str())
+                .filter_map(|url| GitHubRepoRef::parse(url).ok())
+                .find(|repo| repo.slug().eq_ignore_ascii_case(&requested.slug()))
+                .context("Add to Chord links only support official packages; use Add Repo in Settings for other repositories")?;
+            Ok(ScriptCommand::AddPackage(reference))
+        }
         _ => bail!("Unsupported chord URL command: {command}"),
     }
 }
@@ -237,6 +326,46 @@ mod tests {
     use super::{
         CliAppCommand, ScriptCommand, cli_app_command_from_args, normalize_command, parse_command,
     };
+
+    #[test]
+    fn add_to_chord_links_decode_and_canonicalize_official_repositories() {
+        let expected = ScriptCommand::AddPackage(
+            crate::git::GitHubRepoRef::parse("KeyChord/chords-vscode").unwrap(),
+        );
+        for url in [
+            "chord://add-package?repo=KeyChord%2Fchords-vscode",
+            "chord://add-package?repo=keychord%2FCHORDS-VSCODE",
+            "chord://add-package?repo=https%3A%2F%2Fgithub.com%2FKeyChord%2Fchords-vscode",
+        ] {
+            assert_eq!(parse_command(url).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn add_to_chord_rejects_missing_ambiguous_and_untrusted_sources() {
+        for url in [
+            "chord://add-package",
+            "chord://add-package?repo=",
+            "chord://add-package?repo=someone%2Fcode",
+            "chord://add-package?repo=KeyChord%2F..",
+            "chord://add-package?repo=..%2Fchords-vscode",
+            "chord://add-package?repo=https%3A%2F%2Fevil.example%2FKeyChord%2Fchords-vscode",
+            "chord://add-package?repo=KeyChord%2Fchords-vscode&repo=KeyChord%2Fchords-terminal",
+        ] {
+            assert!(parse_command(url).is_err(), "{url}");
+        }
+    }
+
+    #[test]
+    fn cold_start_links_wait_for_packages_and_duplicate_requests_are_coalesced() {
+        let mut pending = super::PendingChords::default();
+        let repo = crate::git::GitHubRepoRef::parse("KeyChord/chords-vscode").unwrap();
+        assert!(pending.add_package(repo.clone()).is_none());
+        assert!(pending.add_package(repo.clone()).is_none());
+        assert_eq!(pending.packages, vec![repo.clone()]);
+        pending.ready = true;
+        assert_eq!(pending.add_package(repo.clone()), Some(repo));
+    }
 
     #[test]
     fn parses_direct_scheme_command() {

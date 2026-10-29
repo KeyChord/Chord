@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "bin": {
-    "tauri-dev": "./_tauri-dev.ts"
+    "_tauri-dev": "./_tauri-dev.ts"
   },
   "type": "module",
   "imports": {

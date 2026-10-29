@@ -1,0 +1,8 @@
+{
+  "name": "@chord/com.npmjs.tanstack__react-table",
+  "type": "module",
+  "exports": "./+.ts",
+  "dependencies": {
+    "@tanstack/react-table": "^9.3.1"
+  }
+}

@@ -112,6 +112,10 @@ pub struct LocalPackageRegistry {
 }
 
 impl LocalPackageRegistry {
+    pub fn package_store(&self) -> anyhow::Result<super::PackageStore> {
+        super::PackageStore::for_app(&self.handle)
+    }
+
     pub fn monorepo_selections(&self) -> anyhow::Result<HashMap<String, Vec<String>>> {
         self.sources_store()?
             .get("monorepoSelections")
@@ -151,7 +155,7 @@ impl LocalPackageRegistry {
         names: Vec<String>,
     ) -> anyhow::Result<Option<Vec<String>>> {
         let root = self.monorepo_root(source)?;
-        let available = super::import_monorepo_packages(&root)?;
+        let available = super::import_monorepo_packages(&self.package_store()?, &root)?;
         super::core::ensure_core_selected(&available, &names)?;
         anyhow::ensure!(
             names.iter().all(|name| available.contains_key(name)),
@@ -198,7 +202,9 @@ impl LocalPackageRegistry {
     }
 
     pub fn add_monorepo(&self, path: &str) -> anyhow::Result<()> {
-        let root = super::validate_monorepo_path(path)?.display().to_string();
+        let root = super::validate_monorepo_path(&self.package_store()?, path)?
+            .display()
+            .to_string();
         let mut paths = self.list_monorepos()?;
         if !paths.contains(&root) {
             paths.push(root);
@@ -227,6 +233,7 @@ impl LocalPackageRegistry {
         let selections = self.monorepo_selections()?;
         for path in self.list_monorepos()? {
             packages.extend(super::import_selected_monorepo_packages(
+                &self.package_store()?,
                 Path::new(&path),
                 selections.get(&path).map(Vec::as_slice).unwrap_or_default(),
             )?);
@@ -280,7 +287,9 @@ impl LocalPackageRegistry {
         let mut packages = HashMap::new();
 
         for local_package_path in self.list_package_paths()? {
-            if let Ok(package) = Self::import_from_local_folder(local_package_path.as_path())
+            if let Ok(package) = self
+                .package_store()?
+                .import_package(local_package_path.as_path())
                 .inspect_err(|e| {
                     log::warn!(
                         "Error importing local folder {}: {e}, skipping",
@@ -296,7 +305,9 @@ impl LocalPackageRegistry {
     }
 
     fn package_from_user_input(&self, path: &str) -> anyhow::Result<LocalChordPackage> {
-        Ok(LocalChordPackage::new(self.canonicalize_path(path)?))
+        let source = self.canonicalize_path(path)?;
+        self.package_store()?.mount(&source)?;
+        Ok(LocalChordPackage::new(source))
     }
 
     fn sources_store(&self) -> anyhow::Result<Arc<Store<Wry>>> {
@@ -337,86 +348,93 @@ impl LocalPackageRegistry {
         Ok(canonical_path)
     }
 
+    #[cfg(test)]
     pub fn import_from_local_folder(root: &Path) -> anyhow::Result<RawChordPackage> {
-        let mut chords_files_contents = HashMap::new();
-        let mut js_files_contents = HashMap::new();
-        let bin_files_contents = HashMap::new();
-        let mut remaining = MAX_PACKAGE_SOURCE_BYTES;
+        read_package(root)
+    }
+}
 
-        let dirname = root
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let manifest = root.join("package.json");
-        let package_json_contents = if manifest.exists() {
-            Some(read_package_source(&manifest, &mut remaining)?)
-        } else {
-            None
-        };
+/// Low-level reader. Production callers must go through PackageStore, which mounts sources
+/// and checks their logical root before any manifest, chords, or JavaScript is read.
+pub(super) fn read_package(root: &Path) -> anyhow::Result<RawChordPackage> {
+    let mut chords_files_contents = HashMap::new();
+    let mut js_files_contents = HashMap::new();
+    let bin_files_contents = HashMap::new();
+    let mut remaining = MAX_PACKAGE_SOURCE_BYTES;
 
-        // Native modules under `target/` are not read: the package's own JS loads them from
-        // disk with `process.dlopen` (see `import.meta.chord.resolveNative`).
-        // Executables in bin/ are also consumed from disk by workers; their bytes never
-        // need to be copied into the GUI's memory.
-        let mut entries = 0;
-        for dir in ["chords", "js"] {
-            let dir_path = root.join(dir);
-            if !dir_path.exists() {
+    let dirname = root
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_default();
+    let manifest = root.join("package.json");
+    let package_json_contents = if manifest.exists() {
+        Some(read_package_source(&manifest, &mut remaining)?)
+    } else {
+        None
+    };
+
+    // Native modules under `target/` are not read: the package's own JS loads them from
+    // disk with `process.dlopen` (see `import.meta.chord.resolveNative`).
+    // Executables in bin/ are also consumed from disk by workers; their bytes never
+    // need to be copied into the GUI's memory.
+    let mut entries = 0;
+    for dir in ["chords", "js"] {
+        let dir_path = root.join(dir);
+        if !dir_path.exists() {
+            continue;
+        }
+
+        for entry in WalkDir::new(&dir_path)
+            .into_iter()
+            .filter_entry(|entry| !is_hidden_entry(entry))
+        {
+            let entry = entry?;
+            entries += 1;
+            anyhow::ensure!(
+                entries <= 10_000,
+                "package {} contains too many source entries",
+                root.display()
+            );
+            let path = entry.path();
+
+            if !path.is_file() {
                 continue;
             }
 
-            for entry in WalkDir::new(&dir_path)
-                .into_iter()
-                .filter_entry(|entry| !is_hidden_entry(entry))
-            {
-                let entry = entry?;
-                entries += 1;
-                anyhow::ensure!(
-                    entries <= 10_000,
-                    "package {} contains too many source entries",
-                    root.display()
-                );
-                let path = entry.path();
+            let relpath = path.strip_prefix(root)?;
 
-                if !path.is_file() {
-                    continue;
+            match dir {
+                "chords" => {
+                    let content = read_package_source(path, &mut remaining)?;
+                    chords_files_contents.insert(relpath.to_path_buf(), content);
                 }
-
-                let relpath = path.strip_prefix(root)?;
-
-                match dir {
-                    "chords" => {
+                "js" => {
+                    if path.extension().is_some_and(|ext| ext == "js") {
                         let content = read_package_source(path, &mut remaining)?;
-                        chords_files_contents.insert(relpath.to_path_buf(), content);
+                        js_files_contents.insert(relpath.to_path_buf(), content);
                     }
-                    "js" => {
-                        if path.extension().is_some_and(|ext| ext == "js") {
-                            let content = read_package_source(path, &mut remaining)?;
-                            js_files_contents.insert(relpath.to_path_buf(), content);
-                        }
-                    }
-                    _ => {}
                 }
+                _ => {}
             }
         }
-
-        log::debug!(
-            "loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}",
-            root,
-            js_files_contents.keys(),
-            chords_files_contents.keys(),
-            bin_files_contents.keys()
-        );
-
-        Ok(RawChordPackage {
-            dirname,
-            root: root.to_path_buf(),
-            package_json_contents,
-            chords_files_contents,
-            js_files_contents,
-            bin_files_contents,
-        })
     }
+
+    log::debug!(
+        "loaded chord package from {:?}:\njs: {:?}\nchords: {:?}\nbin: {:?}",
+        root,
+        js_files_contents.keys(),
+        chords_files_contents.keys(),
+        bin_files_contents.keys()
+    );
+
+    Ok(RawChordPackage {
+        dirname,
+        root: root.to_path_buf(),
+        package_json_contents,
+        chords_files_contents,
+        js_files_contents,
+        bin_files_contents,
+    })
 }
 
 #[allow(dead_code)]

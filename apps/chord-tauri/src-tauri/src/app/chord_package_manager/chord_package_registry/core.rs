@@ -1,3 +1,4 @@
+use super::PackageStore;
 use crate::app::chord_package_manager::ChordPackage;
 use crate::models::{
     BuiltinChordKind, CORE_CHORD_FILE, CORE_CHORD_PACKAGE, ChordAction, ChordHintPattern,
@@ -10,28 +11,70 @@ use std::path::{Path, PathBuf};
 
 const BUNDLED_BINDINGS: &str = include_str!(concat!(env!("OUT_DIR"), "/chords-chord.macos.toml"));
 
-fn core_bindings() -> Result<String> {
+fn core_bindings(store: &PackageStore) -> Result<(PathBuf, String)> {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::collections::hash_map::DefaultHasher::new();
+    BUNDLED_BINDINGS.hash(&mut hash);
+    if cfg!(debug_assertions) {
+        env!("CHORD_CORE_SOURCE").hash(&mut hash);
+    }
+    let root = store.root.join(".core").join(format!(
+        "{}-{:016x}-{}",
+        env!("CARGO_PKG_VERSION"),
+        hash.finish(),
+        if cfg!(debug_assertions) {
+            "dev"
+        } else {
+            "release"
+        }
+    ));
+    let file = root.join(CORE_CHORD_FILE);
+    std::fs::create_dir_all(file.parent().context("Core file has no parent")?)?;
+    let manifest = root.join("package.json");
+    let manifest_contents = serde_json::json!({"name": CORE_CHORD_PACKAGE}).to_string();
+    if std::fs::read_to_string(&manifest).ok().as_deref() != Some(&manifest_contents) {
+        std::fs::write(manifest, manifest_contents)?;
+    }
+    let mut linked = false;
     #[cfg(debug_assertions)]
     {
         let source = Path::new(env!("CHORD_CORE_SOURCE"));
         if source.is_file() {
-            let mut remaining = 32 * 1024 * 1024;
-            return super::local::read_package_source(source, &mut remaining)
-                .context("Failed to read protected Chord bindings");
+            super::package_store::ensure_link(source, &file)?;
+            linked = true;
         }
     }
-    Ok(BUNDLED_BINDINGS.to_owned())
+    if !linked && std::fs::read_to_string(&file).ok().as_deref() != Some(BUNDLED_BINDINGS) {
+        let temporary = file.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+        std::fs::write(&temporary, BUNDLED_BINDINGS)?;
+        if let Err(error) = std::fs::rename(&temporary, &file) {
+            let _ = std::fs::remove_file(&temporary);
+            return Err(error.into());
+        }
+    }
+    let mut package = store.import_package(&root)?;
+    let contents = package
+        .chords_files_contents
+        .remove(Path::new(CORE_CHORD_FILE))
+        .context("Failed to read protected Chord bindings from the package store")?;
+    Ok((root, contents))
 }
 
 /// Restore the core file after every source tier, including same-name local overrides.
-pub(super) fn protect_core_package(packages: &mut HashMap<String, RawChordPackage>) -> Result<()> {
-    protect_core_contents(packages, core_bindings()?);
+pub(super) fn protect_core_package(
+    packages: &mut HashMap<String, RawChordPackage>,
+    store: &PackageStore,
+) -> Result<()> {
+    let (root, contents) = core_bindings(store)?;
+    protect_core_contents(packages, contents, &root);
     Ok(())
 }
 
 /// Bootstrap core controls before optional repositories or JavaScript workers load.
-pub(in crate::app::chord_package_manager) fn load_core_package() -> Result<ChordPackage> {
-    compile_core_contents(&core_bindings()?)
+pub(in crate::app::chord_package_manager) fn load_core_package(
+    store: &PackageStore,
+) -> Result<ChordPackage> {
+    compile_core_contents(&core_bindings(store)?.1)
 }
 
 fn compile_core_contents(contents: &str) -> Result<ChordPackage> {
@@ -68,16 +111,16 @@ fn compile_core_contents(contents: &str) -> Result<ChordPackage> {
     Ok(package)
 }
 
-fn protect_core_contents(packages: &mut HashMap<String, RawChordPackage>, contents: String) {
+fn protect_core_contents(
+    packages: &mut HashMap<String, RawChordPackage>,
+    contents: String,
+    root: &Path,
+) {
     let core = packages
         .entry(CORE_CHORD_PACKAGE.into())
         .or_insert_with(|| RawChordPackage {
             dirname: "chords-chord".into(),
-            root: PathBuf::from(env!("CHORD_CORE_SOURCE"))
-                .ancestors()
-                .nth(5)
-                .unwrap_or(Path::new("."))
-                .to_path_buf(),
+            root: root.to_path_buf(),
             package_json_contents: Some(
                 serde_json::json!({"name": CORE_CHORD_PACKAGE}).to_string(),
             ),
@@ -181,6 +224,24 @@ mod tests {
     use crate::models::{ChordAction, ChordLayout, Key, MetaChordCommand, ParsedChordsFile};
 
     #[test]
+    fn bootstrap_and_protected_core_read_from_the_package_store() {
+        let root = std::env::temp_dir().join(format!("chord-core-store-{}", uuid::Uuid::new_v4()));
+        let store = PackageStore::new(root.join("packages"));
+        let (path, contents) = core_bindings(&store).unwrap();
+        assert!(store.contains(&path));
+        assert_eq!(
+            std::fs::read_to_string(path.join(CORE_CHORD_FILE)).unwrap(),
+            contents
+        );
+        assert_eq!(core_bindings(&store).unwrap(), (path, contents));
+        load_core_package(&store).unwrap();
+        let mut packages = HashMap::new();
+        protect_core_package(&mut packages, &store).unwrap();
+        assert!(store.contains(&packages[CORE_CHORD_PACKAGE].root));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn bundled_file_defines_actions_and_matches_the_canonical_distribution_copy() {
         let distribution = include_str!(
             "../../../../../data/chords-chord/chords/com/leonsilicon/chord/macos.toml"
@@ -235,7 +296,11 @@ mod tests {
     #[test]
     fn core_file_is_present_without_sources_and_cannot_be_overridden_or_deselected() {
         let mut packages = HashMap::new();
-        protect_core_contents(&mut packages, BUNDLED_BINDINGS.into());
+        protect_core_contents(
+            &mut packages,
+            BUNDLED_BINDINGS.into(),
+            Path::new("/test/packages/.core"),
+        );
         assert!(ensure_core_selected(&packages, &[]).is_err());
         ensure_core_selected(&packages, &[CORE_CHORD_PACKAGE.into()]).unwrap();
         let core = packages.get_mut(CORE_CHORD_PACKAGE).unwrap();
@@ -243,7 +308,11 @@ mod tests {
             .insert(CORE_CHORD_FILE.into(), "fake user settings".into());
         core.chords_files_contents
             .insert("chords/other.toml".into(), "ordinary chords".into());
-        protect_core_contents(&mut packages, BUNDLED_BINDINGS.into());
+        protect_core_contents(
+            &mut packages,
+            BUNDLED_BINDINGS.into(),
+            Path::new("/test/packages/.core"),
+        );
         assert_eq!(
             packages[CORE_CHORD_PACKAGE].chords_files_contents[Path::new(CORE_CHORD_FILE)],
             BUNDLED_BINDINGS
@@ -253,7 +322,11 @@ mod tests {
             "ordinary chords"
         );
         packages.clear();
-        protect_core_contents(&mut packages, BUNDLED_BINDINGS.into());
+        protect_core_contents(
+            &mut packages,
+            BUNDLED_BINDINGS.into(),
+            Path::new("/test/packages/.core"),
+        );
         assert!(packages.contains_key(CORE_CHORD_PACKAGE));
     }
 

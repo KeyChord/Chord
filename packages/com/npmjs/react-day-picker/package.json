@@ -1,8 +1,0 @@
-{
-  "name": "@chord/com.npmjs.react-day-picker",
-  "type": "module",
-  "exports": "./+.ts",
-  "dependencies": {
-    "react-day-picker": "^10.0.2"
-  }
-}

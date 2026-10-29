@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitHubRepoRef {
     pub owner: String,
     pub name: String,
@@ -17,9 +17,8 @@ impl GitHubRepoRef {
             anyhow::bail!("Repository cannot be empty");
         }
 
+        let trimmed = trimmed.trim_end_matches('/').trim_end_matches(".git");
         let slug = trimmed
-            .trim_end_matches('/')
-            .trim_end_matches(".git")
             .strip_prefix("https://github.com/")
             .or_else(|| trimmed.strip_prefix("http://github.com/"))
             .or_else(|| trimmed.strip_prefix("git@github.com:"))
@@ -41,9 +40,14 @@ impl GitHubRepoRef {
             anyhow::bail!("Repository must be in the form owner/name");
         }
 
-        if owner.contains(char::is_whitespace) || name.contains(char::is_whitespace) {
-            anyhow::bail!("Repository owner and name cannot contain spaces");
-        }
+        anyhow::ensure!(
+            owner.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+                && !matches!(name, "." | ".."),
+            "Repository owner and name must be valid GitHub path components"
+        );
 
         Ok(Self {
             owner: owner.to_string(),
@@ -60,7 +64,10 @@ impl GitHubRepoRef {
     }
 
     pub fn local_abspath(&self, repos_root: &Path, rev: &str) -> PathBuf {
-        repos_root.join(&self.owner).join(&self.name).join(rev)
+        repos_root
+            .join(self.owner.to_ascii_lowercase())
+            .join(self.name.to_ascii_lowercase())
+            .join(rev)
     }
 
     pub fn into_repo_at_revision(self, repos_root: &Path, rev: impl Into<String>) -> GitRepo {
@@ -113,7 +120,7 @@ pub(crate) fn repo_head_sha(repo_path: &Path) -> Result<String> {
     Ok(head_id.to_string())
 }
 
-fn normalize_revision(rev: &str) -> Result<String> {
+pub(crate) fn normalize_revision(rev: &str) -> Result<String> {
     let trimmed_rev = rev.trim();
     anyhow::ensure!(!trimmed_rev.is_empty(), "Revision cannot be empty");
     let object_id = gix::ObjectId::from_hex(trimmed_rev.as_bytes())
@@ -121,7 +128,7 @@ fn normalize_revision(rev: &str) -> Result<String> {
     Ok(object_id.to_string())
 }
 
-fn verify_repo_at_revision(repo_path: &Path, rev: &str) -> Result<()> {
+pub(crate) fn verify_repo_at_revision(repo_path: &Path, rev: &str) -> Result<()> {
     let actual_rev = repo_head_sha(repo_path)?;
     anyhow::ensure!(
         actual_rev == rev,
@@ -269,7 +276,7 @@ fn materialize_repo_url_head(repo_label: &str, url: &str, repo_base: &Path) -> R
 }
 
 pub fn materialize_repo_head(repo_ref: &GitHubRepoRef, repos_root: &Path) -> Result<GitRepo> {
-    let repo_base = repos_root.join(&repo_ref.owner).join(&repo_ref.name);
+    let repo_base = repo_ref.local_abspath(repos_root, "");
     let rev = materialize_repo_url_head(&repo_ref.slug(), &repo_ref.url(), &repo_base)?;
     Ok(repo_ref.clone().into_repo_at_revision(repos_root, rev))
 }
@@ -350,6 +357,120 @@ mod tests {
             fs::read_to_string(destination.join("package.json")).unwrap(),
             "first"
         );
+    }
+
+    #[test]
+    fn package_store_migration_preserves_distinct_revisions_and_local_overrides() {
+        use crate::app::chord_package_manager::{PackageStore, git::migrate_checkout};
+        let fixture = TestRepository::new();
+        let first = fixture.commit("first", "first");
+        let second = fixture.commit("second", "second");
+        let reference = GitHubRepoRef::parse("test/chords-example").unwrap();
+        let legacy = fixture.root.join("old-cache");
+        let store = PackageStore::new(fixture.root.join("packages"));
+        for revision in [&first, &second] {
+            let old = reference.local_abspath(&legacy, revision);
+            materialize_repo_url_at_revision(
+                "test/chords-example",
+                &fixture.source_url(),
+                &old,
+                revision,
+            )
+            .unwrap();
+            let mut repo = reference
+                .clone()
+                .into_pinned_repo(&legacy, revision.clone());
+            repo.linked_local_path = Some(fixture.source.clone());
+            let old_state = repo.clone();
+            assert!(migrate_checkout(&mut repo, &store.github_dir(), revision).unwrap());
+            assert!(!old.exists());
+            assert!(store.contains(&repo.local_abspath));
+            assert_eq!(repo_head_sha(&repo.local_abspath).unwrap(), *revision);
+            assert_eq!(repo.pinned_rev.as_ref(), Some(revision));
+            assert_eq!(repo.linked_local_path.as_ref(), Some(&fixture.source));
+            assert!(!migrate_checkout(&mut repo, &store.github_dir(), revision).unwrap());
+            assert_eq!(
+                crate::app::chord_package_manager::git::stored_checkout_revision(
+                    &old_state,
+                    &store.github_dir()
+                )
+                .unwrap(),
+                *revision
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(
+                reference
+                    .local_abspath(&store.github_dir(), &first)
+                    .join("package.json")
+            )
+            .unwrap(),
+            "first"
+        );
+        assert_eq!(
+            fs::read_to_string(
+                reference
+                    .local_abspath(&store.github_dir(), &second)
+                    .join("package.json")
+            )
+            .unwrap(),
+            "second"
+        );
+    }
+
+    #[test]
+    fn failed_package_migration_keeps_the_old_path_and_checkout() {
+        use crate::app::chord_package_manager::git::migrate_checkout;
+        let fixture = TestRepository::new();
+        let first = fixture.commit("first", "first");
+        let second = fixture.commit("second", "second");
+        let reference = GitHubRepoRef::parse("test/chords-example").unwrap();
+        let old_root = fixture.root.join("old-cache");
+        let new_root = fixture.root.join("packages/.sources/github.com");
+        let mut repo = reference.clone().into_pinned_repo(&old_root, first.clone());
+        materialize_repo_url_at_revision(
+            "test/chords-example",
+            &fixture.source_url(),
+            &repo.local_abspath,
+            &first,
+        )
+        .unwrap();
+        let invalid_destination = reference.local_abspath(&new_root, &first);
+        materialize_repo_url_at_revision(
+            "test/chords-example",
+            &fixture.source_url(),
+            &invalid_destination,
+            &second,
+        )
+        .unwrap();
+        let original = repo.local_abspath.clone();
+        assert!(migrate_checkout(&mut repo, &new_root, &first).is_err());
+        assert_eq!(repo.local_abspath, original);
+        assert_eq!(repo_head_sha(&original).unwrap(), first);
+        assert_eq!(repo_head_sha(&invalid_destination).unwrap(), second);
+    }
+
+    #[test]
+    fn repository_components_cannot_escape_the_package_store() {
+        for input in [
+            "../repo",
+            "owner/..",
+            "owner/.",
+            "owner/repo?branch=main",
+            "owner/repo#hash",
+            "owner/repo\\other",
+            "owner/a b",
+        ] {
+            assert!(GitHubRepoRef::parse(input).is_err(), "{input}");
+        }
+        for input in [
+            "owner/repo",
+            "https://github.com/owner/repo.git",
+            "http://github.com/owner/repo.git",
+            "git@github.com:owner/repo.git",
+        ] {
+            assert_eq!(GitHubRepoRef::parse(input).unwrap().slug(), "owner/repo");
+        }
     }
 
     #[test]

@@ -5,7 +5,7 @@ import type { ChordMacroEntry } from "@chord/dev.improve.chord.lib.typeshare";
 
 // Mutations never run during server rendering; TauRPC needs the browser's Proxy constructor.
 const previousWindow = globalThis.window;
-globalThis.window = { Proxy } as unknown as Window & typeof globalThis;
+globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { MacrosContent } = await import("#settings-macros-page");
 afterAll(() => {
   globalThis.window = previousWindow;

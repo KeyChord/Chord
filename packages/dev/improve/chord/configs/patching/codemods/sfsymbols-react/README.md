@@ -54,5 +54,5 @@ bun patch --commit 'node_modules/@bradleyhodges/sfsymbols-react'
 ## Run the JSSG tests
 
 ```sh
-bun run --filter @chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react test
+vpx _test-sfsymbols-react
 ```

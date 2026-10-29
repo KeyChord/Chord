@@ -1,4 +1,4 @@
-use super::{LocalPackageRegistry, is_hidden_entry};
+use super::{PackageStore, is_hidden_entry};
 use crate::models::{ParsedChordsFile, RawChordPackage, RawChordsFile};
 use anyhow::Context;
 use nject::injectable;
@@ -87,11 +87,15 @@ pub struct PersonalPackageRegistry {
 
 impl PersonalPackageRegistry {
     pub fn packages_dir(&self) -> anyhow::Result<PathBuf> {
-        Ok(self.handle.path().home_dir()?.join(".chord").join("packages"))
+        Ok(PackageStore::for_app(&self.handle)?.root)
     }
 
     pub fn ensure_default_package(&self) -> anyhow::Result<()> {
-        ensure_default_package(&self.packages_dir()?)
+        let dir = self.packages_dir()?;
+        if dir.join(DEFAULT_PERSONAL_PACKAGE).exists() {
+            return Ok(());
+        }
+        self.create_package(DEFAULT_PERSONAL_PACKAGE)
     }
 
     pub fn import_packages(
@@ -109,7 +113,15 @@ impl PersonalPackageRegistry {
     }
 
     pub fn create_package(&self, dirname: &str) -> anyhow::Result<()> {
-        create_package(&self.packages_dir()?, dirname)
+        let dir = self.packages_dir()?;
+        create_package(&dir, dirname)?;
+        use crate::app::AppHandleExt;
+        self.handle
+            .app_state()
+            .chord_package_manager()
+            .registry
+            .trust
+            .approve_created_package(&dir.join(dirname))
     }
 
     pub fn read_file(&self, dirname: &str, pathslug: &str) -> anyhow::Result<String> {
@@ -147,7 +159,15 @@ fn package_dirnames(dir: &Path) -> anyhow::Result<Vec<String>> {
                 let entry = entry?;
                 let dirname = entry.file_name().to_string_lossy().into_owned();
                 if !dirname.starts_with('.') && entry.path().is_dir() {
-                    dirnames.push(dirname);
+                    if dirname.starts_with('@') {
+                        for child in fs::read_dir(entry.path())? {
+                            let child = child?;
+                            let name = child.file_name().to_string_lossy().into_owned();
+                            if !name.starts_with('.') && child.path().is_dir() {
+                                dirnames.push(format!("{dirname}/{name}"));
+                            }
+                        }
+                    } else { dirnames.push(dirname); }
                 }
             }
         }
@@ -164,6 +184,7 @@ fn package_dirnames(dir: &Path) -> anyhow::Result<Vec<String>> {
 /// loading. When two folders load under the same name, the first in priority order wins.
 fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<PersonalPackageState>) {
     let mut packages = HashMap::new();
+    let mut loaded_from = HashMap::new();
     let mut states = Vec::new();
     let dirnames = match package_dirnames(dir) {
         Ok(dirnames) => dirnames,
@@ -173,20 +194,19 @@ fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<Persona
         }
     };
     for dirname in dirnames {
-        let (name, error) = match LocalPackageRegistry::import_from_local_folder(&dir.join(&dirname))
+        let (name, error) = match PackageStore::new(dir.to_path_buf())
+            .import_package(&dir.join(&dirname))
         {
             Ok(package) => {
                 let name = package.package_name();
-                if let Some(first) = states
-                    .iter()
-                    .find(|state: &&PersonalPackageState| state.name.as_ref() == Some(&name))
-                {
+                if let Some(first) = loaded_from.get(&name) {
                     let error = format!(
                         "{name} is already loaded from the {} folder; give this package a different name in its package.json",
-                        first.dirname
+                        first
                     );
                     (None, Some(error))
                 } else {
+                    loaded_from.insert(name.clone(), dirname.clone());
                     packages.insert(name.clone(), package);
                     (Some(name), None)
                 }
@@ -196,11 +216,10 @@ fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<Persona
         if let Some(error) = &error {
             log::warn!("Error importing personal chord package {dirname}: {error}, skipping");
         }
-        states.push(PersonalPackageState {
-            dirname,
-            name,
-            error,
-        });
+        // Scoped packages are installed libraries, not folders managed by My Chords.
+        if !dirname.starts_with('@') {
+            states.push(PersonalPackageState { dirname, name, error });
+        }
     }
     (packages, states)
 }
@@ -208,6 +227,7 @@ fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<Persona
 fn list(dir: &Path) -> anyhow::Result<PersonalPackages> {
     let mut packages = Vec::new();
     for dirname in package_dirnames(dir)? {
+        if dirname.starts_with('@') { continue; }
         let root = dir.join(&dirname);
         packages.push(PersonalPackageFiles {
             files: chords_files(&root)?,
@@ -233,7 +253,11 @@ fn chords_files(root: &Path) -> anyhow::Result<Vec<String>> {
         .filter_entry(|entry| !is_hidden_entry(entry))
     {
         let path = entry?.into_path();
-        if path.is_file() && path.extension().is_some_and(|extension| extension == "toml") {
+        if path.is_file()
+            && path
+                .extension()
+                .is_some_and(|extension| extension == "toml")
+        {
             files.push(path.strip_prefix(root)?.to_string_lossy().into_owned());
         }
     }
@@ -353,8 +377,12 @@ fn write_atomically(path: &Path, contents: &str) -> anyhow::Result<()> {
         Err(error) if error.kind() == ErrorKind::NotFound => path.to_path_buf(),
         Err(error) => return Err(error.into()),
     };
-    let permissions = fs::metadata(&target).ok().map(|metadata| metadata.permissions());
-    let parent = target.parent().context("chords file has no parent folder")?;
+    let permissions = fs::metadata(&target)
+        .ok()
+        .map(|metadata| metadata.permissions());
+    let parent = target
+        .parent()
+        .context("chords file has no parent folder")?;
     let file_name = target
         .file_name()
         .context("chords file has no name")?
@@ -385,7 +413,9 @@ fn delete_file(root: &Path, pathslug: &str) -> anyhow::Result<()> {
     // Remove folders the file leaves empty, such as `com/apple/finder/`, but keep `chords/`.
     let chords_dir = root.join("chords");
     for folder in path.ancestors().skip(1) {
-        if folder == chords_dir || !folder.starts_with(&chords_dir) || fs::remove_dir(folder).is_err()
+        if folder == chords_dir
+            || !folder.starts_with(&chords_dir)
+            || fs::remove_dir(folder).is_err()
         {
             break;
         }
@@ -406,7 +436,9 @@ fn chords_file_path(root: &Path, pathslug: &str) -> anyhow::Result<PathBuf> {
     );
     // The loader skips hidden entries, so a file saved under one would never load.
     anyhow::ensure!(
-        relative.extension().is_some_and(|extension| extension == "toml")
+        relative
+            .extension()
+            .is_some_and(|extension| extension == "toml")
             && !relative
                 .components()
                 .any(|component| component.as_os_str().to_string_lossy().starts_with('.')),
@@ -433,9 +465,11 @@ mod tests {
         let (packages, states) = import_packages(&dir);
         assert_eq!(states.len(), 1);
         assert_eq!(states[0].name.as_deref(), Some(DEFAULT_PERSONAL_PACKAGE));
-        assert!(packages[DEFAULT_PERSONAL_PACKAGE]
-            .chords_files_contents
-            .contains_key(Path::new(STARTER_PATHSLUG)));
+        assert!(
+            packages[DEFAULT_PERSONAL_PACKAGE]
+                .chords_files_contents
+                .contains_key(Path::new(STARTER_PATHSLUG))
+        );
         assert!(chords_file_problem(&starter_contents(DEFAULT_PERSONAL_PACKAGE)).is_none());
 
         let root = dir.join(DEFAULT_PERSONAL_PACKAGE);
@@ -473,11 +507,36 @@ mod tests {
         assert_eq!(packages["alpha"].root, dir.join("alpha"));
         assert!(states[1].name.is_none() && states[1].error.is_some());
         assert!(states[3].name.is_none());
-        assert!(states[3].error.as_deref().unwrap().contains("alpha is already loaded from the alpha folder"));
+        assert!(
+            states[3]
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("alpha is already loaded from the alpha folder")
+        );
 
         let listed = list(&dir).unwrap();
         assert_eq!(listed.packages.len(), 4);
         assert_eq!(listed.packages[2].files, vec![STARTER_PATHSLUG]);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn scoped_packages_are_discovered_but_are_not_personal_editor_folders() {
+        let dir = temporary_dir();
+        create_package(&dir, "default").unwrap();
+        for (path, name) in [("@keychord/chords-test", "@keychord/test"), ("@thirdparty/test", "@thirdparty/test")] {
+            fs::create_dir_all(dir.join(path)).unwrap();
+            fs::write(dir.join(path).join("package.json"), serde_json::json!({"name": name}).to_string()).unwrap();
+        }
+        fs::create_dir_all(dir.join("@keychord/.managed/stale")).unwrap();
+        let (packages, states) = import_packages(&dir);
+        assert_eq!(packages.len(), 3);
+        assert!(packages.contains_key("@keychord/test"));
+        assert!(packages.contains_key("@thirdparty/test"));
+        assert_eq!(states.len(), 1);
+        assert_eq!(states[0].dirname, "default");
+        assert_eq!(list(&dir).unwrap().packages.len(), 1);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -517,7 +576,8 @@ mod tests {
         create_package(&dir, "default").unwrap();
         let root = dir.join("default");
         let app = "chords/com/apple/finder/macos.toml";
-        let contents = "name = 'Finder'\n[chords]\ngd = { name = 'Downloads', shortcut = 'opt+cmd+l' }\n";
+        let contents =
+            "name = 'Finder'\n[chords]\ngd = { name = 'Downloads', shortcut = 'opt+cmd+l' }\n";
         save_file(&root, app, contents, None).unwrap();
         assert!(
             save_file(&root, app, contents, None)
@@ -531,7 +591,10 @@ mod tests {
             "[chords]\n",
             "name = 'x'\n[chords]\n'0x' = { name = 'x', shell = 'true' }",
         ] {
-            assert!(save_file(&root, app, invalid, Some(contents)).is_err(), "{invalid}");
+            assert!(
+                save_file(&root, app, invalid, Some(contents)).is_err(),
+                "{invalid}"
+            );
         }
         assert_eq!(read_file(&root, app).unwrap(), contents);
 
@@ -549,18 +612,34 @@ mod tests {
         let contents = "name = 'é'\n[chords\n";
         let problem = chords_file_problem(contents).unwrap();
         let start = contents.find("[chords").unwrap() - 1;
-        assert!(problem.from.unwrap() as usize >= start, "{:?}", problem.from);
+        assert!(
+            problem.from.unwrap() as usize >= start,
+            "{:?}",
+            problem.from
+        );
         assert!(problem.to.unwrap() <= contents.encode_utf16().count() as u32);
-        assert!(!problem.message.contains("TOML parse error at line"), "{}", problem.message);
+        assert!(
+            !problem.message.contains("TOML parse error at line"),
+            "{}",
+            problem.message
+        );
 
         // Chord's own rules have no location in the file.
         let reserved = "name = 'x'\n[chords]\n'0x' = { name = 'x', shell = 'true' }\n";
         let problem = chords_file_problem(reserved).unwrap();
-        assert!(problem.message.contains("0 prefix is reserved"), "{}", problem.message);
+        assert!(
+            problem.message.contains("0 prefix is reserved"),
+            "{}",
+            problem.message
+        );
         assert!(problem.from.is_none());
 
         let missing_name = chords_file_problem("[chords]\n").unwrap();
-        assert!(missing_name.message.contains("name"), "{}", missing_name.message);
+        assert!(
+            missing_name.message.contains("name"),
+            "{}",
+            missing_name.message
+        );
     }
 
     #[cfg(unix)]
@@ -581,9 +660,17 @@ mod tests {
 
         let edited = "name = 'Linked'\n[chords]\n";
         save_file(&root, STARTER_PATHSLUG, edited, Some(&starter)).unwrap();
-        assert!(fs::symlink_metadata(root.join(STARTER_PATHSLUG)).unwrap().file_type().is_symlink());
+        assert!(
+            fs::symlink_metadata(root.join(STARTER_PATHSLUG))
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
         assert_eq!(fs::read_to_string(&target).unwrap(), edited);
-        assert_eq!(fs::metadata(&target).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
 
         let app = "chords/com/apple/finder/macos.toml";
         save_file(&root, app, edited, None).unwrap();

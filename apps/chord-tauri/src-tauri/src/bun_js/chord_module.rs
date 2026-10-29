@@ -534,8 +534,11 @@ fn locate_module_path<'js>(ctx: &Ctx<'js>, module_path: &Path) -> rbun::Result<(
             .as_ref()
             .map(|package| package.config.root.clone())
     }) {
-        if let Ok(relative) = module_path.strip_prefix(&root) {
-            return Ok((root.clone(), relative.to_path_buf()));
+        if let Some(relative) = crate::app::chord_package_manager::package_module_relative_path(
+            &root,
+            &module_path,
+        ) {
+            return Ok((root, relative));
         }
     }
 

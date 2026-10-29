@@ -1,3 +1,4 @@
+import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import {
@@ -26,8 +27,8 @@ const levelStyles: Record<AppLogLevel, string> = {
   trace: "text-zinc-400",
   debug: "text-zinc-400",
   info: "text-zinc-900",
-  warn: "bg-amber-100 text-zinc-900",
-  error: "bg-red-100 text-red-900",
+  warn: "bg-zinc-100 text-zinc-900",
+  error: "bg-zinc-200 text-zinc-900 font-medium",
 };
 
 const DIVIDER_TEXT = "-".repeat(120);
@@ -153,7 +154,7 @@ function highlightedMessage(message: string, query: string) {
   while (index !== -1 && highlighted < MAX_HIGHLIGHTS_PER_MESSAGE) {
     parts.push(message.slice(start, index));
     parts.push(
-      <mark key={index} className="rounded-[2px] bg-yellow-300 text-inherit">
+      <mark key={index} className="rounded-[2px] bg-zinc-300 text-inherit">
         {message.slice(index, index + query.length)}
       </mark>,
     );
@@ -263,10 +264,7 @@ export function SettingsLogPage() {
     setIsFollowing(true);
   }
 
-  function appendLocalRows(
-    afterEntry: number,
-    rows: { kind: LocalRowKind; message: string }[],
-  ) {
+  function appendLocalRows(afterEntry: number, rows: { kind: LocalRowKind; message: string }[]) {
     setLocalRows((previous) =>
       capLocalRows([
         ...previous,
@@ -362,12 +360,12 @@ export function SettingsLogPage() {
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border bg-white shadow-sm">
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-muted/20 px-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border bg-white px-2 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-200">
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-default/20 px-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border bg-white px-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
-            <input
+            <Input
               type="search"
-              className="h-7 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              className="h-7 min-w-0 flex-1 border-0 bg-transparent px-0 text-xs shadow-none outline-none placeholder:text-muted-foreground"
               value={query}
               placeholder="Find"
               onChange={(event) => setQuery(event.target.value)}
@@ -387,24 +385,26 @@ export function SettingsLogPage() {
             ) : null}
           </div>
           <div className="flex shrink-0 items-center overflow-hidden rounded-md border bg-background">
-            <button
+            <Button
+              variant="ghost"
               type="button"
-              className="flex size-7 items-center justify-center border-r text-muted-foreground hover:bg-muted disabled:opacity-35"
+              className="flex size-7 items-center justify-center border-r text-muted-foreground hover:bg-default disabled:opacity-35"
               disabled={matches.length === 0}
               onClick={() => showMatch(-1)}
               aria-label="Previous match"
             >
               <ChevronUp className="size-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
               type="button"
-              className="flex size-7 items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-35"
+              className="flex size-7 items-center justify-center text-muted-foreground hover:bg-default disabled:opacity-35"
               disabled={matches.length === 0}
               onClick={() => showMatch(1)}
               aria-label="Next match"
             >
               <ChevronDown className="size-3.5" />
-            </button>
+            </Button>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={() => setQuery("")}>
             Done
@@ -433,7 +433,7 @@ export function SettingsLogPage() {
                   key={row.key}
                   className={
                     row.row.kind === "error"
-                      ? "block min-h-[1lh] bg-red-100 text-red-900"
+                      ? "block min-h-[1lh] bg-zinc-200 text-zinc-900 font-medium"
                       : row.row.kind === "command"
                         ? "block min-h-[1lh] bg-zinc-100 font-semibold text-zinc-700"
                         : "block min-h-[1lh] text-zinc-900"
@@ -450,7 +450,7 @@ export function SettingsLogPage() {
           </pre>
           <textarea
             ref={scrollRef}
-            className="absolute inset-0 z-10 size-full resize-none overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-3.5 py-3 text-[11.5px] leading-[1.55] text-transparent caret-zinc-900 outline-none placeholder:text-zinc-400 selection:bg-blue-200/60 selection:text-transparent"
+            className="absolute inset-0 z-10 size-full resize-none overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-3.5 py-3 text-[11.5px] leading-[1.55] text-transparent caret-zinc-900 outline-none placeholder:text-zinc-400 selection:bg-zinc-300/60 selection:text-transparent"
             style={{
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
             }}
@@ -476,9 +476,9 @@ export function SettingsLogPage() {
           >
             chord
           </span>
-          <input
+          <Input
             type="text"
-            className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2.5 text-xs outline-none placeholder:text-muted-foreground focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+            className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2.5 text-xs outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
             value={command}
             disabled={isRunningCommand}
             placeholder="help"
@@ -523,8 +523,8 @@ export function SettingsLogPage() {
             <span
               className={
                 status === "live"
-                  ? "size-1.5 rounded-full bg-emerald-500"
-                  : "size-1.5 rounded-full bg-amber-500"
+                  ? "size-1.5 rounded-full bg-zinc-900"
+                  : "size-1.5 rounded-full bg-zinc-400"
               }
             />
             <span>{statusLabel}</span>

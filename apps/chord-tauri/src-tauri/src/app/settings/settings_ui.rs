@@ -59,6 +59,13 @@ impl SettingsUi {
         Ok(())
     }
 
+    pub fn open_package_browser(&self) -> Result<()> {
+        let window = self.get_or_create_window()?;
+        let url = window.url()?.join("/settings/browse")?;
+        window.navigate(url)?;
+        self.open()
+    }
+
     #[allow(dead_code)]
     pub fn open_inspector(&self) -> Result<()> {
         let window = self.get_or_create_window()?;

@@ -12,7 +12,7 @@
 		"@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.sidebar": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
 		"@tauri-apps/api": "^2.12.4",

@@ -1,125 +1,108 @@
-import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card";
-import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
-import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
+import { ChordLibrary, listLibraryPackages } from "#chord-library";
+import { PackageApprovals } from "#package-approvals";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@chord/dev.improve.chord.components.ui.empty";
-import { StateQueries, useChordPackageManagerState } from "@chord/dev.improve.chord.lib.state";
+  StateQueries,
+  useChordPackageManagerState,
+  useDesktopAppManagerState,
+} from "@chord/dev.improve.chord.lib.state";
+import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card";
 import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { LocalFoldersCard } from "@chord/dev.improve.chord.routes.settings._components.local-folders-card";
-import { ChevronDownIcon, Package } from "lucide-react";
+import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@chord/dev.improve.chord.components.ui.tabs";
+import { ChevronRight, Settings2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 export function SettingsChordsPage() {
-	return (
-		<StateQueries queries={[useChordPackageManagerState()]}>
-			{(chordPackageManagerData) => (
-				<SettingsChordsPageContent chordPackageManagerData={chordPackageManagerData} />
-			)}
-		</StateQueries>
-	);
+  return (
+    <StateQueries queries={[useChordPackageManagerState(), useDesktopAppManagerState()]}>
+      {(chordPackageManagerData, desktopAppManagerData) => (
+        <SettingsChordsPageContent
+          chordPackageManagerData={chordPackageManagerData}
+          desktopAppManagerData={desktopAppManagerData}
+        />
+      )}
+    </StateQueries>
+  );
 }
 
-function SettingsChordsPageContent({
-	chordPackageManagerData,
+export function SettingsChordsPageContent({
+  chordPackageManagerData,
+  desktopAppManagerData,
 }: {
-	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
+  chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>["data"]>;
+  desktopAppManagerData?: NonNullable<ReturnType<typeof useDesktopAppManagerState>["data"]>;
 }) {
+  const [activeTab, setActiveTab] = useState("packages");
   const { packages, personalPackages } = chordPackageManagerData;
-  const personalNames = new Set(personalPackages.map((state) => state.name));
-
+  const apps = useMemo(
+    () => desktopAppManagerData?.appsMetadata ?? {},
+    [desktopAppManagerData?.appsMetadata],
+  );
+  const libraryPackages = useMemo(() => {
+    const personalNames = new Set(
+      personalPackages.flatMap((state) => (state.name ? [state.name] : [])),
+    );
+    return listLibraryPackages(
+      packages.filter((pkg) => !personalNames.has(pkg.name)),
+      personalNames,
+      apps,
+    );
+  }, [packages, personalPackages, apps]);
   return (
-    <div className="space-y-4">
-      <LocalFoldersCard />
-      <ChordReposCard />
-      <ChordMonoreposCard />
-      <Card size="sm">
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <CardTitle>Loaded Chord Packages</CardTitle>
-              <CardDescription>
-                All chord packages currently loaded into the registry, including local packages.
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{packages.length} loaded</Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 pt-0">
-          {packages.length === 0 ? (
-            <Empty className="rounded-lg border bg-muted/20 py-10">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Package />
-                </EmptyMedia>
-                <EmptyTitle>No loaded chord packages</EmptyTitle>
-                <EmptyDescription>
-                  Add a local chord package or load one from your configured git repos.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="space-y-2">
-              {packages.map((pkg) => (
-                <Collapsible
-                  key={pkg.name}
-                  className="group/collapsible rounded-lg border bg-background/80 overflow-hidden"
-                >
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="flex w-full items-center justify-between rounded-none border-0 p-3 h-auto hover:bg-muted/50"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="font-medium">{pkg.name}</span>
-                        {personalNames.has(pkg.name) && <Badge variant="secondary">My Chords</Badge>}
-                      </span>
-                      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="px-3 pb-3">
-                    {pkg.compiledChordsFiles &&
-                    Object.values(pkg.compiledChordsFiles).length > 0 ? (
-                      <div className="ml-4 space-y-1">
-                        {Object.values(pkg.compiledChordsFiles).flatMap((file) =>
-                          file.chords.map((chord) => (
-                            <p key={chord.rawTrigger} className="text-sm text-muted-foreground">
-                              - {chord.name}
-                            </p>
-                          )),
-                        )}
-                      </div>
-                    ) : (
-                      <div className="ml-4">
-                        <p className="text-sm text-muted-foreground italic">
-                          No chords loaded for this package.
-                        </p>
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-7">
+      <TabsList aria-label="Chords views">
+        <TabsTrigger
+          value="packages"
+          className="min-w-28 px-4 text-[13px]"
+        >
+          Packages
+        </TabsTrigger>
+        <TabsTrigger
+          value="personal"
+          className="min-w-28 px-4 text-[13px]"
+        >
+          My Chords
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent
+        value="packages"
+        forceMount
+        hidden={activeTab !== "packages"}
+        className="space-y-7"
+      >
+        <PackageApprovals
+          packages={chordPackageManagerData.thirdPartyPackages ?? []}
+          errors={chordPackageManagerData.errors}
+        />
+        <ChordLibrary packages={libraryPackages} apps={apps} personalDirnames={{}} />
+        <Collapsible className="group/sources preference-disclosure">
+          <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-5 py-4 text-sm font-normal">
+            <Settings2 className="size-4 text-muted-foreground" /> Manage sources
+            <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-data-[expanded=true]/sources:rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-5 px-5 pb-5">
+            <LocalFoldersCard />
+            <ChordReposCard />
+            <ChordMonoreposCard />
+          </CollapsibleContent>
+        </Collapsible>
+      </TabsContent>
+      <TabsContent value="personal" forceMount hidden={activeTab !== "personal"}>
+        <div className="preference-disclosure p-5">
+          <PersonalChords />
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 }

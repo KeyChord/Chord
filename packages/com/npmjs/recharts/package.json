@@ -1,8 +1,0 @@
-{
-  "name": "@chord/com.npmjs.recharts",
-  "type": "module",
-  "exports": "./+.ts",
-  "dependencies": {
-    "recharts": "3.10.1"
-  }
-}

@@ -1,7 +1,7 @@
 {
 	"name": "@chord/dev.improve.chord.components.ui.dropdown-menu",
-	"type": "module",
 	"private": true,
+	"type": "module",
 	"imports": {
 		"#dropdown-menu": "./dropdown-menu.tsx"
 	},
@@ -9,9 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@chord/com.npmjs.utils-cn": "workspace:*",
-		"lucide-react": "^1.57.0",
-		"radix-ui": "^1.8.1",
+		"@heroui/react": "^3.2.7",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

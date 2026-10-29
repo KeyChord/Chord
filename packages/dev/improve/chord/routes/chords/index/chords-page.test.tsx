@@ -5,7 +5,7 @@ import { ChordLayout, type ChordPackage } from "@chord/dev.improve.chord.lib.typ
 // The passive overlay only uses the viewport during server rendering. Effects
 // that talk to Tauri do not run, and TauRPC needs the browser's Proxy constructor.
 const previousWindow = globalThis.window;
-globalThis.window = { innerHeight: 720, Proxy } as unknown as Window & typeof globalThis;
+globalThis.window = { innerHeight: 720, Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { ChordsPageContent } = await import("#chords-page");
 afterAll(() => {
   globalThis.window = previousWindow;
@@ -17,7 +17,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordInputData: { input: ["Backslash"], quotes: [], inserting: false, blocks: [], openBlock: false },
       chordPanelData: { isVisible: true, layout },
       frontmostData: { filePickerActive: false },
-      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [] },
+      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [], thirdPartyPackages: [] },
       chordExecutionData: { loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" },
       chordMacrosData: {
         entries: [
@@ -49,7 +49,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       },
       chordPanelData: { isVisible: true, layout },
       frontmostData: { filePickerActive: false },
-      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [] },
+      chordPackageManagerData: { packages: [], errors: {}, personalPackages: [], thirdPartyPackages: [] },
       chordExecutionData: { loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" },
       chordMacrosData: { entries: [] },
     };
@@ -86,7 +86,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         chordInputData={{ input: ["KeyG", "KeyH"], quotes: [], inserting: false, blocks: [], openBlock: false }}
         chordPanelData={{ isVisible: true, layout }}
         frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive }}
-        chordPackageManagerData={{ errors: {}, personalPackages: [], packages: [packageFor("dev.fixture", "Host navigation"), packageFor("com.apple.finder", "Finder navigation")] }}
+        chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], packages: [packageFor("dev.fixture", "Host navigation"), packageFor("com.apple.finder", "Finder navigation")] }}
         chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
         chordMacrosData={{ entries: [] }}
       />);
@@ -101,7 +101,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordInputData={{ input: ["Digit3", "Backquote", "KeyD", "Digit2", "Comma", "KeyI", "Digit1", "Digit3", "Backquote", "Slash", "KeyW", "BracketRight", "Enter", "Slash", "KeyW"], quotes: [], inserting: false, blocks: [], openBlock: false }}
       chordPanelData={{ isVisible: true, layout }}
       frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
-      chordPackageManagerData={{ errors: {}, personalPackages: [], packages: [{
+      chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], packages: [{
         name: "@fixture/test",
         rawChordsFiles: {},
         globalChords: [],
@@ -129,7 +129,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordInputData={{ input: ["Digit3", "Quote"], quotes: ["Hello, World"], inserting: true, blocks: [], openBlock: false, description: "Insert mode · Caps+Space closes the quote · Esc cancels" }}
       chordPanelData={{ isVisible: true, layout }}
       frontmostData={{ filePickerActive: false }}
-      chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [] }}
+      chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [], thirdPartyPackages: [] }}
       chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
       chordMacrosData={{ entries: [] }}
     />);
@@ -141,7 +141,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     chordInputData={chordInputData}
     chordPanelData={{ isVisible: true, layout }}
     frontmostData={{ filePickerActive: false }}
-    chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [] }}
+    chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [], thirdPartyPackages: [] }}
     chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
     chordMacrosData={{ entries: [] }}
   />);

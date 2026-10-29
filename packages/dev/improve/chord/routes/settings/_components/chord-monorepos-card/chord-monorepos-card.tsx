@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@chord/com.npmjs.tanstack__react-query";
-import { toast } from "@chord/com.npmjs.sonner";
+import { toast } from "@chord/dev.improve.chord.components.ui.toast";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
-import { ChordReposCard, MonorepoPackagePicker } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
+import {
+  ChordReposCard,
+  MonorepoPackagePicker,
+} from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { Link } from "lucide-react";
 import { useState } from "react";
 
@@ -71,7 +74,8 @@ export function ChordMonoreposCard() {
           </Button>
         </form>
         <p className="text-xs text-muted-foreground">
-          Link the monorepo root, then select packages below. Reload after editing files or adding and removing packages.
+          Link the monorepo root, then select packages below. Reload after editing files or adding
+          and removing packages.
         </p>
         {localMonorepos.isLoading && (
           <p className="text-sm text-muted-foreground">Loading local monorepos...</p>

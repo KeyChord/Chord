@@ -1,4 +1,4 @@
-use super::LocalPackageRegistry;
+use super::PackageStore;
 use crate::models::RawChordPackage;
 use anyhow::{Context, Result, ensure};
 use std::collections::HashMap;
@@ -36,23 +36,28 @@ fn is_package_root(path: &Path) -> bool {
             .any(|dir| path.join(dir).is_dir())
 }
 
-pub fn validate_monorepo_path(path: &str) -> Result<PathBuf> {
+pub fn validate_monorepo_path(store: &PackageStore, path: &str) -> Result<PathBuf> {
     ensure!(!path.trim().is_empty(), "Monorepo path cannot be empty");
     let root = fs::canonicalize(path.trim()).context("Failed to access monorepo folder")?;
+    let mounted = store.mount(&root)?;
     ensure!(
-        !discover_monorepo_packages(&root)?.is_empty(),
+        !discover_monorepo_packages(&mounted)?.is_empty(),
         "No chord packages found. Expected chords-* folders at the root or nested within {}",
         root.display()
     );
     // Detect unreadable packages and duplicate names before saving the source.
-    import_monorepo_packages(&root)?;
+    import_monorepo_packages(store, &mounted)?;
     Ok(root)
 }
 
-pub fn import_monorepo_packages(root: &Path) -> Result<HashMap<String, RawChordPackage>> {
+pub fn import_monorepo_packages(
+    store: &PackageStore,
+    root: &Path,
+) -> Result<HashMap<String, RawChordPackage>> {
+    let root = store.mount(root)?;
     let mut packages: HashMap<String, RawChordPackage> = HashMap::new();
-    for path in discover_monorepo_packages(root)? {
-        let package = LocalPackageRegistry::import_from_local_folder(&path)?;
+    for path in discover_monorepo_packages(&root)? {
+        let package = store.import_package(&path)?;
         let name = package.package_name();
         if let Some(existing) = packages.get(&name) {
             anyhow::bail!(
@@ -69,13 +74,14 @@ pub fn import_monorepo_packages(root: &Path) -> Result<HashMap<String, RawChordP
 
 /// Missing selections deliberately mean no packages, including for older saved sources.
 pub fn import_selected_monorepo_packages(
+    store: &PackageStore,
     root: &Path,
     selected: &[String],
 ) -> Result<HashMap<String, RawChordPackage>> {
     if selected.is_empty() {
         return Ok(HashMap::new());
     }
-    let mut packages = import_monorepo_packages(root)?;
+    let mut packages = import_monorepo_packages(store, root)?;
     packages.retain(|name, _| selected.contains(name));
     Ok(packages)
 }
@@ -90,7 +96,10 @@ mod tests {
             let root =
                 std::env::temp_dir().join(format!("chord-monorepo-{}", uuid::Uuid::new_v4()));
             fs::create_dir_all(&root).unwrap();
-            Self(root)
+            Self(fs::canonicalize(root).unwrap())
+        }
+        fn store(&self) -> PackageStore {
+            PackageStore::new(self.0.join(".store"))
         }
         fn package(&self, folder: &str, name: &str) -> PathBuf {
             let path = self.0.join(folder);
@@ -122,10 +131,10 @@ mod tests {
             discover_monorepo_packages(&fixture.0).unwrap(),
             vec![first.clone(), last, nested, legacy]
         );
-        let packages = import_monorepo_packages(&fixture.0).unwrap();
+        let packages = import_monorepo_packages(&fixture.store(), &fixture.0).unwrap();
         assert_eq!(packages.len(), 4);
-        assert_eq!(packages["@test/a"].root, first);
-        assert!(validate_monorepo_path(fixture.0.to_str().unwrap()).is_ok());
+        assert_eq!(fs::canonicalize(&packages["@test/a"].root).unwrap(), first);
+        assert!(validate_monorepo_path(&fixture.store(), fixture.0.to_str().unwrap()).is_ok());
     }
 
     #[test]
@@ -149,7 +158,12 @@ mod tests {
             discover_monorepo_packages(&fixture.0).unwrap(),
             vec![package]
         );
-        assert_eq!(import_monorepo_packages(&fixture.0).unwrap().len(), 1);
+        assert_eq!(
+            import_monorepo_packages(&fixture.store(), &fixture.0)
+                .unwrap()
+                .len(),
+            1
+        );
     }
 
     #[test]
@@ -163,10 +177,13 @@ mod tests {
             discover_monorepo_packages(&fixture.0).unwrap(),
             vec![package.clone()]
         );
-        let packages = import_monorepo_packages(&fixture.0).unwrap();
+        let packages = import_monorepo_packages(&fixture.store(), &fixture.0).unwrap();
         assert_eq!(packages.len(), 1);
-        assert_eq!(packages["@test/one"].root, package);
-        assert!(validate_monorepo_path(fixture.0.to_str().unwrap()).is_ok());
+        assert_eq!(
+            fs::canonicalize(&packages["@test/one"].root).unwrap(),
+            package
+        );
+        assert!(validate_monorepo_path(&fixture.store(), fixture.0.to_str().unwrap()).is_ok());
     }
 
     #[test]
@@ -179,13 +196,22 @@ mod tests {
         }
         // A matching container without package contents must not hide nested packages.
         let nested = fixture.package("chords-container/group/chords-nested", "@test/nested");
-        let packages = import_monorepo_packages(&fixture.0).unwrap();
+        let packages = import_monorepo_packages(&fixture.store(), &fixture.0).unwrap();
         assert_eq!(packages.len(), 5);
-        assert_eq!(packages["@test/manifest"].root, manifest);
-        assert_eq!(packages["@test/nested"].root, nested);
+        assert_eq!(
+            fs::canonicalize(&packages["@test/manifest"].root).unwrap(),
+            manifest
+        );
+        assert_eq!(
+            fs::canonicalize(&packages["@test/nested"].root).unwrap(),
+            nested
+        );
         for dir in ["chords", "js", "bin"] {
             let name = format!("chords-{dir}");
-            assert_eq!(packages[&name].root, fixture.0.join(&name));
+            assert_eq!(
+                fs::canonicalize(&packages[&name].root).unwrap(),
+                fixture.0.join(&name)
+            );
         }
     }
 
@@ -195,16 +221,21 @@ mod tests {
         let path = fixture.package("chords-one", "@test/one");
         for contents in ["first", "edited"] {
             fs::write(path.join("chords/macos.toml"), contents).unwrap();
-            let packages = import_monorepo_packages(&fixture.0).unwrap();
+            let packages = import_monorepo_packages(&fixture.store(), &fixture.0).unwrap();
             assert_eq!(
                 packages["@test/one"].chords_files_contents[Path::new("chords/macos.toml")],
                 contents
             );
         }
         fixture.package("chords-two", "@test/two");
-        assert_eq!(import_monorepo_packages(&fixture.0).unwrap().len(), 2);
+        assert_eq!(
+            import_monorepo_packages(&fixture.store(), &fixture.0)
+                .unwrap()
+                .len(),
+            2
+        );
         fs::remove_dir_all(path).unwrap();
-        let packages = import_monorepo_packages(&fixture.0).unwrap();
+        let packages = import_monorepo_packages(&fixture.store(), &fixture.0).unwrap();
         assert!(!packages.contains_key("@test/one"));
         assert!(packages.contains_key("@test/two"));
     }
@@ -214,20 +245,21 @@ mod tests {
         let fixture = Fixture::new();
         let path = fixture.package("chords-one", "@test/one");
         assert!(
-            import_selected_monorepo_packages(&fixture.0, &[])
+            import_selected_monorepo_packages(&fixture.store(), &fixture.0, &[])
                 .unwrap()
                 .is_empty()
         );
         let selected = vec!["@test/one".to_owned()];
         assert_eq!(
-            import_selected_monorepo_packages(&fixture.0, &selected)
+            import_selected_monorepo_packages(&fixture.store(), &fixture.0, &selected)
                 .unwrap()
                 .len(),
             1
         );
         fixture.package("chords-two", "@test/two");
         fs::write(path.join("chords/macos.toml"), "edited").unwrap();
-        let packages = import_selected_monorepo_packages(&fixture.0, &selected).unwrap();
+        let packages =
+            import_selected_monorepo_packages(&fixture.store(), &fixture.0, &selected).unwrap();
         assert_eq!(packages.len(), 1);
         assert_eq!(
             packages["@test/one"].chords_files_contents[Path::new("chords/macos.toml")],
@@ -235,12 +267,12 @@ mod tests {
         );
         fs::remove_dir_all(path).unwrap();
         assert!(
-            import_selected_monorepo_packages(&fixture.0, &selected)
+            import_selected_monorepo_packages(&fixture.store(), &fixture.0, &selected)
                 .unwrap()
                 .is_empty()
         );
         assert!(
-            import_selected_monorepo_packages(&fixture.0, &[])
+            import_selected_monorepo_packages(&fixture.store(), &fixture.0, &[])
                 .unwrap()
                 .is_empty()
         );
@@ -250,12 +282,12 @@ mod tests {
     fn monorepo_validation_rejects_invalid_roots_and_duplicate_names() {
         let fixture = Fixture::new();
         for path in ["", "  ", fixture.0.to_str().unwrap()] {
-            assert!(validate_monorepo_path(path).is_err());
+            assert!(validate_monorepo_path(&fixture.store(), path).is_err());
         }
         fixture.package("chords-a", "@test/duplicate");
         fixture.package("chords-b", "@test/duplicate");
         assert!(
-            import_monorepo_packages(&fixture.0)
+            import_monorepo_packages(&fixture.store(), &fixture.0)
                 .unwrap_err()
                 .to_string()
                 .contains("Duplicate package")

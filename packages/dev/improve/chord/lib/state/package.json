@@ -15,7 +15,8 @@
 		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"@tauri-apps/api": "^2.12.4",
 		"react": "^19.3.1",
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*"
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/react": "^19.3.0",

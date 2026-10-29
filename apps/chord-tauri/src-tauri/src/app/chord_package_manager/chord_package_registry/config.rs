@@ -1,4 +1,4 @@
-use crate::app::chord_package_manager::chord_package_registry::LocalPackageRegistry;
+use super::PackageStore;
 use crate::models::RawChordPackage;
 use nject::injectable;
 use std::collections::HashMap;
@@ -15,7 +15,8 @@ impl ConfigPackageRegistry {
     pub fn import_all_packages(&self) -> anyhow::Result<HashMap<String, RawChordPackage>> {
         let mut packages = HashMap::new();
 
-        let packages_dir = self.get_packages_dir()?;
+        let store = PackageStore::for_app(&self.handle)?;
+        let packages_dir = store.migrate_config(&self.get_packages_dir()?)?;
 
         if !packages_dir.exists() {
             return Ok(packages);
@@ -29,14 +30,12 @@ impl ConfigPackageRegistry {
                 continue;
             }
 
-            if let Ok(package) =
-                LocalPackageRegistry::import_from_local_folder(&path).inspect_err(|error| {
-                    log::warn!(
-                        "Error importing config package {}: {error}, skipping",
-                        path.display()
-                    );
-                })
-            {
+            if let Ok(package) = store.import_package(&path).inspect_err(|error| {
+                log::warn!(
+                    "Error importing config package {}: {error}, skipping",
+                    path.display()
+                );
+            }) {
                 packages.insert(package.package_name(), package);
             }
         }

@@ -26,10 +26,15 @@ bun install --frozen-lockfile
 # one-time: build Bun and libbun_embed.dylib in the rbun checkout (~20 min cold);
 # install the prerequisites from rbun's README first
 (cd ../rbun && bun install && bun run _build-bun)
-bun run dev
+vpx _dev
 ```
 
-`bun run dev` signs the development app with a certificate-backed code-signing identity and does not fall back to ad-hoc signing. If you are not on the maintainer's machine, set `CHORD_DEV_SIGNING_IDENTITY` to one of your identities (list them with `security find-identity -v -p codesigning`; a free Apple Development certificate from Xcode works). The development app is called **Chord (Development)** and needs its own Accessibility grant.
+`vpx _dev` signs the development app with a certificate-backed code-signing identity and does not fall back to ad-hoc signing. If you are not on the maintainer's machine, set `CHORD_DEV_SIGNING_IDENTITY` to one of your identities (list them with `security find-identity -v -p codesigning`; a free Apple Development certificate from Xcode works). The development app is called **Chord (Development)** and needs its own Accessibility grant.
+
+Use `vpx _dev --force` to restart an existing development
+session. The launcher quits mprocs through its loopback control server on port 1422
+and frees the Vite/HMR ports 1420 and 1421 before starting the stack. Without
+`--force`, occupied ports are reported and the existing session is left running.
 
 ## Version control
 
@@ -94,9 +99,23 @@ empty or undescribed changes and forwards options such as `--dry-run` to
 ready to move. The agent workflow is documented in
 [the jujutsu skill](./.agents/skills/jujutsu/SKILL.md).
 
+## Frontend components
+
+Chord uses [HeroUI v3](https://heroui.com/docs/react/getting-started/quick-start).
+Shared adapters in `packages/dev/improve/chord/components/ui/` provide compact
+desktop sizing and compose HeroUI's accessible controls. Each adapter declares
+its own `@heroui/react` dependency; feature packages import the Chord adapter.
+The CodeMirror editor and app-specific layouts remain custom components.
+
+`apps/chord-tauri/src/global.css` imports HeroUI's theme and only the component
+styles Chord uses. Add the matching `@heroui/styles/components/<name>.css` import
+when introducing another HeroUI primitive. Keep the body and root transparent
+for the native chord overlay. Settings surfaces define their own backgrounds.
+
 ## Toolchain
 
 Chord uses [proto](https://moonrepo.dev/proto) to install the versions of Bun and Rust pinned for the repository.
+Install [Vite+](https://viteplus.dev/guide) as well to make `vpx` available.
 
 Install proto on macOS, Linux, or WSL:
 
@@ -111,7 +130,24 @@ proto install
 bun install --frozen-lockfile
 ```
 
-Start the desktop app with `bun run dev`, after building rbun's Bun once as shown in
+Project commands are executable `_*.ts` files exposed as workspace binaries. Run them
+from the repository root with `vpx`; Bun remains their runtime through the shebang.
+
+```sh
+vpx _dev                       # desktop development session
+vpx _build                     # type-check and build the frontend
+vpx _release-macos             # package the production macOS app
+vpx _lint                      # lint and apply fixes
+vpx _gen-types                 # regenerate Rust model types
+vpx _gen-official-chord-repos   # regenerate the package catalog
+vpx _e2e-macos test --build     # build and test the production app in Tart
+```
+
+`vpx _vite-dev`, `vpx _preview`, and `vpx _tauri` expose the underlying app tools.
+`vpx _tauri-dev` starts the signed development launcher directly. Tauri build hooks
+invoke the same `_*.ts` files with Bun, so CI does not require a global Vite+ install.
+
+Start the desktop app with `vpx _dev`, after building rbun's Bun once as shown in
 [Building from source](#building-from-source).
 
 On macOS, the development runner builds with Tauri and uses Cargo's runner hook
@@ -119,7 +155,7 @@ to launch a signed, immutable `.app` snapshot through Launch Services. The execu
 and embedded Bun dylib are copied out of the build directories; the copy's Bun
 load command points directly to its bundled dylib. Rebuilding Chord or rbun while
 the app is running cannot replace these files. Vite hot reload still works.
-Running `bun run dev` inside `apps/chord-tauri` uses the same launcher and starts Vite.
+These commands also resolve inside `apps/chord-tauri`; the launchers select their own working directory.
 Raw `cargo run` or `tauri dev` bypasses this launcher and runs the build output directly.
 
 Snapshots live in `~/Library/Application Support/<development identifier>/runtime-snapshots/`,
@@ -256,7 +292,7 @@ state store. `RUST_LOG` remains a startup override and takes precedence over the
 
 After changing IPC methods, regenerate the frontend bindings without launching
 the app with `cargo test --manifest-path apps/chord-tauri/src-tauri/Cargo.toml --lib export_typescript_bindings -- --ignored`.
-Run `bun run gen-types` after changing observable or model types.
+Run `vpx _gen-types` after changing observable or model types.
 
 The project tool versions are declared in [`.prototools`](./.prototools). Rust is also pinned in [`rust-toolchain.toml`](./rust-toolchain.toml) because proto delegates Rust version selection to rustup.
 
@@ -292,7 +328,7 @@ for listener validation and `cargo test --lib file_picker_tests` for scope tests
 
 Chord's core `0` bindings live in the sibling checkout at
 `../chords/@keychord/chords-chord/chords/com/leonsilicon/chord/macos.toml`.
-Development builds and reloads read that file directly. Keep its distribution copy
+Development builds mount that file into the package store and read it through that link. Keep its distribution copy
 at `apps/chord-tauri/data/chords-chord/chords/com/leonsilicon/chord/macos.toml`
 in sync; builds without the sibling checkout embed that copy. The core file is
 always loaded globally and cannot be disabled or replaced by another package source.
@@ -302,10 +338,46 @@ enter the absolute path to your local checkout. Its `package.json` name must mat
 the installed package. Links also work for pinned default packages and persist across
 app restarts.
 
-Chord loads the linked folder in place. After editing chords or JavaScript, click
+Chord creates a symlink under `~/.chord/packages/.linked` and loads the checkout
+through that path. After editing chords or JavaScript, click
 **Reload** on the repo (or use the tray reload action) to reload configs and rebuild
 the JS runtime. Sync is disabled while linked. **Unlink** restores the cached
 version without changing your local files.
+
+All runtime package reads, including manifests, chords, JavaScript and native-file
+resolution, start in `~/.chord/packages`. The layout is:
+
+- `@keychord/` is the trusted official namespace. Verified official downloads are
+  mounted below `@keychord/.managed/<source-id>/<original-folder-name>`; this keeps
+  revisions distinct while retaining the backing checkouts below `.sources/`.
+- Other visible folders (including manually added symlinks and scoped packages)
+  require approval in Chords → Packages → Third-Party Packages before their chords
+  or handlers load. Chord approves packages it creates through My Chords, including
+  a newly created default package. Existing folders are never approved implicitly.
+- `.sources/github.com/<owner>/<repo>/<full-commit>/` contains downloaded checkouts.
+  GitHub names are case-insensitive. Different owners, repositories and commits
+  have separate paths; syncing or resetting never overwrites another revision.
+- `.linked/<source-id>/<original-folder-name>` mounts local packages and monorepos.
+  The source ID uses the complete canonical checkout path, so equal folder names
+  in different locations remain distinct. Editing the original checkout works as before.
+- `.sources/config/<source-id>` contains legacy config packages, scoped by their
+  original app config directory so development and production sources stay separate.
+- `.core` contains the protected core bindings, scoped by build contents and,
+  for development, source checkout.
+
+The source stores still select active repositories and monorepo packages; retained
+downloads and old revisions are not automatically activated. At startup, existing
+downloaded checkouts move from the app cache into this store, preserving pinned
+revisions and local overrides. Legacy config packages also migrate on reload.
+Neither path has a fallback loader outside `~/.chord/packages`.
+
+Approvals live in the app's `package-trust.json` store, outside package contents,
+and include both the logical package path and its canonical target. A manifest's
+name does not confer trust; changing a linked package's target requires approval
+again. Revoke Approval removes its chords and runtime registrations immediately,
+even if a subsequent reload fails. Local overrides of official repositories also
+require approval. New third-party packages must be downloaded and extracted
+manually; Add Repo accepts official repositories only.
 
 ## Chord monorepos
 
@@ -345,7 +417,7 @@ Settings → Browse lists only the official packages named in
 Each listing's name, description, categories and repo URL come from the `displayName`,
 `description`, `categories` and `repository.url` fields of the package's `package.json` in the
 sibling `../chords` checkout. After changing that list or those fields, run
-`bun run gen-official-chord-repos` and commit the regenerated `official-chord-repos.gen.json`;
+`vpx _gen-official-chord-repos` and commit the regenerated `official-chord-repos.gen.json`;
 a test fails while it is out of date (and is skipped without the sibling checkout).
 Community packages are not listed: Browse links to a GitHub search for the `chordpack` topic.
 The chords monorepo's mirror sync adds that topic to every official `chords-*` mirror, and
@@ -368,7 +440,7 @@ from the rbun checkout, so build it once:
 # install the prerequisites from rbun's README first
 (cd ../rbun && bun install && bun run _build-bun)
 
-bun run dev
+vpx _dev
 ```
 
 The runtime integration lives in `apps/chord-tauri/src-tauri/src/bun_js/` and exposes the
@@ -387,6 +459,65 @@ The CLI uses the same embedded runtime:
 apps/chord-tauri/src-tauri/target/debug/chord bun ./script.ts
 apps/chord-tauri/src-tauri/target/debug/chord run ./script.ts export-name arg1 arg2
 ```
+
+## End-to-end tests
+
+End-to-end tests run the production app in a macOS virtual machine, so they can type real
+keystrokes, remap the Caps key, and crash Chord without touching the host. They live in
+`packages/dev/improve/chord/configs/e2e/macos` as `*.e2e.ts` files, which a plain `bun test`
+does not pick up. They need [tart](https://tart.run) on an Apple Silicon Mac (`TART` may point
+to its binary).
+
+```sh
+vpx _e2e-macos setup          # once: builds the golden VM (downloads about 30 GB)
+vpx _e2e-macos setup --concurrency 2  # fewer parallel downloads on a shared connection
+vpx _e2e-macos test --build   # builds the DMG as the release workflow does, then tests it
+vpx _e2e-macos test           # tests the newest DMG under apps/chord-tauri/src-tauri/target
+vpx _e2e-macos test --release prod   # tests a published release
+```
+
+`--build` produces the signed release app and DMG, with updater archives disabled so a
+`TAURI_SIGNING_PRIVATE_KEY` is not needed. Image download progress is printed during setup.
+Download concurrency defaults to 4. A completed image pull is cached, and subsequent test
+runs clone the local `chord-e2e-golden` VM without downloading the image again. `setup --force`
+rebuilds the golden VM; the existing golden VM is replaced only after provisioning succeeds.
+The CLI also finds `tart.app` in `~/Applications` or `/Applications` when it is not on `PATH`.
+
+`setup` clones Cirrus Labs' macOS 27 vanilla image (auto-login, SSH and passwordless sudo for
+`admin`/`admin`) and disables System Integrity Protection in Recovery by typing `csrutil disable`
+over VNC; screenshots of each step land in `target/e2e/setup/`. With SIP off, a test run can
+grant Accessibility by writing the system TCC database, pinned to the app's designated code
+requirement, as if the user had switched it on in System Settings.
+
+Each `test` run clones the golden VM, installs the DMG by mounting it and copying the app to
+`/Applications`, and runs the tests against it. Tests drive the VM through two channels: SSH
+for setup and assertions, and Virtualization.framework's VNC server (`tart run
+--vnc-experimental`) for input. VNC key events arrive on the VM's virtual keyboard, so they pass
+through `UserKeyMapping` and reach Chord's event tap like presses on a physical keyboard. A
+failed test saves a screenshot and Chord's log to `target/e2e/runs/<run>/`. The clone is deleted
+afterwards unless `--keep` is passed.
+
+To iterate on tests, keep a VM running and rerun against it; each run reinstalls the DMG:
+
+```sh
+vpx _e2e-macos up                          # boots a clone with Chord installed and running
+vpx _e2e-macos test --vm <name> [files...]
+vpx _e2e-macos ssh                         # or: vpx _e2e-macos screenshot
+vpx _e2e-macos down
+```
+
+`up` and `test` print a `vnc://` URL; `open` it to watch or control the VM in Screen Sharing.
+Tests use `Session` from `#session`: `session.chord("/er")` holds Space, types the keys, and
+releases Space (or presses Caps with `{ complete: "caps" }`); `session.restartChord({ name:
+files })` replaces personal packages in `~/.chord/packages` and waits until they are loaded; and
+`session.openRecorder(file)` opens a Terminal window that records the keystrokes it receives.
+Fixture setup preserves the managed package directories and the default package, and records
+approval for each test package's exact path and canonical target before launching Chord.
+
+The eight tests cover shell and Bun handlers, completion by Space release and by Caps,
+swallowing chord input before it reaches the focused app, Caps remapping and toggling, crash
+recovery through the Caps guardian, and remap cleanup on quit. The VNC protocol unit tests
+run separately with `bun test packages/dev/improve/chord/configs/e2e/macos/vnc.test.ts`.
 
 ## Releases
 

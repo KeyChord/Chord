@@ -26,6 +26,19 @@ pub struct ChordJsPackageBuilder {
     handle: AppHandle,
 }
 
+/// Bun may report a module's real path after traversing a package-store symlink. Keep
+/// package-relative/native resolution anchored to the registered path inside the store.
+pub fn package_module_relative_path(root: &Path, module: &Path) -> Option<PathBuf> {
+    module
+        .strip_prefix(root)
+        .map(Path::to_path_buf)
+        .ok()
+        .or_else(|| {
+            let target = std::fs::canonicalize(root).ok()?;
+            module.strip_prefix(target).map(Path::to_path_buf).ok()
+        })
+}
+
 impl ChordJsPackage {
     pub fn builder(handle: AppHandle, name: &str, root: PathBuf) -> ChordJsPackageBuilder {
         ChordJsPackageBuilder {

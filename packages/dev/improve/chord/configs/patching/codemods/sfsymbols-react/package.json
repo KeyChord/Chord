@@ -3,10 +3,10 @@
 	"type": "module",
 	"version": "0.0.0",
 	"private": true,
-	"scripts": {
-		"test": "npx --yes codemod@latest jssg test -l json ./codemod.ts ./@fixtures --strictness loose"
-	},
 	"devDependencies": {
 		"@codemod.com/jssg-types": "^1.6.3"
+	},
+	"bin": {
+		"_test-sfsymbols-react": "./_test-sfsymbols-react.ts"
 	}
 }

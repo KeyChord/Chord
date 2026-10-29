@@ -3,7 +3,7 @@
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#gen-official-chord-repos": "./gen-official-chord-repos.ts",
+		"#gen-official-chord-repos": "./_gen-official-chord-repos.ts",
 		"#official-chord-packages.json": "./@assets/official-chord-packages.json",
 		"#official-chord-repos": "./official-chord-repos.ts",
 		"#official-chord-repos.gen.json": "./@assets/official-chord-repos.gen.json"
@@ -11,12 +11,12 @@
 	"exports": {
 		".": "./+.ts"
 	},
-	"scripts": {
-		"gen": "bun ./gen-official-chord-repos.ts"
-	},
 	"dependencies": {},
 	"devDependencies": {
 		"@chord/dev.improve.chord.lib.github": "workspace:*",
 		"@types/bun": "^1.4.3"
+	},
+	"bin": {
+		"_gen-official-chord-repos": "./_gen-official-chord-repos.ts"
 	}
 }

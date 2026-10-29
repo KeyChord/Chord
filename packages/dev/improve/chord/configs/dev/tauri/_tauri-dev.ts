@@ -14,6 +14,7 @@ await Bun.write(controlFile, "");
 const args = process.argv.slice(2);
 const noVite = args.includes("--no-vite");
 const cliArgs = args.filter((arg) => arg !== "--no-vite");
+const appDir = join(import.meta.dir, "../../../../../../../apps/chord-tauri");
 let runtime: typeof import("#runtime") | undefined;
 if (process.platform === "darwin") {
   runtime = await import("#runtime");
@@ -41,9 +42,8 @@ if (process.platform === "darwin") {
 
 const tauri = Bun.spawn(
   [
-    "bun",
-    "run",
-    "tauri",
+    process.execPath,
+    join(appDir, "_tauri.ts"),
     "dev",
     "--no-watch",
     "--config",
@@ -52,7 +52,7 @@ const tauri = Bun.spawn(
     ...cliArgs,
   ],
   {
-    cwd: process.cwd(),
+    cwd: appDir,
     env: {
       ...process.env,
       CHORD_LOG_CONTROL_FILE: controlFile,
