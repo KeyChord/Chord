@@ -103,7 +103,9 @@ name = "Finder"
 
 > Note that anything after a `#` in _chord files_ is a comment used purely for documentation and is ignored by the configuration file.
 
-You'll then be able to type <kbd>/</kbd><kbd>f</kbd><kbd>⇪</kbd> in chord mode to open Finder, and then <kbd>g</kbd><kbd>h</kbd><kbd>⇪</kbd> to open your home directory!
+You'll then be able to type:
+1. <kbd>/</kbd><kbd>f</kbd><kbd>⇪</kbd> to open Finder
+2. <kbd>g</kbd><kbd>h</kbd><kbd>⇪</kbd> to open your home directory!
 
 ### Pre-Made Chord Packages
 
@@ -111,9 +113,9 @@ Instead of defining your own chords for every app, Chord provides pre-made chord
 
 Chord's compiled chords contain certain conventions:
 
-Navigation - `n/e/s/w` (north, east, south, west)
-Movement - `l/r/u/d` (left, right, up, down)
-Position & Order - `f/k/a/z` (front, back, first, last)
+- Navigation: `n/e/s/w` (north, east, south, west)
+- Movement: `l/r/u/d` (left, right, up, down)
+- Position & Order: `f/k/a/z` (front, back, first, last)
 
 > For a full list of these conventions, see the [KeyChords/chords](https://github.com/KeyChord/chords) repo!
 
