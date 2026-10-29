@@ -378,8 +378,8 @@ apps/chord-tauri/src-tauri/target/debug/chord run ./script.ts export-name arg1 a
 ## Releases
 
 Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
-which builds the app and uploads the DMGs to the rolling release of the same name (Apple Silicon, plus
-Intel when a matching Intel Bun build exists; see below). `beta` is published as a prerelease;
+which builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling release of the
+same name. Both architectures must succeed before publishing. `beta` is published as a prerelease;
 [`prod`](https://github.com/KeyChord/Chord/releases/tag/prod) is marked as the repository's latest
 release, so `https://github.com/KeyChord/Chord/releases/latest` always serves production. Beta uses
 the `com.leonsilicon.chord.beta` application identifier, while local development uses
@@ -402,9 +402,9 @@ points the build at it with `RBUN_BUN_LIB_DIR` plus a generated overlay config t
 in `Cargo.toml` resolves — the dylib satisfies the linker, but cargo still needs rbun's source
 manifest. The workflow downloads the release for the Bun commit that rbun's checkout pins, because
 Chord links against that commit's embedding API. After bumping the Bun submodule in rbun, let its
-`build-bun-embed` workflow finish before the next Chord release build. The Intel leg is optional:
-rbun's Intel build of Bun does not currently finish within its job limit, so without a matching
-Intel dylib the release ships Apple Silicon only.
+`build-bun-embed` workflow finish for both architectures before the next Chord release build.
+The Intel runtime is built on `macos-15-intel` using prebuilt LLVM tools from conda-forge, avoiding
+the Homebrew LLVM source build that previously exceeded the job limit.
 
 ### Code signing
 

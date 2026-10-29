@@ -114,7 +114,7 @@ export interface ChordHint {
 export interface ChordInputState {
 	/**
 	 * The keys a user has pressed for a chord but not yet executed. Think of it as the equivalent
-	 * of an HTML <input />'s `value`. Always cleared when executed.
+	 * of an HTML <input />'s `value`. Reset to its blocks when executed.
 	 */
 	input: ChordInput;
 	/** Insert-mode text for each quote in `input`, in order; see `ChordInputEvent::quotes`. */
@@ -124,6 +124,16 @@ export interface ChordInputState {
 	 * the chord. Chord stays active without Space until Caps+Space closes the quote.
 	 */
 	inserting: boolean;
+	/**
+	 * Where each block of `input` ends, ascending. Keys typed with Shift held form a
+	 * block, which stays in `input` after every run until Backspace removes it.
+	 */
+	blocks: number[];
+	/**
+	 * Shift is held after typing a key, so the keys after `blocks` are a block that
+	 * becomes solid when Shift is released.
+	 */
+	openBlock: boolean;
 	/** The chord currently being pressed down. */
 	pressedInputEvent?: ChordInputEvent;
 	/** The chord that is "active" */

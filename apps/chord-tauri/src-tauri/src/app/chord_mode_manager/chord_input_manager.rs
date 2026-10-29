@@ -168,6 +168,10 @@ impl ChordInputManager {
         }
         let event = ChordKeyboardEvent::new(key_event, &device_keys, !fresh_press);
         let press_triggers = [ChordEventTrigger::Keydown, ChordEventTrigger::Keypress];
+        // Releasing Shift makes the block typed while it was held solid.
+        if !event.shift_key {
+            self.close_block()?;
+        }
 
         if let KeyEvent::Release(Key(code)) = key_event {
             let should_end = self
@@ -237,7 +241,8 @@ impl ChordInputManager {
             }
             KeyEvent::Press(Key(KeyMappingCode::CapsLock)) => {
                 let state = self.observable.get_state()?;
-                if state.input.is_empty() {
+                // Blocks alone never run, so Caps repeats the last chord as on an empty buffer.
+                if !state.has_loose_keys() {
                     self.dispatch_current_buffer(&press_triggers, &event)?;
                     if let Some(selected) = state.selected_input_event {
                         self.execute_input(
@@ -274,23 +279,23 @@ impl ChordInputManager {
                 let state = self.observable.get_state()?;
                 let selected = select_escape(&state.input, &self.sequence.lock().macros)?;
                 if let Some(input) = selected {
-                    self.edit_buffer(input, state.quotes, false)?;
+                    let blocks = rebase_blocks(state.blocks, &state.input, &input);
+                    self.edit_buffer(input, blocks, state.open_block, state.quotes, false)?;
                 }
                 self.dispatch_current_buffer(&press_triggers, &event)?;
             }
             // A quote always opens like an unshifted key, entering insert mode at the
-            // start of a step.
+            // start of a step. It ends a block typed before it, since insert mode
+            // never sees Shift's release.
             KeyEvent::Press(key @ Key(KeyMappingCode::Quote)) => {
-                self.handle_unshifted_key_press(key, &event)?;
+                self.handle_key_press(key, &event, false)?;
             }
             KeyEvent::Press(key) => {
                 if is_shift_pressed && Self::should_clear_key_buffer_on_shifted_press(key) {
                     self.clear_key_buffer()?;
                     self.dispatch_current_buffer(&press_triggers, &event)?;
-                } else if is_shift_pressed && Key::serialize_sequence(&[*key]).is_some() {
-                    self.handle_shifted_key_press(key, &event)?;
                 } else {
-                    self.handle_unshifted_key_press(key, &event)?;
+                    self.handle_key_press(key, &event, is_shift_pressed)?;
                 }
             }
         }
@@ -525,35 +530,43 @@ impl ChordInputManager {
 
     fn set_executed_event(&self, event: ChordInputEvent) -> Result<()> {
         self.executions.fetch_add(1, Ordering::SeqCst);
-        self.observable.set_state(move |state| ChordInputState {
-            input: vec![],
-            quotes: vec![],
-            inserting: false,
-            pressed_input_event: Some(event.clone()),
-            selected_input_event: Some(event),
-            error: None,
-            ..state
+        self.observable.set_state(move |state| {
+            let (input, quotes) = state.block_input();
+            ChordInputState {
+                input,
+                quotes,
+                inserting: false,
+                pressed_input_event: Some(event.clone()),
+                selected_input_event: Some(event),
+                error: None,
+                ..state
+            }
         })
     }
 
     /// Input that cannot run stays on screen like an executed chord, with the
-    /// reason in place of the chord's name.
+    /// reason in place of the chord's name. Its blocks stay in the buffer.
     fn fail_input(&self, input: &[Key], quotes: &[String], error: String) -> Result<()> {
         self.end_active_task();
         self.executions.fetch_add(1, Ordering::SeqCst);
-        self.observable.set_state(|_| ChordInputState {
-            input: vec![],
-            quotes: vec![],
-            inserting: false,
-            pressed_input_event: None,
-            // Nothing ran, so no application received the chord.
-            selected_input_event: Some(ChordInputEvent {
-                input: input.to_vec(),
-                application_id: None,
-                quotes: quotes.to_vec(),
-            }),
-            description: None,
-            error: Some(error),
+        self.observable.set_state(|state| {
+            let (kept_input, kept_quotes) = state.block_input();
+            ChordInputState {
+                input: kept_input,
+                quotes: kept_quotes,
+                inserting: false,
+                blocks: state.blocks,
+                open_block: state.open_block,
+                pressed_input_event: None,
+                // Nothing ran, so no application received the chord.
+                selected_input_event: Some(ChordInputEvent {
+                    input: input.to_vec(),
+                    application_id: None,
+                    quotes: quotes.to_vec(),
+                }),
+                description: None,
+                error: Some(error),
+            }
         })?;
         self.reset_matching_chords()
     }
@@ -589,12 +602,12 @@ impl ChordInputManager {
         match error {
             Some(error) => self.fail_input(keys, quotes, error),
             // Chords that only handle keyboard events have no input action to run.
-            None => self.clear_key_buffer(),
+            None => self.clear_loose_keys(),
         }
     }
 
     fn should_execute_key_buffer_on_release(state: &ChordInputState) -> bool {
-        !state.input.is_empty() && state.selected_input_event.is_none()
+        state.has_loose_keys() && state.selected_input_event.is_none()
     }
 
     fn should_toggle_indicator_for_tab_event(key_event: &KeyEvent, is_shift_pressed: bool) -> bool {
@@ -604,10 +617,17 @@ impl ChordInputManager {
         ) && is_shift_pressed
     }
 
-    fn next_key_buffer_for_unshifted_press(key_buffer: &[Key], key: &Key) -> Vec<Key> {
+    /// Backspace removes the last key after the blocks, else the whole last block.
+    fn next_key_buffer_for_key_press(key_buffer: &[Key], blocks: &[u32], key: &Key) -> Vec<Key> {
         let mut next_key_buffer = key_buffer.to_vec();
         if key.0 == KeyMappingCode::Backspace {
-            next_key_buffer.pop();
+            let block_ends = blocks.iter().map(|&end| end as usize);
+            if block_ends.clone().last() == Some(next_key_buffer.len()) {
+                let previous_end = block_ends.rev().nth(1).unwrap_or(0);
+                next_key_buffer.truncate(previous_end);
+            } else {
+                next_key_buffer.pop();
+            }
         } else if Key::serialize_sequence(&[*key]).is_some() {
             next_key_buffer.push(*key);
         }
@@ -619,14 +639,26 @@ impl ChordInputManager {
         expand_typed_reference(&input, &self.sequence.lock().macros).unwrap_or(input)
     }
 
-    fn handle_unshifted_key_press(&self, key: &Key, event: &ChordKeyboardEvent) -> Result<()> {
+    /// A key typed with Shift held joins the open block, which takes in every key
+    /// after the solid blocks; see `ChordInputState::blocks`.
+    fn handle_key_press(&self, key: &Key, event: &ChordKeyboardEvent, shifted: bool) -> Result<()> {
         let state = self.observable.get_state()?;
-        let mut next_key_buffer = Self::next_key_buffer_for_unshifted_press(&state.input, key);
-        if next_key_buffer.len() > state.input.len() {
-            next_key_buffer = self.expand_typed_reference(next_key_buffer);
+        let mut blocks = state.blocks;
+        if state.open_block && !shifted {
+            blocks = close_block(&state.input, blocks);
+        }
+        let mut next_key_buffer = Self::next_key_buffer_for_key_press(&state.input, &blocks, key);
+        blocks = rebase_blocks(blocks, &state.input, &next_key_buffer);
+        let grew = next_key_buffer.len() > state.input.len();
+        if grew {
+            let expanded = self.expand_typed_reference(next_key_buffer.clone());
+            blocks = rebase_blocks(blocks, &next_key_buffer, &expanded);
+            next_key_buffer = expanded;
         }
         self.edit_buffer(
             next_key_buffer,
+            blocks,
+            shifted && (state.open_block || grew),
             state.quotes,
             key.0 == KeyMappingCode::Quote,
         )?;
@@ -636,27 +668,59 @@ impl ChordInputManager {
         )
     }
 
+    fn close_block(&self) -> Result<()> {
+        if !self.observable.get_state()?.open_block {
+            return Ok(());
+        }
+        self.observable.set_state(|state| ChordInputState {
+            blocks: close_block(&state.input, state.blocks),
+            open_block: false,
+            ..state
+        })
+    }
+
     fn should_clear_key_buffer_on_shifted_press(key: &Key) -> bool {
         key.0 == KeyMappingCode::Backspace
     }
 
+    /// Esc and Shift+Backspace clear the whole input, blocks included.
     fn clear_key_buffer(&self) -> Result<()> {
-        self.end_active_task();
         self.observable.set_state(|state| ChordInputState {
-            input: vec![],
-            quotes: vec![],
-            inserting: false,
-            selected_input_event: None,
-            pressed_input_event: None,
-            description: None,
-            error: None,
+            blocks: vec![],
+            open_block: false,
             ..state
+        })?;
+        self.clear_loose_keys()
+    }
+
+    /// Clears the input after its blocks.
+    fn clear_loose_keys(&self) -> Result<()> {
+        self.end_active_task();
+        self.observable.set_state(|state| {
+            let (input, quotes) = state.block_input();
+            ChordInputState {
+                input,
+                quotes,
+                inserting: false,
+                selected_input_event: None,
+                pressed_input_event: None,
+                description: None,
+                error: None,
+                ..state
+            }
         })?;
         self.reset_matching_chords()
     }
 
     /// Replaces the buffer being typed; see `ChordSequence::edit_quotes`.
-    fn edit_buffer(&self, input: Vec<Key>, quotes: Vec<String>, opened: bool) -> Result<()> {
+    fn edit_buffer(
+        &self,
+        input: Vec<Key>,
+        blocks: Vec<u32>,
+        open_block: bool,
+        quotes: Vec<String>,
+        opened: bool,
+    ) -> Result<()> {
         let (quotes, inserting) = self.sequence.lock().edit_quotes(&input, quotes, opened)?;
         if inserting {
             *self.carried_keys.lock() = self.held_keys.lock().clone();
@@ -665,6 +729,8 @@ impl ChordInputManager {
             input,
             quotes,
             inserting,
+            blocks,
+            open_block,
             description: None,
             selected_input_event: None,
             pressed_input_event: None,
@@ -717,7 +783,13 @@ impl ChordInputManager {
         let state = self.observable.get_state()?;
         let mut input = state.input;
         input.push(Key(KeyMappingCode::Quote));
-        self.edit_buffer(input.clone(), state.quotes.clone(), false)?;
+        self.edit_buffer(
+            input.clone(),
+            state.blocks,
+            state.open_block,
+            state.quotes.clone(),
+            false,
+        )?;
         self.held_keys.lock().insert(Key(KeyMappingCode::Space));
         self.run_dispatch(
             self.resolve_dispatch(&input, &state.quotes, &[ChordEventTrigger::Keydown], None)?,
@@ -725,43 +797,33 @@ impl ChordInputManager {
         )
     }
 
-    fn handle_shifted_key_press(&self, key: &Key, event: &ChordKeyboardEvent) -> Result<()> {
-        let state = self.observable.get_state()?;
-        let mut sequence = state.input;
-        let mut quotes = state.quotes;
-        if sequence.is_empty() {
-            let Some(selected) = state.selected_input_event else {
-                return self.dispatch_current_buffer(
-                    &[ChordEventTrigger::Keydown, ChordEventTrigger::Keypress],
-                    event,
-                );
-            };
-            sequence = selected.input;
-            quotes = selected.quotes;
-            sequence.pop();
-        }
-        sequence.push(*key);
-        let sequence = self.expand_typed_reference(sequence);
-        let dispatch = match self.resolve_dispatch(
-            &sequence,
-            &quotes,
-            &[
-                ChordEventTrigger::Keydown,
-                ChordEventTrigger::Keypress,
-                ChordEventTrigger::Input,
-            ],
-            Some(event),
-        ) {
-            Ok(dispatch) => dispatch,
-            Err(error) => return self.fail_input(&sequence, &quotes, format!("{error:#}")),
-        };
-        if dispatch.input_event.is_some() {
-            self.complete_dispatch(&sequence, &quotes, dispatch, true)
-        } else {
-            self.edit_buffer(sequence, quotes, key.0 == KeyMappingCode::Quote)?;
-            self.run_dispatch(dispatch, false)
+}
+
+/// `blocks` with the keys of `input` after them made solid as one more block.
+fn close_block(input: &[Key], mut blocks: Vec<u32>) -> Vec<u32> {
+    let end = input.len() as u32;
+    if blocks.last().is_none_or(|&last| last < end) {
+        blocks.push(end);
+    }
+    blocks
+}
+
+/// `blocks` after the input changes from `before` to `after`: no block extends past
+/// the first changed key, and blocks left empty are dropped.
+fn rebase_blocks(blocks: Vec<u32>, before: &[Key], after: &[Key]) -> Vec<u32> {
+    let kept = before
+        .iter()
+        .zip(after)
+        .take_while(|(before, after)| before == after)
+        .count() as u32;
+    let mut rebased = Vec::with_capacity(blocks.len());
+    for end in blocks {
+        let end = end.min(kept);
+        if end > rebased.last().copied().unwrap_or(0) {
+            rebased.push(end);
         }
     }
+    rebased
 }
 
 /// Applies one insert-mode key event to the open quote's `text`, returning whether
@@ -899,15 +961,17 @@ mod tests {
     fn backspace_edits_the_buffer_and_non_text_keys_preserve_it() {
         let buffer = Key::parse_sequence("j,a").unwrap();
         assert_eq!(
-            ChordInputManager::next_key_buffer_for_unshifted_press(
+            ChordInputManager::next_key_buffer_for_key_press(
                 &buffer,
+                &[],
                 &Key(KeyMappingCode::Backspace)
             ),
             Key::parse_sequence("j,").unwrap()
         );
         assert_eq!(
-            ChordInputManager::next_key_buffer_for_unshifted_press(
+            ChordInputManager::next_key_buffer_for_key_press(
                 &buffer,
+                &[],
                 &Key(KeyMappingCode::ShiftLeft)
             ),
             buffer
@@ -917,17 +981,96 @@ mod tests {
             let mut expected = buffer.clone();
             expected.push(Key(key));
             assert_eq!(
-                ChordInputManager::next_key_buffer_for_unshifted_press(&buffer, &Key(key)),
+                ChordInputManager::next_key_buffer_for_key_press(&buffer, &[], &Key(key)),
                 expected
             );
         }
         assert!(
-            ChordInputManager::next_key_buffer_for_unshifted_press(
+            ChordInputManager::next_key_buffer_for_key_press(
+                &[],
                 &[],
                 &Key(KeyMappingCode::Backspace)
             )
             .is_empty()
         );
+    }
+
+    #[test]
+    fn backspace_removes_keys_after_the_blocks_then_one_whole_block() {
+        let backspace = |buffer: &str, blocks: &[u32]| {
+            let before = Key::parse_sequence(buffer).unwrap();
+            let after = ChordInputManager::next_key_buffer_for_key_press(
+                &before,
+                blocks,
+                &Key(KeyMappingCode::Backspace),
+            );
+            let blocks = rebase_blocks(blocks.to_vec(), &before, &after);
+            (Key::serialize_sequence(&after).unwrap(), blocks)
+        };
+        // Blocks `g` and `de`, then the loose `f`.
+        assert_eq!(backspace("gdef", &[1, 3]), ("gde".into(), vec![1, 3]));
+        assert_eq!(backspace("gde", &[1, 3]), ("g".into(), vec![1]));
+        assert_eq!(backspace("g", &[1]), ("".into(), vec![]));
+    }
+
+    #[test]
+    fn shift_blocks_take_in_loose_keys_and_stay_after_a_run() {
+        let state = |input: &str, blocks: &[u32], open_block: bool| ChordInputState {
+            input: Key::parse_sequence(input).unwrap(),
+            blocks: blocks.to_vec(),
+            open_block,
+            ..Default::default()
+        };
+        // `g`, then Shift+d: the open block is everything after the solid blocks.
+        let open = state("gd", &[], true);
+        assert!(!open.has_loose_keys());
+        assert_eq!(open.block_input().0, open.input);
+        // Releasing Shift makes it one solid block; Shift+a after that is another.
+        assert_eq!(close_block(&open.input, open.blocks.clone()), vec![2]);
+        assert_eq!(
+            close_block(&Key::parse_sequence("gda").unwrap(), vec![2]),
+            vec![2, 3]
+        );
+        // Closing twice adds nothing.
+        assert_eq!(close_block(&open.input, vec![2]), vec![2]);
+        // Only keys after the blocks run, and a run keeps the blocks.
+        let typed = state("gde", &[2], false);
+        assert!(typed.has_loose_keys());
+        assert_eq!(
+            typed.block_input().0,
+            Key::parse_sequence("gd").unwrap()
+        );
+        assert!(!state("gd", &[2], false).has_loose_keys());
+        assert!(!ChordInputState::default().has_loose_keys());
+    }
+
+    #[test]
+    fn blocks_keep_their_quote_texts() {
+        let quote = Key(KeyMappingCode::Quote);
+        let mut input = vec![quote, quote, Key(KeyMappingCode::KeyA)];
+        let block_len = input.len() as u32;
+        input.extend([Key(KeyMappingCode::Enter), quote, quote]);
+        let state = ChordInputState {
+            input,
+            quotes: vec!["hi".into(), "there".into()],
+            blocks: vec![block_len],
+            ..Default::default()
+        };
+        let (input, quotes) = state.block_input();
+        assert_eq!(input.len(), 3);
+        assert_eq!(quotes, vec!["hi".to_owned()]);
+    }
+
+    #[test]
+    fn edits_cut_blocks_at_the_first_changed_key() {
+        let keys = |input: &str| Key::parse_sequence(input).unwrap();
+        // Appending keeps every block.
+        assert_eq!(rebase_blocks(vec![1, 3], &keys("gde"), &keys("gdef")), vec![1, 3]);
+        // An expansion that replaces keys from index 2 ends the second block there.
+        assert_eq!(rebase_blocks(vec![1, 3], &keys("gde"), &keys("gdxy")), vec![1, 2]);
+        // A block left empty is dropped.
+        assert_eq!(rebase_blocks(vec![1, 3], &keys("gde"), &keys("gxy")), vec![1]);
+        assert_eq!(rebase_blocks(vec![1], &keys("g"), &keys("x")), Vec::<u32>::new());
     }
 
     #[test]

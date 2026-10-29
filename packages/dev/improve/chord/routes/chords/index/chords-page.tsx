@@ -1,9 +1,9 @@
 import type { Chord, ChordHint, ChordReference } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd } from '@chord/dev.improve.chord.components.ui.kbd';
-import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState, useKeyboardState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState } from '@chord/dev.improve.chord.lib.state';
 import { emit, listen } from '@tauri-apps/api/event';
-import { getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
+import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -59,6 +59,14 @@ function sortTokens(tokens: Iterable<string>) {
 	return [...letterTokens, ...otherTokens];
 }
 
+/** Keys typed with Shift held, which stay after every run until Backspace removes them. */
+type BlockState = 'solid' | 'open';
+
+/** Class names for a key in a block; an open block is still being typed with Shift held. */
+function blockKeyClassName(block: BlockState) {
+	return cn('border-sky-400/90 bg-sky-100 text-sky-950', block === 'open' && 'border-dashed bg-sky-50');
+}
+
 function ChordKeyRow({
 	token,
 	description = '',
@@ -66,6 +74,7 @@ function ChordKeyRow({
 	isSelected = false,
 	isFailed = false,
 	isDimmed = false,
+	block,
 	keySize,
 	descriptionFontSize,
 }: {
@@ -77,6 +86,8 @@ function ChordKeyRow({
 	/** Selected keys belong to input that failed to execute. */
 	isFailed?: boolean
 	isDimmed?: boolean
+	/** The selected key belongs to a block. */
+	block?: BlockState
 	keySize: number
 	descriptionFontSize: number
 }) {
@@ -98,9 +109,11 @@ function ChordKeyRow({
 					'shrink-0 rounded-md border font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
-						? isFailed
-							? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
-							: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
+						? block
+							? blockKeyClassName(block)
+							: isFailed
+								? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
+								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
@@ -115,9 +128,9 @@ function ChordKeyRow({
 
 export function ChordsPage() {
 	return (
-		<StateQueries queries={[useChordInputState(), useChordPanelState(), useKeyboardState(), useFrontmostState(), useChordPackageManagerState(), useChordExecutionState(), useChordMacrosState()]} quiet>
-			{(chordInputData, chordPanelData, keyboardData, frontmostData, chordPackageManagerData, chordExecutionData, chordMacrosData) => (
-				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} keyboardData={keyboardData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
+		<StateQueries queries={[useChordInputState(), useChordPanelState(), useFrontmostState(), useChordPackageManagerState(), useChordExecutionState(), useChordMacrosState()]} quiet>
+			{(chordInputData, chordPanelData, frontmostData, chordPackageManagerData, chordExecutionData, chordMacrosData) => (
+				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
 			)}
 		</StateQueries>
 	);
@@ -126,7 +139,6 @@ export function ChordsPage() {
 export function ChordsPageContent({
 	chordInputData,
 	chordPanelData,
-	keyboardData,
 	frontmostData,
 	chordPackageManagerData,
 	chordExecutionData,
@@ -134,7 +146,6 @@ export function ChordsPageContent({
 }: {
 	chordInputData: NonNullable<ReturnType<typeof useChordInputState>['data']>
 	chordPanelData: NonNullable<ReturnType<typeof useChordPanelState>['data']>
-	keyboardData: NonNullable<ReturnType<typeof useKeyboardState>['data']>
 	frontmostData: NonNullable<ReturnType<typeof useFrontmostState>['data']>
 	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
 	chordExecutionData: NonNullable<ReturnType<typeof useChordExecutionState>['data']>
@@ -142,7 +153,6 @@ export function ChordsPageContent({
 }) {
 	const chordInputState = chordInputData;
 	const chordPanelState = chordPanelData;
-	const keyboardState = keyboardData;
 	const { frontmostAppBundleId, filePickerActive } = frontmostData;
 	const { packages } = chordPackageManagerData;
 	const { loops, metaCommands, haltLoopTemplate } = chordExecutionData;
@@ -294,25 +304,44 @@ export function ChordsPageContent({
 	const normalizedBufferTokens = normalizeChordTokens(chordInputState.input);
 	const escapeSuggestions = getEscapeSuggestions(normalizedBufferTokens, chordMacrosData.entries);
 	const normalizedActiveChordTokens = normalizeChordTokens(chordInputState.selectedInputEvent?.input ?? []);
+	// Blocks stay in the buffer after a run, so only keys after them count as typing.
+	const blockLength = chordInputState.blocks.at(-1) ?? 0;
+	const isTyping = normalizedBufferTokens.length > blockLength;
+	const startsWithBlocks = (tokens: string[]) => normalizedBufferTokens.slice(0, blockLength).every((token, index) => tokens[index] === token);
 	// Failed input stays selected until the next key press, in place of an executed chord.
-	const executionError = normalizedBufferTokens.length === 0 && chordInputState.error
+	const executionError = !isTyping && chordInputState.error
 		? chordInputState.error.charAt(0).toUpperCase() + chordInputState.error.slice(1)
 		: undefined;
 
 	const shouldHighlightActiveChord
-		= (keyboardState.isShiftPressed || executionError !== undefined)
-			&& normalizedBufferTokens.length === 0
+		= executionError !== undefined
 			&& normalizedActiveChordTokens.length > 0;
 	const selectedTokens = shouldHighlightActiveChord
 		? normalizedActiveChordTokens
 		: normalizedBufferTokens;
-	const floatingTokens = normalizedBufferTokens.length > 0
+	const showsBuffer = isTyping || !chordInputState.selectedInputEvent;
+	const floatingTokens = showsBuffer
 		? normalizedBufferTokens
 		: normalizedActiveChordTokens;
+	const floatingQuotes = showsBuffer ? chordInputState.quotes : chordInputState.selectedInputEvent?.quotes ?? [];
 	// Typed quotes keep their text beside the keys; show it in place.
-	const floatingDisplayTokens = normalizedBufferTokens.length > 0
-		? withQuoteTexts(normalizedBufferTokens, chordInputState.quotes, chordInputState.inserting)
-		: withQuoteTexts(normalizedActiveChordTokens, chordInputState.selectedInputEvent?.quotes ?? [], false);
+	const floatingDisplayTokens = withQuoteTexts(floatingTokens, floatingQuotes, showsBuffer && chordInputState.inserting);
+	const floatingBlockEnds = startsWithBlocks(floatingTokens)
+		? blockDisplayEnds(floatingTokens, floatingQuotes, chordInputState.blocks)
+		: [];
+	const getFloatingBlock = (index: number): BlockState | undefined =>
+		index < (floatingBlockEnds.at(-1) ?? 0)
+			? 'solid'
+			: showsBuffer && chordInputState.openBlock && index >= (floatingBlockEnds.at(-1) ?? 0)
+				? 'open'
+				: undefined;
+	const selectedBlockEnds = startsWithBlocks(selectedTokens) ? chordInputState.blocks : [];
+	const getColumnBlock = (columnIndex: number): BlockState | undefined =>
+		columnIndex < (selectedBlockEnds.at(-1) ?? 0)
+			? 'solid'
+			: !shouldHighlightActiveChord && chordInputState.openBlock && columnIndex >= blockLength
+				? 'open'
+				: undefined;
 	const insertText = chordInputState.inserting ? chordInputState.quotes.at(-1) ?? '' : undefined;
 	const currentPrefixLength = selectedTokens.length;
 	const commandPrefix = getCommandPrefix(selectedTokens);
@@ -436,7 +465,7 @@ export function ChordsPageContent({
 			return;
 		}
 
-		const typedTokens = isFloating && normalizedBufferTokens.length > 0 ? floatingDisplayTokens : null;
+		const typedTokens = isFloating && showsBuffer && normalizedBufferTokens.length > 0 ? floatingDisplayTokens : null;
 		const floor = floatingWidthFloorRef.current;
 		bar.style.minWidth = typedTokens && floor && !isDeletionOf(typedTokens, floor.tokens)
 			? `min(${floor.width}px, 100% - 1.5rem)`
@@ -477,21 +506,28 @@ export function ChordsPageContent({
 						<div className="flex flex-col items-center gap-1.5" aria-live="polite">
 							<div ref={floatingKeysRef} className="w-full overflow-x-hidden py-0.5">
 								<div className="mx-auto flex w-max min-w-full justify-center gap-1.5">
-									{floatingDisplayTokens.length > 0 ? floatingDisplayTokens.map((token, index) => (
-										<Kbd
-											key={`${index}-${token}`}
-											className={cn(
-												'h-7 min-w-7 shrink-0 rounded-md border px-1.5 font-mono text-sm shadow-sm',
-												normalizedBufferTokens.length > 0
-													? 'border-border/80 bg-background/95 text-foreground'
-													: executionError
-														? 'border-red-400/90 bg-red-100 text-red-950'
-														: 'border-emerald-400/90 bg-emerald-100 text-emerald-950',
-											)}
-										>
-										{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={token} /> : token}
-										</Kbd>
-								)) : (
+									{floatingDisplayTokens.length > 0 ? floatingDisplayTokens.map((token, index) => {
+										const block = getFloatingBlock(index);
+										return (
+											<Kbd
+												key={`${index}-${token}`}
+												className={cn(
+													'h-7 min-w-7 shrink-0 rounded-md border px-1.5 font-mono text-sm shadow-sm',
+													block
+														? blockKeyClassName(block)
+														: showsBuffer
+															? 'border-border/80 bg-background/95 text-foreground'
+															: executionError
+																? 'border-red-400/90 bg-red-100 text-red-950'
+																: 'border-emerald-400/90 bg-emerald-100 text-emerald-950',
+													// Separates adjacent blocks, and blocks from the keys typed after them.
+													index + 1 < floatingDisplayTokens.length && floatingBlockEnds.includes(index + 1) && 'mr-1.5',
+												)}
+											>
+											{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={token} /> : token}
+											</Kbd>
+										);
+									}) : (
 									<Kbd
 										aria-label="No key pressed"
 										className="h-7 min-w-7 shrink-0 rounded-md border border-border/80 bg-background/95 px-1.5 font-mono text-sm text-foreground shadow-sm"
@@ -531,7 +567,7 @@ export function ChordsPageContent({
 							{keyColumns.map((column, columnIndex) => (
 								<div
 									key={column.id}
-									className="flex flex-col items-start overflow-y-auto px-1 py-1"
+									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', columnIndex > 0 && selectedBlockEnds.includes(columnIndex) && 'ml-3')}
 									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px` }}
 								>
 									{SHOW_DEVELOPMENT_LABEL && column.id === 'column-0'
@@ -550,6 +586,7 @@ export function ChordsPageContent({
 											isSelected={row.keys.includes(column.selectedToken)}
 											isFailed={executionError !== undefined}
 											isDimmed={column.hasSelection && !row.keys.includes(column.selectedToken)}
+											block={getColumnBlock(columnIndex)}
 											keySize={keySize}
 											descriptionFontSize={descriptionFontSize}
 										/>

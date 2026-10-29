@@ -38,16 +38,13 @@ jobs:
         include:
           - runner: macos-15
             arch: aarch64
+            macho_arch: arm64
             target: aarch64-apple-darwin
-          # KeyChord/rbun's Intel build of Bun does not currently finish within
-          # its job limit, so this leg can lack a matching libbun_embed. It is
-          # optional: the release then ships Apple Silicon only.
           - runner: macos-15-intel
             arch: x86_64
+            macho_arch: x86_64
             target: x86_64-apple-darwin
-            optional: true
     runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.optional == true }}
     env:
       # `secrets` is not available in step-level `if:`, but `env` is.
       APPLE_CERT_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64 }}
@@ -142,6 +139,7 @@ jobs:
           gh release download "$tag" -R KeyChord/rbun --pattern "$asset" --dir "$dir" --clobber
           mv "$dir/$asset" "$dir/libbun_embed.dylib"
           lipo -info "$dir/libbun_embed.dylib"
+          lipo -verify_arch "${{ matrix.macho_arch }}" "$dir/libbun_embed.dylib"
           echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
@@ -323,11 +321,7 @@ jobs:
             channel="beta"
             flags=(--prerelease --latest=false)
           fi
-          if [ -e assets/Chord-x86_64.dmg ]; then
-            download="Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel."
-          else
-            download="Download \`Chord-aarch64.dmg\`; this build is for Apple Silicon only."
-          fi
+          download="Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel."
           notes="Automatic $channel build from \`$RELEASE_TAG\` @ ${short}. $download $gatekeeper"
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then

@@ -34,6 +34,11 @@ export function withQuoteTexts(tokens: string[], quotes: string[], inserting: bo
 	return result;
 }
 
+/** Where each block of `tokens` ends among the display tokens of `withQuoteTexts`. */
+export function blockDisplayEnds(tokens: string[], quotes: string[], blocks: number[]) {
+	return blocks.map(end => withQuoteTexts(tokens.slice(0, end), quotes, false).length);
+}
+
 /** Whether `next` only drops keys or quote text from the end of `previous`, as Backspace does. */
 export function isDeletionOf(next: string[], previous: string[]) {
 	const nextText = next.join('\0');

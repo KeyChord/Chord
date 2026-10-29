@@ -194,6 +194,23 @@ pub fn serialize_with_quotes(input: &[Key], quotes: &[String]) -> Option<String>
     Some(output)
 }
 
+/// The number of insert-mode quotes in typed `input`, counted like
+/// `serialize_with_quotes`: one per adjacent `''` pair.
+pub fn typed_quote_count(input: &[Key]) -> usize {
+    let mut count = 0;
+    let mut keys = input.iter().peekable();
+    while let Some(key) = keys.next() {
+        if key.0 == KeyMappingCode::Quote
+            && keys
+                .next_if(|next| next.0 == KeyMappingCode::Quote)
+                .is_some()
+        {
+            count += 1;
+        }
+    }
+    count
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ChordCommand {
     Pending,

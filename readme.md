@@ -2,48 +2,66 @@
 
 **Multi-letter shortcuts for macOS.**
 
-_Chord_ lets you bind actions to key sequences while **keeping your existing shortcuts untouched**.
+**Chord** lets you bind actions to key sequences while _keeping your existing shortcuts untouched_.
+
+## Installation
+
+1. Download `Chord-aarch64.dmg` from the [latest release](https://github.com/KeyChord/Chord/releases/latest). It is signed and notarized.
+2. Open the DMG, drag **Chord** into `Applications`, and launch it.
 
 ## Setup
 
-> _Chord_ currently only supports macOS (Apple Silicon).
+Chord requires macOS _Accessibility Permissions_ so it can detect when you press `Caps Lock` + `Space`, which activates _Chord Mode_.
 
-1. Download `Chord-aarch64.dmg` from the [latest release](https://github.com/KeyChord/Chord/releases/latest). It is signed and notarized.
-2. Open the DMG, drag _Chord_ into `Applications`, and launch it.
+### Chord Mode
 
-Chord stays running in the background and does nothing until you hold down `Caps Lock` + `Space`, which activates _Chord Mode_.
+Once you enter _Chord Mode_, it stays active as long as `Space` is held down.
 
-_Chord Mode_ stays active for as long as you keep `Space` held down (you can release `Caps Lock`).
+> Only `Space` needs to be pressed; you can release `Caps Lock`.
 
 In _Chord Mode_, keys you type will be interpreted as chord inputs and won't be passed through to the focused application.
 
-After typing out a chord, you can execute it by pressing `Caps Lock` (while still keeping `Space` held to stay in _Chord Mode_!)
+### Triggering a Chord
 
-> For example, with `Space` held down, typing `0,<caps>` opens Chord's settings window.
+Chords can only be triggered in _Chord Mode_, so make sure to keep `Space` held down.
+
+Then, type out the chord's letters and press `Caps Lock` to trigger it.
+
+> As an example, with `Space` held down, typing `0,<caps>` opens Chord's settings window.
 
 Once you're done, you can release `Space` to exit _Chord Mode_.
 
-> For sending one-off chords, you can release `Space` right after typing out the chord to execute it. For example, typing `0,` and then releasing `Space` also opens Chord's settings.
+#### Auto-trigger
+
+For sending one-off chords, you can release `Space` right after typing out the chord to execute it.
+
+For example, instead of pressing `Caps Lock`, you can also type `0,` in _Chord Mode_ and then release `Space` to bring up Chord's settings.
 
 <details>
-    <summary>Are you a `vim` user?</summary>
-    For `vim` users, you can think of _Chord Mode_ as somewhat analagous to _Normal Mode_, with the main difference that it's [a lot easier to exit](https://stackoverflow.com/questions/11828270/how-do-i-exit-vim): just lift up `Space`!
+    <summary>Are you a <code>vim</code> user?</summary>
+    For <code>vim</code> users, it might help to treat _Chord Mode_ as somewhat analagous to <code>vim</code>'s _Normal Mode_, with the main difference that it's [a lot easier to exit](https://stackoverflow.com/questions/11828270/how-do-i-exit-vim): just lift up <code>Space</code>!
 </details>
 
-## Chord Files
+## Configuration
+
+### Chord Files
 
 All chords are defined in configuration files called _chord files._
 
 A _chord file_ contains chords for a single application and platform, inferred by its path.
 
-For example, a _chord file_ for macOS Finder would live at:
+#### _Chord File_ Example - Finder
+
+A _chord file_ for macOS Finder would live at:
 
 `chords/com/apple/Finder/macos.toml`
 
 <details>
-    <summary>Why do chord files end in `.toml`?</summary>
+    <summary>Why do chord files end in <code>.toml</code>?</summary>
     Chord files are written with a standardized configuration format called [TOML](https://toml.io/en/v1.1.0). You won't need to spend time learning it, as it's very simple and intuitive.
 </details>
+
+### Chord Packages
 
 All _chord files_ live under a top-level `chords/` folder, which itself is part of a _chord package_ that contains both _chord files_ and scripts the chords might use.
 
@@ -51,7 +69,9 @@ Your default _chord package_ is located in `~/.chord/packages/default`.
 
 By adding _chord files_ to this package, you can create your own chords!
 
-For example, if you create the following file in your _chord package:_
+#### _Chord Package_ Example - Finder 
+
+If you create the following file in your _chord package:_
 
 `chords/com/apple/Finder/macos.toml`
 
@@ -64,7 +84,7 @@ name = "Finder"
 # Always use single quotes when defining a chord's key sequence
 'gh' = {
   # The `name` property is a required label for the chord
-  name = 'Goto Home', 
+  name = 'Goto: Home', 
   
   # The `shortcut` property tells Chord to simulate a shortcut when this chord is triggered
   shortcut = 'cmd+shift+h' 
@@ -83,15 +103,86 @@ name = "Finder"
 
 You'll then be able to type `/f<caps>` in chord mode to open Finder, and then `gh<caps>` to open your home directory!
 
-## Chord Packages
+### Pre-Made Chord Packages
 
 Instead of defining your own chords for every app, Chord provides pre-made chord packages you can use!
 
-Chord's chords contain certain conventions:
+Chord's compiled chords contain certain conventions:
 
-`nesw` - Cardinal directions represent navigation
-`lrud` - Positional directions represent movement
+Navigation - `n/e/s/w` (north, east, south, west)
+Movement - `l/r/u/d` (left, right, up, down)
+Position & Order - `f/k/a/z` (front, back, first, last)
 
 > For a full list of these conventions, see the [KeyChords/chords](https://github.com/KeyChord/chords) repo!
 
-To add a Chord package, you can use the Git URL
+### Chord Scripts
+
+In addition to simulating shortcuts and executing shell commands, chords can also run scripts!
+
+This is useful for apps that have configurable shortcuts, in which case, you can't just simulate the default ones.
+
+### Chord Scripts Example - IntelliJ IDEA
+
+For example, here's what a _chord file_ for IntelliJ might look like:
+
+```toml
+# chords/com/jetbrains/intellij/macos.toml
+name = "IntelliJ IDEA"
+
+[on.action]
+file = "jetbrains.js"
+
+[chords]
+'fh' = { name = "File: Here", '@input:action' = ['NewFile'] }
+```
+
+Where `jetbrains.js` refers to this file located at `js/jetbrains.js`:
+
+```javascript
+// `mkdtempDisposable` makes a temporary directory that's automatically cleaned up
+import { mkdtempDisposable } from "node:fs/promises";
+
+/**
+ * Every script should have a top-level "builder" function as its
+ * default export. The builder returns the event handler function.
+ */
+export default function actionBuilder() {
+  // Any code here runs only once: when the chord file is first loaded
+  const ideaPath = "/Applications/IntelliJ IDEA.app/Contents/MacOS/idea"
+  
+  /**
+   * The event handler function gets called every time the chord is triggered.
+   * The arguments come from the `array` assigned to the '@<event>:<handler>' property
+   * specified in the TOML chord file.
+   * 
+   * For example, if the chord file had:
+   * 
+   * 'fh' = { 
+   *    # ...
+   *    '@input:action' = ['NewFile']
+   * }
+   *
+   * Then Chord would call `action("NewFile")`.
+   */
+  return async function action(actionId) {
+    // We create a temporary directory to avoid conflicting with future/past calls
+    await using dir = await mkdtempDisposable(`/tmp/jetbrains-`) 
+    
+    // The following Groovy script runs the action `actionId` in IntelliJ
+    const scriptPath = `${dir.path}/action.groovy`;
+    await Bun.write(scriptPath, `
+      import com.intellij.openapi.actionSystem.ActionManager
+      IDE.application.invokeAndWait {
+        def m = ActionManager.instance
+        def a = m.getAction("${actionId}")
+        if (a) m.tryToExecute(a, null, null, null, true)
+      }
+    `);
+  
+    // We use `Bun.$` to run the above code with the IntelliJ CLI
+    await Bun.$`${ideaPath} ideScript ${scriptPath}`.quiet();
+  };
+}
+```
+
+Using this script, we can define chords for IntelliJ-based IDEs that work regardless of what the user's existing IDE shortcuts are!

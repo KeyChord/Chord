@@ -218,7 +218,7 @@ Handlers receive the entered sequence as `this.input` (for example, `hsr12`), al
 | `@keydown:event`  | After each keydown, using the buffer after any edit.                                          |
 | `@keypress:event` | After the matching keydown handlers, for every key press, including Backspace and modifiers.  |
 | `@keyup:event`    | After each key release, using the current buffer.                                             |
-| `@input:event`    | When the chord is completed with Caps Lock, the final shifted key, Space release, or the CLI. |
+| `@input:event`    | When the chord is completed with Caps Lock, Space release, or the CLI.                        |
 
 All matching lifecycle chords are visited in app/global and package priority order. Ordinary input completion keeps its first-match action priority. Initializers run before the other callbacks for a buffer snapshot, and callbacks are awaited in event order, including Promise return values. A callback failure stops the remaining callbacks for that snapshot and is reported through Chord's normal handler-error path.
 
