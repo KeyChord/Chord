@@ -17,33 +17,31 @@ Chord requires macOS _Accessibility Permissions_ so it can detect when you press
 
 ### Chord Mode
 
-Once you enter _Chord Mode_, it stays active as long as `Space` is held down.
+Once you enter _Chord Mode_, it stays active as long as <kbd>␣</kbd> is held down.
 
-_Only `Space` needs to be pressed; you should release `Caps Lock` after pressing `Space`._
+_Only <kbd>␣</kbd> needs to stay pressed; you should release <kbd>⇪</kbd> after pressing <kbd>␣</kbd> 
 
 In _Chord Mode_, any keys you type will be intercepted by Chord as input. These key events won't be passed to the focused application.
 
 ### Triggering a Chord
 
-Chords can only be triggered in _Chord Mode_, so make sure to keep `Space` held down.
+> Chords can only be triggered in _Chord Mode_, so make sure to keep <kbd>␣</kbd> held down!
 
-Then, type out the chord's letters and press `Caps Lock` to trigger it.
+To trigger a chord, type out the chord's letters and then press <kbd>⇪</kbd>.
 
-> For example, with `Space` held down, you can type:
-> <kbd>0</kbd> <kbd>,</kbd> <kbd>⇪</kbd>
-> and it'll open Chord's settings window.
+For example, typing <kbd>0</kbd><kbd>,</kbd><kbd>⇪</kbd> opens Chord's settings window.
 
-Once you're done, you can release `Space` to exit _Chord Mode_.
+Once you're done, you can release <kbd>␣</kbd> to exit _Chord Mode_.
 
 #### Auto-trigger
 
-For sending one-off chords, you can release `Space` right after typing out the chord to execute it.
+For sending one-off chords, you can release <kbd>␣</kbd> right after typing out the chord to execute it.
 
-For example, instead of pressing `Caps Lock`, you can also type `0,` in _Chord Mode_ and then release `Space` to bring up Chord's settings.
+For example, instead of pressing <kbd>⇪</kbd>, you can also type <kbd>0</kbd><kbd>,</kbd> and then release  <kbd>␣</kbd> to bring up Chord's settings.
 
 <details>
     <summary>Are you a <code>vim</code> user?</summary>
-    For <code>vim</code> users, it might help to treat _Chord Mode_ as somewhat analagous to <code>vim</code>'s _Normal Mode_, with the main difference that it's [a lot easier to exit](https://stackoverflow.com/questions/11828270/how-do-i-exit-vim): just lift up <code>Space</code>!
+    For <code>vim</code> users, it might help to treat _Chord Mode_ as somewhat analagous to <code>vim</code>'s _Normal Mode_, with the main difference that it's [a lot easier to exit](https://stackoverflow.com/questions/11828270/how-do-i-exit-vim): just lift up <kbd>␣</kbd>!
 </details>
 
 ## Configuration
@@ -105,7 +103,7 @@ name = "Finder"
 
 > Note that anything after a `#` in _chord files_ is a comment used purely for documentation and is ignored by the configuration file.
 
-You'll then be able to type `/f<caps>` in chord mode to open Finder, and then `gh<caps>` to open your home directory!
+You'll then be able to type <kbd>/</kbd><kbd>f</kbd><kbd>⇪</kbd> in chord mode to open Finder, and then <kbd>g</kbd><kbd>h</kbd><kbd>⇪</kbd> to open your home directory!
 
 ### Pre-Made Chord Packages
 
