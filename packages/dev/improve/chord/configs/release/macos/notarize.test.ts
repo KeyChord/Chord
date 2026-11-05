@@ -120,7 +120,7 @@ test("stapling that keeps failing fails the release, and says why", async () => 
   const dmg = join(dir, "Chord.dmg");
   writeFileSync(dmg, "");
   await expect(notarize(dmg, CREDENTIALS, 0)).rejects.toThrow("network connection was lost");
-  expect(staplerCalls()).toHaveLength(8);
+  expect(staplerCalls()).toHaveLength(24);
 });
 
 test("stapling alone needs no submission, and fails on a file Apple doesn't know", async () => {

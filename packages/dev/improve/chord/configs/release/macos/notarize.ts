@@ -24,11 +24,12 @@ function parseSubmission(output: string): { id?: string; status?: string } {
 
 /** What `stapler` exits with when it loses its connection to Apple. */
 const CONNECTION_LOST = 68;
-const STAPLER_ATTEMPTS = 8;
+const STAPLER_ATTEMPTS = 24;
 
 /**
- * Both actions reach Apple's ticket service, which dropped about a third of the connections from
- * GitHub's runners. Only that is worth another try: a file with no ticket fails right away.
+ * Both actions reach Apple's ticket service, and from GitHub's Intel runners most connections to
+ * it drop, seven in a row at worst so far. Only that is worth another try: a file with no ticket
+ * fails right away.
  */
 async function stapler(action: "staple" | "validate", path: string, retryMs: number) {
   for (let attempt = 1; ; attempt++) {
