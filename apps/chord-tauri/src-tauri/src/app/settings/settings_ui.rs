@@ -30,6 +30,8 @@ impl SettingsUi {
         .min_inner_size(760.0, 620.0)
         .visible(false)
         .focused(false)
+        // The click that brings the window forward also presses what it lands on.
+        .accept_first_mouse(true)
         .resizable(true)
         .center();
 
@@ -56,6 +58,10 @@ impl SettingsUi {
         window.show()?;
         window.unminimize()?;
         window.set_focus()?;
+        // Focusing the window alone can leave the app that launched Chord in the menu bar.
+        #[cfg(target_os = "macos")]
+        objc2_app_kit::NSRunningApplication::currentApplication()
+            .activateWithOptions(objc2_app_kit::NSApplicationActivationOptions::ActivateAllWindows);
         Ok(())
     }
 

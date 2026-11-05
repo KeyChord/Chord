@@ -9,8 +9,12 @@ name: release
 #
 # Signing: each Apple / Tauri signing step is gated on its secret (these live at
 # the org level). With them present the build is Developer ID signed and
-# notarized; without one it degrades to an ad-hoc signed build rather than
-# failing.
+# notarized; without one `beta` degrades to an ad-hoc signed build, and any
+# other build fails rather than reach new users un-notarized.
+#
+# Running this by hand from any other branch builds and notarizes without
+# publishing, leaving the result as the run's artifacts:
+#   gh workflow run release --ref <branch>
 
 on:
   workflow_dispatch:
@@ -28,8 +32,6 @@ env:
 
 jobs:
   build:
-    # A manual run from any other branch would publish a release named after it.
-    if: ${{ github.ref_name == 'beta' || github.ref_name == 'prod' }}
     permissions:
       contents: write
     strategy:
@@ -199,12 +201,13 @@ jobs:
           # tauri hard-errors when an Updater-type bundle is requested while
           # `plugins.updater.pubkey` is set but TAURI_SIGNING_PRIVATE_KEY is not
           # ("A public key has been found, but no private key"). Building only
-          # dmg+app skips updater signing entirely, so the unsigned path works.
+          # the app skips updater signing entirely, so the unsigned path works.
+          # The disk image is made afterwards, from the notarized app.
           if [ -n "${UPDATER_KEY:-}" ]; then
-            echo "bundles=dmg,app,updater" >> "$GITHUB_OUTPUT"
+            echo "bundles=app,updater" >> "$GITHUB_OUTPUT"
           else
-            echo "no updater signing key; building dmg,app only"
-            echo "bundles=dmg,app" >> "$GITHUB_OUTPUT"
+            echo "no updater signing key; building the app only"
+            echo "bundles=app" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build Tauri app
@@ -233,19 +236,29 @@ jobs:
 
       - name: Stage assets
         id: stage
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
           bundle="apps/chord-tauri/src-tauri/target/${{ matrix.target }}/release/bundle"
           out="$RUNNER_TEMP/release-assets"
           mkdir -p "$out"
           suffix="${{ matrix.arch }}"
-
-          dmg="$(find "$bundle/dmg" -maxdepth 1 -name '*.dmg' | head -n1)"
-          test -n "$dmg" || { echo "::error::no .dmg produced"; exit 1; }
-          cp "$dmg" "$out/Chord-$suffix.dmg"
+          scripts="packages/dev/improve/chord/configs/release/macos"
 
           app="$(find "$bundle/macos" -maxdepth 1 -name '*.app' | head -n1)"
           test -n "$app" || { echo "::error::no .app produced"; exit 1; }
+          dmg="$out/Chord-$suffix.dmg"
+          # Tauri's own DMG has a blank window on CI, where Finder can't be scripted.
+          bun "$scripts/_make-dmg.ts" \
+            "$PWD/$app" "$dmg" "$PWD/apps/chord-tauri/src-tauri/icons/icon.icns"
+          # Tauri notarized the app, but spctl assesses the disk image apart from it.
+          if [ "${{ steps.signing.outputs.signed }}" = true ] && [ -n "${APPLE_ID:-}" ]; then
+            bun "$scripts/_notarize.ts" "$dmg"
+          fi
+
           # Sanity-check that the embedded Bun runtime actually shipped.
           test -f "$app/Contents/Frameworks/libbun_embed.dylib" \
             || { echo "::error::libbun_embed.dylib missing from bundle"; exit 1; }
@@ -265,10 +278,13 @@ jobs:
 
           # spctl only exists on macOS, so record the Gatekeeper verdict here for
           # the ubuntu publish job to read.
-          if spctl -a -vv "$app" 2>&1 | grep -qi notarized; then
+          if bun "$scripts/_notarize.ts" --check "$PWD/$app" "$dmg"; then
             echo notarized > "$out/gatekeeper.txt"
-          else
+          elif [ "$RELEASE_TAG" = beta ]; then
             echo unsigned > "$out/gatekeeper.txt"
+          else
+            echo "::error::this build isn't fully notarized, so it can't be released; check the Apple secrets"
+            exit 1
           fi
           cat "$out/gatekeeper.txt"
 
@@ -282,6 +298,8 @@ jobs:
           if-no-files-found: error
 
   publish:
+    # A manual run from any other branch would publish a release named after it.
+    if: ${{ github.ref_name == 'beta' || github.ref_name == 'prod' }}
     needs: build
     permissions:
       contents: write

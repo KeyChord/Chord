@@ -85,6 +85,7 @@
         "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.macros.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.onboarding.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.personal.index": "workspace:*",
       },
       "devDependencies": {
@@ -111,6 +112,7 @@
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.utils-cn": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
         "@chord/dev.improve.chord.routes": "workspace:*",
         "@chord/dev.improve.chord.routes.chords.index": "workspace:*",
@@ -123,6 +125,7 @@
         "@chord/dev.improve.chord.routes.settings.global-shortcuts.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.macros.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.onboarding.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.personal.index": "workspace:*",
         "@fontsource-variable/geist": "^5.3.0",
         "@fontsource-variable/inter": "^5.3.0",
@@ -535,6 +538,9 @@
       "bin": {
         "_e2e-macos": "./_e2e-macos.ts",
       },
+      "dependencies": {
+        "@chord/dev.improve.chord.configs.release.macos": "workspace:*",
+      },
       "devDependencies": {
         "@types/bun": "^1.4.3",
       },
@@ -553,9 +559,13 @@
       "name": "@chord/dev.improve.chord.configs.release.macos",
       "version": "0.0.0",
       "bin": {
+        "_gen-dmg-background": "./_gen-dmg-background.ts",
+        "_make-dmg": "./_make-dmg.ts",
+        "_notarize": "./_notarize.ts",
         "_release-macos": "./_release-macos.ts",
       },
       "devDependencies": {
+        "@fontsource-variable/inter": "^5.3.0",
         "@types/bun": "^1.4.3",
       },
     },
@@ -1080,6 +1090,11 @@
     "packages/dev/improve/chord/routes/settings/general/index": {
       "name": "@chord/dev.improve.chord.routes.settings.general.index",
       "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/com.npmjs.tanstack__react-router": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
@@ -1140,6 +1155,30 @@
         "@chord/dev.improve.chord.components.ui.textarea": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+        "lucide-react": "^1.57.0",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "react-dom": "^19.3.1",
+      },
+    },
+    "packages/dev/improve/chord/routes/settings/onboarding/index": {
+      "name": "@chord/dev.improve.chord.routes.settings.onboarding.index",
+      "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/com.npmjs.tanstack__react-router": "workspace:*",
+        "@chord/com.npmjs.utils-cn": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
+        "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
+        "@chord/dev.improve.chord.lib.github": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+        "@tauri-apps/api": "^2.12.4",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
@@ -1379,6 +1418,8 @@
     "@chord/dev.improve.chord.routes.settings.log.index": ["@chord/dev.improve.chord.routes.settings.log.index@workspace:packages/dev/improve/chord/routes/settings/log/index"],
 
     "@chord/dev.improve.chord.routes.settings.macros.index": ["@chord/dev.improve.chord.routes.settings.macros.index@workspace:packages/dev/improve/chord/routes/settings/macros/index"],
+
+    "@chord/dev.improve.chord.routes.settings.onboarding.index": ["@chord/dev.improve.chord.routes.settings.onboarding.index@workspace:packages/dev/improve/chord/routes/settings/onboarding/index"],
 
     "@chord/dev.improve.chord.routes.settings.personal.index": ["@chord/dev.improve.chord.routes.settings.personal.index@workspace:packages/dev/improve/chord/routes/settings/personal/index"],
 

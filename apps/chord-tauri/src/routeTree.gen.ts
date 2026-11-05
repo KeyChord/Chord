@@ -10,6 +10,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as ChordsIndexRouteImport } from './routes/chords/index'
+import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBrowseIndexRouteImport } from './routes/settings/browse/index'
 import { Route as SettingsChordsIndexRouteImport } from './routes/settings/chords/index'
@@ -34,6 +35,11 @@ const SettingsRouteRoute = SettingsRouteRouteImport.update({
 const ChordsIndexRoute = ChordsIndexRouteImport.update({
   id: '/chords/',
   path: '/chords/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingIndexRoute = OnboardingIndexRouteImport.update({
+  id: '/onboarding/',
+  path: '/onboarding/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteRouteWithChildren
   '/chords/': typeof ChordsIndexRoute
+  '/onboarding/': typeof OnboardingIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chords': typeof ChordsIndexRoute
+  '/onboarding': typeof OnboardingIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/settings/browse': typeof SettingsBrowseIndexRoute
   '/settings/chords': typeof SettingsChordsIndexRoute
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRouteRouteWithChildren
   '/chords/': typeof ChordsIndexRoute
+  '/onboarding/': typeof OnboardingIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/'
     | '/settings'
     | '/chords/'
+    | '/onboarding/'
     | '/settings/'
     | '/settings/browse/'
     | '/settings/chords/'
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/chords'
+    | '/onboarding'
     | '/settings'
     | '/settings/browse'
     | '/settings/chords'
@@ -168,6 +179,7 @@ export interface FileRouteTypes {
     | '/'
     | '/settings'
     | '/chords/'
+    | '/onboarding/'
     | '/settings/'
     | '/settings/browse/'
     | '/settings/chords/'
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SettingsRouteRoute: typeof SettingsRouteRouteWithChildren
   ChordsIndexRoute: typeof ChordsIndexRoute
+  OnboardingIndexRoute: typeof OnboardingIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/chords'
       fullPath: '/chords/'
       preLoaderRoute: typeof ChordsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/': {
+      id: '/onboarding/'
+      path: '/onboarding'
+      fullPath: '/onboarding/'
+      preLoaderRoute: typeof OnboardingIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -316,6 +336,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SettingsRouteRoute: SettingsRouteRouteWithChildren,
   ChordsIndexRoute: ChordsIndexRoute,
+  OnboardingIndexRoute: OnboardingIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

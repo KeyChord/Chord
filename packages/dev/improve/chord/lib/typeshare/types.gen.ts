@@ -23,6 +23,8 @@ export interface AppSettingsState {
 	showMenuBarIcon: boolean;
 	showDockIcon: boolean;
 	isChordPanelHiddenByDefault: boolean;
+	/** The guided first-run setup has been finished or skipped. */
+	isOnboardingComplete: boolean;
 }
 
 export enum BuiltinChordKind {

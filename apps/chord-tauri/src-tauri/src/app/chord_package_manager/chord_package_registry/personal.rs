@@ -14,6 +14,7 @@ use walkdir::WalkDir;
 
 /// Chord creates this package when it is missing, so there is always a place for new chords.
 pub const DEFAULT_PERSONAL_PACKAGE: &str = "default";
+const GLOBAL_CHORDS_FILE: &str = "chords/macos.toml";
 
 /// The file every new personal package starts with.
 const STARTER_PATHSLUG: &str = "chords/macos.toml";
@@ -32,6 +33,7 @@ fn starter_contents(dirname: &str) -> String {
 name = "{dirname}"
 
 [chords]
+"?/" = {{ name = "My chords" }}
 "#
     )
 }
@@ -126,6 +128,19 @@ impl PersonalPackageRegistry {
 
     pub fn read_file(&self, dirname: &str, pathslug: &str) -> anyhow::Result<String> {
         read_file(&self.package_root(dirname)?, pathslug)
+    }
+
+    /// Adds a chord that runs in every app to the starter package's chords file, without
+    /// disturbing what is already in the file, including its comments.
+    pub fn add_global_chord(&self, sequence: &str, name: &str, shell: &str) -> anyhow::Result<()> {
+        let contents = self.read_file(DEFAULT_PERSONAL_PACKAGE, GLOBAL_CHORDS_FILE)?;
+        let updated = insert_chord(&contents, sequence, name, shell)?;
+        self.save_file(
+            DEFAULT_PERSONAL_PACKAGE,
+            GLOBAL_CHORDS_FILE,
+            &updated,
+            Some(&contents),
+        )
     }
 
     pub fn save_file(
@@ -338,6 +353,52 @@ pub fn chords_file_problem(contents: &str) -> Option<ChordsFileProblem> {
 /// Writes a chords file after checking that it would load. `expected` is the contents the
 /// editor started from, or `None` to create a new file; a file that changed on disk since then
 /// is not overwritten.
+/// `contents` with a shell chord added to its `[chords]` table.
+fn insert_chord(
+    contents: &str,
+    sequence: &str,
+    name: &str,
+    shell: &str,
+) -> anyhow::Result<String> {
+    let parsed: toml::Table = contents.parse().context("Your chords file has a mistake in it")?;
+    let taken = parsed
+        .get("chords")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|chords| chords.contains_key(sequence));
+    anyhow::ensure!(!taken, "You already have a chord for {sequence}");
+
+    let quote = |text: &str| toml::Value::String(text.to_owned()).to_string();
+    let line = format!(
+        "{} = {{ name = {}, shell = {} }}\n",
+        quote(sequence),
+        quote(name),
+        quote(shell)
+    );
+    let mut updated = String::with_capacity(contents.len() + line.len() + 10);
+    let mut inserted = false;
+    for existing in contents.split_inclusive('\n') {
+        updated.push_str(existing);
+        if !inserted && existing.trim_end() == "[chords]" {
+            if !existing.ends_with('\n') {
+                updated.push('\n');
+            }
+            updated.push_str(&line);
+            inserted = true;
+        }
+    }
+    if !inserted {
+        if !updated.is_empty() && !updated.ends_with('\n') {
+            updated.push('\n');
+        }
+        updated.push_str("\n[chords]\n");
+        updated.push_str(&line);
+    }
+    updated
+        .parse::<toml::Table>()
+        .context("The new chord would break your chords file")?;
+    Ok(updated)
+}
+
 fn save_file(
     root: &Path,
     pathslug: &str,
@@ -643,6 +704,40 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn inserting_a_chord_keeps_comments_and_goes_under_the_table() {
+        let starter = "# My chords\nname = \"default\"\n\n[chords]\n# Keep me\n";
+        let updated = insert_chord(starter, "/s", "Safari", "open -b com.apple.Safari").unwrap();
+        assert_eq!(
+            updated,
+            "# My chords\nname = \"default\"\n\n[chords]\n\"/s\" = { name = \"Safari\", shell = \"open -b com.apple.Safari\" }\n# Keep me\n"
+        );
+    }
+
+    #[test]
+    fn inserting_a_chord_adds_the_table_when_it_is_missing() {
+        let updated = insert_chord("name = \"default\"", "/s", "Safari", "open").unwrap();
+        let parsed: toml::Table = updated.parse().unwrap();
+        assert_eq!(parsed["chords"]["/s"]["name"].as_str(), Some("Safari"));
+    }
+
+    #[test]
+    fn inserting_a_chord_escapes_names() {
+        let updated = insert_chord("[chords]\n", "/q", "Say \"hi\" \\ there", "open").unwrap();
+        let parsed: toml::Table = updated.parse().unwrap();
+        assert_eq!(
+            parsed["chords"]["/q"]["name"].as_str(),
+            Some("Say \"hi\" \\ there")
+        );
+    }
+
+    #[test]
+    fn inserting_a_chord_refuses_keys_already_in_the_file() {
+        let contents = "[chords]\n\"/s\" = { name = \"Safari\", shell = \"open\" }\n";
+        let error = insert_chord(contents, "/s", "Slack", "open").unwrap_err();
+        assert!(error.to_string().contains("already have a chord"));
+    }
+
     #[test]
     fn saving_keeps_symlinks_and_permissions_and_deleting_prunes_empty_folders() {
         use std::os::unix::fs::{PermissionsExt, symlink};

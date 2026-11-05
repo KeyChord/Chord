@@ -59,6 +59,13 @@ export function SettingsChordsPageContent({
       apps,
     );
   }, [packages, personalPackages, apps]);
+  // Trust warnings lead only when there is a decision to make. Otherwise, someone new would meet
+  // "can run arbitrary code" before seeing a single chord.
+  const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
+  const needsApproval = thirdPartyPackages.some((pkg) => !pkg.approved);
+  const approvals = (
+    <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
+  );
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-7">
       <TabsList aria-label="Chords views">
@@ -81,11 +88,9 @@ export function SettingsChordsPageContent({
         hidden={activeTab !== "packages"}
         className="space-y-7"
       >
-        <PackageApprovals
-          packages={chordPackageManagerData.thirdPartyPackages ?? []}
-          errors={chordPackageManagerData.errors}
-        />
+        {needsApproval ? approvals : null}
         <ChordLibrary packages={libraryPackages} apps={apps} personalDirnames={{}} />
+        {needsApproval ? null : approvals}
         <Collapsible className="group/sources preference-disclosure">
           <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-5 py-4 text-sm font-normal">
             <Settings2 className="size-4 text-muted-foreground" /> Manage sources

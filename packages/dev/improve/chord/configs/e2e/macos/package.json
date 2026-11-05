@@ -8,18 +8,26 @@
   "type": "module",
   "imports": {
     "#chord-app": "./chord-app.ts",
+    "#fresh-mac": "./fresh-mac.ts",
     "#golden": "./golden.ts",
     "#guest": "./guest.ts",
+    "#journey": "./journey.ts",
     "#keysyms": "./keysyms.ts",
     "#png": "./png.ts",
+    "#release-server": "./release-server.ts",
+    "#screen": "./screen.ts",
     "#session": "./session.ts",
     "#tart": "./tart.ts",
+    "#ui-server": "./ui-server.ts",
     "#vm": "./vm.ts",
     "#vnc": "./vnc.ts",
     "#wait": "./wait.ts"
   },
   "exports": {
     ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.configs.release.macos": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.4.3"

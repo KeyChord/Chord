@@ -26,9 +26,35 @@ pub struct ChordCommandOutput {
     pub stdout: String,
 }
 
+/// What first-run setup needs to know about this Mac.
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct OnboardingInfo {
+    /// Chord is running from the disk image it was downloaded on, and would disappear with it.
+    pub needs_move_to_applications: bool,
+    /// What this version of macOS calls the System Settings page that lists Chord.
+    pub accessibility_pane_name: String,
+}
+
+#[derive(Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledApp {
+    pub bundle_id: String,
+    pub name: String,
+    pub icon_data_url: Option<String>,
+    /// Kept in the Dock, so it is probably an app this person uses every day.
+    pub in_dock: bool,
+}
+
 #[taurpc_api(mod = "resolvers")]
 pub trait Api {
     async fn open_accessibility_settings();
+    async fn request_accessibility_access();
+    async fn get_onboarding_info() -> AppResult<OnboardingInfo>;
+    async fn set_onboarding_complete(complete: bool) -> AppResult<()>;
+    async fn move_to_applications() -> AppResult<()>;
+    async fn list_installed_apps() -> AppResult<Vec<InstalledApp>>;
+    async fn add_app_chord(sequence: String, name: String, bundle_id: String) -> AppResult<()>;
     async fn refresh_permissions() -> AppResult<bool>;
     async fn voice_over_uses_caps_lock() -> bool;
     async fn open_voice_over_utility();

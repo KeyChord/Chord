@@ -141,6 +141,7 @@ vpx _lint                      # lint and apply fixes
 vpx _gen-types                 # regenerate Rust model types
 vpx _gen-official-chord-repos   # regenerate the package catalog
 vpx _e2e-macos test --build     # build and test the production app in Tart
+vpx _e2e-macos journey --build  # go from the website to a first chord, as a new user, in Tart
 ```
 
 `vpx _vite-dev`, `vpx _preview`, and `vpx _tauri` expose the underlying app tools.
@@ -519,7 +520,79 @@ swallowing chord input before it reaches the focused app, Caps remapping and tog
 recovery through the Caps guardian, and remap cleanup on quit. The VNC protocol unit tests
 run separately with `bun test packages/dev/improve/chord/configs/e2e/macos/vnc.test.ts`.
 
+### The first run, from zero
+
+`journey` goes through everything a new user does, with nothing installed beforehand: visit the
+website, download Chord through Safari, drag it out of the disk image, follow the setup in the
+app, make a first chord, and use it.
+
+```sh
+vpx _e2e-macos journey --build     # a build from this checkout, through a local copy of the site
+vpx _e2e-macos journey --site http://localhost:8787 --build  # also an unpublished website
+vpx _e2e-macos journey --published # exactly what a new user gets today from trychord.app
+```
+
+The run leaves `target/e2e/runs/<run>/journey.md`: each step with a screenshot and how long it
+took. To see it live, `open` the `vnc://` URL it prints.
+
+This differs from `test` on purpose. `test` starts from a golden VM with SIP off and permissions
+already granted, to test the app. `journey` tests the way in, so it starts from the pristine image
+with SIP on, and sets Gatekeeper to the default of a new Mac (the image turns it off). Accessibility
+is granted by clicking the switch in System Settings and typing the password, and steps are driven
+by the text on screen, read with Vision on the host (`screen.ts`), so a step fails if the words
+someone is told to look for aren't there. SSH only checks results.
+
+Gatekeeper's prompt only appears for a notarized DMG. A local build isn't, so the run removes the
+quarantine mark from the download and never sees the prompt. To cover it before a release, pass a
+notarized DMG with `--dmg` (see [Code signing](#code-signing)); the run then keeps the mark.
+`--published` also covers it, but only exercises what has been released, so it fails at the setup
+steps until a release includes them.
+
+To explore as a new user would, one step at a time, and to see what's confusing before scripting
+it, start a pristine VM and drive it with `ui`:
+
+```sh
+vpx _e2e-macos fresh
+vpx _e2e-macos ui shot                      # prints a screenshot's path and the text on screen
+vpx _e2e-macos ui click "Download for Mac"  # or: ui click <x> <y>
+vpx _e2e-macos ui drag <x1> <y1> <x2> <y2>
+vpx _e2e-macos ui type "hello"              # also: ui key cmd+space, ui chord /s, ui wait "text"
+vpx _e2e-macos down
+```
+
+Coordinates are framebuffer pixels: twice the display's points, so the 1440x900 display is 2880x1800.
+
+A few things that cost time to find:
+
+- Don't connect to a VM's VNC server repeatedly. Virtualization.framework's server crashes the
+  whole VM when clients come and go on a busy screen (`VncClient.close` has the details), so `ui`
+  keeps one connection in a background server for the VM's life, and `journey` uses one connection.
+- The server ignores scroll wheel events. Drag the scrollbar, or use the keyboard.
+- The guest has no developer tools, deliberately. Any `git` or `python3` run in it brings up the
+  prompt to install them, the same one Chord must never cause.
+- A guest reboot stops `tart run`. Shut the guest down and run it again instead.
+
+## First-run setup
+
+New installs open `/onboarding` instead of Settings (`routes/settings/onboarding/index`). Its steps
+come straight from watching someone new try to set up Chord without help, so please keep them
+plain-spoken and tell people exactly what to click, in the words on the button. `Settings → General`
+reopens it.
+
+`isOnboardingComplete` in the settings observable is the source of truth. The first launch that
+finds nothing stored decides and stores it: repositories on disk mean an install from before
+onboarding, which skips it. Setup continues by itself when the permission observable flips, and
+`AppSettings::init` brings the window back from System Settings at that moment. The practice step
+listens to `state:app-mode` and `state:chord-input` directly, because a chord that runs is reported
+and cleared too quickly for rendered state to see it.
+
 ## Releases
+
+The disk image comes from `vpx _make-dmg`, not Tauri, whose window is blank on CI because Finder
+can't be scripted there. It arranges the window with [dmgbuild](https://dmgbuild.readthedocs.io)
+from a fresh virtual environment, so building one needs `python3`. The background image is checked
+in under `packages/dev/improve/chord/configs/release/macos/@assets/dmg`; change it by editing
+`dmg-background.swift` and running `vpx _gen-dmg-background`.
 
 Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
 which builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling release of the
@@ -538,6 +611,15 @@ jj bookmark set prod -r dev --allow-backwards
 jj git push -b prod
 ```
 
+To see a build through notarization before publishing it, run the workflow by hand from any other
+branch. It does everything except publish, and leaves the result as the run's artifacts:
+
+```sh
+gh workflow run release --ref dev
+gh run download <run id> --name chord-aarch64 --dir target/e2e/ci
+vpx _e2e-macos journey --dmg target/e2e/ci/Chord-aarch64.dmg --site <local site>
+```
+
 CI cannot build the vendored Bun itself — that takes ~30 minutes. Instead
 [`KeyChord/rbun`](https://github.com/KeyChord/rbun) builds `libbun_embed.dylib` once per Bun source
 commit and publishes it as a `bun-embed-<sha>` release asset; Chord's workflow downloads it and
@@ -552,16 +634,35 @@ the Homebrew LLVM source build that previously exceeded the job limit.
 
 ### Code signing
 
-Release builds are signed with the Developer ID certificate and notarized: `spctl -a -vv` on a
-downloaded `.dmg` reports `source=Notarized Developer ID`, so the app opens by double-click with no
-Gatekeeper prompt. The secrets below live at the organization level (they do not appear in
-`gh secret list`, which shows only repository secrets). Each signing step is individually gated on
-its secret, so the workflow still produces an ad-hoc signed build if one is ever removed.
+Release builds are signed with the Developer ID certificate, and both the app and the disk image are
+notarized and stapled. Gatekeeper assesses them separately, so check both:
+
+```sh
+vpx _notarize --check /Applications/Chord.app Chord-aarch64.dmg
+```
+
+Under the hood that's `spctl -a -vv` on the app and `spctl -a -vv -t open --context context:primary-signature`
+on the disk image, each of which must report exactly `source=Notarized Developer ID`, and
+`xcrun stapler validate`. Be careful searching that output: `source=Unnotarized Developer ID`
+contains the word too.
+
+To notarize from your own Mac, save your Apple credentials in the keychain once, then release with
+the Developer ID certificate (`tauri.conf.json` names a development one, which Apple won't notarize):
+
+```sh
+xcrun notarytool store-credentials chord
+APPLE_SIGNING_IDENTITY="Developer ID Application: …" CHORD_NOTARY_PROFILE=chord vpx _release-macos
+```
+
+The secrets below live at the organization level (they do not appear in `gh secret list`, which
+shows only repository secrets). Each signing step is individually gated on its secret. Without them
+`beta` still produces an ad-hoc signed build, but any other build fails, because Gatekeeper would
+refuse it for every new user.
 
 | Secret | Effect |
 | --- | --- |
 | `APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64`, `APPLE_DEVELOPER_CERTIFICATE_PASSWORD` | Signs with a Developer ID certificate instead of ad-hoc |
-| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarizes and staples the bundle |
+| `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarizes and staples the app and the disk image |
 | `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater archive (`Chord-<arch>.app.tar.gz` and its `.sig`) |
 
 The updater artifact is only built when `TAURI_SIGNING_PRIVATE_KEY` is set: Tauri fails the build if

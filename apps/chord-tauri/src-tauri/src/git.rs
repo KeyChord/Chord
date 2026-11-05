@@ -103,15 +103,27 @@ impl GitHubRepoRef {
     }
 }
 
+/// Opens a repository without running the `git` executable. `gix::open` and `gix::prepare_clone`
+/// ask it for its installation's configuration, and on a Mac without the developer tools
+/// `/usr/bin/git` is a stub that makes macOS offer to install them, on Chord's first launch.
+/// These options still read the system, user and environment configuration.
+fn open_options() -> gix::open::Options {
+    gix::open::Options::default()
+}
+
+fn open_repo(repo_path: &Path) -> Result<gix::Repository> {
+    Ok(gix::open_opts(repo_path, open_options())?)
+}
+
 fn repo_head_short_sha(repo_path: &Path) -> Option<String> {
-    let repo = gix::open(repo_path).ok()?;
+    let repo = open_repo(repo_path).ok()?;
     let mut head = repo.head().ok()?;
     let head_id = head.try_peel_to_id().ok()??;
     Some(head_id.shorten_or_id().to_string())
 }
 
 pub(crate) fn repo_head_sha(repo_path: &Path) -> Result<String> {
-    let repo = gix::open(repo_path)
+    let repo = open_repo(repo_path)
         .with_context(|| format!("Failed to open repository at {}", repo_path.display()))?;
     let mut head = repo.head()?;
     let head_id = head
@@ -138,7 +150,7 @@ pub(crate) fn verify_repo_at_revision(repo_path: &Path, rev: &str) -> Result<()>
         rev
     );
 
-    let repo = gix::open(repo_path)?;
+    let repo = open_repo(repo_path)?;
     anyhow::ensure!(
         !repo.is_dirty()?,
         "Repository at {} has tracked worktree changes",
@@ -158,7 +170,13 @@ fn clone_repo_url(url: &str, destination: &Path, revision: Option<&str>) -> Resu
         destination.display()
     );
 
-    let mut clone = gix::prepare_clone(url, destination)?;
+    let mut clone = gix::clone::PrepareFetch::new(
+        url,
+        destination,
+        gix::create::Kind::WithWorktree,
+        gix::create::Options::default(),
+        open_options(),
+    )?;
     if let Some(revision) = revision {
         clone = clone.with_revision(Some(revision.to_owned()))?;
     }

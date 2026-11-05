@@ -246,6 +246,20 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
     #[cfg(target_os = "macos")]
     let mut exit_code = 0;
     app.run(move |handle, event| {
+        // Only once launching has finished can macOS make Chord the active app. Before that the
+        // window opens behind whichever app launched it, and clicks on it do not register.
+        if let RunEvent::Ready = event {
+            let settings = handle.app_state().settings();
+            if !settings.is_onboarding_complete() {
+                app::settings::install_location::eject_installer();
+            }
+            if tauri_app::startup::should_open_window_on_launch(settings.is_onboarding_complete()) {
+                if let Err(error) = settings.ui.open() {
+                    log::error!("Failed to show settings window on launch: {error:#}");
+                }
+            }
+        }
+
         #[cfg(target_os = "macos")]
         if let RunEvent::ExitRequested {
             code: Some(code), ..

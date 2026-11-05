@@ -45,8 +45,24 @@ export type GlobalShortcutMappingInfo = {
 	hotkeyId: string,
 };
 
+export type InstalledApp = {
+	bundleId: string,
+	name: string,
+	iconDataUrl: string | null,
+	/**  Kept in the Dock, so it is probably an app this person uses every day. */
+	inDock: boolean,
+};
+
 export type LocalChordPackage = {
 	path: string,
+};
+
+/**  What first-run setup needs to know about this Mac. */
+export type OnboardingInfo = {
+	/**  Chord is running from the disk image it was downloaded on, and would disappear with it. */
+	needsMoveToApplications: boolean,
+	/**  What this version of macOS calls the System Settings page that lists Chord. */
+	accessibilityPaneName: string,
 };
 
 export type PersonalPackageFiles = {
@@ -67,12 +83,13 @@ export type Result<T, E> = {
 	ok: T,
 	err: E,
 };
-const ARGS_MAP = {"":{"addGitMonorepo":["repo"],"addGitRepo":["repo"],"addLocalChordFolder":["path"],"addLocalChordMonorepo":["path"],"checkChordsFile":["contents"],"createPersonalPackage":["dirname"],"deletePersonalChordsFile":["dirname","pathslug"],"getAppLogs":[],"getCurrentStates":[],"installCli":[],"listGlobalShortcutMappings":[],"listLocalChordFolders":[],"listLocalChordMonorepos":[],"listMonorepoPackages":["source"],"listPersonalPackages":[],"openAccessibilitySettings":[],"openPersonalPackage":["dirname"],"openVoiceOverUtility":[],"pickLocalChordFolder":[],"quitApp":[],"readPersonalChordsFile":["dirname","pathslug"],"refreshCliInstallation":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"reloadChords":[],"removeChordMacro":["target"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removeLocalChordMonorepo":["path"],"removePlaceholderChordBinding":["file_path","sequence_template"],"resetDefaultChords":[],"runChordCommand":["command"],"savePersonalChordsFile":["dirname","pathslug","contents","expected"],"setChordMacro":["target","sequence","previous_target"],"setGitRepoLocalLink":["repo","path"],"setMonorepoPackages":["source","names"],"setPackageApprovals":["identities","approved"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"],"voiceOverUsesCapsLock":[]}};
+const ARGS_MAP = {"":{"addAppChord":["sequence","name","bundle_id"],"addGitMonorepo":["repo"],"addGitRepo":["repo"],"addLocalChordFolder":["path"],"addLocalChordMonorepo":["path"],"checkChordsFile":["contents"],"createPersonalPackage":["dirname"],"deletePersonalChordsFile":["dirname","pathslug"],"getAppLogs":[],"getCurrentStates":[],"getOnboardingInfo":[],"installCli":[],"listGlobalShortcutMappings":[],"listInstalledApps":[],"listLocalChordFolders":[],"listLocalChordMonorepos":[],"listMonorepoPackages":["source"],"listPersonalPackages":[],"moveToApplications":[],"openAccessibilitySettings":[],"openPersonalPackage":["dirname"],"openVoiceOverUtility":[],"pickLocalChordFolder":[],"quitApp":[],"readPersonalChordsFile":["dirname","pathslug"],"refreshCliInstallation":[],"refreshPermissions":[],"relaunchApp":["bundle_id"],"reloadChords":[],"removeChordMacro":["target"],"removeGitRepo":["repo"],"removeGlobalShortcutMapping":["shortcut"],"removeLocalChordMonorepo":["path"],"removePlaceholderChordBinding":["file_path","sequence_template"],"requestAccessibilityAccess":[],"resetDefaultChords":[],"runChordCommand":["command"],"savePersonalChordsFile":["dirname","pathslug","contents","expected"],"setChordMacro":["target","sequence","previous_target"],"setGitRepoLocalLink":["repo","path"],"setMonorepoPackages":["source","names"],"setOnboardingComplete":["complete"],"setPackageApprovals":["identities","approved"],"setPlaceholderChordBinding":["file_path","sequence_template","sequence"],"syncGitRepo":["repo"],"toggleAutostart":[],"toggleDockIcon":[],"toggleHideGuideByDefault":[],"toggleMenuBarIcon":[],"updateGlobalShortcutMapping":["old_shortcut","new_shortcut"],"voiceOverUsesCapsLock":[]}};
 
-const RESULT_MAP = {"":{"addGitMonorepo":true,"addGitRepo":true,"addLocalChordFolder":true,"addLocalChordMonorepo":true,"checkChordsFile":true,"createPersonalPackage":true,"deletePersonalChordsFile":true,"getAppLogs":true,"getCurrentStates":true,"installCli":true,"listGlobalShortcutMappings":true,"listLocalChordFolders":true,"listLocalChordMonorepos":true,"listMonorepoPackages":true,"listPersonalPackages":true,"openAccessibilitySettings":false,"openPersonalPackage":true,"openVoiceOverUtility":false,"pickLocalChordFolder":true,"quitApp":true,"readPersonalChordsFile":true,"refreshCliInstallation":true,"refreshPermissions":true,"relaunchApp":true,"reloadChords":true,"removeChordMacro":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removeLocalChordMonorepo":true,"removePlaceholderChordBinding":true,"resetDefaultChords":true,"runChordCommand":true,"savePersonalChordsFile":true,"setChordMacro":true,"setGitRepoLocalLink":true,"setMonorepoPackages":true,"setPackageApprovals":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true,"voiceOverUsesCapsLock":false}};
+const RESULT_MAP = {"":{"addAppChord":true,"addGitMonorepo":true,"addGitRepo":true,"addLocalChordFolder":true,"addLocalChordMonorepo":true,"checkChordsFile":true,"createPersonalPackage":true,"deletePersonalChordsFile":true,"getAppLogs":true,"getCurrentStates":true,"getOnboardingInfo":true,"installCli":true,"listGlobalShortcutMappings":true,"listInstalledApps":true,"listLocalChordFolders":true,"listLocalChordMonorepos":true,"listMonorepoPackages":true,"listPersonalPackages":true,"moveToApplications":true,"openAccessibilitySettings":false,"openPersonalPackage":true,"openVoiceOverUtility":false,"pickLocalChordFolder":true,"quitApp":true,"readPersonalChordsFile":true,"refreshCliInstallation":true,"refreshPermissions":true,"relaunchApp":true,"reloadChords":true,"removeChordMacro":true,"removeGitRepo":true,"removeGlobalShortcutMapping":true,"removeLocalChordMonorepo":true,"removePlaceholderChordBinding":true,"requestAccessibilityAccess":false,"resetDefaultChords":true,"runChordCommand":true,"savePersonalChordsFile":true,"setChordMacro":true,"setGitRepoLocalLink":true,"setMonorepoPackages":true,"setOnboardingComplete":true,"setPackageApprovals":true,"setPlaceholderChordBinding":true,"syncGitRepo":true,"toggleAutostart":true,"toggleDockIcon":true,"toggleHideGuideByDefault":true,"toggleMenuBarIcon":true,"updateGlobalShortcutMapping":true,"voiceOverUsesCapsLock":false}};
 
 export type Router = {
 	"": {
+		addAppChord: (sequence: string, name: string, bundleId: string) => Promise<null>,
 		addGitMonorepo: (repo: string) => Promise<GitRepo>,
 		addGitRepo: (repo: string) => Promise<GitRepo>,
 		addLocalChordFolder: (path: string) => Promise<LocalChordPackage>,
@@ -86,12 +103,15 @@ export type Router = {
 		deletePersonalChordsFile: (dirname: string, pathslug: string) => Promise<null>,
 		getAppLogs: () => Promise<AppLogEntry[]>,
 		getCurrentStates: () => Promise<string>,
+		getOnboardingInfo: () => Promise<OnboardingInfo>,
 		installCli: () => Promise<null>,
 		listGlobalShortcutMappings: () => Promise<GlobalShortcutMappingInfo[]>,
+		listInstalledApps: () => Promise<InstalledApp[]>,
 		listLocalChordFolders: () => Promise<string[]>,
 		listLocalChordMonorepos: () => Promise<string[]>,
 		listMonorepoPackages: (source: string) => Promise<([string, boolean])[]>,
 		listPersonalPackages: () => Promise<PersonalPackages>,
+		moveToApplications: () => Promise<null>,
 		openAccessibilitySettings: () => Promise<void>,
 		openPersonalPackage: (dirname: string | null) => Promise<null>,
 		openVoiceOverUtility: () => Promise<void>,
@@ -107,12 +127,14 @@ export type Router = {
 		removeGlobalShortcutMapping: (shortcut: string) => Promise<null>,
 		removeLocalChordMonorepo: (path: string) => Promise<null>,
 		removePlaceholderChordBinding: (filePath: string, sequenceTemplate: string) => Promise<null>,
+		requestAccessibilityAccess: () => Promise<void>,
 		resetDefaultChords: () => Promise<null>,
 		runChordCommand: (command: string) => Promise<ChordCommandOutput>,
 		savePersonalChordsFile: (dirname: string, pathslug: string, contents: string, expected: string | null) => Promise<null>,
 		setChordMacro: (target: ChordMacroName, sequence: string, previousTarget: { type: "buffer"; value: number } | { type: "named"; value: string } | null) => Promise<null>,
 		setGitRepoLocalLink: (repo: string, path: string | null) => Promise<GitRepo>,
 		setMonorepoPackages: (source: string, names: string[]) => Promise<null>,
+		setOnboardingComplete: (complete: boolean) => Promise<null>,
 		setPackageApprovals: (identities: string[], approved: boolean) => Promise<null>,
 		setPlaceholderChordBinding: (filePath: string, sequenceTemplate: string, sequence: string) => Promise<null>,
 		syncGitRepo: (repo: string) => Promise<GitRepo>,

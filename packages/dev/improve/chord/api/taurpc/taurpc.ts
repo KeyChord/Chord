@@ -1,6 +1,7 @@
 import type {
 	ChordsFileProblem,
 	GlobalShortcutMappingInfo,
+	InstalledApp,
 	PersonalPackageFiles,
 	PersonalPackages,
 } from '#bindings';
@@ -14,6 +15,7 @@ export const taurpc = createTauRPCProxy();
 export type {
 	ChordsFileProblem,
 	GlobalShortcutMappingInfo,
+	InstalledApp,
 	PersonalPackageFiles,
 	PersonalPackages,
 };

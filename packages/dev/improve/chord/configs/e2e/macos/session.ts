@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { appPid, approvePackages, type ChordApp, launch, quit } from "#chord-app";
 import { Guest, shellQuote } from "#guest";
 import { Keysym } from "#keysyms";
+import { type ChordInputOptions, Screen } from "#screen";
 import { SESSION_ENV, type SessionState } from "#vm";
 import { VncClient } from "#vnc";
 import { waitFor, type WaitOptions } from "#wait";
@@ -15,11 +16,6 @@ export type PackageFiles = Record<string, string>;
 const PROBE_PACKAGE = "e2e-probe";
 const PROBE_SEQUENCE = ";;e2e-ready";
 const PROBE_FILE = "/tmp/chord-e2e-ready";
-
-export interface ChordInputOptions {
-  /** How the chord runs: by releasing Space (default) or by pressing Caps while Space is held. */
-  complete?: "release" | "caps";
-}
 
 /**
  * A test file's connection to the VM prepared by `_e2e-macos test`: SSH for setup and
@@ -44,24 +40,13 @@ export class Session {
       Guest.connect(state.host),
       VncClient.connect(state.vncUrl),
     ]);
+    if (!state.app) throw new Error(`${state.vm} has no Chord installed`);
     return new Session(guest, vnc, state.app, state.artifacts);
   }
 
-  /**
-   * Types a chord as a user does: Caps+Space enters Chord mode, Caps is let go while Space
-   * stays down, the keys are typed, and the chord runs.
-   */
-  async chord(sequence: string, { complete = "release" }: ChordInputOptions = {}) {
-    this.vnc.key(Keysym.CapsLock, true);
-    await Bun.sleep(40);
-    this.vnc.key(Keysym.Space, true);
-    await Bun.sleep(40);
-    this.vnc.key(Keysym.CapsLock, false);
-    await Bun.sleep(80);
-    await this.vnc.type(sequence);
-    if (complete === "caps") await this.vnc.press(Keysym.CapsLock);
-    this.vnc.key(Keysym.Space, false);
-    await Bun.sleep(80);
+  /** Types a chord on the VM's keyboard. */
+  async chord(sequence: string, options: ChordInputOptions = {}) {
+    await new Screen(this.vnc, join(this.artifacts, "screen")).chord(sequence, options);
   }
 
   /** Runs `sequence` through the app's CLI, which forwards it to the running app. */
@@ -185,7 +170,7 @@ export class Session {
   }
 
   async close() {
-    this.vnc.close();
+    await this.vnc.close();
     await this.guest.close();
   }
 

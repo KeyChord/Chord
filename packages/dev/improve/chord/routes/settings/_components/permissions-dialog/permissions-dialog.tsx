@@ -29,10 +29,11 @@ function PermissionsDialogContent({
   onDismiss: () => void;
   permissionsData: NonNullable<ReturnType<typeof usePermissionsState>["data"]>;
 }) {
-  const { data: isAccessibilityEnabled, refetch: refetchPermissions } = useQuery({
+  // Chord's state hears about a grant by itself, including while this window is in the background.
+  const isAccessibilityEnabled = permissionsData.isAccessibilityEnabled ?? false;
+  const { refetch: refetchPermissions } = useQuery({
     queryKey: ["macos-permissions"],
     queryFn: () => taurpc.refreshPermissions(),
-    initialData: permissionsData.isAccessibilityEnabled ?? false,
     refetchOnWindowFocus: "always",
   });
   useEffect(() => {
@@ -66,11 +67,11 @@ function PermissionsDialogContent({
         </div>
         <DialogHeader className="gap-2 pt-0.5">
           <DialogTitle className="text-[17px] leading-5">
-            Chord needs Accessibility access
+            Allow Chord to use your keyboard
           </DialogTitle>
           <DialogDescription className="leading-5">
-            Accessibility lets Chord detect your global trigger and run actions in other apps. macOS
-            requires you to approve this in System Settings.
+            Chords can't run until you do. Chord needs this to notice when you start a chord and to
+            press keys for you, and macOS only lets you allow it in System Settings.
           </DialogDescription>
         </DialogHeader>
       </div>

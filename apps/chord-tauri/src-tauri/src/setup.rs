@@ -173,10 +173,6 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let settings = state.settings();
     settings.apply_all()?;
 
-    if tauri_app::startup::should_show_permission_dialog() {
-        settings.ui.open()?;
-    }
-
     log::debug!("finished setup()");
 
     Ok(())

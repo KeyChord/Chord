@@ -15,6 +15,8 @@ const SECURITY_NONE = 1;
 const SECURITY_VNC = 2;
 const ENCODING_RAW = 0;
 const ENCODING_DESKTOP_SIZE = -223;
+const BUTTON_LEFT = 1;
+const FRAME_RETRY_MS = 2_000;
 
 /** Incoming bytes, read in exact sizes by a single reader. */
 class ByteQueue {
@@ -117,10 +119,14 @@ export class VncClient {
   private frameWaiters: { resolve: () => void; reject: (error: Error) => void }[] = [];
   private failure: Error | undefined;
   private closed = false;
+  /** Framebuffer updates requested and not yet read. */
+  private framesRequested = 0;
 
   private constructor(
     private readonly socket: Socket<undefined>,
     private readonly input: ByteQueue,
+    /** Resolves when the connection is gone, as it is when the VM stops. */
+    readonly ended: Promise<void>,
   ) {}
 
   /** Connects to a `vnc://:password@host:port` URL, as printed by `tart run --vnc-experimental`. */
@@ -129,6 +135,10 @@ export class VncClient {
     const input = new ByteQueue();
     // The socket exists before the client that writes to it.
     let drain = () => {};
+    let resolveEnded = () => {};
+    const ended = new Promise<void>((resolve) => {
+      resolveEnded = resolve;
+    });
     const socket = await Bun.connect({
       hostname: target.hostname,
       port: Number(target.port || 5900),
@@ -141,13 +151,14 @@ export class VncClient {
         },
         close() {
           input.fail(new Error("VNC connection closed"));
+          resolveEnded();
         },
         error(_socket, error) {
           input.fail(error);
         },
       },
     });
-    const client = new VncClient(socket, input);
+    const client = new VncClient(socket, input, ended);
     drain = () => client.flush();
     try {
       await withTimeout(
@@ -156,7 +167,7 @@ export class VncClient {
         `VNC handshake with ${target.host}`,
       );
     } catch (error) {
-      client.close();
+      await client.close();
       throw error;
     }
     void client.readMessages();
@@ -199,21 +210,51 @@ export class VncClient {
     }
   }
 
-  /** Clicks at framebuffer pixel coordinates. */
-  async click(x: number, y: number, { delayMs = 60 } = {}) {
-    const pointer = (buttons: number) =>
+  /** Moves the pointer to framebuffer pixel coordinates, with `buttons` held. */
+  move(x: number, y: number, buttons = 0) {
+    this.send(
       message(6, (view) => {
         view.setUint8(0, 5);
         view.setUint8(1, buttons);
         view.setUint16(2, x);
         view.setUint16(4, y);
-      });
-    this.send(pointer(0));
+      }),
+    );
+  }
+
+  /** Clicks at framebuffer pixel coordinates; `count: 2` is a double-click. */
+  async click(x: number, y: number, { delayMs = 60, count = 1 } = {}) {
+    this.move(x, y);
     await Bun.sleep(delayMs);
-    this.send(pointer(1));
-    await Bun.sleep(delayMs);
-    this.send(pointer(0));
-    await Bun.sleep(delayMs);
+    for (let i = 0; i < count; i++) {
+      this.move(x, y, BUTTON_LEFT);
+      await Bun.sleep(delayMs);
+      this.move(x, y);
+      await Bun.sleep(delayMs);
+    }
+  }
+
+  /** Presses at one point, moves in steps as a hand would, and releases at another. */
+  async drag(
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    { steps = 24, delayMs = 30 } = {},
+  ) {
+    this.move(from.x, from.y);
+    await Bun.sleep(200);
+    this.move(from.x, from.y, BUTTON_LEFT);
+    await Bun.sleep(400);
+    for (let step = 1; step <= steps; step++) {
+      this.move(
+        Math.round(from.x + ((to.x - from.x) * step) / steps),
+        Math.round(from.y + ((to.y - from.y) * step) / steps),
+        BUTTON_LEFT,
+      );
+      await Bun.sleep(delayMs);
+    }
+    await Bun.sleep(400);
+    this.move(to.x, to.y);
+    await Bun.sleep(200);
   }
 
   /** The current framebuffer. */
@@ -227,7 +268,14 @@ export class VncClient {
       this.frameWaiters.push({ resolve, reject }),
     );
     this.requestFrame();
-    await withTimeout(updated, timeoutMs, "VNC framebuffer update");
+    // The server occasionally drops a request while the screen is changing, and the next one
+    // works, so asking once and waiting would just stall for the whole timeout.
+    const retry = setInterval(() => this.requestFrame(), FRAME_RETRY_MS);
+    try {
+      await withTimeout(updated, timeoutMs, "VNC framebuffer update");
+    } finally {
+      clearInterval(retry);
+    }
     return { width: this.width, height: this.height, rgb: this.rgb.slice() };
   }
 
@@ -236,10 +284,29 @@ export class VncClient {
     return encodePng(width, height, rgb);
   }
 
-  close() {
+  /**
+   * Reads every requested framebuffer update, then ends the connection and waits for the
+   * server to do the same. Await this before the process exits.
+   *
+   * Prefer one connection for a VM's whole life. Virtualization.framework's VNC server crashes
+   * the VM process when clients come and go on a busy screen: a hang-up with an update in
+   * flight does it within two connections, and even clean hang-ups eventually leave the next
+   * client without frames and the one after it crashing the VM (an assertion in
+   * `-[_VZVirtualMachineAccessor addAccessorObserver:]`).
+   */
+  async close({ timeoutMs = FRAME_RETRY_MS * 2 } = {}) {
     if (this.closed) return;
+    const settled = (promise: Promise<unknown>, what: string) =>
+      withTimeout(promise, timeoutMs, what).catch(() => {});
+    await settled(this.framesRead(), "outstanding VNC framebuffer updates");
     this.closed = true;
     this.socket.end();
+    await settled(this.ended, "the VNC server to close the connection");
+  }
+
+  /** A request the server dropped never gets an answer, so the caller bounds this wait. */
+  private async framesRead() {
+    while (this.framesRequested > 0 && !this.failure) await Bun.sleep(10);
   }
 
   private async handshake(password: string) {
@@ -354,6 +421,7 @@ export class VncClient {
         }
       }
     }
+    this.framesRequested = Math.max(0, this.framesRequested - 1);
     // A resize invalidates the frame; ask again at the new size.
     if (resized && this.frameWaiters.length > 0) {
       this.requestFrame();
@@ -369,6 +437,7 @@ export class VncClient {
   }
 
   private requestFrame() {
+    this.framesRequested++;
     this.send(
       message(10, (view) => {
         view.setUint8(0, 3);

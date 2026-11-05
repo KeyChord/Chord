@@ -34,7 +34,7 @@ function PermissionsCardContent({
       <CardHeader>
         <CardTitle>Permissions</CardTitle>
         <CardDescription>
-          Grant macOS access for the global trigger and for clicking chords.
+          macOS has to allow Chord to use your keyboard.
         </CardDescription>
       </CardHeader>
       <CardContent className="preference-group">
@@ -42,7 +42,7 @@ function PermissionsCardContent({
           <div className="min-w-0">
             <p className="preference-label">Accessibility</p>
             <p className="preference-description">
-              Needed for the global trigger and automated clicking.
+              Lets Chord notice when you start a chord, and press keys for you.
             </p>
           </div>
           {permissions.isAccessibilityEnabled ? (

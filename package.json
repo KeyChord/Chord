@@ -88,6 +88,7 @@
     "@chord/dev.improve.chord.routes.settings.log.index": "workspace:*",
     "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
     "@chord/dev.improve.chord.routes.settings.macros.index": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings.onboarding.index": "workspace:*",
     "@chord/dev.improve.chord.routes.settings.personal.index": "workspace:*",
     "@chord/com.npmjs.tanstack__react-table": "workspace:*",
     "@chord/dev.improve.chord.components.ui.toast": "workspace:*"

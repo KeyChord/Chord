@@ -64,6 +64,7 @@ rdev = { git = "https://github.com/KeyChord/rdev", features = [
 ] }
 observable-property = "0.4.4"
 toml = "1.1.8"
+plist = "1"
 anyhow = "1.0"
 regex = "1.13.1"
 libc = "0.2"

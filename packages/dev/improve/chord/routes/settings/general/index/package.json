@@ -3,12 +3,18 @@
 	"type": "module",
 	"private": true,
 	"imports": {
+		"#getting-started-card": "./getting-started-card.tsx",
 		"#settings-general-page": "./settings-general-page.tsx"
 	},
 	"exports": {
 		".": "./+.ts"
 	},
 	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",

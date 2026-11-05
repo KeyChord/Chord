@@ -710,6 +710,7 @@ dependencies = [
  "ordermap",
  "osakit",
  "parking_lot",
+ "plist",
  "raw-window-handle",
  "rbun",
  "rdev",

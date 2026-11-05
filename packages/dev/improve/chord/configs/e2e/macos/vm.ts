@@ -9,7 +9,8 @@ export interface SessionState {
   vm: string;
   host: string;
   vncUrl: string;
-  app: ChordApp;
+  /** Absent on a `fresh` VM until someone installs Chord in it. */
+  app?: ChordApp;
   /** Screenshots and logs of failed tests go here. */
   artifacts: string;
 }
@@ -31,16 +32,21 @@ export interface BootedVm {
   exited: Promise<number>;
 }
 
-/** Clones `golden` to `name`, boots it headless, and waits for the desktop session. */
+/** Clones `base`, a local VM or an image, boots it headless, and waits for the desktop session. */
 export async function bootClone(
-  golden: string,
+  base: string,
   name: string,
-  { logFile, detached = false }: { logFile: string; detached?: boolean },
+  {
+    logFile,
+    detached = false,
+    display,
+  }: { logFile: string; detached?: boolean; display?: string },
 ): Promise<BootedVm> {
-  if (!(await findVm(golden))) {
-    throw new Error(`no golden VM ${golden}; create it with \`vpx _e2e-macos setup\``);
+  if (!base.includes("/") && !(await findVm(base))) {
+    throw new Error(`no golden VM ${base}; create it with \`vpx _e2e-macos setup\``);
   }
-  await tart(["clone", golden, name]);
+  await tart(["clone", base, name]);
+  if (display) await tart(["set", name, "--display", display]);
   let guest: Guest | undefined;
   try {
     const { vncUrl, exited } = await runVm(name, { logFile, detached });

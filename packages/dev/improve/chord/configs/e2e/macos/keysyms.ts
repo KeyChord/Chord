@@ -21,6 +21,38 @@ export const Keysym = {
   Command: 0xffe9,
 } as const;
 
+/** A key by the name a person would call it, for command lines and scripts. */
+export function keysymNamed(name: string): number {
+  const named: Record<string, number> = {
+    space: Keysym.Space,
+    backspace: Keysym.Backspace,
+    delete: Keysym.Backspace,
+    tab: Keysym.Tab,
+    return: Keysym.Return,
+    enter: Keysym.Return,
+    escape: Keysym.Escape,
+    esc: Keysym.Escape,
+    left: Keysym.Left,
+    up: Keysym.Up,
+    right: Keysym.Right,
+    down: Keysym.Down,
+    shift: Keysym.Shift,
+    control: Keysym.Control,
+    ctrl: Keysym.Control,
+    caps: Keysym.CapsLock,
+    capslock: Keysym.CapsLock,
+    command: Keysym.Command,
+    cmd: Keysym.Command,
+  };
+  const lower = name.toLowerCase();
+  const keysym = named[lower];
+  if (keysym !== undefined) return keysym;
+  const fn = /^f(\d+)$/.exec(lower);
+  if (fn) return functionKey(Number(fn[1]));
+  if (name.length === 1) return strokeFor(name).keysym;
+  throw new Error(`unknown key ${name}`);
+}
+
 /** F1 is 0xffbe; the function keys are consecutive up to F35. */
 export function functionKey(n: number): number {
   if (!Number.isInteger(n) || n < 1 || n > 35) throw new RangeError(`no function key F${n}`);

@@ -4,12 +4,22 @@
 	"version": "0.0.0",
 	"private": true,
 	"bin": {
+		"_gen-dmg-background": "./_gen-dmg-background.ts",
+		"_make-dmg": "./_make-dmg.ts",
+		"_notarize": "./_notarize.ts",
 		"_release-macos": "./_release-macos.ts"
 	},
+	"imports": {
+		"#make-dmg": "./make-dmg.ts",
+		"#notarize": "./notarize.ts"
+	},
 	"exports": {
-		".": "./+.ts"
+		".": "./+.ts",
+		"./make-dmg": "./make-dmg.ts",
+		"./notarize": "./notarize.ts"
 	},
 	"devDependencies": {
+		"@fontsource-variable/inter": "^5.3.0",
 		"@types/bun": "^1.4.3"
 	}
 }

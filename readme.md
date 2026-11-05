@@ -7,13 +7,15 @@
 ## Installation
 
 1. Download `Chord-aarch64.dmg` from the [latest release](https://github.com/KeyChord/Chord/releases/latest). It is signed and notarized.
-2. Open the DMG, drag **Chord** into `Applications`, and launch it.
+2. Open the DMG, drag **Chord** into `Applications`, and open it.
+
+Chord then starts a short guided setup: it asks for the permission it needs, helps you make your first chord, and has you practice using it. The rest of this readme is reference for what you learn there. To see the guide again, open **Settings → General → Getting Started**.
 
 # Setup
 
 ## Permissions
 
-Chord requires macOS _Accessibility Permissions_ so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
+Chord requires macOS _Accessibility Permissions_ (called _Device Control and Data Access_ on macOS 27) so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
 
 ## Chord Mode
 

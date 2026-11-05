@@ -10,11 +10,14 @@
  * DMG and updater artifact ourselves.
  *
  * Environment:
- *   APPLE_SIGNING_IDENTITY   overrides bundle.macOS.signingIdentity from tauri.conf.json
+ *   APPLE_SIGNING_IDENTITY   overrides bundle.macOS.signingIdentity from tauri.conf.json, whose
+ *                            development identity Apple won't notarize: use the Developer ID one
  *   TAURI_SIGNING_PRIVATE_KEY (+ _PASSWORD)  enables signing the updater artifact
- *   APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID  enables notarization + stapling
+ *   CHORD_NOTARY_PROFILE, or APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID  enables notarization + stapling
  *   CODESIGN_NO_TIMESTAMP=1  skips the trusted timestamp (offline builds)
  */
+import { makeDmg } from "#make-dmg";
+import { isNotarized, notarize, notaryCredentials } from "#notarize";
 import { $ } from "bun";
 import fs from "node:fs";
 import path from "node:path";
@@ -58,9 +61,25 @@ const outDir = path.join(srcTauri, "target/release/bundle/chord-release");
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 
+// In this order, so that the app inside the disk image and the updater archive carry their tickets.
+const credentials = notaryCredentials();
+if (credentials) {
+  console.log("notarizing the app");
+  await notarize(app, credentials);
+} else {
+  console.log("no notary credentials; skipping notarization");
+}
+
 const dmg = path.join(outDir, `${productName}.dmg`);
 console.log(`creating ${dmg}`);
-await $`hdiutil create -volname ${productName} -srcfolder ${app} -ov -format UDZO ${dmg}`;
+await makeDmg(app, dmg, path.join(srcTauri, "icons/icon.icns"));
+if (credentials) {
+  console.log("notarizing the disk image");
+  await notarize(dmg, credentials);
+  for (const artifact of [app, dmg]) {
+    if (!(await isNotarized(artifact))) throw new Error(`${artifact} isn't notarized`);
+  }
+}
 
 const updaterArchive = path.join(outDir, `${productName}.app.tar.gz`);
 console.log(`creating updater artifact ${updaterArchive}`);
@@ -69,15 +88,6 @@ if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
   await $`${process.execPath} ${tauriScript} signer sign ${updaterArchive}`.cwd(appDir);
 } else {
   console.log("TAURI_SIGNING_PRIVATE_KEY not set; updater artifact left unsigned");
-}
-
-if (process.env.APPLE_ID && process.env.APPLE_PASSWORD && process.env.APPLE_TEAM_ID) {
-  console.log("notarizing");
-  await $`xcrun notarytool submit ${dmg} --apple-id ${process.env.APPLE_ID} --password ${process.env.APPLE_PASSWORD} --team-id ${process.env.APPLE_TEAM_ID} --wait`;
-  await $`xcrun stapler staple ${app}`;
-  await $`xcrun stapler staple ${dmg}`;
-} else {
-  console.log("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID not set; skipping notarization");
 }
 
 console.log(`done: ${outDir}`);

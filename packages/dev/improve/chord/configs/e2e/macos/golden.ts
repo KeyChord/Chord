@@ -79,7 +79,7 @@ async function disableSip(vm: string, logDir: string, log: (message: string) => 
     await vnc.type("halt\n");
     await withTimeout(run.exited, 120_000, "Recovery to shut down");
   } finally {
-    vnc.close();
+    await vnc.close();
     await tart(["stop", vm]).catch(() => {});
   }
 }

@@ -5,14 +5,24 @@
  * a golden VM (SIP disabled so Accessibility can be granted), installs a release DMG the
  * way a user does, and runs the `*.e2e.ts` files, which type real keystrokes through
  * Virtualization.framework's VNC server. Nothing touches the host's keyboard settings.
+ *
+ * `fresh`, `ui` and `journey` start further back, on a pristine VM with SIP on: `journey` goes
+ * from the website to using a first chord by itself, and `fresh` with `ui` lets a person or an
+ * agent do the same one step at a time.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { makeDmg } from "@chord/dev.improve.chord.configs.release.macos/make-dmg";
+import { isNotarized } from "@chord/dev.improve.chord.configs.release.macos/notarize";
+import { $ } from "bun";
 import { grantAccessibility, installDmg, launch, quit } from "#chord-app";
 import { createGolden, DEFAULT_IMAGE, GOLDEN_VM } from "#golden";
 import { Guest } from "#guest";
-import { deleteVm, findVm, tartBinary } from "#tart";
+import { JOURNEY_ENV, type JourneyState } from "#journey";
+import { LIVE_SITE, startReleaseServer } from "#release-server";
+import { deleteVm, findVm, runVm, tartBinary, vmIp } from "#tart";
+import { serveUi, stopUiServer, uiRequest } from "#ui-server";
 import {
   bootClone,
   E2E_DIR,
@@ -23,7 +33,7 @@ import {
   SESSION_ENV,
   type SessionState,
 } from "#vm";
-import { VncClient } from "#vnc";
+import { withTimeout } from "#wait";
 
 const USAGE = `Usage: vpx _e2e-macos <command> [options]
 
@@ -31,22 +41,39 @@ Commands:
   setup               Build the golden VM that test runs clone (once; pulls ~30 GB)
   test [files...]     Run the e2e tests against a production DMG in a fresh clone
   up                  Boot a clone with Chord installed and running, and leave it up
-  down                Stop and delete a VM started by \`up\`
-  screenshot [path]   Save the screen of a VM started by \`up\`
-  ssh [command]       Open a shell, or run a command, in a VM started by \`up\`
+  fresh               Boot a pristine VM with SIP on and nothing installed, for going from
+                      zero as a new user, and leave it up
+  ui <action> [...]   Look at and act on a running VM as a person would (see below)
+  journey             Run a new user's whole first run, from the website to using a chord
+  down                Stop and delete a VM started by \`up\` or \`fresh\`
+  screenshot [path]   Save the screen of a running VM
+  ssh [command]       Open a shell, or run a command, in a running VM
 
 Options:
   --dmg <path>        DMG to install (default: the newest from \`vpx _tauri build\`)
   --build             Build the DMG first, as the release workflow does
   --release <tag>     Download Chord-aarch64.dmg from a GitHub release (prod, beta, ...)
+  --site <url>        Website to start from (journey; default ${LIVE_SITE})
+  --published         Download the published release from the website (journey)
   --vm <name>         Use a VM started by \`up\` (test, down, screenshot, ssh)
   --keep              Leave the test VM running afterwards (test)
   --force             Rebuild an existing golden VM (setup)
   --image <ref>       Base image (setup; default ${DEFAULT_IMAGE})
   --concurrency <n>   Parallel image downloads (setup; default 4)
   --golden <name>     Golden VM (default ${GOLDEN_VM})
+
+UI actions (each saves a numbered screenshot and prints the text on screen with coordinates):
+  ui shot [name]              Look at the screen
+  ui click <x> <y>|<text>     Click a point, or the first visible text containing <text>
+  ui dclick <x> <y>|<text>    Double-click
+  ui drag <x1> <y1> <x2> <y2> Drag with the left button
+  ui type <text>              Type on the keyboard
+  ui key <combo>              Press keys together, for example cmd+space or return
+  ui chord <keys> [--caps]    Hold Caps+Space, type <keys>, and release (or press Caps)
+  ui wait <text> [--timeout <seconds>]   Wait for text to appear
 `;
 
+const FRESH_DISPLAY = "1440x900";
 const APP_DIR = join(REPO_ROOT, "apps/chord-tauri");
 const TESTS_DIR = import.meta.dir;
 
@@ -62,6 +89,10 @@ const { values, positionals } = parseArgs({
     image: { type: "string", default: DEFAULT_IMAGE },
     concurrency: { type: "string", default: "4" },
     golden: { type: "string", default: GOLDEN_VM },
+    caps: { type: "boolean" },
+    site: { type: "string", default: LIVE_SITE },
+    published: { type: "boolean" },
+    timeout: { type: "string", default: "60" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -125,9 +156,18 @@ async function resolveDmg(): Promise<string> {
         env: { ...process.env, CI: "true" },
       },
     );
+    // The same disk image a release ships, not the one Tauri made along the way.
+    const dmg = join(E2E_DIR, "build/Chord-aarch64.dmg");
+    await $`mkdir -p ${join(E2E_DIR, "build")}`;
+    await makeDmg(
+      join(APP_DIR, "src-tauri/target/release/bundle/macos/Chord.app"),
+      dmg,
+      join(APP_DIR, "src-tauri/icons/icon.icns"),
+    );
+    return dmg;
   }
   const target = join(APP_DIR, "src-tauri/target");
-  const dirs = [join(target, "release/bundle/dmg")];
+  const dirs = [join(E2E_DIR, "build"), join(target, "release/bundle/dmg")];
   for (const entry of readdirSync(target, { withFileTypes: true })) {
     if (entry.isDirectory()) dirs.push(join(target, entry.name, "release/bundle/dmg"));
   }
@@ -194,7 +234,7 @@ async function test() {
     } else {
       const running = await loadRunning(values.vm);
       guest = await Guest.connect(running.host);
-      await quit(guest, running.app);
+      if (running.app) await quit(guest, running.app);
       const app = await install(guest, dmg);
       state = { vm: running.vm, host: running.host, vncUrl: running.vncUrl, app, artifacts };
     }
@@ -208,7 +248,7 @@ async function test() {
       stdio: ["inherit", "inherit", "inherit"],
     });
     status = await child.exited;
-    await guest.copyFrom(state.app.log, join(artifacts, "chords.log")).catch(() => {});
+    if (state.app) await guest.copyFrom(state.app.log, join(artifacts, "chords.log")).catch(() => {});
   } finally {
     await guest?.close();
     if (ephemeral && values.keep && state) {
@@ -248,9 +288,122 @@ async function up() {
   console.log(`watch or control it with: open '${vm.vncUrl}'`);
 }
 
+/**
+ * A VM as close to a new user's Mac as the base image allows: SIP on, nothing of Chord's, no
+ * pre-granted permissions, a laptop-sized display, and Gatekeeper on (the image turns it off).
+ */
+async function bootFresh(name: string, logFile: string): Promise<{ host: string; vncUrl: string }> {
+  console.log(`booting ${name} from ${values.image}`);
+  const prepare = await bootClone(values.image!, name, { logFile, display: FRESH_DISPLAY });
+  // The image pins a 1024x768 desktop in this file; without it macOS fits the display instead.
+  await prepare.guest.run(`
+    sudo spctl --global-enable
+    sudo rm -f /Library/Preferences/com.apple.windowserver.displays.plist
+  `);
+  // The guest shutting down ends tart, so a VM can't reboot under a detached run.
+  await prepare.guest.run("sudo shutdown -h now", { check: false });
+  await withTimeout(prepare.exited, 180_000, `${name} to shut down`);
+  await prepare.guest.close();
+
+  const { vncUrl } = await runVm(name, { logFile, detached: true });
+  const host = await vmIp(name);
+  const guest = await Guest.connect(host);
+  await guest.waitUntilReady();
+  await guest.close();
+  return { host, vncUrl };
+}
+
+async function fresh() {
+  const id = stamp();
+  const name = `chord-fresh-${id}`;
+  const artifacts = join(E2E_DIR, "runs", id);
+  const vm = await bootFresh(name, join(artifacts, "tart.log"));
+  const state: SessionState = { vm: name, ...vm, artifacts };
+  await saveRunning(state);
+  try {
+    await uiRequest(state, { action: "allow-known-developers", args: [] });
+  } catch (error) {
+    await stopUiServer(name);
+    await deleteVm(name);
+    forgetRunning(name);
+    throw error;
+  }
+  console.log(`${name} is up at ${vm.host}; nothing is installed`);
+  console.log(`watch it with: open '${vm.vncUrl}'`);
+  console.log(`screenshots from \`ui\` go to ${join(artifacts, "screen")}`);
+}
+
+/**
+ * The whole first run. With a local DMG (the default), Safari downloads it from a local copy of
+ * the website, and Gatekeeper's check is skipped unless Apple has notarized that DMG. With
+ * \`--published\`, everything is what a new user gets today.
+ */
+async function journey() {
+  const dmg = values.published ? undefined : await resolveDmg();
+  const id = stamp();
+  const name = `chord-journey-${id}`;
+  const artifacts = join(E2E_DIR, "runs", id);
+  process.once("SIGINT", () => {
+    console.log(`\ninterrupted; deleting ${name}`);
+    void deleteVm(name).finally(() => process.exit(130));
+  });
+  let status = 1;
+  try {
+    const vm = await bootFresh(name, join(artifacts, "tart.log"));
+    const guest = await Guest.connect(vm.host);
+    const server =
+      dmg || values.site !== LIVE_SITE
+        ? await startReleaseServer(guest, { site: values.site!, dmg })
+        : undefined;
+    await guest.close();
+    const state: JourneyState = {
+      host: vm.host,
+      vncUrl: vm.vncUrl,
+      siteUrl: server?.url ?? values.site!,
+      checkedByGatekeeper: dmg === undefined || (await isNotarized(dmg)),
+      artifacts,
+    };
+    const file = join(artifacts, "journey.json");
+    await Bun.write(file, JSON.stringify(state, null, 2));
+    console.log(`watch with: open '${vm.vncUrl}'`);
+    const child = Bun.spawn(
+      ["bun", "test", "--timeout", "240000", join(TESTS_DIR, "first-run.journey.ts")],
+      {
+        cwd: REPO_ROOT,
+        env: { ...process.env, [JOURNEY_ENV]: file },
+        stdio: ["inherit", "inherit", "inherit"],
+      },
+    );
+    status = await child.exited;
+    server?.stop();
+  } finally {
+    if (values.keep) {
+      console.log(`left ${name} running; delete it with \`tart delete ${name}\` once stopped`);
+    } else {
+      await deleteVm(name);
+    }
+  }
+  console.log(`story of this run: ${join(artifacts, "journey.md")}`);
+  process.exitCode = status;
+}
+
+async function ui() {
+  const [action, ...rest] = args;
+  if (!action) throw new Error(`ui needs an action\n\n${USAGE}`);
+  const state = await loadRunning(values.vm);
+  const reply = await uiRequest(state, {
+    action,
+    args: rest,
+    timeoutSeconds: Number(values.timeout),
+    caps: values.caps,
+  });
+  console.log(reply);
+}
+
 async function down() {
   const name = values.vm ?? (await loadRunning().catch(() => undefined))?.vm;
   if (!name) throw new Error("no VM to stop; pass --vm <name>");
+  await stopUiServer(name);
   await deleteVm(name);
   forgetRunning(name);
   console.log(`deleted ${name}`);
@@ -258,10 +411,8 @@ async function down() {
 
 async function screenshot() {
   const state = await loadRunning(values.vm);
-  const vnc = await VncClient.connect(state.vncUrl);
   const path = resolve(args[0] ?? join(E2E_DIR, `screenshot-${stamp()}.png`));
-  await Bun.write(path, await vnc.screenshot());
-  vnc.close();
+  await uiRequest(state, { action: "shot", args: [path] });
   console.log(path);
 }
 
@@ -296,6 +447,18 @@ switch (command) {
     break;
   case "up":
     await up();
+    break;
+  case "fresh":
+    await fresh();
+    break;
+  case "journey":
+    await journey();
+    break;
+  case "ui":
+    await ui();
+    break;
+  case "__ui-server":
+    await serveUi(await loadRunning(values.vm));
     break;
   case "down":
     await down();

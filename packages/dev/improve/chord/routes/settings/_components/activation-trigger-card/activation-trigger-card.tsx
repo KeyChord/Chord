@@ -17,14 +17,16 @@ export function ActivationTriggerCard() {
       <CardHeader>
         <CardTitle>Keyboard Shortcuts</CardTitle>
         <CardDescription>
-          Use this keyboard trigger to open the chord overlay anywhere in macOS.
+          Start a chord from anywhere on your Mac.
         </CardDescription>
       </CardHeader>
       <CardContent className="preference-group">
         <div className="preference-row">
           <div className="min-w-0">
-            <p className="preference-label">Open chord overlay</p>
-            <p className="preference-description">Hold to enter chord mode and type a sequence.</p>
+            <p className="preference-label">Start a chord</p>
+            <p className="preference-description">
+              Press caps lock and space together, and keep holding space while you type.
+            </p>
           </div>
           <div className="shrink-0">
             <ShortcutKeys shortcut="capsLock+space" />

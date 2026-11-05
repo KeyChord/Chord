@@ -124,6 +124,13 @@ impl AppPermissions {
     }
 
     pub async fn load(&self) -> Result<bool> {
+        match self.handle.autolaunch().is_enabled() {
+            Ok(enabled) => self.observable.set_state(|prev| AppPermissionsState {
+                is_autostart_enabled: Some(enabled),
+                ..prev
+            })?,
+            Err(error) => log::warn!("Could not read the launch on login setting: {error:#}"),
+        }
         Ok(self.refresh_if_changed()?.accessibility)
     }
 

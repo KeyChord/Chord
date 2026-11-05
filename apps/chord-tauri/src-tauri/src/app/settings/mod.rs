@@ -1,3 +1,4 @@
+pub mod install_location;
 mod app;
 pub use app::*;
 mod settings;

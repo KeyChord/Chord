@@ -1,4 +1,5 @@
 import type {
+  AppModeState,
   AppPermissionsState,
   AppSettingsState,
   ChordInputState,
@@ -18,6 +19,7 @@ import { listen } from "@tauri-apps/api/event";
 import { createStateQuery } from "#state-query";
 
 export interface TauriStates {
+  "app-mode": AppModeState;
   keyboard: KeyboardState;
   "chord-panel": ChordPanelState;
   "chord-input": ChordInputState;
@@ -33,6 +35,7 @@ export interface TauriStates {
 }
 
 const stateIds = [
+  "app-mode",
   "keyboard",
   "chord-panel",
   "chord-input",

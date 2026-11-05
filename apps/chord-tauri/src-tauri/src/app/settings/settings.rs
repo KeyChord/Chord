@@ -11,7 +11,7 @@ use tauri_plugin_store::StoreExt;
 pub struct AppSettings {
     pub ui: SettingsUi,
     observable: AppSettingsObservable,
-    handle: AppHandle,
+    pub(super) handle: AppHandle,
 }
 
 impl AppSettings {
@@ -53,6 +53,41 @@ impl AppSettings {
     pub fn toggle_hide_guide_by_default(&self) -> anyhow::Result<()> {
         self.update_state(|state| {
             state.is_chord_panel_hidden_by_default = !state.is_chord_panel_hidden_by_default;
+        })
+    }
+
+    /// Reads whether first-run setup is done. The first launch that finds nothing stored decides,
+    /// and stores it: repositories exist only on an install from before onboarding, and by the
+    /// next launch a new install has them too, whether or not setup was finished.
+    pub fn load_onboarding(&self, has_existing_install: bool) -> anyhow::Result<()> {
+        let store = self
+            .handle
+            .store(APP_STATE_STORE_PATH)
+            .context("failed to open app state store")?;
+        let complete = match store.get(ONBOARDING_COMPLETE_KEY) {
+            Some(value) => serde_json::from_value(value)
+                .with_context(|| format!("failed to parse `{ONBOARDING_COMPLETE_KEY}`"))?,
+            None => {
+                store.set(ONBOARDING_COMPLETE_KEY, has_existing_install);
+                store.save().context("failed to save app state store")?;
+                has_existing_install
+            }
+        };
+        self.observable.set_state(|state| AppSettingsState {
+            is_onboarding_complete: complete,
+            ..state
+        })
+    }
+
+    pub fn is_onboarding_complete(&self) -> bool {
+        self.observable
+            .get_state()
+            .is_ok_and(|state| state.is_onboarding_complete)
+    }
+
+    pub fn set_onboarding_complete(&self, complete: bool) -> anyhow::Result<()> {
+        self.update_state(|state| {
+            state.is_onboarding_complete = complete;
         })
     }
 
@@ -115,6 +150,11 @@ impl AppSettings {
                 HIDE_GUIDE_BY_DEFAULT_KEY,
                 defaults.is_chord_panel_hidden_by_default,
             )?,
+            is_onboarding_complete: Self::read_bool_setting(
+                handle,
+                ONBOARDING_COMPLETE_KEY,
+                defaults.is_onboarding_complete,
+            )?,
         })
     }
 
@@ -143,6 +183,7 @@ impl AppSettings {
             HIDE_GUIDE_BY_DEFAULT_KEY,
             state.is_chord_panel_hidden_by_default,
         );
+        store.set(ONBOARDING_COMPLETE_KEY, state.is_onboarding_complete);
         store.save().context("failed to save app state store")?;
 
         Ok(())
@@ -163,3 +204,4 @@ fn cli_executable() -> anyhow::Result<std::path::PathBuf> {
 const SHOW_MENU_BAR_ICON_KEY: &str = "showMenuBarIcon";
 const SHOW_DOCK_ICON_KEY: &str = "showDockIcon";
 const HIDE_GUIDE_BY_DEFAULT_KEY: &str = "hideGuideByDefault";
+const ONBOARDING_COMPLETE_KEY: &str = "onboardingComplete";
