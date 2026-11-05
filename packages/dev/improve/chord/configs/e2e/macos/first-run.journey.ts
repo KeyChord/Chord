@@ -112,7 +112,12 @@ journey.step("quitting partway through picks up where setup left off", async () 
   await journey.waitUntil("Chord to quit", async () =>
     (await guest.run(`pgrep -f 'Contents/MacOS/chord$'`, { check: false })).exitCode !== 0,
   );
-  await guest.run("open /Applications/Chord.app");
+  // LaunchServices can refuse this (-600) for a moment after the app quits, more so under Rosetta.
+  await journey.waitUntil(
+    "Chord to open again",
+    async () => (await guest.run("open /Applications/Chord.app", { check: false })).exitCode === 0,
+    { timeoutMs: 15_000, intervalMs: 1_000 },
+  );
   await screen.clickText("Get Started", { timeoutMs: 60_000 });
   await screen.waitForText("Allow Chord to use your keyboard", { timeoutMs: 10_000 });
 });
@@ -231,7 +236,7 @@ journey.step("every chord in the default packages loads", async () => {
   const nameOnly = /couldn't find any actions for chord \{"name": String\("[^"]*"\)\}$/;
   const skipped = (log ?? "")
     .split("\n")
-    .filter((line) => /couldn't find any actions|parse error|skipping chords file/.test(line))
+    .filter((line) => /couldn't find any actions|parse error|skipping chords file|skipping handler/.test(line))
     .filter((line) => !nameOnly.test(line))
     .filter((line) => !(journey.intel && NO_INTEL_ADDON.test(line)));
   expect(skipped).toEqual([]);

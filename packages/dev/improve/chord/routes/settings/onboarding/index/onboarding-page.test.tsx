@@ -97,6 +97,18 @@ test('packs show which are added, and every official pack is offered', () => {
 	expect(html).not.toContain('Add VSCode Chords');
 });
 
+test('a pack still loading its chords says so, even once it is saved', () => {
+	const html = render(
+		<PacksView
+			installedSlugs={new Set(['keychord/chords-terminal'])}
+			pendingUrl="https://github.com/KeyChord/chords-terminal"
+			onAdd={() => {}}
+		/>,
+	);
+	expect(html).toContain('Adding…');
+	expect(html).not.toContain('Added');
+});
+
 test('finishing without the permission warns that chords will not work', () => {
 	expect(render(<DoneStep isPermissionGranted={false} onFinish={() => {}} />)).toContain('won&#x27;t work');
 	expect(render(<DoneStep isPermissionGranted onFinish={() => {}} />)).not.toContain('won&#x27;t work');

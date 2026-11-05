@@ -33,7 +33,9 @@ export function PacksView({
 								? <p role="alert" className="text-[12px] leading-[17px] text-red-600 dark:text-red-400">Couldn't add this pack. Check your internet connection and try again.</p>
 								: null}
 						</div>
-						{isInstalled
+						{/* The pack is saved before its chords finish loading, which can take a minute on
+						    an Intel Mac; it's "Added" only once they have, and Continue waits until then. */}
+						{isInstalled && !isPending
 							? (
 									<span className="flex shrink-0 items-center gap-1 text-[12.5px] font-medium text-emerald-700 dark:text-emerald-400">
 										<Check className="size-4" /> Added

@@ -7,7 +7,8 @@ use crate::app::chord_package_manager::{
 };
 use crate::app::state::AppSingleton;
 use crate::models::{
-    ChordEventTrigger, ChordInput, ChordInputEvent, ChordsFileImportOverride, CompiledChordsFile,
+    Chord, ChordAction, ChordEventTrigger, ChordInput, ChordInputEvent, ChordsFileImportOverride,
+    CompiledChordsFile,
     CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
     CORE_CHORD_PACKAGE, is_core_chords_file,
 };
@@ -83,9 +84,61 @@ fn resolve_handler_args(
         .collect()
 }
 
+/// Takes out the actions that emit to a handler that failed to load, and the chords left with
+/// none, so one handler that can't load (such as a native add-on built for another architecture)
+/// doesn't take the rest of its file with it. Returns how many chords were dropped.
+fn without_failed_handlers(chords: Vec<Chord>, failed_events: &HashSet<String>) -> (Vec<Chord>, usize) {
+    if failed_events.is_empty() {
+        return (chords, 0);
+    }
+    let before = chords.len();
+    let chords = chords
+        .into_iter()
+        .filter_map(|mut chord| {
+            let count = chord.actions.len();
+            chord.actions.retain(|action| {
+                !matches!(action, ChordAction::Emit(emit) if failed_events.contains(&emit.event_key))
+            });
+            // A chord that never had actions is the package's business, not a failed handler's.
+            (chord.actions.len() == count || !chord.actions.is_empty()).then_some(chord)
+        })
+        .collect::<Vec<_>>();
+    let dropped = before - chords.len();
+    (chords, dropped)
+}
+
 #[cfg(test)]
 mod handler_args_tests {
     use super::*;
+
+    #[test]
+    fn a_handler_that_fails_to_load_only_takes_the_chords_that_need_it() {
+        let file: ParsedChordsFile = r#"
+name = "Menu"
+[on.menu]
+file = "menu.js"
+[on.tray]
+file = "tray.js"
+[chords]
+'=0' = { name = "Apple menu", '@input:menu' = [] }
+'=vu' = { name = "Volume Up", shortcut = "AudioVolumeUp" }
+'=x' = { name = "Either", shortcut = "cmd+x", '@input:menu' = ["x"] }
+'=c' = { name = "Control Center", '@input:tray' = ["CONTROL_CENTER"] }
+"#
+        .parse()
+        .unwrap();
+        let failed = HashSet::from(["menu".to_string()]);
+        let (chords, dropped) = without_failed_handlers(file.chords.clone(), &failed);
+        let mut names = chords.iter().map(|chord| chord.name.as_str()).collect::<Vec<_>>();
+        names.sort();
+        assert_eq!(names, ["Control Center", "Either", "Volume Up"]);
+        assert_eq!(dropped, 1);
+        let either = chords.iter().find(|chord| chord.name == "Either").unwrap();
+        assert!(matches!(either.actions.as_slice(), [ChordAction::Shortcut(_)]));
+
+        let (all, dropped) = without_failed_handlers(file.chords.clone(), &HashSet::new());
+        assert_eq!((all.len(), dropped), (file.chords.len(), 0));
+    }
 
     #[test]
     fn import_meta_overrides_handler_args() {
@@ -732,6 +785,7 @@ impl ChordPackageManager {
 
         // Compile sequentially inside this package's bounded worker queue.
         for (pathslug, parsed_chord_file) in &parsed_chords_files {
+            let mut handler_errors = Vec::new();
             let compile_result = Self::compile_chords_file(
                 self.handle.clone(),
                 parsed_chord_file,
@@ -739,8 +793,10 @@ impl ChordPackageManager {
                 &js_package,
                 &parsed_chords_files,
                 &None,
+                &mut handler_errors,
             )
             .await;
+            errors.extend(handler_errors);
 
             match compile_result {
                 Ok(chords_file) => {
@@ -825,6 +881,7 @@ impl ChordPackageManager {
         js_package: &Option<ChordJsPackage>,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
         r#override: &Option<ChordsFileImportOverride>,
+        handler_errors: &mut Vec<String>,
     ) -> Result<CompiledChordsFile> {
         validate_chords_imports(&pathslug, parsed_chords_files)?;
         Self::compile_validated_chords_file(
@@ -834,6 +891,7 @@ impl ChordPackageManager {
             js_package,
             parsed_chords_files,
             r#override,
+            handler_errors,
         )
         .await
     }
@@ -845,12 +903,14 @@ impl ChordPackageManager {
         js_package: &Option<ChordJsPackage>,
         parsed_chords_files: &HashMap<PathBuf, ParsedChordsFile>,
         r#override: &Option<ChordsFileImportOverride>,
+        handler_errors: &mut Vec<String>,
     ) -> Result<CompiledChordsFile> {
         log::debug!("compiling chords file {}", chords_file.name);
 
         let mut chords = chords_file.chords.clone();
         let mut chord_hints = chords_file.chord_hints.clone();
         let mut handlers = Vec::new();
+        let mut failed_events = HashSet::new();
         for (event, handler) in &chords_file.handlers {
             let build_args = resolve_handler_args(&handler.args, chords_file, r#override.as_ref())?;
 
@@ -877,7 +937,7 @@ impl ChordPackageManager {
             let Some(module_path) = js_package.resolve_file_path(&pathslug, &file)? else {
                 anyhow::bail!("file {} not found in js package {}", file, js_package.name);
             };
-            let handler_id = bun_handlers::register_handler(
+            let registered = bun_handlers::register_handler(
                 handle.clone(),
                 module_path.to_string_lossy().into_owned(),
                 raw,
@@ -885,12 +945,25 @@ impl ChordPackageManager {
                 bundle_id,
                 build_args,
             )
-            .await?;
-
-            handlers.push(CompiledChordsFileHandler {
-                event: event.clone(),
-                handler_id,
-            });
+            .await;
+            match registered {
+                Ok(handler_id) => handlers.push(CompiledChordsFileHandler {
+                    event: event.clone(),
+                    handler_id,
+                }),
+                // The file's other chords still work, so keep them and say what's missing.
+                Err(error) => {
+                    log::error!(
+                        "skipping handler {event} in {} because it failed to load: {error:#}",
+                        pathslug.display()
+                    );
+                    handler_errors.push(format!(
+                        "Handler {event} in {} failed to load: {error:#}",
+                        pathslug.display()
+                    ));
+                    failed_events.insert(event.clone());
+                }
+            }
         }
 
         for import in &chords_file.imports {
@@ -912,11 +985,22 @@ impl ChordPackageManager {
                 js_package,
                 parsed_chords_files,
                 &import.r#override,
+                handler_errors,
             ))
             .await?;
             chords.extend(compiled_file.chords.clone());
             chord_hints.extend(compiled_file.chord_hints.clone());
             handlers.extend(compiled_file.handlers.clone());
+        }
+
+        // An import may have loaded a handler for the same event.
+        failed_events.retain(|event| !handlers.iter().any(|handler| &handler.event == event));
+        let (chords, dropped) = without_failed_handlers(chords, &failed_events);
+        if dropped > 0 {
+            log::warn!(
+                "left out {dropped} chords in {} that need a handler that failed to load",
+                pathslug.display()
+            );
         }
 
         log::debug!("finished compiling chords file {}", chords_file.name);

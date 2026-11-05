@@ -734,6 +734,28 @@ export default function() {
     }
 
     #[tokio::test]
+    #[ignore = "requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn a_handler_that_throws_while_loading_fails_fast_every_time() {
+        let fixture = Fixture::new();
+        // The fixture's deadline is 500 ms, so a stalled registration shows up as a timeout.
+        let worker = fixture.worker().await;
+        // What an add-on built only for another architecture does, as `@keychord/config` builds it.
+        let missing = fixture.module("missing-addon", r#"
+const nativeFiles = { "plan9-mips": "native/plan9-mips/menu/menu.node" };
+const nativeTarget = process.platform + "-" + process.arch;
+if (!nativeFiles[nativeTarget]) throw new Error("[chord-native] menu has no addon for " + nativeTarget);
+export default function() { return () => {}; }
+"#);
+        // A reload imports the same module again.
+        for attempt in 1..=2 {
+            let error = register(&worker, missing.clone()).await.unwrap_err();
+            assert!(error.to_string().contains("has no addon for"), "attempt {attempt}: {error:#}");
+        }
+        let healthy = fixture.module("healthy-after", "export default function() { return () => {}; }");
+        register(&worker, healthy).await.unwrap();
+    }
+
+    #[tokio::test]
     #[ignore = "requires legacy NodeSwift fixtures; see tests/package-isolation/README.md"]
     async fn legacy_node_swift_fatal_error_is_contained() {
         let native = PathBuf::from(
