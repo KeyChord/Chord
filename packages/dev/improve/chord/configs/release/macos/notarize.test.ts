@@ -2,18 +2,23 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { notarize, notaryCredentials, saysNotarized } from "#notarize";
+import { assessNotarization, notarize, notaryCredentials, saysNotarized } from "#notarize";
 
 const CREDENTIALS = ["--keychain-profile", "test"];
+const CONNECTION_LOST = 68;
+const NO_TICKET = 65;
 
 let dir: string;
 let originalPath: string | undefined;
 
 /**
- * Stands in for Apple: answers `submit` with the given output, records every call, and fails the
- * first `stapleFailures` attempts to staple.
+ * Stands in for Apple: answers `submit` with the given output and records every call. Each
+ * `stapler` action exits with `staplerExit` for its first `staplerFailures` attempts.
  */
-function fakeXcrun(submission: string, log = "", stapleFailures = 0) {
+function fakeXcrun(
+  submission: string,
+  { log = "", staplerFailures = 0, staplerExit = CONNECTION_LOST } = {},
+) {
   const script = `#!/bin/sh
 echo "$*" >> "${dir}/calls"
 case "$2" in
@@ -25,11 +30,11 @@ EOF
 ${log}
 EOF
   ;;
-  staple)
-    tried=$(grep -c ' staple ' "${dir}/calls")
-    if [ "$tried" -le ${stapleFailures} ]; then
+  staple|validate)
+    tried=$(grep -c "^stapler $2 " "${dir}/calls")
+    if [ "$tried" -le ${staplerFailures} ]; then
       echo "The network connection was lost."
-      exit 68
+      exit ${staplerExit}
     fi
   ;;
 esac
@@ -39,7 +44,15 @@ esac
   chmodSync(xcrun, 0o755);
 }
 
+/** Stands in for Gatekeeper, saying this to any assessment. */
+function fakeSpctl(verdict: string) {
+  const spctl = join(dir, "bin/spctl");
+  writeFileSync(spctl, `#!/bin/sh\necho "${verdict}"\n`);
+  chmodSync(spctl, 0o755);
+}
+
 const calls = () => readFileSync(join(dir, "calls"), "utf8").trim().split("\n");
+const staplerCalls = () => calls().filter((call) => call.startsWith("stapler"));
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "chord-notarize-test-"));
@@ -94,30 +107,49 @@ test("an app is sent as an archive, and the ticket goes on the app", async () =>
   expect(calls()[1]).toBe(`stapler staple ${app}`);
 });
 
-test("stapling survives a dropped connection", async () => {
-  fakeXcrun(`{"id":"1","status":"Accepted"}`, "", 2);
+test("stapling survives dropped connections", async () => {
+  fakeXcrun(`{"id":"1","status":"Accepted"}`, { staplerFailures: 2 });
   const dmg = join(dir, "Chord.dmg");
   writeFileSync(dmg, "");
   await notarize(dmg, CREDENTIALS, 0);
-  expect(calls().filter((call) => call.startsWith("stapler"))).toHaveLength(3);
+  expect(staplerCalls()).toHaveLength(3);
 });
 
 test("stapling that keeps failing fails the release, and says why", async () => {
-  fakeXcrun(`{"id":"1","status":"Accepted"}`, "", 99);
+  fakeXcrun(`{"id":"1","status":"Accepted"}`, { staplerFailures: 99 });
   const dmg = join(dir, "Chord.dmg");
   writeFileSync(dmg, "");
   await expect(notarize(dmg, CREDENTIALS, 0)).rejects.toThrow("network connection was lost");
-  expect(calls().filter((call) => call.startsWith("stapler"))).toHaveLength(5);
+  expect(staplerCalls()).toHaveLength(8);
+});
+
+test("a dropped connection while checking the ticket doesn't count against the build", async () => {
+  fakeXcrun("", { staplerFailures: 2 });
+  fakeSpctl("x: accepted\nsource=Notarized Developer ID");
+  const { notarized } = await assessNotarization(join(dir, "Chord.dmg"), 0);
+  expect(notarized).toBe(true);
+  expect(staplerCalls()).toHaveLength(3);
+});
+
+test("a file with no ticket isn't notarized, and isn't tried again", async () => {
+  fakeXcrun("", { staplerFailures: 99, staplerExit: NO_TICKET });
+  fakeSpctl("x: accepted\nsource=Notarized Developer ID");
+  const { notarized, details } = await assessNotarization(join(dir, "Chord.dmg"), 0);
+  expect(notarized).toBe(false);
+  expect(details).toContain(`stapler (exit ${NO_TICKET})`);
+  expect(staplerCalls()).toHaveLength(1);
 });
 
 test("a rejection fails with Apple's reason and staples nothing", async () => {
-  fakeXcrun(`{"id":"42","status":"Invalid"}`, "The signature does not include a secure timestamp.");
+  fakeXcrun(`{"id":"42","status":"Invalid"}`, {
+    log: "The signature does not include a secure timestamp.",
+  });
   const dmg = join(dir, "Chord.dmg");
   writeFileSync(dmg, "");
   const attempt = notarize(dmg, CREDENTIALS);
   await expect(attempt).rejects.toThrow("Chord.dmg (Invalid)");
   await expect(attempt).rejects.toThrow("secure timestamp");
-  expect(calls().some((call) => call.startsWith("stapler"))).toBe(false);
+  expect(staplerCalls()).toHaveLength(0);
 });
 
 test("no answer from Apple fails with what notarytool printed", async () => {
@@ -125,5 +157,5 @@ test("no answer from Apple fails with what notarytool printed", async () => {
   const dmg = join(dir, "Chord.dmg");
   writeFileSync(dmg, "");
   await expect(notarize(dmg, CREDENTIALS)).rejects.toThrow("Invalid credentials");
-  expect(calls().some((call) => call.startsWith("stapler"))).toBe(false);
+  expect(staplerCalls()).toHaveLength(0);
 });

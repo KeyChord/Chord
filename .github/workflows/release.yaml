@@ -132,8 +132,10 @@ jobs:
           sha="$(git -C ../rbun ls-tree HEAD packages/com/github/oven-sh/bun/src | awk '{print $3}')"
           test -n "$sha" || { echo "::error::rbun does not pin a Bun submodule commit"; exit 1; }
           tag="bun-embed-${sha:0:12}"
-          if ! gh release view "$tag" -R KeyChord/rbun --json assets \
-               --jq '.assets[].name' | grep -qx "$asset"; then
+          # Not a pipe into grep: with pipefail, grep leaving at its first match can
+          # kill gh with a broken pipe, which looks the same as no match.
+          if ! names="$(gh release view "$tag" -R KeyChord/rbun --json assets --jq '.assets[].name')" \
+             || ! grep -qxF "$asset" <<<"$names"; then
             echo "::error::KeyChord/rbun has no $asset for Bun ${sha:0:12} (release $tag); run its build-bun-embed workflow first"
             exit 1
           fi

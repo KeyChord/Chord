@@ -22,18 +22,19 @@ function parseSubmission(output: string): { id?: string; status?: string } {
   }
 }
 
-const STAPLE_ATTEMPTS = 5;
+/** What `stapler` exits with when it loses its connection to Apple. */
+const CONNECTION_LOST = 68;
+const STAPLER_ATTEMPTS = 8;
 
-/** Apple's ticket service does drop connections, which shouldn't cost a whole release build. */
-async function staple(path: string, retryMs: number) {
+/**
+ * Both actions reach Apple's ticket service, which dropped about a third of the connections from
+ * GitHub's runners. Only that is worth another try: a file with no ticket fails right away.
+ */
+async function stapler(action: "staple" | "validate", path: string, retryMs: number) {
   for (let attempt = 1; ; attempt++) {
-    const result = await $`xcrun stapler staple ${path}`.nothrow().quiet();
-    if (result.exitCode === 0) return;
-    const output = `${result.stdout}${result.stderr}`;
-    if (attempt === STAPLE_ATTEMPTS) {
-      throw new Error(`could not staple ${basename(path)} (exit ${result.exitCode}):\n${output}`);
-    }
-    console.warn(`stapling ${basename(path)} failed (exit ${result.exitCode}); trying again`);
+    const result = await $`xcrun stapler ${action} ${path}`.nothrow().quiet();
+    if (result.exitCode !== CONNECTION_LOST || attempt === STAPLER_ATTEMPTS) return result;
+    console.warn(`stapler ${action} lost its connection to Apple; trying again`);
     await Bun.sleep(retryMs);
   }
 }
@@ -43,7 +44,7 @@ async function staple(path: string, retryMs: number) {
  * with no connection. A disk image gets its own: `spctl` assesses it apart from the app in it, and
  * rejects one that is signed but that Apple hasn't seen, even though macOS 27 still mounts that.
  */
-export async function notarize(path: string, credentials: string[], stapleRetryMs = 15_000) {
+export async function notarize(path: string, credentials: string[], retryMs = 15_000) {
   const work = mkdtempSync(join(tmpdir(), "chord-notarize-"));
   try {
     // notarytool takes a disk image as it is, but an app only in an archive.
@@ -62,7 +63,12 @@ export async function notarize(path: string, credentials: string[], stapleRetryM
         : `${submit.stderr}${submit.stdout}`;
       throw new Error(`Apple did not accept ${basename(path)} (${status ?? "no answer"}):\n${reason}`);
     }
-    await staple(path, stapleRetryMs);
+    const stapled = await stapler("staple", path, retryMs);
+    if (stapled.exitCode !== 0) {
+      throw new Error(
+        `could not staple ${basename(path)} (exit ${stapled.exitCode}):\n${stapled.stdout}${stapled.stderr}`,
+      );
+    }
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -74,11 +80,11 @@ export function saysNotarized(assessment: string) {
 }
 
 /** Whether this is accepted as notarized with the ticket on it, and what was said about it. */
-export async function assessNotarization(path: string) {
+export async function assessNotarization(path: string, retryMs = 15_000) {
   // A disk image is assessed as something to open, and an app as something to run.
   const kind = path.endsWith(".dmg") ? ["-t", "open", "--context", "context:primary-signature"] : [];
   const assessment = await $`spctl -a -vv ${kind} ${path}`.nothrow().quiet();
-  const stapled = await $`xcrun stapler validate ${path}`.nothrow().quiet();
+  const stapled = await stapler("validate", path, retryMs);
   const gatekeeper = await $`spctl --status`.nothrow().quiet();
   const verdict = `${assessment.stdout}${assessment.stderr}`.trim();
   return {
