@@ -39,6 +39,16 @@ async function stapler(action: "staple" | "validate", path: string, retryMs: num
   }
 }
 
+/** Puts the ticket Apple already has for this on it, or fails saying why. */
+export async function staple(path: string, retryMs = 15_000) {
+  const stapled = await stapler("staple", path, retryMs);
+  if (stapled.exitCode !== 0) {
+    throw new Error(
+      `could not staple ${basename(path)} (exit ${stapled.exitCode}):\n${stapled.stdout}${stapled.stderr}`,
+    );
+  }
+}
+
 /**
  * Sends an app or a disk image to Apple and staples the ticket to it, so that it opens on a Mac
  * with no connection. A disk image gets its own: `spctl` assesses it apart from the app in it, and
@@ -63,12 +73,7 @@ export async function notarize(path: string, credentials: string[], retryMs = 15
         : `${submit.stderr}${submit.stdout}`;
       throw new Error(`Apple did not accept ${basename(path)} (${status ?? "no answer"}):\n${reason}`);
     }
-    const stapled = await stapler("staple", path, retryMs);
-    if (stapled.exitCode !== 0) {
-      throw new Error(
-        `could not staple ${basename(path)} (exit ${stapled.exitCode}):\n${stapled.stdout}${stapled.stderr}`,
-      );
-    }
+    await staple(path, retryMs);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

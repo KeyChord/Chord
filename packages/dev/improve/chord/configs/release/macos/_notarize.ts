@@ -1,15 +1,16 @@
 #!/usr/bin/env bun
 /* eslint-disable no-console -- This CLI reports each file's result. */
-import { assessNotarization, notarize, notaryCredentials } from "#notarize";
+import { assessNotarization, notarize, notaryCredentials, staple } from "#notarize";
 import { parseArgs } from "node:util";
 
 const { values, positionals: paths } = parseArgs({
   allowPositionals: true,
-  options: { check: { type: "boolean" } },
+  options: { check: { type: "boolean" }, staple: { type: "boolean" } },
 });
 if (paths.length === 0) {
-  console.error("Usage: vpx _notarize [--check] <app or dmg>...");
-  console.error("  --check  only say whether each one is notarized, and fail if one isn't");
+  console.error("Usage: vpx _notarize [--check | --staple] <app or dmg>...");
+  console.error("  --check   only say whether each one is notarized, and fail if one isn't");
+  console.error("  --staple  only put on the ticket of something Apple has already notarized");
   process.exit(1);
 }
 
@@ -21,6 +22,14 @@ if (values.check) {
     allNotarized &&= notarized;
   }
   process.exit(allNotarized ? 0 : 1);
+}
+
+if (values.staple) {
+  for (const path of paths) {
+    await staple(path);
+    console.log(`${path}: stapled`);
+  }
+  process.exit(0);
 }
 
 const credentials = notaryCredentials();

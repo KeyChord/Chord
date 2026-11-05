@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assessNotarization, notarize, notaryCredentials, saysNotarized } from "#notarize";
+import { assessNotarization, notarize, notaryCredentials, saysNotarized, staple } from "#notarize";
 
 const CREDENTIALS = ["--keychain-profile", "test"];
 const CONNECTION_LOST = 68;
@@ -121,6 +121,18 @@ test("stapling that keeps failing fails the release, and says why", async () => 
   writeFileSync(dmg, "");
   await expect(notarize(dmg, CREDENTIALS, 0)).rejects.toThrow("network connection was lost");
   expect(staplerCalls()).toHaveLength(8);
+});
+
+test("stapling alone needs no submission, and fails on a file Apple doesn't know", async () => {
+  fakeXcrun("", { staplerFailures: 1 });
+  const app = join(dir, "Chord.app");
+  await staple(app, 0);
+  expect(calls()).toEqual([`stapler staple ${app}`, `stapler staple ${app}`]);
+
+  writeFileSync(join(dir, "calls"), "");
+  fakeXcrun("", { staplerFailures: 99, staplerExit: NO_TICKET });
+  await expect(staple(app, 0)).rejects.toThrow(`could not staple Chord.app (exit ${NO_TICKET})`);
+  expect(staplerCalls()).toHaveLength(1);
 });
 
 test("a dropped connection while checking the ticket doesn't count against the build", async () => {

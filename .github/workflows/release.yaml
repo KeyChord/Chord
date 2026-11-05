@@ -253,11 +253,20 @@ jobs:
           app="$(find "$bundle/macos" -maxdepth 1 -name '*.app' | head -n1)"
           test -n "$app" || { echo "::error::no .app produced"; exit 1; }
           dmg="$out/Chord-$suffix.dmg"
+          notarizing=false
+          if [ "${{ steps.signing.outputs.signed }}" = true ] && [ -n "${APPLE_ID:-}" ]; then
+            notarizing=true
+          fi
+          # Tauri doesn't check whether stapling the app worked, and on these runners
+          # it can lose its connection to Apple. Make sure before the app goes in the DMG.
+          if [ "$notarizing" = true ]; then
+            bun "$scripts/_notarize.ts" --staple "$PWD/$app"
+          fi
           # Tauri's own DMG has a blank window on CI, where Finder can't be scripted.
           bun "$scripts/_make-dmg.ts" \
             "$PWD/$app" "$dmg" "$PWD/apps/chord-tauri/src-tauri/icons/icon.icns"
           # Tauri notarized the app, but spctl assesses the disk image apart from it.
-          if [ "${{ steps.signing.outputs.signed }}" = true ] && [ -n "${APPLE_ID:-}" ]; then
+          if [ "$notarizing" = true ]; then
             bun "$scripts/_notarize.ts" "$dmg"
           fi
 
@@ -285,7 +294,7 @@ jobs:
           elif [ "$RELEASE_TAG" = beta ]; then
             echo unsigned > "$out/gatekeeper.txt"
           else
-            echo "::error::this build isn't fully notarized, so it can't be released; check the Apple secrets"
+            echo "::error::this build isn't fully notarized, so it can't be released; the reason is above"
             exit 1
           fi
           cat "$out/gatekeeper.txt"
