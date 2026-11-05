@@ -7,8 +7,10 @@ use crate::app::AppHandleExt;
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 
 pub const TRAY_ID: &str = "chord-tray";
+// Black-on-transparent template image, 50×36 px; macOS draws tray icons
+// 18 pt tall, so this is a crisp 2× bitmap.
 const TRAY_ICON_BYTES: &[u8] =
-    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"));
+    include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray.png"));
 
 fn load_tray_icon() -> tauri::Result<Image<'static>> {
     Image::from_bytes(TRAY_ICON_BYTES).map(|image| image.to_owned())
