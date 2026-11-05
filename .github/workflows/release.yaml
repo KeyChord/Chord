@@ -353,6 +353,36 @@ jobs:
           download="Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel."
           notes="Automatic $channel build from \`$RELEASE_TAG\` @ ${short}. $download $gatekeeper"
 
+          # What installed copies of Chord read to update themselves. The updater only installs a
+          # higher version, so a production release that doesn't raise it would reach nobody.
+          version="$(jq -r .version apps/chord-tauri/src-tauri/tauri.conf.json)"
+          published="$(curl -fsSL "https://github.com/KeyChord/Chord/releases/download/$RELEASE_TAG/latest.json" 2>/dev/null | jq -r '.version // empty' || true)"
+          if [ "$RELEASE_TAG" = prod ] && [ -n "$published" ] \
+            && [ "$(printf '%s\n%s\n' "$published" "$version" | sort -V | tail -n1)" != "$version" -o "$published" = "$version" ]; then
+            echo "::error::version $version isn't above the published $published; raise it in apps/chord-tauri/src-tauri/tauri.conf.json and Cargo.toml"
+            exit 1
+          fi
+          for arch in aarch64 x86_64; do
+            if [ ! -s "assets/Chord-$arch.app.tar.gz.sig" ]; then
+              echo "::error::Chord-$arch.app.tar.gz has no updater signature, so installed copies couldn't verify it"
+              exit 1
+            fi
+          done
+          base="https://github.com/KeyChord/Chord/releases/download/$RELEASE_TAG"
+          mkdir -p manifest
+          jq -n \
+            --arg version "$version" \
+            --arg notes "Chord $version from \`$RELEASE_TAG\` @ ${short}." \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg arm "$(cat assets/Chord-aarch64.app.tar.gz.sig)" \
+            --arg intel "$(cat assets/Chord-x86_64.app.tar.gz.sig)" \
+            --arg base "$base" \
+            '{version: $version, notes: $notes, pub_date: $date, platforms: {
+              "darwin-aarch64": {signature: $arm, url: ($base + "/Chord-aarch64.app.tar.gz")},
+              "darwin-x86_64": {signature: $intel, url: ($base + "/Chord-x86_64.app.tar.gz")}
+            }}' > manifest/latest.json
+          jq '{version, pub_date, platforms: (.platforms | keys)}' manifest/latest.json
+
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             # Move the rolling tag onto this commit, then refresh the release.
             git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
@@ -370,10 +400,12 @@ jobs:
           # `--clobber` replaces the previous build's assets in place. Names are
           # commit-free, so the download URLs are stable across releases.
           gh release upload "$RELEASE_TAG" assets/* --clobber
+          # Last, so nobody reads a manifest whose archives aren't uploaded yet.
+          gh release upload "$RELEASE_TAG" manifest/latest.json --clobber
 
           # Delete anything left from an older naming scheme; otherwise the
           # release accumulates a stale set of assets on every push.
-          keep="$(cd assets && ls)"
+          keep="$(cd assets && ls; echo latest.json)"
           gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' \
             | while read -r existing; do
                 if ! grep -qxF "$existing" <<<"$keep"; then

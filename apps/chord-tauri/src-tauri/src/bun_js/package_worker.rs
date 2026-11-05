@@ -380,6 +380,11 @@ pub async fn dispatch_lifecycle(app: crate::app::desktop_app::ObservedApp, launc
     while jobs.join_next().await.is_some() {}
 }
 
+/// Whether this package has a worker that hasn't been stopped, so its registered handlers run.
+pub fn is_running(name: &str) -> bool {
+    workers().lock().get(name).is_some_and(|worker| worker.is_running())
+}
+
 pub fn shutdown_all() {
     for worker in workers().lock().drain().map(|(_, worker)| worker) {
         worker.stop();

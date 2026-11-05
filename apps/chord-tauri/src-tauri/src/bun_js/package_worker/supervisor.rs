@@ -279,6 +279,10 @@ impl PackageSupervisor {
         self.active.lock().stop();
     }
 
+    pub(super) fn is_running(&self) -> bool {
+        !self.stopped.load(Ordering::Acquire)
+    }
+
     pub(super) fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         self.stop_notice.notify_waiters();

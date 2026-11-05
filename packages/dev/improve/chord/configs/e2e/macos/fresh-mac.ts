@@ -12,7 +12,8 @@ export async function allowKnownDevelopers(guest: Guest, screen: Screen) {
     'open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Security"',
   );
   // The menu is the other text on the row, showing the current choice. The window scrolls to this
-  // row as it opens, so both have to come from one look at the screen.
+  // row as it opens, so both come from one look at the screen, and only once the row stops moving.
+  let previousRow: number | undefined;
   const menu = await waitFor(
     "the Allow applications from menu",
     async () => {
@@ -20,6 +21,9 @@ export async function allowKnownDevelopers(guest: Guest, screen: Screen) {
       const label = boxes.find((box) => box.text.includes("Allow applications from"));
       if (!label) return undefined;
       const row = center(label).y;
+      const settled = previousRow !== undefined && Math.abs(row - previousRow) < 2;
+      previousRow = row;
+      if (!settled) return undefined;
       return boxes.find(
         (box) => Math.abs(center(box).y - row) < 20 && box.text.includes("App Store"),
       );

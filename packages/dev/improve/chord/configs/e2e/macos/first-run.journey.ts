@@ -200,10 +200,20 @@ journey.step("a chord pack can be added without developer tools", async () => {
     (box) => button("Add").test(box.text) && Math.abs(center(box).y - y) < 40 && center(box).x > x,
   );
   if (!add) throw new Error("no Add button next to Terminal Chords");
+  const workers = await packageWorkers();
   await vnc.click(center(add).x, center(add).y);
   await screen.waitForText("Added", { timeoutMs: 120_000 });
   expect(await asksForDeveloperTools()).toBe(false);
+  // Only the new pack loads; the packages already running keep their workers.
+  const after = await packageWorkers();
+  expect(workers.filter((pid) => !after.includes(pid))).toEqual([]);
 });
+
+/** Process IDs of the package workers, one per loaded package with JavaScript. */
+async function packageWorkers(): Promise<string[]> {
+  const { stdout } = await guest.run("pgrep -f 'Contents/MacOS/chord __package-worker'", { check: false });
+  return stdout.split("\n").filter(Boolean);
+}
 
 journey.step("finishing leaves Chord ready, and starting at login", async () => {
   await screen.clickText(button("Continue"));
@@ -232,12 +242,9 @@ const NO_INTEL_ADDON = /has no addon for darwin-x64/;
 // is skipped with only a log line.
 journey.step("every chord in the default packages loads", async () => {
   const log = await guest.readFile(`${guest.home}/Library/Logs/com.leonsilicon.chord/chords.log`);
-  // A chord with nothing but a name is unfinished in its package, not one this app can't read.
-  const nameOnly = /couldn't find any actions for chord \{"name": String\("[^"]*"\)\}$/;
   const skipped = (log ?? "")
     .split("\n")
     .filter((line) => /couldn't find any actions|parse error|skipping chords file|skipping handler/.test(line))
-    .filter((line) => !nameOnly.test(line))
     .filter((line) => !(journey.intel && NO_INTEL_ADDON.test(line)));
   expect(skipped).toEqual([]);
 });

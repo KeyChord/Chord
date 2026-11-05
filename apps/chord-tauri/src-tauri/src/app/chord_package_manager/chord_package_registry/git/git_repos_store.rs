@@ -260,6 +260,36 @@ impl GitReposStore {
         Ok(())
     }
 
+    /// Moves an install that an earlier Chord set up off the default revisions this one has
+    /// replaced (`[[previous]]` in data/default-packages.toml). Returns whether anything changed.
+    pub fn upgrade_default_repos(&self) -> Result<bool> {
+        let installed = self
+            .observable
+            .get_state()?
+            .repos
+            .values()
+            .map(|repo| (repo.slug.clone(), repo.pinned_rev.clone()))
+            .collect::<Vec<_>>();
+        let upgrade = crate::default_packages::plan_default_package_upgrade(&installed)?;
+        if upgrade.is_empty() {
+            return Ok(false);
+        }
+        log::info!(
+            "Upgrading the default packages: pinning {:?}, removing {:?}",
+            upgrade
+                .pin
+                .iter()
+                .map(|spec| format!("{}@{}", spec.repo_ref.slug(), spec.rev))
+                .collect::<Vec<_>>(),
+            upgrade.remove
+        );
+        self.ensure_pinned_repos(upgrade.pin)?;
+        for slug in &upgrade.remove {
+            self.remove_repo(slug)?;
+        }
+        Ok(true)
+    }
+
     pub fn set_local_link(&self, slug: &str, path: Option<String>) -> Result<GitRepo> {
         let mut repo = self
             .observable

@@ -27,6 +27,7 @@ mod process;
 mod setup;
 mod state;
 mod tauri_app;
+mod updater;
 
 pub use tauri_app::*;
 
@@ -204,6 +205,7 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_user_input::init())
         .setup(move |app| {
             api.set_handle(app.handle().clone());

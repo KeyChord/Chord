@@ -173,6 +173,8 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let settings = state.settings();
     settings.apply_all()?;
 
+    crate::updater::start(handle.clone());
+
     log::debug!("finished setup()");
 
     Ok(())
@@ -196,6 +198,9 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
                 "Failed to sync the default packages; loading the existing active repositories: {error:#}"
             );
         }
+    } else if let Err(error) = store.upgrade_default_repos() {
+        // Offline, say: the next launch tries again.
+        log::error!("Failed to upgrade the default packages; loading the existing ones: {error:#}");
     }
 
     let chord_pm = state.chord_package_manager();

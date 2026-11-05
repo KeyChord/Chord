@@ -609,6 +609,17 @@ the `com.leonsilicon.chord.beta` application identifier, while local development
 channel's settings, packages, caches, logs, and other application-scoped data separate. Each run
 replaces the previous assets, so the download URLs stay stable.
 
+Installed copies update themselves from `latest.json`, which the publish job writes beside the signed
+`.app.tar.gz` archives. They check at launch and once a day, install a higher version, and offer to
+restart into it. So raise `version` in `apps/chord-tauri/src-tauri/tauri.conf.json` and `Cargo.toml`
+for every production release: the publish job refuses one that isn't higher than what's out. To try
+an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` set to another
+`latest.json`; what it lists must still carry this repository's updater signature.
+
+Chord installs the packages pinned in `apps/chord-tauri/data/default-packages.toml` on first launch.
+When you change a pin, keep the set it replaces in that file's `[[previous]]` list: on its first
+launch after an update, Chord moves an install still on a previous set to the current one.
+
 To promote a build to production, push its commit to `prod`, for example the current `dev`:
 
 ```sh

@@ -1,34 +1,79 @@
 # Packages Chord installs, at these revisions, on first launch and when chords are reset.
 # Pin each to its mirror's commit, and run `vpx _e2e-macos journey --build` after changing one:
 # its last steps fail when a default package has chords this app can't load.
+#
+# When you change a pin, first copy the set below, as it was released, to the top of [[previous]].
 
 [packages."@keychord/chords-chord"]
 git = "https://github.com/KeyChord/chords-chord"
-rev = "8d25d56f50f5ed4d5c7a2d57b26ae6b8cc321060"
+rev = "6ba92be5776d36392565c3a5c113dba334213cd5"
 
 # The menu bar, plus the system chords (force quit, lock, volume, brightness) that used to be
 # in chords-os.
 [packages."@keychord/chords-menu"]
 git = "https://github.com/KeyChord/chords-menu"
-rev = "da98e10e215ad195d130ec5c384e6290ec13bdf9"
+rev = "e6bb912eb0bdeafaa1993bcebd38cc7f4e2271d1"
 
 # Only names for Apple's apps; each app's chords are a package of its own.
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
-rev = "668d486b2dd6c61eae683ce22fb9722a7de9e2c8"
+rev = "7b04e95c14256ea88a25ecf2b0ee4e241272021f"
 
 [packages."@keychord/chords-com.apple.finder"]
 git = "https://github.com/KeyChord/chords-com.apple.finder"
-rev = "d73e7895930afb8b604fcc0adc94fea6496057f6"
+rev = "ba820ac63a1087d2a052262f8c58024866dc9cee"
 
 [packages."@keychord/chords-com.apple.Safari"]
 git = "https://github.com/KeyChord/chords-com.apple.Safari"
-rev = "bc7907c1927c2b098b41406639d52e7040585e47"
+rev = "b070d16faaaeb1c05d4ae786b95eb509bda31137"
 
 [packages."@keychord/chords-com.apple.ActivityMonitor"]
 git = "https://github.com/KeyChord/chords-com.apple.ActivityMonitor"
-rev = "36a317c206c5c1745b1d03c554113e0e9dd6bf0e"
+rev = "07720355bfadddfadf71006b49bdb6dea68c6dfa"
 
 [packages."@keychord/chords-com.apple.AccessibilityInspector"]
 git = "https://github.com/KeyChord/chords-com.apple.AccessibilityInspector"
-rev = "67992e304310aac8531e73d9f14c7599b7125bd4"
+rev = "b97ca29c06fd6a0c2c32a35170cadbcffd48792d"
+
+# Default sets that earlier versions of Chord installed, newest first. When Chord updates, an
+# install still on one of these revisions moves to the pins above. It gets the packages the
+# defaults gained after its set, and loses the ones they dropped, if those are still at the
+# revision Chord installed. Chord leaves anything it can't match alone.
+
+[[previous]] # 2026-11-05, f7979bd9
+"KeyChord/chords-chord" = "8d25d56f50f5ed4d5c7a2d57b26ae6b8cc321060"
+"KeyChord/chords-com.apple" = "668d486b2dd6c61eae683ce22fb9722a7de9e2c8"
+"KeyChord/chords-com.apple.AccessibilityInspector" = "67992e304310aac8531e73d9f14c7599b7125bd4"
+"KeyChord/chords-com.apple.ActivityMonitor" = "36a317c206c5c1745b1d03c554113e0e9dd6bf0e"
+"KeyChord/chords-com.apple.Safari" = "bc7907c1927c2b098b41406639d52e7040585e47"
+"KeyChord/chords-com.apple.finder" = "d73e7895930afb8b604fcc0adc94fea6496057f6"
+"KeyChord/chords-menu" = "da98e10e215ad195d130ec5c384e6290ec13bdf9"
+
+[[previous]] # 2026-10-29, fdfe539f
+"KeyChord/chords-chord" = "ac9554d97020822c00d085a252e67c879e74e529"
+"KeyChord/chords-com.apple" = "c00fce97863ac2c71d8d6821e4c5c05b7f357214"
+"KeyChord/chords-menu" = "64446147cbf48709099d1965792ae3ac231dbfd7"
+"KeyChord/chords-os" = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
+
+[[previous]] # 2026-10-13, 3c17eeec
+"KeyChord/chords-chord" = "ac9554d97020822c00d085a252e67c879e74e529"
+"KeyChord/chords-com.apple" = "c00fce97863ac2c71d8d6821e4c5c05b7f357214"
+"KeyChord/chords-menu" = "64446147cbf48709099d1965792ae3ac231dbfd7"
+"KeyChord/chords-os" = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
+"KeyChord/chords-tray" = "bb87a30463424e808e49a7375e3a37194720ae73"
+
+[[previous]] # 2026-08-31, ae7b83ee
+"KeyChord/chords-chord" = "ac9554d97020822c00d085a252e67c879e74e529"
+"KeyChord/chords-com.apple" = "c00fce97863ac2c71d8d6821e4c5c05b7f357214"
+"KeyChord/chords-commands" = "dfb1c75a23b4999027381df00f20355bda1ac799"
+"KeyChord/chords-menu" = "64446147cbf48709099d1965792ae3ac231dbfd7"
+"KeyChord/chords-os" = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
+"KeyChord/chords-tray" = "bb87a30463424e808e49a7375e3a37194720ae73"
+
+[[previous]] # 2026-08-28, 54ad8764
+"KeyChord/chords-chord" = "54ff9b5c8481fd8311dedca8dfeb1b7736bed16c"
+"KeyChord/chords-com.apple" = "4a861ddae0231fcf2d6508bff9870691bcacd2b5"
+"KeyChord/chords-commands" = "e8022ed88df9616b8f7f1010d8a43757664a20fd"
+"KeyChord/chords-menu" = "a918384eabd8b2f169098abb63d1cf97396eb11e"
+"KeyChord/chords-os" = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
+"KeyChord/chords-tray" = "c06b4212049dec676b7b20f7fec8b571b2a41403"

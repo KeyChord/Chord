@@ -1,6 +1,6 @@
 [package]
 name = "chords"
-version = "0.1.0"
+version = "0.2.0"
 description = "shortcuts reimagined"
 edition = "2024"
 autobins = false
@@ -95,6 +95,7 @@ tracing-log = "0.2" # This is the bridge
 atomic_enum = "0.3"
 derive_more = { version = "2", features = ["display"] }
 nject = "0.5.1"
+tauri-plugin-updater = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6.2"

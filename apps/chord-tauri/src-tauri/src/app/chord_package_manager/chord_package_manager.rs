@@ -65,6 +65,49 @@ struct ChordInputEventContext {
     event: ChordInputEvent,
 }
 
+/// A package keeps what it loaded last time, worker and all, when that came from the same
+/// revision of a pinned GitHub source. Official packages load through a link named after their
+/// source's path, and pinned sources are directories named after the commit, so the files behind
+/// the same link can't have changed. Anything else (personal, linked or third-party) loads again.
+fn can_keep_loaded_package(
+    root: &Path,
+    previous_root: Option<&Path>,
+    source: Option<&Path>,
+    pinned_sources: Option<&Path>,
+    worker_running: bool,
+) -> bool {
+    worker_running
+        && previous_root == Some(root)
+        && source
+            .zip(pinned_sources)
+            .is_some_and(|(source, sources)| source.starts_with(sources))
+}
+
+#[cfg(test)]
+mod keep_loaded_package_tests {
+    use super::*;
+
+    #[test]
+    fn only_an_unchanged_pinned_source_with_a_live_worker_is_kept() {
+        let sources = Path::new("/u/.chord/packages/.sources/github.com");
+        let pinned = sources.join("keychord/chords-menu/e6bb912e");
+        let link = Path::new("/u/.chord/packages/@keychord/.managed/1f2e3d/chords-menu");
+        let keep = |root: &Path, previous: Option<&Path>, source: &Path, running| {
+            can_keep_loaded_package(root, previous, Some(source), Some(sources), running)
+        };
+        assert!(keep(link, Some(link), &pinned, true));
+        assert!(!keep(link, Some(link), &pinned, false), "stopped worker");
+        let other = Path::new("/u/.chord/packages/@keychord/.managed/4c5b6a/chords-menu");
+        assert!(!keep(link, Some(other), &pinned, true), "another revision's link");
+        assert!(!keep(link, None, &pinned, true), "not loaded before");
+        let checkout = Path::new("/u/code/chords/@keychord/chords-menu");
+        assert!(!keep(link, Some(link), checkout, true), "linked to a checkout");
+        let personal = Path::new("/u/.chord/packages/default");
+        assert!(!keep(personal, Some(personal), personal, true), "editable package");
+        assert!(!can_keep_loaded_package(link, Some(link), None, Some(sources), true), "source missing");
+    }
+}
+
 fn resolve_handler_args(
     args: &[toml::Value],
     chords_file: &ParsedChordsFile,
@@ -640,7 +683,39 @@ impl ChordPackageManager {
 
         let mut chord_packages = OrderMap::new();
         let mut package_errors = HashMap::new();
+        let previous_packages = self.packages.read().clone();
+        let previous_errors = self
+            .observable
+            .get_state()
+            .map(|state| state.errors)
+            .unwrap_or_default();
+        let pinned_sources = self
+            .registry
+            .git
+            .git_repos_store
+            .github_repos_dir()
+            .ok()
+            .and_then(|sources| std::fs::canonicalize(sources).ok());
         for (package_name, raw_chord_package) in raw_chord_packages {
+            // Adding one pack used to restart every package's worker, which takes a while for
+            // each under Rosetta.
+            let kept = previous_packages.get(&package_name).filter(|_| {
+                !raw_chord_package.js_files_contents.is_empty()
+                    && can_keep_loaded_package(
+                        &raw_chord_package.root,
+                        previous_roots.get(&package_name).map(PathBuf::as_path),
+                        std::fs::canonicalize(&raw_chord_package.root).ok().as_deref(),
+                        pinned_sources.as_deref(),
+                        crate::bun_js::package_worker::is_running(&package_name),
+                    )
+            });
+            if let Some(package) = kept {
+                log::debug!("keeping package {package_name}: same pinned revision, worker running");
+                let errors = previous_errors.get(&package_name).cloned().unwrap_or_default();
+                package_errors.insert(package_name, errors);
+                chord_packages.insert(package.name.clone(), package.clone());
+                continue;
+            }
             match self.load_package(raw_chord_package).await {
                 Ok((package, errors)) => {
                     package_errors.insert(package_name, errors);
