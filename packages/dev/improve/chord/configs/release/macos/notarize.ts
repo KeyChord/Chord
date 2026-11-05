@@ -57,11 +57,24 @@ export function saysNotarized(assessment: string) {
   return /^source=Notarized Developer ID$/m.test(assessment);
 }
 
-/** Whether a new Mac would accept this as notarized, with the ticket on it. */
-export async function isNotarized(path: string) {
+/** Whether this is accepted as notarized with the ticket on it, and what was said about it. */
+export async function assessNotarization(path: string) {
   // A disk image is assessed as something to open, and an app as something to run.
   const kind = path.endsWith(".dmg") ? ["-t", "open", "--context", "context:primary-signature"] : [];
   const assessment = await $`spctl -a -vv ${kind} ${path}`.nothrow().quiet();
   const stapled = await $`xcrun stapler validate ${path}`.nothrow().quiet();
-  return saysNotarized(`${assessment.stdout}${assessment.stderr}`) && stapled.exitCode === 0;
+  const gatekeeper = await $`spctl --status`.nothrow().quiet();
+  const verdict = `${assessment.stdout}${assessment.stderr}`.trim();
+  return {
+    notarized: saysNotarized(verdict) && stapled.exitCode === 0,
+    details: [
+      `Gatekeeper: ${gatekeeper.stdout}${gatekeeper.stderr}`.trim(),
+      verdict,
+      `stapler (exit ${stapled.exitCode}): ${stapled.stdout}${stapled.stderr}`.trim(),
+    ].join("\n"),
+  };
+}
+
+export async function isNotarized(path: string) {
+  return (await assessNotarization(path)).notarized;
 }

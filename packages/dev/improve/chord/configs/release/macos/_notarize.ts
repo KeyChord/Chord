@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /* eslint-disable no-console -- This CLI reports each file's result. */
-import { isNotarized, notarize, notaryCredentials } from "#notarize";
+import { assessNotarization, notarize, notaryCredentials } from "#notarize";
 import { parseArgs } from "node:util";
 
 const { values, positionals: paths } = parseArgs({
@@ -16,8 +16,8 @@ if (paths.length === 0) {
 if (values.check) {
   let allNotarized = true;
   for (const path of paths) {
-    const notarized = await isNotarized(path);
-    console.log(`${path}: ${notarized ? "notarized" : "not notarized"}`);
+    const { notarized, details } = await assessNotarization(path);
+    console.log(`${path}: ${notarized ? "notarized" : `not notarized\n${details}`}`);
     allNotarized &&= notarized;
   }
   process.exit(allNotarized ? 0 : 1);
