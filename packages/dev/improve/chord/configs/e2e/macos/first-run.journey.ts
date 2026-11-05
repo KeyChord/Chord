@@ -55,9 +55,29 @@ journey.step("the website says what to press and how to get Chord", async () => 
   await screen.waitForText("caps lock");
 });
 
+/** Scrolls down a few lines at a time, as a person would, until `query` is on screen. */
+async function scrollTo(query: string | RegExp) {
+  return await waitFor(
+    `${String(query)} on screen`,
+    async () => {
+      const box = await screen.find(query);
+      if (box) return box;
+      // The VNC server ignores the scroll wheel.
+      for (let line = 0; line < 3; line++) {
+        vnc.key(Keysym.Down, true);
+        vnc.key(Keysym.Down, false);
+      }
+      return undefined;
+    },
+    { timeoutMs: 30_000, intervalMs: 500 },
+  );
+}
+
 journey.step("downloading Chord says what happens next", async () => {
   // The link's underline runs into the last letter of "Intel" for OCR.
-  await screen.clickText(journey.intel ? /Download for Inte\S* Macs/ : "Download for Mac");
+  const link = journey.intel ? /Download for Inte\S* Macs/ : "Download for Mac";
+  await scrollTo(link);
+  await screen.clickText(link);
   // Safari asks once per website.
   await screen.clickText(button("Allow"), { timeoutMs: 15_000 });
   await journey.waitForFile(DOWNLOADED);
