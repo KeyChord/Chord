@@ -11,7 +11,7 @@ import { waitFor } from "#wait";
 
 const journey = await Journey.open();
 const { guest, screen, vnc } = journey;
-const DOWNLOADED = `${guest.home}/Downloads/Chord-aarch64.dmg`;
+const DOWNLOADED = `${guest.home}/Downloads/${journey.intel ? "Chord-x86_64.dmg" : "Chord-aarch64.dmg"}`;
 const FIRST_CHORD = "/s";
 
 beforeAll(() => screen.wake());
@@ -56,7 +56,8 @@ journey.step("the website says what to press and how to get Chord", async () => 
 });
 
 journey.step("downloading Chord says what happens next", async () => {
-  await screen.clickText("Download for Mac");
+  // The link's underline runs into the last letter of "Intel" for OCR.
+  await screen.clickText(journey.intel ? /Download for Inte\S* Macs/ : "Download for Mac");
   // Safari asks once per website.
   await screen.clickText(button("Allow"), { timeoutMs: 15_000 });
   await journey.waitForFile(DOWNLOADED);
@@ -83,6 +84,9 @@ journey.step("dragging Chord to Applications installs it", async () => {
   const to = center(destination);
   await vnc.drag({ x: from.x, y: from.y - lift }, { x: to.x, y: to.y - lift });
   await journey.waitForFile("/Applications/Chord.app/Contents/Info.plist");
+  // Not lipo: on a new Mac that asks to install the developer tools.
+  const { stdout } = await guest.run("file -b /Applications/Chord.app/Contents/MacOS/chord");
+  expect(stdout).toContain(journey.intel ? "x86_64" : "arm64");
 });
 
 journey.step("opening Chord starts setup, and nothing asks for developer tools", async () => {
@@ -213,4 +217,44 @@ journey.step("the chord still works after setup", async () => {
   await guest.run("killall Safari", { check: false });
   await screen.chord(FIRST_CHORD);
   await waitForFront("com.apple.Safari");
+});
+
+/** No official package ships an Intel add-on yet, so on Intel their native chords are skipped. */
+const NO_INTEL_ADDON = /has no addon for darwin-x64/;
+
+// The packages Chord installs on first launch are pinned in apps/chord-tauri/data, and a pin can
+// fall behind what this app reads. A chords file it can't read, or whose handler fails to load,
+// is skipped with only a log line.
+journey.step("every chord in the default packages loads", async () => {
+  const log = await guest.readFile(`${guest.home}/Library/Logs/com.leonsilicon.chord/chords.log`);
+  // A chord with nothing but a name is unfinished in its package, not one this app can't read.
+  const nameOnly = /couldn't find any actions for chord \{"name": String\("[^"]*"\)\}$/;
+  const skipped = (log ?? "")
+    .split("\n")
+    .filter((line) => /couldn't find any actions|parse error|skipping chords file/.test(line))
+    .filter((line) => !nameOnly.test(line))
+    .filter((line) => !(journey.intel && NO_INTEL_ADDON.test(line)));
+  expect(skipped).toEqual([]);
+});
+
+journey.step("a Finder chord from the default packages works", async () => {
+  await guest.run("open /Applications");
+  await waitForFront("com.apple.finder");
+  await screen.chord("gh");
+  // Only the home folder has this one.
+  await screen.waitForText(button("Public"), { timeoutMs: 10_000 });
+});
+
+journey.step("a menu bar chord from the default packages works", async () => {
+  if (journey.intel) {
+    // Fails once Intel add-ons ship, as a reminder to run the chord here too.
+    const log = await guest.readFile(`${guest.home}/Library/Logs/com.leonsilicon.chord/chords.log`);
+    expect(log).toMatch(NO_INTEL_ADDON);
+    return;
+  }
+  // Its handler runs Swift through a native add-on.
+  await screen.chord("=0.");
+  await screen.waitForText("About This Mac", { timeoutMs: 10_000 });
+  vnc.key(Keysym.Escape, true);
+  vnc.key(Keysym.Escape, false);
 });

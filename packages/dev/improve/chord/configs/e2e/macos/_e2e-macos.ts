@@ -52,9 +52,11 @@ Commands:
 Options:
   --dmg <path>        DMG to install (default: the newest from \`vpx _tauri build\`)
   --build             Build the DMG first, as the release workflow does
-  --release <tag>     Download Chord-aarch64.dmg from a GitHub release (prod, beta, ...)
+  --release <tag>     Download the DMG from a GitHub release (prod, beta, ...)
   --site <url>        Website to start from (journey; default ${LIVE_SITE})
   --published         Download the published release from the website (journey)
+  --intel             Take the Intel DMG through the website's Intel link, and run it under
+                      Rosetta (journey; with --published, --dmg or --release, not --build)
   --vm <name>         Use a VM started by \`up\` (test, down, screenshot, ssh)
   --keep              Leave the test VM running afterwards (test)
   --force             Rebuild an existing golden VM (setup)
@@ -92,6 +94,7 @@ const { values, positionals } = parseArgs({
     caps: { type: "boolean" },
     site: { type: "string", default: LIVE_SITE },
     published: { type: "boolean" },
+    intel: { type: "boolean" },
     timeout: { type: "string", default: "60" },
     help: { type: "boolean", short: "h" },
   },
@@ -120,8 +123,8 @@ async function resolveDmg(): Promise<string> {
   if (values.dmg) return resolve(values.dmg);
   if (values.release) {
     const dir = join(E2E_DIR, "releases", values.release);
-    // tart runs only Apple Silicon guests.
-    const asset = "Chord-aarch64.dmg";
+    // tart runs only Apple Silicon guests; the Intel build runs there under Rosetta.
+    const asset = values.intel ? "Chord-x86_64.dmg" : "Chord-aarch64.dmg";
     await run([
       "gh",
       "release",
@@ -339,6 +342,7 @@ async function fresh() {
  * \`--published\`, everything is what a new user gets today.
  */
 async function journey() {
+  if (values.intel && values.build) throw new Error("--intel can't build here; pass --dmg or --release");
   const dmg = values.published ? undefined : await resolveDmg();
   const id = stamp();
   const name = `chord-journey-${id}`;
@@ -351,9 +355,15 @@ async function journey() {
   try {
     const vm = await bootFresh(name, join(artifacts, "tart.log"));
     const guest = await Guest.connect(vm.host);
+    // tart runs only Apple Silicon guests, so this is as close to an Intel Mac as it gets.
+    if (values.intel) await guest.run("sudo softwareupdate --install-rosetta --agree-to-license");
     const server =
       dmg || values.site !== LIVE_SITE
-        ? await startReleaseServer(guest, { site: values.site!, dmg })
+        ? await startReleaseServer(guest, {
+            site: values.site!,
+            dmg,
+            name: values.intel ? "Chord-x86_64.dmg" : "Chord-aarch64.dmg",
+          })
         : undefined;
     await guest.close();
     const state: JourneyState = {
@@ -361,6 +371,7 @@ async function journey() {
       vncUrl: vm.vncUrl,
       siteUrl: server?.url ?? values.site!,
       checkedByGatekeeper: dmg === undefined || (await isNotarized(dmg)),
+      intel: values.intel === true,
       artifacts,
     };
     const file = join(artifacts, "journey.json");

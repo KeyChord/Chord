@@ -1,13 +1,9 @@
 #!/usr/bin/env bun
 /* eslint-disable no-console -- This release CLI writes progress and usage to stdout. */
 /**
- * macOS release pipeline for the full-power build.
- *
- * Tauri signs every bundled executable with the same entitlements file, but the native host
- * needs `com.apple.security.cs.disable-library-validation` (it loads package-built dylibs) while
- * the main app should keep library validation. So after `tauri build` produces the signed .app
- * we re-sign the sidecar with `NativeHost.entitlements`, re-sign the bundle, and then produce the
- * DMG and updater artifact ourselves.
+ * macOS release pipeline for the full-power build: after `tauri build` produces the signed .app,
+ * re-sign it with Entitlements.plist (which lets packages' native add-ons load; see the note
+ * there), then produce the DMG and updater artifact ourselves.
  *
  * Environment:
  *   APPLE_SIGNING_IDENTITY   overrides bundle.macOS.signingIdentity from tauri.conf.json, whose

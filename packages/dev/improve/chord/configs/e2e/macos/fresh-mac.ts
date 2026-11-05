@@ -1,5 +1,6 @@
 import type { Guest } from "#guest";
 import { center, type Screen } from "#screen";
+import { waitFor } from "#wait";
 
 /**
  * The image disables Gatekeeper, and turning it back on selects "App Store" alone. A new Mac
@@ -10,12 +11,21 @@ export async function allowKnownDevelopers(guest: Guest, screen: Screen) {
   await guest.run(
     'open "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Security"',
   );
-  const label = center(await screen.waitForText("Allow applications from"));
-  // The menu is the other text on the row, showing the current choice.
-  const menu = (await screen.read()).find(
-    (box) => Math.abs(center(box).y - label.y) < 20 && box.text.includes("App Store"),
+  // The menu is the other text on the row, showing the current choice. The window scrolls to this
+  // row as it opens, so both have to come from one look at the screen.
+  const menu = await waitFor(
+    "the Allow applications from menu",
+    async () => {
+      const boxes = await screen.read();
+      const label = boxes.find((box) => box.text.includes("Allow applications from"));
+      if (!label) return undefined;
+      const row = center(label).y;
+      return boxes.find(
+        (box) => Math.abs(center(box).y - row) < 20 && box.text.includes("App Store"),
+      );
+    },
+    { timeoutMs: 60_000, intervalMs: 1_000 },
   );
-  if (!menu) throw new Error("cannot find the Allow applications from menu");
   await screen.vnc.click(center(menu).x, center(menu).y);
   await screen.clickText("Known Developers", { timeoutMs: 5_000 });
   await screen.authorize();

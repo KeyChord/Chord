@@ -1,18 +1,34 @@
 # Packages Chord installs, at these revisions, on first launch and when chords are reset.
+# Pin each to its mirror's commit, and run `vpx _e2e-macos journey --build` after changing one:
+# its last steps fail when a default package has chords this app can't load.
 
 [packages."@keychord/chords-chord"]
 git = "https://github.com/KeyChord/chords-chord"
-rev = "ac9554d97020822c00d085a252e67c879e74e529"
+rev = "8d25d56f50f5ed4d5c7a2d57b26ae6b8cc321060"
 
-[packages."@keychord/chords-os"]
-git = "https://github.com/KeyChord/chords-os"
-rev = "13a44c0714e3b1dc138c67ae26969bf925b8ca96"
-
+# The menu bar, plus the system chords (force quit, lock, volume, brightness) that used to be
+# in chords-os.
 [packages."@keychord/chords-menu"]
 git = "https://github.com/KeyChord/chords-menu"
-rev = "64446147cbf48709099d1965792ae3ac231dbfd7"
+rev = "da98e10e215ad195d130ec5c384e6290ec13bdf9"
 
+# Only names for Apple's apps; each app's chords are a package of its own.
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
-rev = "c00fce97863ac2c71d8d6821e4c5c05b7f357214"
+rev = "668d486b2dd6c61eae683ce22fb9722a7de9e2c8"
 
+[packages."@keychord/chords-com.apple.finder"]
+git = "https://github.com/KeyChord/chords-com.apple.finder"
+rev = "d73e7895930afb8b604fcc0adc94fea6496057f6"
+
+[packages."@keychord/chords-com.apple.Safari"]
+git = "https://github.com/KeyChord/chords-com.apple.Safari"
+rev = "bc7907c1927c2b098b41406639d52e7040585e47"
+
+[packages."@keychord/chords-com.apple.ActivityMonitor"]
+git = "https://github.com/KeyChord/chords-com.apple.ActivityMonitor"
+rev = "36a317c206c5c1745b1d03c554113e0e9dd6bf0e"
+
+[packages."@keychord/chords-com.apple.AccessibilityInspector"]
+git = "https://github.com/KeyChord/chords-com.apple.AccessibilityInspector"
+rev = "67992e304310aac8531e73d9f14c7599b7125bd4"

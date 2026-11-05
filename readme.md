@@ -6,7 +6,7 @@
 
 ## Installation
 
-1. Download `Chord-aarch64.dmg` from the [latest release](https://github.com/KeyChord/Chord/releases/latest). It is signed and notarized.
+1. Download `Chord-aarch64.dmg` (Apple silicon) or `Chord-x86_64.dmg` (Intel) from the [latest release](https://github.com/KeyChord/Chord/releases/latest). Both are signed and notarized.
 2. Open the DMG, drag **Chord** into `Applications`, and open it.
 
 Chord then starts a short guided setup: it asks for the permission it needs, helps you make your first chord, and has you practice using it. The rest of this readme is reference for what you learn there. To see the guide again, open **Settings → General → Getting Started**.

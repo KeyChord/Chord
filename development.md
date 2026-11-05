@@ -530,10 +530,15 @@ app, make a first chord, and use it.
 vpx _e2e-macos journey --build     # a build from this checkout, through a local copy of the site
 vpx _e2e-macos journey --site http://localhost:8787 --build  # also an unpublished website
 vpx _e2e-macos journey --published # exactly what a new user gets today from trychord.app
+vpx _e2e-macos journey --published --intel  # the same through the Intel link, under Rosetta
 ```
 
 The run leaves `target/e2e/runs/<run>/journey.md`: each step with a screenshot and how long it
 took. To see it live, `open` the `vnc://` URL it prints.
+
+VMs reach the internet through the host's NAT, which stops working while the host is on a full-tunnel
+VPN (`0/1` and `128.0/1` through a `utun` in `netstat -rn -f inet`). A journey then stalls on the
+download, on Rosetta, or on adding a chord pack.
 
 This differs from `test` on purpose. `test` starts from a golden VM with SIP off and permissions
 already granted, to test the app. `journey` tests the way in, so it starts from the pristine image

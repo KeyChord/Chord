@@ -18,6 +18,17 @@ test("other links are left alone", () => {
   expect(html).toContain('href="https://github.com/KeyChord/Chord"');
 });
 
+test("the Intel link can be the one pointed at the local DMG", () => {
+  const intel = PUBLISHED.replace("aarch64", "x86_64");
+  const html = pointDownloadsAt(
+    `<head></head><a href="${PUBLISHED}">Mac</a><a href="${intel}">Intel</a>`,
+    "/local.dmg",
+    "Chord-x86_64.dmg",
+  );
+  expect(html).toContain(`<a href="${PUBLISHED}">`);
+  expect(html).toContain('<a href="/local.dmg">Intel');
+});
+
 test("a page without a head still gets the click handler", () => {
   expect(pointDownloadsAt("<a>x</a>", "/local.dmg")).toContain("<script>");
 });

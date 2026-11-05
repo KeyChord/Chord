@@ -7,8 +7,8 @@
 import type { Guest } from "#guest";
 
 export const LIVE_SITE = "https://trychord.app";
+/** The Apple silicon download. The Intel one is `Chord-x86_64.dmg`. */
 const DOWNLOAD_NAME = "Chord-aarch64.dmg";
-const LOCAL_DOWNLOAD_PATH = `/__chord-e2e/${DOWNLOAD_NAME}`;
 
 export interface ReleaseServer {
   url: string;
@@ -16,10 +16,14 @@ export interface ReleaseServer {
 }
 
 /** Rewrites what a site says about the published DMG so the VM downloads the local one. */
-export function pointDownloadsAt(html: string, localPath: string): string {
-  const published = /https:\/\/github\.com\/KeyChord\/Chord\/releases\/[^"'\s<>]*Chord-aarch64\.dmg/g;
+export function pointDownloadsAt(html: string, localPath: string, name = DOWNLOAD_NAME): string {
+  const file = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const published = new RegExp(
+    `https://github\\.com/KeyChord/Chord/releases/[^"'\\s<>]*${file}`,
+    "g",
+  );
   // Script bundles build the link at runtime, so also catch the click itself.
-  const script = `<script>document.addEventListener("click",(e)=>{const a=e.target.closest?.('a[href*="${DOWNLOAD_NAME}"]');if(a)a.href=${JSON.stringify(localPath)}},true)</script>`;
+  const script = `<script>document.addEventListener("click",(e)=>{const a=e.target.closest?.('a[href*="${name}"]');if(a)a.href=${JSON.stringify(localPath)}},true)</script>`;
   const rewritten = html.replace(published, localPath);
   return rewritten.includes("</head>")
     ? rewritten.replace("</head>", `${script}</head>`)
@@ -36,19 +40,20 @@ async function hostAddress(guest: Guest): Promise<string> {
 
 export async function startReleaseServer(
   guest: Guest,
-  { site, dmg }: { site: string; dmg?: string },
+  { site, dmg, name = DOWNLOAD_NAME }: { site: string; dmg?: string; name?: string },
 ): Promise<ReleaseServer> {
   const origin = new URL(site).origin;
+  const localPath = `/__chord-e2e/${name}`;
   const server = Bun.serve({
     hostname: await hostAddress(guest),
     port: 0,
     async fetch(request) {
       const { pathname, search } = new URL(request.url);
-      if (dmg && pathname === LOCAL_DOWNLOAD_PATH) {
+      if (dmg && pathname === localPath) {
         return new Response(Bun.file(dmg), {
           headers: {
             "content-type": "application/octet-stream",
-            "content-disposition": `attachment; filename="${DOWNLOAD_NAME}"`,
+            "content-disposition": `attachment; filename="${name}"`,
           },
         });
       }
@@ -62,7 +67,7 @@ export async function startReleaseServer(
         headers.delete(name);
       }
       if (dmg && upstream.headers.get("content-type")?.includes("text/html")) {
-        return new Response(pointDownloadsAt(await upstream.text(), LOCAL_DOWNLOAD_PATH), {
+        return new Response(pointDownloadsAt(await upstream.text(), localPath, name), {
           status: upstream.status,
           headers,
         });

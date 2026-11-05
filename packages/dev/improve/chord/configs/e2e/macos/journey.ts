@@ -16,6 +16,8 @@ export interface JourneyState {
   siteUrl: string;
   /** The download keeps its quarantine mark. Without notarization, Gatekeeper would refuse it. */
   checkedByGatekeeper: boolean;
+  /** Downloads the Intel build, which the VM runs under Rosetta. */
+  intel: boolean;
   artifacts: string;
 }
 
@@ -41,6 +43,7 @@ export class Journey {
     readonly screen: Screen,
     readonly siteUrl: string,
     readonly checkedByGatekeeper: boolean,
+    readonly intel: boolean,
     private readonly artifacts: string,
   ) {}
 
@@ -60,6 +63,7 @@ export class Journey {
       screen,
       state.siteUrl,
       state.checkedByGatekeeper,
+      state.intel,
       state.artifacts,
     );
   }
