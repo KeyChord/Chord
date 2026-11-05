@@ -22,12 +22,28 @@ function parseSubmission(output: string): { id?: string; status?: string } {
   }
 }
 
+const STAPLE_ATTEMPTS = 5;
+
+/** Apple's ticket service does drop connections, which shouldn't cost a whole release build. */
+async function staple(path: string, retryMs: number) {
+  for (let attempt = 1; ; attempt++) {
+    const result = await $`xcrun stapler staple ${path}`.nothrow().quiet();
+    if (result.exitCode === 0) return;
+    const output = `${result.stdout}${result.stderr}`;
+    if (attempt === STAPLE_ATTEMPTS) {
+      throw new Error(`could not staple ${basename(path)} (exit ${result.exitCode}):\n${output}`);
+    }
+    console.warn(`stapling ${basename(path)} failed (exit ${result.exitCode}); trying again`);
+    await Bun.sleep(retryMs);
+  }
+}
+
 /**
  * Sends an app or a disk image to Apple and staples the ticket to it, so that it opens on a Mac
  * with no connection. A disk image gets its own: `spctl` assesses it apart from the app in it, and
  * rejects one that is signed but that Apple hasn't seen, even though macOS 27 still mounts that.
  */
-export async function notarize(path: string, credentials: string[]) {
+export async function notarize(path: string, credentials: string[], stapleRetryMs = 15_000) {
   const work = mkdtempSync(join(tmpdir(), "chord-notarize-"));
   try {
     // notarytool takes a disk image as it is, but an app only in an archive.
@@ -46,7 +62,7 @@ export async function notarize(path: string, credentials: string[]) {
         : `${submit.stderr}${submit.stdout}`;
       throw new Error(`Apple did not accept ${basename(path)} (${status ?? "no answer"}):\n${reason}`);
     }
-    await $`xcrun stapler staple ${path}`.quiet();
+    await staple(path, stapleRetryMs);
   } finally {
     rmSync(work, { recursive: true, force: true });
   }

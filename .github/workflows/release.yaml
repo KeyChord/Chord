@@ -133,7 +133,7 @@ jobs:
           test -n "$sha" || { echo "::error::rbun does not pin a Bun submodule commit"; exit 1; }
           tag="bun-embed-${sha:0:12}"
           if ! gh release view "$tag" -R KeyChord/rbun --json assets \
-               --jq '.assets[].name' 2>/dev/null | grep -qx "$asset"; then
+               --jq '.assets[].name' | grep -qx "$asset"; then
             echo "::error::KeyChord/rbun has no $asset for Bun ${sha:0:12} (release $tag); run its build-bun-embed workflow first"
             exit 1
           fi

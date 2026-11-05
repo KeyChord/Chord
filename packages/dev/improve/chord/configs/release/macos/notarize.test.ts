@@ -9,8 +9,11 @@ const CREDENTIALS = ["--keychain-profile", "test"];
 let dir: string;
 let originalPath: string | undefined;
 
-/** Stands in for Apple: answers `submit` with the given output, and records every call. */
-function fakeXcrun(submission: string, log = "") {
+/**
+ * Stands in for Apple: answers `submit` with the given output, records every call, and fails the
+ * first `stapleFailures` attempts to staple.
+ */
+function fakeXcrun(submission: string, log = "", stapleFailures = 0) {
   const script = `#!/bin/sh
 echo "$*" >> "${dir}/calls"
 case "$2" in
@@ -21,6 +24,13 @@ EOF
   log) cat <<'EOF'
 ${log}
 EOF
+  ;;
+  staple)
+    tried=$(grep -c ' staple ' "${dir}/calls")
+    if [ "$tried" -le ${stapleFailures} ]; then
+      echo "The network connection was lost."
+      exit 68
+    fi
   ;;
 esac
 `;
@@ -82,6 +92,22 @@ test("an app is sent as an archive, and the ticket goes on the app", async () =>
   await notarize(app, CREDENTIALS);
   expect(calls()[0]).toMatch(/notarytool submit \S+\/Chord\.app\.zip /);
   expect(calls()[1]).toBe(`stapler staple ${app}`);
+});
+
+test("stapling survives a dropped connection", async () => {
+  fakeXcrun(`{"id":"1","status":"Accepted"}`, "", 2);
+  const dmg = join(dir, "Chord.dmg");
+  writeFileSync(dmg, "");
+  await notarize(dmg, CREDENTIALS, 0);
+  expect(calls().filter((call) => call.startsWith("stapler"))).toHaveLength(3);
+});
+
+test("stapling that keeps failing fails the release, and says why", async () => {
+  fakeXcrun(`{"id":"1","status":"Accepted"}`, "", 99);
+  const dmg = join(dir, "Chord.dmg");
+  writeFileSync(dmg, "");
+  await expect(notarize(dmg, CREDENTIALS, 0)).rejects.toThrow("network connection was lost");
+  expect(calls().filter((call) => call.startsWith("stapler"))).toHaveLength(5);
 });
 
 test("a rejection fails with Apple's reason and staples nothing", async () => {
