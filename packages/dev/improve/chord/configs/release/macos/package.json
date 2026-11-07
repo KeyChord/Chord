@@ -4,17 +4,20 @@
 	"version": "0.0.0",
 	"private": true,
 	"bin": {
+		"_check-load-paths": "./_check-load-paths.ts",
 		"_gen-dmg-background": "./_gen-dmg-background.ts",
 		"_make-dmg": "./_make-dmg.ts",
 		"_notarize": "./_notarize.ts",
 		"_release-macos": "./_release-macos.ts"
 	},
 	"imports": {
+		"#load-paths": "./load-paths.ts",
 		"#make-dmg": "./make-dmg.ts",
 		"#notarize": "./notarize.ts"
 	},
 	"exports": {
 		".": "./+.ts",
+		"./load-paths": "./load-paths.ts",
 		"./make-dmg": "./make-dmg.ts",
 		"./notarize": "./notarize.ts"
 	},

@@ -12,6 +12,7 @@
  *   CHORD_NOTARY_PROFILE, or APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID  enables notarization + stapling
  *   CODESIGN_NO_TIMESTAMP=1  skips the trusted timestamp (offline builds)
  */
+import { describeStrayLoadPath, strayLoadPaths } from "#load-paths";
 import { makeDmg } from "#make-dmg";
 import { isNotarized, notarize, notaryCredentials } from "#notarize";
 import { $ } from "bun";
@@ -47,6 +48,12 @@ const app = path.join(bundleDir, `${productName}.app`);
 const bunRuntime = path.join(app, "Contents/Frameworks/libbun_embed.dylib");
 if (!(await Bun.file(bunRuntime).exists())) {
   throw new Error(`embedded Bun runtime missing from bundle: ${bunRuntime}`);
+}
+const strayPaths = await strayLoadPaths(app);
+if (strayPaths.length > 0) {
+  throw new Error(
+    `${app} could load code from outside itself, and XProtect won't open it:\n${strayPaths.map(describeStrayLoadPath).join("\n")}`,
+  );
 }
 
 console.log("re-signing app bundle with Entitlements.plist");

@@ -636,6 +636,15 @@ gh run download <run id> --name chord-aarch64 --dir target/e2e/ci
 vpx _e2e-macos journey --dmg target/e2e/ci/Chord-aarch64.dmg --site <local site>
 ```
 
+Notarized isn't enough. Chord turns library validation off (see `Entitlements.plist`), so XProtect
+also refuses an app that could load a library from outside itself, with the same "Apple could not
+verify “Chord” is free of malware" an unnotarized app gets. 0.2.0 shipped like that: its rpath
+started with the runner's `/Users/runner/work/_temp/bun-embed`. `build.rs` now adds rbun's directory
+only to development builds (`tauri_build::is_dev()`), so a `tauri build` binary searches only
+`@executable_path/../Frameworks`, and a production build run straight from `target/` can't find the
+runtime. The release workflow and `vpx _release-macos` stop before publishing if
+`vpx _check-load-paths <app>` finds a library or rpath outside the app and the system.
+
 CI cannot build the vendored Bun itself — that takes ~30 minutes. Instead
 [`KeyChord/rbun`](https://github.com/KeyChord/rbun) builds `libbun_embed.dylib` once per Bun source
 commit and publishes it as a `bun-embed-<sha>` release asset; Chord's workflow downloads it and

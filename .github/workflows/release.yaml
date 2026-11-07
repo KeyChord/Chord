@@ -252,6 +252,10 @@ jobs:
 
           app="$(find "$bundle/macos" -maxdepth 1 -name '*.app' | head -n1)"
           test -n "$app" || { echo "::error::no .app produced"; exit 1; }
+          # XProtect won't open an app whose rpath leads outside it, such as into this runner's
+          # build directory, however it's signed: "Apple could not verify Chord is free of malware".
+          bun "$scripts/_check-load-paths.ts" "$PWD/$app" \
+            || { echo "::error::the app could load code from outside itself; see above"; exit 1; }
           dmg="$out/Chord-$suffix.dmg"
           notarizing=false
           if [ "${{ steps.signing.outputs.signed }}" = true ] && [ -n "${APPLE_ID:-}" ]; then

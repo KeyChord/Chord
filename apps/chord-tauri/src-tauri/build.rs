@@ -8,12 +8,20 @@ fn main() {
     );
     println!("cargo:rerun-if-changed=../data/*");
 
-    // rbun links `libbun_embed.dylib` dynamically. Dev builds find it where
-    // the rbun checkout built it; the app bundle ships it in
-    // `Contents/Frameworks` (`bundle.macOS.frameworks` in tauri.conf.json).
-    if let Ok(lib_dir) = std::env::var("DEP_BUN_EMBED_LIB_DIR") {
-        // Not `-bins`: the test harness links the library too.
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{lib_dir}");
+    // rbun links `libbun_embed.dylib` dynamically. Development builds (`tauri dev`,
+    // `cargo test`, plain `cargo build`) run from `target/` and find it where rbun
+    // built or CI downloaded it. `tauri build` ships it in `Contents/Frameworks`
+    // (`bundle.macOS.frameworks` in tauri.conf.json), and that binary must not look
+    // anywhere else: Chord has library validation off (Entitlements.plist), so a
+    // directory outside the bundle on its rpath, such as CI's
+    // /Users/runner/work/_temp/bun-embed, would load whatever someone puts there.
+    // XProtect refuses to open such an app ("Apple could not verify Chord is free of
+    // malware"), notarized or not.
+    if tauri_build::is_dev() {
+        if let Ok(lib_dir) = std::env::var("DEP_BUN_EMBED_LIB_DIR") {
+            // Not `-bins`: the test harness links the library too.
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{lib_dir}");
+        }
     }
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         println!("cargo:rustc-link-arg-bins=-Wl,-rpath,@executable_path/../Frameworks");
