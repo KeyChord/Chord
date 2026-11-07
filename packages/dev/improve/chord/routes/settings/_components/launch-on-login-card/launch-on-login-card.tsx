@@ -49,8 +49,8 @@ function LaunchOnLoginCardContent({
   const toggleDockIconMutation = useMutation({
     mutationFn: taurpc.toggleDockIcon,
   });
-  const toggleHideGuideByDefaultMutation = useMutation({
-    mutationFn: taurpc.toggleHideGuideByDefault,
+  const toggleHideHintPanelByDefaultMutation = useMutation({
+    mutationFn: taurpc.toggleHideHintPanelByDefault,
   });
 
   return (
@@ -58,7 +58,7 @@ function LaunchOnLoginCardContent({
       <CardHeader>
         <CardTitle>Application</CardTitle>
         <CardDescription>
-          Control how Chord starts, where its icon appears, and whether the guide is shown by
+          Control how Chord starts, where its icon appears, and whether the Hint Panel is shown by
           default.
         </CardDescription>
       </CardHeader>
@@ -95,13 +95,13 @@ function LaunchOnLoginCardContent({
             }}
           />
           <SettingSwitchRow
-            id="hide-guide-by-default"
-            label="Hide guide by default"
-            description="Start chord mode with the guide hidden. Press Shift+Tab to reveal it when needed."
+            id="hide-hint-panel-by-default"
+            label="Hide Hint Panel by default"
+            description="Start chord mode with the Hint Panel hidden. Press Shift+Tab to reveal it when needed."
             checked={settings.isChordPanelHiddenByDefault}
-            disabled={toggleHideGuideByDefaultMutation.isPending}
+            disabled={toggleHideHintPanelByDefaultMutation.isPending}
             onCheckedChange={() => {
-              toggleHideGuideByDefaultMutation.mutate();
+              toggleHideHintPanelByDefaultMutation.mutate();
             }}
           />
         </div>

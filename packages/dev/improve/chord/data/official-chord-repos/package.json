@@ -4,7 +4,6 @@
 	"private": true,
 	"imports": {
 		"#gen-official-chord-repos": "./_gen-official-chord-repos.ts",
-		"#official-chord-packages.json": "./@assets/official-chord-packages.json",
 		"#official-chord-repos": "./official-chord-repos.ts",
 		"#official-chord-repos.gen.json": "./@assets/official-chord-repos.gen.json"
 	},

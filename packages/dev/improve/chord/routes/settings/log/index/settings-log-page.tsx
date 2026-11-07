@@ -1,3 +1,4 @@
+import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
@@ -252,11 +253,13 @@ export function SettingsLogPage() {
     }
   }
 
-  async function copyLogs() {
-    await navigator.clipboard.writeText(logText);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1_500);
-  }
+  const copyLogs = useMutation({
+    mutationFn: () => navigator.clipboard.writeText(logText),
+    onSuccess: () => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1_500);
+    },
+  });
 
   function clearLogs() {
     clear();
@@ -339,7 +342,9 @@ export function SettingsLogPage() {
             variant="secondary"
             size="sm"
             disabled={logText.length === 0}
-            onClick={() => void copyLogs()}
+            onClick={() => {
+              copyLogs.mutate();
+            }}
           >
             {copied ? <Check /> : <Copy />}
             {copied ? "Copied" : "Copy to pasteboard"}

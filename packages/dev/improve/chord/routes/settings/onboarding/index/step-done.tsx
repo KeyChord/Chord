@@ -45,10 +45,10 @@ export function DoneStep({
 					)}
 			<div className="divide-y divide-black/[0.06] rounded-[12px] border border-black/[0.08] dark:divide-white/10 dark:border-white/10">
 				<Tip title="Use any chord">
-					Hold <Key>caps lock</Key> + <Key>space</Key>, type its letters, and let go.
+					Press <Key>caps lock</Key> and <Key>space</Key> together. Let go of caps lock but keep holding space, type its letters, then let go of space.
 				</Tip>
 				<Tip title="Forgot a chord?">
-					Hold <Key>caps lock</Key> + <Key>space</Key> and look at the list on your screen. It shows the chords for whichever app you're using.
+					Press <Key>caps lock</Key> and <Key>space</Key> together, keep holding space, and look at the list on your screen. It shows the chords for whichever app you're using.
 				</Tip>
 				<Tip title="Open Chord's settings">
 					Use the chord <Key>0</Key> <Key>,</Key> or click the Chord icon at the top of your screen, in the menu bar.

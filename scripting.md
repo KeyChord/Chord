@@ -62,7 +62,7 @@ the file so the controls remain available without external package sources.
 Leading decimal digits set a chord's repeat count: `12ab` executes `ab` twelve times.
 Without a prefix the chord executes once; the prefix `1` starts an indefinite loop.
 For example, `1ab` keeps executing `ab` after the keys are released, chord mode ends,
-or another chord runs. Each loop receives a distinct ID displayed in the chord panel
+or another chord runs. Each loop receives a distinct ID displayed in the Hint Panel
 alongside its `0h<ID>` command. Halting a loop stops further iterations. An in-flight
 JavaScript callback finishes before its values are released, preserving other handlers
 in the same package worker. Shell commands are cancelled and simulated shortcut keys
@@ -447,7 +447,7 @@ open 'chord://add-package?repo=KeyChord%2Fchords-vscode'
 ## CLI
 
 The Chord app's executable doubles as a `chord` CLI. To put it on your `PATH`, open
-**Settings → General → Command Line** and click **Add chord to PATH**, which links
+**Settings → Advanced → Command Line** and click **Install command…**, which links
 `/usr/local/bin/chord` to the app (macOS may ask for your password). Development builds use the
 name `chordd`. Run `chord --help` for the full list.
 

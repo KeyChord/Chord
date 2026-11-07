@@ -116,7 +116,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
       chordMacrosData={{ entries: [] }}
     />);
-    expect(html).toContain("↩");
+    expect(html).toContain('aria-label="Return"');
     if (layout === ChordLayout.SidebarLeft) {
       expect(html).toContain("Repeat 3 times · `d2,i13` · Step 2");
       // The next column offers the rest of the chord being typed.

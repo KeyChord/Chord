@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@chord/dev.improve.chord.components.ui.card";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
+import { KeyLabel } from "@chord/dev.improve.chord.components.ui.kbd";
 import { Textarea } from "@chord/dev.improve.chord.components.ui.textarea";
 import { StateQueries, useChordMacrosState } from "@chord/dev.improve.chord.lib.state";
 import { Pencil, Trash2 } from "lucide-react";
@@ -251,7 +252,12 @@ function BufferRow({ digit, entry }: { digit: number; entry?: ChordMacroEntry })
 function EnterHint() {
   return (
     <>
-      Each new line is an Enter key press; <kbd>⌘↩</kbd> saves.
+      Each new line is an Enter key press;{" "}
+      <kbd>
+        <KeyLabel label="⌘" />
+        <KeyLabel label="↩" />
+      </kbd>{" "}
+      saves.
     </>
   );
 }

@@ -3,7 +3,18 @@
 // make a first chord, and use it. Everything goes through the screen, mouse and keyboard, by the
 // text a person would look for. SSH only checks the results. See development.md.
 import { afterAll, beforeAll, expect } from "bun:test";
+import { rmSync } from "node:fs";
+import { basename, join } from "node:path";
+import { saysNotarized } from "@chord/dev.improve.chord.configs.release.macos/notarize";
 import { allowKnownDevelopers } from "#fresh-mac";
+import {
+  checkDownload,
+  guestAssessment,
+  guestChecks,
+  guestTime,
+  guestVerdicts,
+  launchProblems,
+} from "#gatekeeper";
 import { Journey } from "#journey";
 import { Keysym } from "#keysyms";
 import { center } from "#screen";
@@ -28,6 +39,18 @@ const asksForDeveloperTools = async () =>
     })
   ).exitCode === 0;
 
+/** Fails unless the VM's own Gatekeeper takes `path` as notarized. */
+async function expectNotarizedInVm(path: string) {
+  const verdict = await guestAssessment(guest, path);
+  if (!saysNotarized(verdict)) {
+    throw new Error(`the VM's Gatekeeper doesn't take ${path} as notarized:\n${verdict}`);
+  }
+}
+
+/** Gatekeeper's question about an app from the internet, or macOS refusing to open it at all. */
+const GATEKEEPER_PROMPT =
+  /^\s*Open\s*$|Not Opened|could not verify|can.t be opened|is damaged|will damage your computer/;
+
 /** The app in front, which is the one a person is looking at. */
 async function frontApp(): Promise<string> {
   const { stdout } = await guest.run(
@@ -42,6 +65,8 @@ journey.step("the Mac is set up like a new one", async () => {
   expect(stdout).toContain("enabled.");
   expect(stdout).toContain("assessments enabled");
   expect(stdout).not.toContain("Chord");
+  // A pass means only as much as this macOS checks.
+  await journey.note(await guestChecks(guest));
 });
 
 journey.step("the website says what to press and how to get Chord", async () => {
@@ -87,6 +112,18 @@ journey.step("downloading Chord says what happens next", async () => {
   expect(stdout).toContain("Safari");
 });
 
+journey.step("the download is notarized and loads only from itself", async () => {
+  // The file Safari saved, not the one the run started from: with --published, nothing else.
+  // The host checks load paths, which the VM's macOS may not, and the VM can't without
+  // developer tools.
+  const copy = join(journey.artifacts, basename(DOWNLOADED));
+  await guest.copyFrom(DOWNLOADED, copy);
+  const notarized = await checkDownload(copy, { requireNotarized: journey.checkedByGatekeeper });
+  expect(notarized).toBe(journey.checkedByGatekeeper);
+  rmSync(copy);
+  if (journey.checkedByGatekeeper) await expectNotarizedInVm(DOWNLOADED);
+});
+
 journey.step("dragging Chord to Applications installs it", async () => {
   if (!journey.checkedByGatekeeper) {
     await guest.run(`xattr -d com.apple.quarantine ${DOWNLOADED}`);
@@ -107,12 +144,27 @@ journey.step("dragging Chord to Applications installs it", async () => {
   // Not lipo: on a new Mac that asks to install the developer tools.
   const { stdout } = await guest.run("file -b /Applications/Chord.app/Contents/MacOS/chord");
   expect(stdout).toContain(journey.intel ? "x86_64" : "arm64");
+  if (journey.checkedByGatekeeper) await expectNotarizedInVm("/Applications/Chord.app");
 });
 
-journey.step("opening Chord starts setup, and nothing asks for developer tools", async () => {
+journey.step("opening Chord passes Gatekeeper and XProtect and starts setup", async () => {
+  const since = await guestTime(guest);
   await guest.run("open /Applications/Chord.app");
-  if (journey.checkedByGatekeeper) await screen.clickText(button("Open"), { timeoutMs: 30_000 });
+  if (journey.checkedByGatekeeper) {
+    const prompt = await screen.waitForText(GATEKEEPER_PROMPT, { timeoutMs: 30_000 });
+    if (!button("Open").test(prompt.text)) {
+      const log = await guestVerdicts(guest, since);
+      throw new Error(
+        `macOS refused to open Chord ("${prompt.text}"):\n${launchProblems(log).join("\n")}\n\n${log}`,
+      );
+    }
+    await vnc.click(center(prompt).x, center(prompt).y);
+  }
   await screen.waitForText("Welcome to Chord", { timeoutMs: 60_000 });
+  if (journey.checkedByGatekeeper) {
+    // XProtect logs its verdict before Gatekeeper asks, so it's there by now.
+    expect(launchProblems(await guestVerdicts(guest, since))).toEqual([]);
+  }
   expect(await asksForDeveloperTools()).toBe(false);
   // Its window would otherwise sit on top of setup.
   await journey.waitUntil(
@@ -214,12 +266,12 @@ async function waitForFront(bundleId: string) {
 journey.step("a chord pack can be added without developer tools", async () => {
   await screen.clickText(button("Continue"));
   await screen.waitForText("Want chords for the apps you use?");
-  await screen.waitForText("Terminal Chords");
-  const { x, y } = center((await screen.find("Terminal Chords"))!);
+  await screen.waitForText("AeroSpace Chords");
+  const { x, y } = center((await screen.find("AeroSpace Chords"))!);
   const add = (await screen.read()).find(
     (box) => button("Add").test(box.text) && Math.abs(center(box).y - y) < 40 && center(box).x > x,
   );
-  if (!add) throw new Error("no Add button next to Terminal Chords");
+  if (!add) throw new Error("no Add button next to AeroSpace Chords");
   const workers = await packageWorkers();
   await vnc.click(center(add).x, center(add).y);
   await screen.waitForText("Added", { timeoutMs: 120_000 });

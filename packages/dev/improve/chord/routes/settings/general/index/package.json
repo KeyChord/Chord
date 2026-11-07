@@ -17,7 +17,6 @@
 		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
 		"react": "^19.3.1"

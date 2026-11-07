@@ -9,6 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
 		"@tauri-apps/plugin-opener": "^2.7.2",
 		"lucide-react": "^1.57.0",

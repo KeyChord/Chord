@@ -12,6 +12,7 @@ const { PacksView } = await import('#step-packs');
 const { WelcomeStep } = await import('#step-welcome');
 const { DoneStep } = await import('#step-done');
 const { MoveStep } = await import('#step-move');
+const { ChordKeysPanel } = await import('#step-first-chord');
 afterAll(() => {
 	globalThis.window = previousWindow;
 });
@@ -78,6 +79,49 @@ test('practice explains typing something else', () => {
 	);
 	expect(html).toContain('/x');
 	expect(html).toContain('/s');
+});
+
+test('practice does not call the right keys wrong when the chord could not run', () => {
+	const html = render(
+		<PracticeView
+			progress={{ ...initialPractice, typed: '/s', attempted: '/s', hint: 'did-not-run', error: 'No chord found' }}
+			sequence="/s"
+			appName="Safari"
+		/>,
+	);
+	expect(html).toContain('correctly');
+	expect(html).toContain('No chord found');
+	expect(html).not.toContain('No harm done');
+});
+
+const keysPanel = {
+	appName: 'Todoist',
+	keys: 't',
+	isAllowing: false,
+	onKeysChange: () => {},
+	onAllowFolder: () => {},
+};
+
+test('a letter another chord uses names that chord and asks for a different one', () => {
+	const conflict = { packageName: 'p', chordsFilePathslug: 'f', chord: { name: 'Terminal' } } as never;
+	const html = render(<ChordKeysPanel {...keysPanel} conflict={conflict} />);
+	expect(html).toContain('/t');
+	expect(html).toContain('already used by');
+	expect(html).toContain('Terminal');
+	expect(html).toContain('different letter');
+});
+
+test('a free letter shows no conflict', () => {
+	expect(render(<ChordKeysPanel {...keysPanel} />)).not.toContain('already used by');
+});
+
+test('a chords folder Chord may not use explains why and offers to allow it', () => {
+	const blockedFolder = { name: 'default', path: '/Users/me/.chord/packages/default', identity: 'id', approved: false };
+	const html = render(<ChordKeysPanel {...keysPanel} blockedFolder={blockedFolder} />);
+	expect(html).toContain('/Users/me/.chord/packages/default');
+	expect(html).toContain('wouldn&#x27;t run');
+	expect(html).toContain('can run code');
+	expect(html).toContain('Allow This Folder');
 });
 
 test('practice celebrates the chord running', () => {

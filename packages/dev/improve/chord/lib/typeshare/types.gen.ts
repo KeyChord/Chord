@@ -25,6 +25,7 @@ export interface AppSettingsState {
 	isChordPanelHiddenByDefault: boolean;
 	/** The guided first-run setup has been finished or skipped. */
 	isOnboardingComplete: boolean;
+	isSettingsSidebarCollapsed: boolean;
 }
 
 export enum BuiltinChordKind {

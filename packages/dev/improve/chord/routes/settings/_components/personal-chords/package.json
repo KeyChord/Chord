@@ -18,6 +18,7 @@
     "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
     "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
     "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
     "@chord/dev.improve.chord.lib.state": "workspace:*",
     "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
     "lucide-react": "^1.57.0",

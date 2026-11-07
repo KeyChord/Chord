@@ -45,7 +45,6 @@
         "@chord/dev.improve.chord.configs.dev": "workspace:*",
         "@chord/dev.improve.chord.configs.dev.tauri": "workspace:*",
         "@chord/dev.improve.chord.configs.e2e.macos": "workspace:*",
-        "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": "workspace:*",
         "@chord/dev.improve.chord.configs.release.macos": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
@@ -79,6 +78,7 @@
         "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.configure.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.danger.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.general.index": "workspace:*",
@@ -105,9 +105,6 @@
         "_lint": "./_lint.ts",
       },
       "dependencies": {
-        "@bradleyhodges/sfsymbols": "^8.1.3",
-        "@bradleyhodges/sfsymbols-react": "^8.1.3",
-        "@bradleyhodges/sfsymbols-types": "^8.1.3",
         "@chord/com.npmjs.rename-fn": "workspace:*",
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
@@ -119,6 +116,7 @@
         "@chord/dev.improve.chord.routes.settings": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.configure.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.danger.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.general.index": "workspace:*",
@@ -128,6 +126,7 @@
         "@chord/dev.improve.chord.routes.settings.onboarding.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.personal.index": "workspace:*",
         "@fontsource-variable/geist": "^5.3.0",
+        "@fontsource-variable/geist-mono": "^5.3.0",
         "@fontsource-variable/inter": "^5.3.0",
         "@headless-tree/core": "^1.8.0",
         "@headless-tree/react": "^1.8.0",
@@ -400,6 +399,7 @@
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
         "@heroui/react": "^3.2.7",
+        "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
       "devDependencies": {
@@ -545,16 +545,6 @@
         "@types/bun": "^1.4.3",
       },
     },
-    "packages/dev/improve/chord/configs/patching/codemods/sfsymbols-react": {
-      "name": "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react",
-      "version": "0.0.0",
-      "bin": {
-        "_test-sfsymbols-react": "./_test-sfsymbols-react.ts",
-      },
-      "devDependencies": {
-        "@codemod.com/jssg-types": "^1.6.3",
-      },
-    },
     "packages/dev/improve/chord/configs/release/macos": {
       "name": "@chord/dev.improve.chord.configs.release.macos",
       "version": "0.0.0",
@@ -654,9 +644,12 @@
       "name": "@chord/dev.improve.chord.routes.settings",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
         "@tauri-apps/api": "^2.12.4",
@@ -858,6 +851,7 @@
     "packages/dev/improve/chord/routes/settings/_components/open-repo-button": {
       "name": "@chord/dev.improve.chord.routes.settings._components.open-repo-button",
       "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@tauri-apps/plugin-opener": "^2.7.2",
         "lucide-react": "^1.57.0",
@@ -911,6 +905,7 @@
         "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.select": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
@@ -988,8 +983,6 @@
     "packages/dev/improve/chord/routes/settings/_components/shortcut-keys": {
       "name": "@chord/dev.improve.chord.routes.settings._components.shortcut-keys",
       "dependencies": {
-        "@bradleyhodges/sfsymbols": "^8.1.3",
-        "@bradleyhodges/sfsymbols-react": "^8.1.3",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "pretty-key": "^0.2.0",
         "react": "^19.3.1",
@@ -1067,6 +1060,17 @@
         "react-dom": "^19.3.1",
       },
     },
+    "packages/dev/improve/chord/routes/settings/command-line/index": {
+      "name": "@chord/dev.improve.chord.routes.settings.command-line.index",
+      "dependencies": {
+        "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+      },
+    },
     "packages/dev/improve/chord/routes/settings/configure/index": {
       "name": "@chord/dev.improve.chord.routes.settings.configure.index",
       "dependencies": {
@@ -1097,7 +1101,6 @@
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
@@ -1132,6 +1135,7 @@
     "packages/dev/improve/chord/routes/settings/log/index": {
       "name": "@chord/dev.improve.chord.routes.settings.log.index",
       "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
@@ -1153,6 +1157,7 @@
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.textarea": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
@@ -1252,12 +1257,6 @@
 
     "@blazediff/core": ["@blazediff/core@1.10.0", "", {}, "sha512-AOQff0zgR7cGsZL+4E7hVkmujoPUpm0J9xzWGWZj5wCjd3gmxESXAPfKyuzs93VdpQNFhHlBhfOjrcZ+XTERtQ=="],
 
-    "@bradleyhodges/sfsymbols": ["@bradleyhodges/sfsymbols@8.1.3", "", { "dependencies": { "@bradleyhodges/sfsymbols-types": "8.1.3" } }, "sha512-qX6Y0cfuRQkEZ2Bu+DKnpK8/Y7o1gIgv/wOSW5aoINabbQaSUrVTHedFVK4HxbapUmZgi87iXwgn3LhDbGJ91A=="],
-
-    "@bradleyhodges/sfsymbols-react": ["@bradleyhodges/sfsymbols-react@8.1.3", "", { "dependencies": { "@bradleyhodges/sfsymbols-types": "^8.1.3", "cn": "^0.2.5" }, "peerDependencies": { "react": "^18.0.0 || ^19.0.0" } }, "sha512-hhFoqpfOk/zWaF7OU8GRjO84+vIKrOVk2qC3lzh3n4MjOmZauJ7o8PYsEwNRZWENbkbzRNiGHi+pijDlyyRYmg=="],
-
-    "@bradleyhodges/sfsymbols-types": ["@bradleyhodges/sfsymbols-types@8.1.3", "", {}, "sha512-5sD1CeQklZviXDmQn6NQXeRaNetCwN1GFnCm/OBNkoqP4c6yEEeyuPmLtzyygxjnXPbEj8sqRtxDv1oIZzfhsQ=="],
-
     "@chord/com.npmjs.desm": ["@chord/com.npmjs.desm@workspace:packages/com/npmjs/desm"],
 
     "@chord/com.npmjs.map-obj": ["@chord/com.npmjs.map-obj@workspace:packages/com/npmjs/map-obj"],
@@ -1338,8 +1337,6 @@
 
     "@chord/dev.improve.chord.configs.e2e.macos": ["@chord/dev.improve.chord.configs.e2e.macos@workspace:packages/dev/improve/chord/configs/e2e/macos"],
 
-    "@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react": ["@chord/dev.improve.chord.configs.patching.codemods.sfsymbols-react@workspace:packages/dev/improve/chord/configs/patching/codemods/sfsymbols-react"],
-
     "@chord/dev.improve.chord.configs.release.macos": ["@chord/dev.improve.chord.configs.release.macos@workspace:packages/dev/improve/chord/configs/release/macos"],
 
     "@chord/dev.improve.chord.data.official-chord-repos": ["@chord/dev.improve.chord.data.official-chord-repos@workspace:packages/dev/improve/chord/data/official-chord-repos"],
@@ -1408,6 +1405,8 @@
 
     "@chord/dev.improve.chord.routes.settings.chords.index": ["@chord/dev.improve.chord.routes.settings.chords.index@workspace:packages/dev/improve/chord/routes/settings/chords/index"],
 
+    "@chord/dev.improve.chord.routes.settings.command-line.index": ["@chord/dev.improve.chord.routes.settings.command-line.index@workspace:packages/dev/improve/chord/routes/settings/command-line/index"],
+
     "@chord/dev.improve.chord.routes.settings.configure.index": ["@chord/dev.improve.chord.routes.settings.configure.index@workspace:packages/dev/improve/chord/routes/settings/configure/index"],
 
     "@chord/dev.improve.chord.routes.settings.danger.index": ["@chord/dev.improve.chord.routes.settings.danger.index@workspace:packages/dev/improve/chord/routes/settings/danger/index"],
@@ -1440,9 +1439,9 @@
 
     "@codemirror/view": ["@codemirror/view@6.43.14", "", { "dependencies": { "@codemirror/state": "^6.7.0", "crelt": "^1.0.6", "style-mod": "^4.1.0", "w3c-keyname": "^2.2.4" } }, "sha512-hC45YnmJNR1rz42OF57BLoQNFMV12/13drnvibDsR2quNDmldcb4WvYVV81hFQg56i9lcqQMEDqilhX2QDcGQQ=="],
 
-    "@codemod.com/jssg-types": ["@codemod.com/jssg-types@1.6.3", "", {}, "sha512-b5829ixO5TdGL5xg5YcL9YfiLC3WwFZU+8Zx78NpsHlJ1iySbqfA0g0psqNXv8ss/r7hdpy2KiBXm3GE6bN5bQ=="],
-
     "@fontsource-variable/geist": ["@fontsource-variable/geist@5.3.0", "", {}, "sha512-j0m+vLQuG5XAYoHtGCVu0spvlGreR3EzpECUVzkFmI1mTVnAO38l/NEPDCFgZ177JxzYJCLSmTQibIiYPilGrA=="],
+
+    "@fontsource-variable/geist-mono": ["@fontsource-variable/geist-mono@5.3.0", "", {}, "sha512-vBbuwDEo9AkrqADMXOrlAR3DFcJi4/JxeuU43FoiQERnNwsfXNnvxvReZG02cQKmyk4DZkZdBZX3oTDvy2zBAw=="],
 
     "@fontsource-variable/inter": ["@fontsource-variable/inter@5.3.0", "", {}, "sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA=="],
 
@@ -1943,8 +1942,6 @@
     "client-only": ["client-only@0.0.1", "", {}, "sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA=="],
 
     "clsx": ["clsx@2.1.1", "", {}, "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="],
-
-    "cn": ["cn@0.2.6", "", { "bin": { "cn": "bin/cn.mjs" } }, "sha512-+i4L0zUGgRcEnhsxueVrP7iBGxBx5iD0WOTYg1MwFEu2ZyCmH5Ov2V1cul2Ht5UchRQQgftCf4be/RxspuW6QQ=="],
 
     "context": ["context@3.1.0", "", { "dependencies": { "vest-utils": "^1.5.0" } }, "sha512-foRhGPhITOiZWqoDx9oUv0UXidbgib9wWDykR7n5pZNa7hvW8rbM/KX+yoc91PbhuiRBWdBvO2f83DUy7N27Ww=="],
 

@@ -9,6 +9,9 @@ mod cli_worker;
 #[derive(Debug, Parser)]
 #[command(name = "chord", about = "shortcuts reimagined")]
 struct Cli {
+    /// Passed by Start at Login; `is_autostart_launch` reads it to keep Settings closed.
+    #[arg(long = "autostart", hide = true)]
+    _autostart: bool,
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -276,6 +279,12 @@ fn run_export_cli(file: PathBuf, export: String, args: Vec<String>) -> anyhow::R
 mod tests {
     use super::{Cli, Commands, decode_elevated_argument};
     use clap::Parser;
+
+    #[test]
+    fn start_at_login_launches_the_app() {
+        let cli = Cli::try_parse_from(["chord", "--autostart"]).unwrap();
+        assert!(cli.command.is_none());
+    }
 
     #[test]
     fn parses_bun_script_arguments() {

@@ -1,3 +1,4 @@
+import { useMutation } from '@chord/com.npmjs.tanstack__react-query';
 import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
 import { Button } from '@chord/dev.improve.chord.components.ui.button';
 import { Loader2, ShieldCheck } from 'lucide-react';
@@ -21,11 +22,15 @@ export function PermissionStep({
 	onSkip: () => void;
 }) {
 	const [hasOpened, setHasOpened] = useState(false);
-	function open() {
+	const openSettings = useMutation({
 		// macOS's prompt opens the right page by itself the first time. After that it may not
 		// come back, so go straight to the page.
-		if (hasOpened) void taurpc.openAccessibilitySettings();
-		else void taurpc.requestAccessibilityAccess();
+		mutationFn: (alreadyOpened: boolean) =>
+			alreadyOpened ? taurpc.openAccessibilitySettings() : taurpc.requestAccessibilityAccess(),
+	});
+	function open() {
+		// Passed in because the state below changes before the mutation function runs.
+		openSettings.mutate(hasOpened);
 		setHasOpened(true);
 	}
 	return (

@@ -164,6 +164,7 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
         None
     };
 
+    let has_startup_command = startup_command.is_some();
     let app = tauri::Builder::default()
         .invoke_handler(taurpc::create_ipc_handler(api_handler))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
@@ -255,7 +256,10 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
             if !settings.is_onboarding_complete() {
                 app::settings::install_location::eject_installer();
             }
-            if tauri_app::startup::should_open_window_on_launch(settings.is_onboarding_complete()) {
+            if tauri_app::startup::should_open_window_on_launch(
+                has_startup_command,
+                settings.is_onboarding_complete(),
+            ) {
                 if let Err(error) = settings.ui.open() {
                     log::error!("Failed to show settings window on launch: {error:#}");
                 }

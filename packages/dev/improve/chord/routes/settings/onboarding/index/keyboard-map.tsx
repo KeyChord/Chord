@@ -57,7 +57,7 @@ export function KeyboardMap({
 								data-pressed={isPressed || undefined}
 								style={{ flex: key.width ?? 1 }}
 								className={cn(
-									'flex h-[27px] min-w-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-[5px] border text-[9.5px]',
+									'flex h-[27px] min-w-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-[5px] border font-mono text-[9.5px]',
 									isPressed
 										? 'border-emerald-600 bg-emerald-500 font-semibold text-white'
 										: isHighlighted
@@ -78,7 +78,7 @@ export function KeyboardMap({
 /** A key named in instructions, drawn like the key it refers to. */
 export function Key({ children }: { children: React.ReactNode }) {
 	return (
-		<kbd className="mx-[1px] inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-[5px] border border-black/15 bg-background px-1.5 align-[1px] font-sans text-[11.5px] font-medium text-foreground shadow-[0_1px_0_rgba(0,0,0,0.12)] dark:border-white/20">
+		<kbd className="mx-[1px] inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-[5px] border border-black/15 bg-background px-1.5 align-[1px] font-mono text-[11.5px] font-medium text-foreground shadow-[0_1px_0_rgba(0,0,0,0.12)] dark:border-white/20">
 			{children}
 		</kbd>
 	);

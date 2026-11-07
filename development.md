@@ -301,7 +301,7 @@ The project tool versions are declared in [`.prototools`](./.prototools). Rust i
 
 Native macOS Open/Save panels temporarily give `com.apple.finder` chords priority
 over the foreground app's chords, followed by global chords. The real app ID is
-preserved for handlers and shortcut delivery, and the chord panel shows the same
+preserved for handlers and shortcut delivery, and the Hint Panel shows the same
 Finder bindings. The Finder package must be installed or loaded from a monorepo.
 
 An Accessibility observer listens for window/sheet creation, focus changes and
@@ -413,11 +413,12 @@ the monorepo's copies. Duplicate package names within one monorepo are rejected.
 
 ## Browse catalog
 
-Settings → Browse lists only the official packages named in
-`packages/dev/improve/chord/data/official-chord-repos/@assets/official-chord-packages.json`.
+Settings → Browse lists every package under `@keychord/` in the sibling `../chords` checkout,
+except private ones and the default packages in `apps/chord-tauri/data/default-packages.toml`,
+which Chord installs itself and shows among the installed chords.
 Each listing's name, description, categories and repo URL come from the `displayName`,
-`description`, `categories` and `repository.url` fields of the package's `package.json` in the
-sibling `../chords` checkout. After changing that list or those fields, run
+`description`, `categories` and `repository.url` fields of the package's `package.json`.
+After adding or removing a package, changing those fields or changing the defaults, run
 `vpx _gen-official-chord-repos` and commit the regenerated `official-chord-repos.gen.json`;
 a test fails while it is out of date (and is skipped without the sibling checkout).
 Community packages are not listed: Browse links to a GitHub search for the `chordpack` topic.
@@ -552,6 +553,23 @@ quarantine mark from the download and never sees the prompt. To cover it before 
 notarized DMG with `--dmg` (see [Code signing](#code-signing)); the run then keeps the mark.
 `--published` also covers it, but only exercises what has been released, so it fails at the setup
 steps until a release includes them.
+
+Every command checks the DMG on the host before a VM boots (`checkDownload` in `gatekeeper.ts`). It
+fails if the app in it could load code from outside itself, which is what kept the notarized 0.2.0
+from opening (see [Releases](#releases)), and if the disk image and the app aren't either both
+notarized with tickets stapled or both not. `--release prod` must be notarized. The journey checks
+the file Safari downloaded the same way, so `--published` is covered too, and with Gatekeeper on it
+also checks in the VM:
+
+- the VM's `spctl` takes the download and the installed app as notarized;
+- opening Chord brings Gatekeeper's question, not a refusal such as "Apple could not verify
+  “Chord” is free of malware", which fails the step with the reason from the VM's log;
+- the VM's log has XProtect's verdict on the first launch: notarized, no malware type, and no
+  rpath or library it rejected.
+
+The VM's macOS may be older than users' and miss checks they run: 0.1.0 passed the journey with the
+rpath that got 0.2.0 refused. `journey.md` notes the VM's macOS and XProtect versions and whether
+its XProtect checks load paths. The host's check covers that either way.
 
 To explore as a new user would, one step at a time, and to see what's confusing before scripting
 it, start a pristine VM and drive it with `ui`:

@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@chord/dev.improve.chord.components.ui.dialog";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
+import { KeyLabel } from "@chord/dev.improve.chord.components.ui.kbd";
 import { Select } from "@chord/dev.improve.chord.components.ui.select";
 import { StateQueries, useChordPackageManagerState } from "@chord/dev.improve.chord.lib.state";
 import {
@@ -768,7 +769,14 @@ function FileEditor({
               </span>
             ) : (
               <span className="text-muted-foreground">
-                <kbd>⌘S</kbd> saves and reloads Chord. <kbd>⌘F</kbd> finds and replaces.
+                <kbd>
+                  <KeyLabel label="⌘" />S
+                </kbd>{" "}
+                saves and reloads Chord.{" "}
+                <kbd>
+                  <KeyLabel label="⌘" />F
+                </kbd>{" "}
+                finds and replaces.
               </span>
             )}
           </p>

@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import officialChordPackages from "#official-chord-packages.json";
 import { getGitHubSlug } from "@chord/dev.improve.chord.lib.github";
 
 export interface OfficialChordRepo {
@@ -12,21 +11,45 @@ export interface OfficialChordRepo {
 
 // The chords monorepo is checked out next to Chord, as apps/chord-tauri/src-tauri/build.rs expects.
 export const chordsMonorepoUrl = new URL("../../../../../../../chords/", import.meta.url);
+const defaultPackagesUrl = new URL(
+  "../../../../../../apps/chord-tauri/data/default-packages.toml",
+  import.meta.url,
+);
 const generatedFileUrl = new URL("./@assets/official-chord-repos.gen.json", import.meta.url);
 
+/**
+ * Every public package in the monorepo's @keychord directory, except the ones Chord installs
+ * itself: those are already among the installed chords, so there's nothing to offer.
+ */
 export async function readOfficialChordRepos(
   chordsDir = chordsMonorepoUrl,
+  defaultPackagesFile = defaultPackagesUrl,
 ): Promise<OfficialChordRepo[]> {
-  return Promise.all(
-    officialChordPackages.map(async (packageName) => {
-      const pkg = (await Bun.file(new URL(`${packageName}/package.json`, chordsDir)).json()) as {
+  const defaults = Bun.TOML.parse(await Bun.file(defaultPackagesFile).text()) as {
+    packages: Record<string, unknown>;
+  };
+  const builtInPackages = new Set<unknown>(Object.keys(defaults.packages));
+  const manifests = await Array.fromAsync(
+    new Bun.Glob("@keychord/*/package.json").scan(Bun.fileURLToPath(chordsDir)),
+  );
+
+  const repos = await Promise.all(
+    manifests.map(async (manifest) => {
+      const pkg = (await Bun.file(new URL(manifest, chordsDir)).json()) as {
+        name?: unknown;
+        private?: unknown;
         displayName?: unknown;
         description?: unknown;
         categories?: unknown;
         repository?: string | { url?: unknown };
       };
+      if (pkg.private === true || builtInPackages.has(pkg.name)) {
+        return [];
+      }
+
       const url = typeof pkg.repository === "string" ? pkg.repository : pkg.repository?.url;
       if (
+        typeof pkg.name !== "string" ||
         typeof pkg.displayName !== "string" ||
         typeof pkg.description !== "string" ||
         !Array.isArray(pkg.categories) ||
@@ -35,19 +58,23 @@ export async function readOfficialChordRepos(
         !getGitHubSlug(url)
       ) {
         throw new Error(
-          `${packageName}/package.json needs a displayName, description, categories and a GitHub repository.url`,
+          `${manifest} needs a name, displayName, description, categories and a GitHub repository.url`,
         );
       }
 
-      return {
-        packageName,
-        displayName: pkg.displayName,
-        description: pkg.description,
-        categories: pkg.categories,
-        url,
-      };
+      return [
+        {
+          packageName: pkg.name,
+          displayName: pkg.displayName,
+          description: pkg.description,
+          categories: pkg.categories,
+          url,
+        },
+      ];
     }),
   );
+
+  return repos.flat().sort((a, b) => a.displayName.localeCompare(b.displayName, "en"));
 }
 
 if (import.meta.main) {

@@ -113,7 +113,8 @@ pub trait Api {
     async fn toggle_autostart() -> AppResult<()>;
     async fn toggle_menu_bar_icon() -> AppResult<()>;
     async fn toggle_dock_icon() -> AppResult<()>;
-    async fn toggle_hide_guide_by_default() -> AppResult<()>;
+    async fn toggle_hide_hint_panel_by_default() -> AppResult<()>;
+    async fn toggle_settings_sidebar() -> AppResult<()>;
     async fn quit_app() -> AppResult<()>;
     async fn get_current_states() -> AppResult<String>;
     async fn get_app_logs() -> AppResult<Vec<AppLogEntry>>;

@@ -1,11 +1,14 @@
 import { TanStackDevtools } from "@chord/com.npmjs.tanstack__react-devtools";
+import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { Link, Outlet, useRouterState } from "@chord/com.npmjs.tanstack__react-router";
 import { TanStackRouterDevtoolsPanel } from "@chord/com.npmjs.tanstack__react-router-devtools";
+import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
+import { useSettingsState } from "@chord/dev.improve.chord.lib.state";
 import { LogStreamProvider } from "@chord/dev.improve.chord.routes.settings._components.log-stream";
 import { PermissionsDialog } from "@chord/dev.improve.chord.routes.settings._components.permissions-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -15,8 +18,9 @@ import {
   Compass,
   Keyboard,
   Braces,
+  PanelLeft,
   Settings2,
-  SlidersHorizontal,
+  SquareTerminal,
   Terminal,
   TriangleAlert,
 } from "lucide-react";
@@ -41,11 +45,6 @@ const navigationGroups = [
         label: "Browse",
         to: "/settings/browse",
         icon: Compass,
-      },
-      {
-        label: "Configure",
-        to: "/settings/configure",
-        icon: SlidersHorizontal,
       },
     ],
   },
@@ -73,6 +72,11 @@ const navigationGroups = [
         to: "/settings/global-shortcuts",
         icon: Command,
       },
+      {
+        label: "Command Line",
+        to: "/settings/command-line",
+        icon: SquareTerminal,
+      },
     ],
   },
 ] as const;
@@ -96,6 +100,8 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
       group.items.some((item) => pathname === item.to || pathname === `${item.to}/`),
   );
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
+  const settings = useSettingsState();
+  const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLogPage = pathname === "/settings/log" || pathname === "/settings/log/";
   const currentPage = navigationGroups
@@ -109,12 +115,44 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, isAdvancedPage]);
 
+  // Waiting for the saved state keeps a collapsed sidebar from opening and sliding shut.
+  if (settings.isPending) {
+    return null;
+  }
+
+  const isSidebarCollapsed = settings.data?.isSettingsSidebarCollapsed ?? false;
+  const sidebarToggleLabel = isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar";
+
   return (
-    <div className="settings-window-shell flex min-h-0 h-full w-full">
-      <aside className="settings-window-sidebar flex w-[15.5rem] shrink-0 flex-col border-r border-black/[0.08] text-sidebar-foreground">
+    <div className="settings-window-shell relative flex min-h-0 h-full w-full">
+      {/* Beside the traffic lights, where it stays put whether the sidebar is open or not. */}
+      <button
+        type="button"
+        aria-controls="settings-sidebar"
+        aria-expanded={!isSidebarCollapsed}
+        aria-label={sidebarToggleLabel}
+        title={sidebarToggleLabel}
+        className="absolute left-[84px] top-[17px] z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={() => {
+          toggleSidebarMutation.mutate();
+        }}
+      >
+        <PanelLeft className="size-4" strokeWidth={1.8} />
+      </button>
+
+      <aside
+        id="settings-sidebar"
+        inert={isSidebarCollapsed}
+        data-collapsed={isSidebarCollapsed || undefined}
+        className="settings-window-sidebar flex w-[15.5rem] shrink-0 select-none flex-col overflow-hidden border-r border-black/[0.08] text-sidebar-foreground transition-[width] duration-200 ease-out motion-reduce:transition-none data-collapsed:w-0 data-collapsed:border-r-0"
+      >
         <div className="h-[50px] shrink-0" onMouseDown={handleTitleBarMouseDown} />
 
-        <nav aria-label="Settings" className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-4 pt-1">
+        {/* Fixed width, so the links are clipped as the sidebar closes instead of reflowing. */}
+        <nav
+          aria-label="Settings"
+          className="min-h-0 w-[calc(15.5rem-1px)] flex-1 overflow-y-auto px-2.5 pb-4 pt-1"
+        >
           {navigationGroups.map((group) => (
             <Collapsible
               key={group.label}
@@ -161,7 +199,8 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
 
       <main className="settings-content-surface flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
         <header
-          className="flex h-[62px] shrink-0 items-center px-4"
+          data-sidebar-collapsed={isSidebarCollapsed || undefined}
+          className="flex h-[62px] shrink-0 items-center px-4 transition-[padding] duration-200 ease-out motion-reduce:transition-none data-sidebar-collapsed:pl-[120px]"
           onMouseDown={handleTitleBarMouseDown}
         >
           <h1 className="settings-page-title cursor-default select-none">

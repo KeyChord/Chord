@@ -28,6 +28,7 @@
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/inter";
 
 @source '../../../packages/dev/improve/chord';
@@ -116,6 +117,8 @@
 }
 @theme inline {
   --font-sans: "Geist Variable", sans-serif;
+  /* Used for keycaps: its slashed zero keeps 0 distinct from O. ui-monospace draws the key symbols it lacks, such as ↩. */
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -165,8 +168,7 @@
   --settings-label-tracking: 0.07px;
   --settings-description-font: 400 9.7px/13px "Inter Variable", sans-serif;
   --settings-description-tracking: 0.25px;
-  --settings-key-font: 510 9.7px/13px "Inter Variable", sans-serif;
-  --settings-key-tracking: 0.31px;
+  --settings-key-font: 510 9.7px/13px "Geist Mono Variable", ui-monospace, monospace;
 }
 
 .settings-window-shell {
@@ -365,7 +367,7 @@
   background: var(--settings-key);
   color: var(--settings-key-foreground);
   font: var(--settings-key-font);
-  letter-spacing: var(--settings-key-tracking);
+  letter-spacing: 0;
   word-spacing: normal;
 }
 .shortcut-key[data-symbol] {

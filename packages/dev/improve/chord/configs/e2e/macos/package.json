@@ -9,6 +9,7 @@
   "imports": {
     "#chord-app": "./chord-app.ts",
     "#fresh-mac": "./fresh-mac.ts",
+    "#gatekeeper": "./gatekeeper.ts",
     "#golden": "./golden.ts",
     "#guest": "./guest.ts",
     "#journey": "./journey.ts",

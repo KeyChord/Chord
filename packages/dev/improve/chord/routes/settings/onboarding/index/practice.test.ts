@@ -13,9 +13,9 @@ const run = (events: PracticeEvent[]) =>
 
 const enter: PracticeEvent = { type: 'mode', chord: true };
 const leave: PracticeEvent = { type: 'mode', chord: false };
-const typed = (...input: string[]): PracticeEvent => ({ type: 'input', input, executed: null, failed: false });
-const executed = (...keys: string[]): PracticeEvent => ({ type: 'input', input: [], executed: keys, failed: false });
-const failed = (...keys: string[]): PracticeEvent => ({ type: 'input', input: [], executed: keys, failed: true });
+const typed = (...input: string[]): PracticeEvent => ({ type: 'input', input, executed: null, error: null });
+const executed = (...keys: string[]): PracticeEvent => ({ type: 'input', input: [], executed: keys, error: null });
+const failed = (...keys: string[]): PracticeEvent => ({ type: 'input', input: [], executed: keys, error: 'No chord found' });
 
 test('reads the keys Chord publishes as what they type', () => {
 	expect(keysToText(['Slash', 'KeyS', 'Digit1', 'Comma'])).toBe('/s1,');
@@ -63,6 +63,21 @@ test('keys that are no chord at all explain what happened', () => {
 
 test('the right keys failing to run do not count', () => {
 	expect(run([enter, failed('Slash', 'KeyS')]).ran).toBe(false);
+});
+
+test('the right keys that Chord cannot run are not called the wrong keys', () => {
+	const state = run([enter, typed('Slash'), typed('Slash', 'KeyS'), failed('Slash', 'KeyS'), typed(), leave]);
+	expect(state.ran).toBe(false);
+	expect(state.hint).toBe('did-not-run');
+	expect(state.error).toBe('No chord found');
+});
+
+test('the right keys cleared without running are not called the wrong keys', () => {
+	expect(run([enter, typed('Slash', 'KeyS'), typed(), leave]).hint).toBe('did-not-run');
+});
+
+test('trying again forgets why the last attempt could not run', () => {
+	expect(run([enter, failed('Slash', 'KeyS'), leave, enter]).error).toBeNull();
 });
 
 test('trying again clears the last hint and keys', () => {

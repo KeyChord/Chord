@@ -1,6 +1,6 @@
 import type { Chord, ChordHint, ChordReference } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
-import { Kbd } from '@chord/dev.improve.chord.components.ui.kbd';
+import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
 import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState } from '@chord/dev.improve.chord.lib.state';
 import { emit, listen } from '@tauri-apps/api/event';
 import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
@@ -106,7 +106,7 @@ function ChordKeyRow({
 					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
 				}}
 				className={cn(
-					'shrink-0 rounded-md border font-mono shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
+					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
 						? block
@@ -117,7 +117,7 @@ function ChordKeyRow({
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
-				{token}
+				<KeyLabel label={token} />
 			</Kbd>
 			{error
 				? <div role="alert" className="line-clamp-2 max-w-80 text-red-600 dark:text-red-400" style={{ fontSize: `${descriptionFontSize}px` }}>{error}</div>
@@ -512,7 +512,7 @@ export function ChordsPageContent({
 											<Kbd
 												key={`${index}-${token}`}
 												className={cn(
-													'h-7 min-w-7 shrink-0 rounded-md border px-1.5 font-mono text-sm shadow-sm',
+													'h-7 min-w-7 shrink-0 rounded-md border px-1.5 text-sm shadow-sm',
 													block
 														? blockKeyClassName(block)
 														: showsBuffer
@@ -524,13 +524,13 @@ export function ChordsPageContent({
 													index + 1 < floatingDisplayTokens.length && floatingBlockEnds.includes(index + 1) && 'mr-1.5',
 												)}
 											>
-											{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={token} /> : token}
+											{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={token} /> : <KeyLabel label={token} />}
 											</Kbd>
 										);
 									}) : (
 									<Kbd
 										aria-label="No key pressed"
-										className="h-7 min-w-7 shrink-0 rounded-md border border-border/80 bg-background/95 px-1.5 font-mono text-sm text-foreground shadow-sm"
+										className="h-7 min-w-7 shrink-0 rounded-md border border-border/80 bg-background/95 px-1.5 text-sm text-foreground shadow-sm"
 									/>
 								)}
 								</div>

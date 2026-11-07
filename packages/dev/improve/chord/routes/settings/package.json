@@ -11,8 +11,11 @@
 	"dependencies": {
 		"@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
+		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
+		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
 		"@tauri-apps/api": "^2.12.4",

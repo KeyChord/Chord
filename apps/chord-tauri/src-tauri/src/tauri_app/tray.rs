@@ -7,8 +7,9 @@ use crate::app::AppHandleExt;
 use crate::constants::OPEN_INSPECTOR_MENU_ID;
 
 pub const TRAY_ID: &str = "chord-tray";
-// Black-on-transparent template image, 50×36 px; macOS draws tray icons
-// 18 pt tall, so this is a crisp 2× bitmap.
+// Black-on-transparent template image, 36×36 px; tray icons are drawn 18 pt
+// tall with their width following the aspect ratio, so this is a square 2×
+// bitmap. The glyph is 14 pt, the visual size of the system's menu bar icons.
 const TRAY_ICON_BYTES: &[u8] =
     include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/tray.png"));
 

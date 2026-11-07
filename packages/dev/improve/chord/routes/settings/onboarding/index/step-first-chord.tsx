@@ -2,10 +2,19 @@ import { useMutation, useQuery } from '@chord/com.npmjs.tanstack__react-query';
 import { taurpc, type InstalledApp } from '@chord/dev.improve.chord.api.taurpc';
 import { Button } from '@chord/dev.improve.chord.components.ui.button';
 import { Input } from '@chord/dev.improve.chord.components.ui.input';
+import { useChordPackageManagerState } from '@chord/dev.improve.chord.lib.state';
+import type { ChordReference, ThirdPartyPackage } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Loader2, Search } from 'lucide-react';
 import { useState } from 'react';
-import { chordSequence, GLOBAL_PREFIX, sanitizeChordKeys, suggestChordKeys } from '#first-chord';
+import {
+	chordSequence,
+	findBlockedChordsFolder,
+	findChordConflict,
+	GLOBAL_PREFIX,
+	sanitizeChordKeys,
+	suggestChordKeys,
+} from '#first-chord';
 import { Key } from '#keyboard-map';
 import { Click, StepLayout } from '#step-layout';
 
@@ -50,6 +59,69 @@ export function AppTile({
 	);
 }
 
+/** Where the chord's keys are chosen, and anything that has to change before it can work. */
+export function ChordKeysPanel({
+	appName,
+	keys,
+	conflict,
+	blockedFolder,
+	isAllowing,
+	error,
+	onKeysChange,
+	onAllowFolder,
+}: {
+	appName: string;
+	keys: string;
+	conflict?: ChordReference;
+	blockedFolder?: ThirdPartyPackage;
+	isAllowing: boolean;
+	error?: string;
+	onKeysChange: (keys: string) => void;
+	onAllowFolder: () => void;
+}) {
+	return (
+		<div className="space-y-2 rounded-[12px] border border-black/[0.08] bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
+			<label className="flex items-center gap-2 text-[13.5px] text-foreground">
+				<span>To open <Click>{appName}</Click>, you'll type</span>
+				<Key>{GLOBAL_PREFIX}</Key>
+				<Input
+					aria-label="Letters for this chord"
+					value={keys}
+					onChange={event => onKeysChange(sanitizeChordKeys(event.target.value))}
+					className="w-16 text-center font-medium"
+				/>
+			</label>
+			{conflict
+				? (
+						<p role="alert" className="text-[12.5px] font-medium leading-[19px] text-amber-800 dark:text-amber-300">
+							<span className="font-semibold">{chordSequence(keys)}</span> is already used by <span className="font-semibold">{conflict.chord.name}</span>. Choose a different letter to continue.
+						</p>
+					)
+				: (
+						<p className="text-[12.5px] leading-[19px] text-muted-foreground">
+							Change the letter to anything easy to remember. Starting with <Key>{GLOBAL_PREFIX}</Key> is what makes it work in every app.
+						</p>
+					)}
+			{blockedFolder
+				? (
+						<div role="alert" className="space-y-2 rounded-[10px] bg-amber-500/10 p-3 text-[12.5px] leading-[19px] text-amber-800 dark:text-amber-300">
+							<p>
+								Chord found a chords folder from an earlier install that it hasn't been allowed to use, so a new chord wouldn't run. Chords in this folder can run code on your Mac, so only allow it if you recognize it.
+							</p>
+							<code className="block break-all text-[11.5px]">{blockedFolder.path}</code>
+							<Button type="button" size="sm" variant="outline" disabled={isAllowing} onClick={onAllowFolder}>
+								{isAllowing ? 'Allowing…' : 'Allow This Folder'}
+							</Button>
+						</div>
+					)
+				: null}
+			{error
+				? <p role="alert" className="text-[12.5px] font-medium text-red-600 dark:text-red-400">{error}</p>
+				: null}
+		</div>
+	);
+}
+
 export function FirstChordStep({
 	stepNumber,
 	stepCount,
@@ -76,6 +148,17 @@ export function FirstChordStep({
 		onError: () => {},
 		onSuccess: (_, { app, sequence }) => onCreated({ sequence, appName: app.name }),
 	});
+	const allowFolder = useMutation({
+		mutationFn: (folder: ThirdPartyPackage) => taurpc.setPackageApprovals([folder.identity], true),
+		onError: () => {},
+	});
+	const { data: packageManager } = useChordPackageManagerState();
+	const existingChords = packageManager?.packages.flatMap(pkg => pkg.globalChords) ?? [];
+	const blockedFolder = packageManager ? findBlockedChordsFolder(packageManager) : undefined;
+	// A chord shows up in this list as soon as it's saved, and doesn't conflict with itself.
+	const conflict = keys && !add.isPending && !add.isSuccess
+		? findChordConflict(chordSequence(keys), existingChords)
+		: undefined;
 
 	const normalizedSearch = search.trim().toLowerCase();
 	const visible = (apps.data ?? [])
@@ -84,7 +167,7 @@ export function FirstChordStep({
 
 	function select(app: InstalledApp) {
 		setSelected(app);
-		setKeys(suggestChordKeys(app.name));
+		setKeys(suggestChordKeys(app.name, existingChords));
 		add.reset();
 	}
 
@@ -98,7 +181,7 @@ export function FirstChordStep({
 				<Button
 					type="button"
 					size="lg"
-					disabled={!selected || !keys || add.isPending}
+					disabled={!selected || !keys || !packageManager || conflict !== undefined || blockedFolder !== undefined || add.isPending}
 					onClick={() => {
 						if (selected) add.mutate({ app: selected, sequence: chordSequence(keys) });
 					}}
@@ -147,27 +230,27 @@ export function FirstChordStep({
 			</div>
 			{selected
 				? (
-						<div className="space-y-2 rounded-[12px] border border-black/[0.08] bg-black/[0.02] p-4 dark:border-white/10 dark:bg-white/[0.03]">
-							<label className="flex items-center gap-2 text-[13.5px] text-foreground">
-								<span>To open <Click>{selected.name}</Click>, you'll type</span>
-								<Key>{GLOBAL_PREFIX}</Key>
-								<Input
-									aria-label="Letters for this chord"
-									value={keys}
-									onChange={(event) => {
-										setKeys(sanitizeChordKeys(event.target.value));
-										add.reset();
-									}}
-									className="w-16 text-center font-medium"
-								/>
-							</label>
-							<p className="text-[12.5px] leading-[19px] text-muted-foreground">
-								Change the letter to anything easy to remember. Starting with <Key>{GLOBAL_PREFIX}</Key> is what makes it work in every app.
-							</p>
-							{add.isError
-								? <p role="alert" className="text-[12.5px] font-medium text-red-600 dark:text-red-400">{errorMessage(add.error)}. Try a different letter.</p>
-								: null}
-						</div>
+						<ChordKeysPanel
+							appName={selected.name}
+							keys={keys}
+							conflict={conflict}
+							blockedFolder={blockedFolder}
+							isAllowing={allowFolder.isPending}
+							error={
+								allowFolder.isError
+									? errorMessage(allowFolder.error)
+									: add.isError
+										? `${errorMessage(add.error)}. Try a different letter.`
+										: undefined
+							}
+							onKeysChange={(next) => {
+								setKeys(next);
+								add.reset();
+							}}
+							onAllowFolder={() => {
+								if (blockedFolder) allowFolder.mutate(blockedFolder);
+							}}
+						/>
 					)
 				: null}
 		</StepLayout>

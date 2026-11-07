@@ -7,7 +7,7 @@ function Kbd({ children, className, ...props }: ComponentProps<"kbd">) {
     <HeroKbd
       {...props}
       data-slot="kbd"
-      className={cn("h-5 min-w-5 justify-center rounded-sm px-1 font-sans text-xs", className)}
+      className={cn("h-5 min-w-5 justify-center rounded-sm px-1 font-mono text-xs", className)}
     >
       {children}
     </HeroKbd>

@@ -20,6 +20,9 @@ impl AppSingleton for AppSettings {
         if let Err(error) = self.refresh_cli_installation() {
             log::warn!("Could not refresh command line installation: {error:#}");
         }
+        if let Err(error) = self.load_settings_sidebar() {
+            log::warn!("Could not restore the Settings sidebar: {error:#}");
+        }
 
         let state = self.handle.app_state();
         let repos_store = &state.chord_package_manager().registry.git.git_repos_store;

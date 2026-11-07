@@ -41,8 +41,9 @@ interface OfficialChordRepo {
 type InstallFilter = "all" | "installed" | "not-installed";
 
 const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
-const categories = [...new Set(officialChordRepos.flatMap((repo) => repo.categories))];
-const requiredRepoSlug = "keychord/chords-chord";
+const categories = [...new Set(officialChordRepos.flatMap((repo) => repo.categories))].sort(
+  (a, b) => a.localeCompare(b, "en"),
+);
 // Official chord package mirrors and community chord package repos carry the `chordpack` topic.
 const communityChordPackagesUrl = "https://github.com/search?q=topic%3Achordpack&type=repositories";
 
@@ -246,8 +247,6 @@ export function SettingsBrowsePageContent({
                       <Download />
                       {isInstalling ? "Installing..." : "Install"}
                     </Button>
-                  ) : installedRepo.slug.toLowerCase() === requiredRepoSlug ? (
-                    <Badge variant="outline">Required</Badge>
                   ) : (
                     <Button
                       type="button"
@@ -295,6 +294,10 @@ export function SettingsBrowsePageContent({
 }
 
 function CommunityChordPackages() {
+  const openCommunityPackages = useMutation({
+    mutationFn: () => openUrl(communityChordPackagesUrl),
+  });
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
       <div className="space-y-1">
@@ -325,7 +328,7 @@ function CommunityChordPackages() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                void openUrl(communityChordPackagesUrl);
+                openCommunityPackages.mutate();
               }}
             >
               Open GitHub

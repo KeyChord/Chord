@@ -3,7 +3,7 @@
  * guidance reacts to what they actually did. Every event matters: a chord that runs is reported
  * and cleared in quick succession, so this works from the event stream and not rendered state.
  */
-export type PracticeHint = 'released-too-soon' | 'wrong-keys' | null;
+export type PracticeHint = 'released-too-soon' | 'wrong-keys' | 'did-not-run' | null;
 
 export interface PracticeProgress {
 	/** Caps Lock and Space were pressed and Space is still held. */
@@ -18,6 +18,8 @@ export interface PracticeProgress {
 	/** The target chord ran. */
 	ran: boolean;
 	hint: PracticeHint;
+	/** Why Chord said the last keys couldn't run. */
+	error: string | null;
 }
 
 export const initialPractice: PracticeProgress = {
@@ -26,6 +28,7 @@ export const initialPractice: PracticeProgress = {
 	attempted: '',
 	ran: false,
 	hint: null,
+	error: null,
 };
 
 export type PracticeEvent =
@@ -34,7 +37,7 @@ export type PracticeEvent =
 		type: 'input';
 		input: readonly string[];
 		executed: readonly string[] | null;
-		failed: boolean;
+		error: string | null;
 	};
 
 const NAMED_KEYS: Record<string, string> = {
@@ -64,6 +67,12 @@ export function keysToText(keys: readonly string[]) {
 	return keys.map(keyToText).join('');
 }
 
+/** What to say when Space comes up and the target chord hasn't run. */
+function missedHint(attempted: string, target: string): PracticeHint {
+	if (attempted === '') return 'released-too-soon';
+	return attempted === target ? 'did-not-run' : 'wrong-keys';
+}
+
 export function advancePractice(
 	state: PracticeProgress,
 	event: PracticeEvent,
@@ -78,15 +87,15 @@ export function advancePractice(
 			...state,
 			inChordMode: false,
 			typed: state.attempted,
-			hint: state.attempted === '' ? 'released-too-soon' : 'wrong-keys',
+			hint: missedHint(state.attempted, target),
 		};
 	}
 	if (event.executed) {
 		const executed = keysToText(event.executed);
-		if (!event.failed && executed === target) {
+		if (event.error === null && executed === target) {
 			return { ...state, typed: executed, attempted: executed, ran: true, hint: null };
 		}
-		return { ...state, typed: executed, attempted: executed };
+		return { ...state, typed: executed, attempted: executed, error: event.error };
 	}
 	const typed = keysToText(event.input);
 	if (!state.inChordMode) return state;

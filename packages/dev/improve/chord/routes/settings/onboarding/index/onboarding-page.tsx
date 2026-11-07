@@ -1,4 +1,4 @@
-import { useQuery } from '@chord/com.npmjs.tanstack__react-query';
+import { useMutation, useQuery } from '@chord/com.npmjs.tanstack__react-query';
 import { useNavigate } from '@chord/com.npmjs.tanstack__react-router';
 import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
 import { usePermissionsState } from '@chord/dev.improve.chord.lib.state';
@@ -35,8 +35,12 @@ export function OnboardingPage() {
 	}, [step, isGranted]);
 
 	const finish = useFinishOnboarding(() => void navigate({ to: '/settings/chords' }));
+	const skip = useMutation({
+		mutationFn: () => taurpc.setOnboardingComplete(true),
+		onSettled: () => void navigate({ to: '/settings/general' }),
+	});
 	const skipSetup = () => {
-		void taurpc.setOnboardingComplete(true).finally(() => void navigate({ to: '/settings/general' }));
+		skip.mutate();
 	};
 	const numbers = (current: Step) => ({
 		stepNumber: NUMBERED_STEPS.indexOf(current) + 1,

@@ -14,6 +14,7 @@ pub struct AppSettingsState {
     pub is_chord_panel_hidden_by_default: bool,
     /// The guided first-run setup has been finished or skipped.
     pub is_onboarding_complete: bool,
+    pub is_settings_sidebar_collapsed: bool,
 }
 
 impl Default for AppSettingsState {
@@ -31,6 +32,7 @@ impl Default for AppSettingsState {
             show_dock_icon: true,
             is_chord_panel_hidden_by_default: false,
             is_onboarding_complete: false,
+            is_settings_sidebar_collapsed: false,
         }
     }
 }

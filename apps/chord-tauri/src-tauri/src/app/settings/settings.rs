@@ -50,9 +50,38 @@ impl AppSettings {
         })
     }
 
-    pub fn toggle_hide_guide_by_default(&self) -> anyhow::Result<()> {
+    pub fn toggle_hide_hint_panel_by_default(&self) -> anyhow::Result<()> {
         self.update_state(|state| {
             state.is_chord_panel_hidden_by_default = !state.is_chord_panel_hidden_by_default;
+        })
+    }
+
+    pub fn load_settings_sidebar(&self) -> anyhow::Result<()> {
+        let collapsed = Self::read_bool_setting(
+            &self.handle,
+            SETTINGS_SIDEBAR_COLLAPSED_KEY,
+            AppSettingsState::default().is_settings_sidebar_collapsed,
+        )?;
+        self.observable.set_state(|state| AppSettingsState {
+            is_settings_sidebar_collapsed: collapsed,
+            ..state
+        })
+    }
+
+    /// Writes only its own key: `update_state` would re-apply the Dock and menu bar on every click.
+    pub fn toggle_settings_sidebar(&self) -> anyhow::Result<()> {
+        self.observable.try_set_state(|mut state| {
+            state.is_settings_sidebar_collapsed = !state.is_settings_sidebar_collapsed;
+            let store = self
+                .handle
+                .store(APP_STATE_STORE_PATH)
+                .context("failed to open app state store")?;
+            store.set(
+                SETTINGS_SIDEBAR_COLLAPSED_KEY,
+                state.is_settings_sidebar_collapsed,
+            );
+            store.save().context("failed to save app state store")?;
+            Ok(state)
         })
     }
 
@@ -108,7 +137,7 @@ impl AppSettings {
     fn apply_state(&self, state: &AppSettingsState) -> anyhow::Result<()> {
         self.apply_menu_bar_icon_visibility(state.show_menu_bar_icon)?;
         self.apply_dock_icon_visibility(state.show_dock_icon)?;
-        // self.apply_guide_visibility(!state.hide_guide_by_default)?;
+        // self.apply_hint_panel_visibility(!state.is_chord_panel_hidden_by_default)?;
         Ok(())
     }
 
@@ -147,7 +176,7 @@ impl AppSettings {
             )?,
             is_chord_panel_hidden_by_default: Self::read_bool_setting(
                 handle,
-                HIDE_GUIDE_BY_DEFAULT_KEY,
+                HIDE_HINT_PANEL_BY_DEFAULT_KEY,
                 defaults.is_chord_panel_hidden_by_default,
             )?,
             is_onboarding_complete: Self::read_bool_setting(
@@ -155,10 +184,14 @@ impl AppSettings {
                 ONBOARDING_COMPLETE_KEY,
                 defaults.is_onboarding_complete,
             )?,
+            is_settings_sidebar_collapsed: Self::read_bool_setting(
+                handle,
+                SETTINGS_SIDEBAR_COLLAPSED_KEY,
+                defaults.is_settings_sidebar_collapsed,
+            )?,
         })
     }
 
-    #[allow(dead_code)]
     fn read_bool_setting(handle: &AppHandle, key: &str, default: bool) -> anyhow::Result<bool> {
         let store = handle
             .store(APP_STATE_STORE_PATH)
@@ -180,7 +213,7 @@ impl AppSettings {
         store.set(SHOW_MENU_BAR_ICON_KEY, state.show_menu_bar_icon);
         store.set(SHOW_DOCK_ICON_KEY, state.show_dock_icon);
         store.set(
-            HIDE_GUIDE_BY_DEFAULT_KEY,
+            HIDE_HINT_PANEL_BY_DEFAULT_KEY,
             state.is_chord_panel_hidden_by_default,
         );
         store.set(ONBOARDING_COMPLETE_KEY, state.is_onboarding_complete);
@@ -203,5 +236,7 @@ fn cli_executable() -> anyhow::Result<std::path::PathBuf> {
 
 const SHOW_MENU_BAR_ICON_KEY: &str = "showMenuBarIcon";
 const SHOW_DOCK_ICON_KEY: &str = "showDockIcon";
-const HIDE_GUIDE_BY_DEFAULT_KEY: &str = "hideGuideByDefault";
+// Keeps the Hint Panel's former name: this key is already saved on existing installs.
+const HIDE_HINT_PANEL_BY_DEFAULT_KEY: &str = "hideGuideByDefault";
 const ONBOARDING_COMPLETE_KEY: &str = "onboardingComplete";
+const SETTINGS_SIDEBAR_COLLAPSED_KEY: &str = "settingsSidebarCollapsed";

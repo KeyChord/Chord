@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@chord/com.npmjs.tanstack__react-query';
+import { officialChordReposData } from '@chord/dev.improve.chord.data.official-chord-repos';
 import { renderToString } from 'react-dom/server';
 
 // Mutations never run during server rendering; TauRPC needs the browser's Proxy constructor.
@@ -51,7 +52,8 @@ test('categories appear once each as filters after All', () => {
 	const html = render({});
 	const filters = html.match(/<div[^>]*aria-label="Category"[^>]*>(.*?)<\/div>/)![1]!;
 	const labels = [...filters.matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(match => match[1]);
-	expect(labels).toEqual(['All', 'Browsers', 'Editors', 'Terminals', 'Window Management']);
+	const categories = [...new Set(officialChordReposData.flatMap(repo => repo.categories))];
+	expect(labels).toEqual(['All', ...categories.sort((a, b) => a.localeCompare(b, 'en'))]);
 });
 
 test('installed repos show their commit and uninstall action; linked and pinned repos say so', () => {
@@ -78,7 +80,8 @@ test('install all is disabled once every repo is installed', () => {
 	expect(installAllButton(render({}))).not.toContain('disabled=""');
 
 	const all = Object.fromEntries(
-		['chords-chromium', 'chords-vscode', 'chords-jetbrains', 'chords-terminal', 'chords-warp', 'chords-aerospace']
+		officialChordReposData
+			.map(repo => repo.url.split('/').at(-1)!)
 			.map(name => [`KeyChord/${name}`, gitRepo(name)]),
 	);
 	expect(installAllButton(render(all))).toContain('disabled=""');

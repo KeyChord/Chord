@@ -33,7 +33,7 @@ function usePractice(target: string) {
 					type: 'input',
 					input: payload.input,
 					executed: payload.selectedInputEvent?.input ?? null,
-					failed: Boolean(payload.error),
+					error: payload.error ?? null,
 				});
 			}),
 		];
@@ -110,15 +110,21 @@ export function PracticeView({
 									You let go of space before typing. Press caps lock and space again, and keep holding space until you've typed the letters.
 								</p>
 							)
-						: progress.hint === 'wrong-keys'
+						: progress.hint === 'did-not-run'
 							? (
 									<p className="rounded-[10px] bg-amber-500/10 p-3 text-amber-800 dark:text-amber-300">
-										That was <span className="font-semibold">{progress.typed}</span>, not <span className="font-semibold">{sequence}</span>. No harm done, so give it another try.
+										You typed <span className="font-semibold">{sequence}</span> correctly, but Chord couldn't run it{progress.error ? <>: {progress.error}</> : null}. You can skip this for now and check the chord in Settings.
 									</p>
 								)
-							: progress.inChordMode
-								? <p className="p-3 text-muted-foreground">While you hold space, a list of your chords shows up on the screen, so you never have to memorize them.</p>
-								: <p className="p-3 text-muted-foreground">Don't worry, caps lock still works. Tap it by itself to turn capital letters on or off.</p>}
+							: progress.hint === 'wrong-keys'
+								? (
+										<p className="rounded-[10px] bg-amber-500/10 p-3 text-amber-800 dark:text-amber-300">
+											That was <span className="font-semibold">{progress.typed}</span>, not <span className="font-semibold">{sequence}</span>. No harm done, so give it another try.
+										</p>
+									)
+								: progress.inChordMode
+									? <p className="p-3 text-muted-foreground">While you hold space, a list of your chords shows up on the screen, so you never have to memorize them.</p>
+									: <p className="p-3 text-muted-foreground">Don't worry, caps lock still works. Tap it by itself to turn capital letters on or off.</p>}
 			</div>
 		</>
 	);

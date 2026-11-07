@@ -1,7 +1,7 @@
 import { Button } from '@chord/dev.improve.chord.components.ui.button';
 import { ArrowRight } from 'lucide-react';
 import { Key } from '#keyboard-map';
-import { StepLayout } from '#step-layout';
+import { Click, Instruction, StepLayout } from '#step-layout';
 
 export function WelcomeStep({ onContinue, onSkip }: { onContinue: () => void; onSkip: () => void }) {
 	return (
@@ -21,11 +21,22 @@ export function WelcomeStep({ onContinue, onSkip }: { onContinue: () => void; on
 			)}
 		>
 			<div className="rounded-[12px] border border-black/[0.08] bg-black/[0.02] p-4 text-[13.5px] leading-[24px] text-foreground dark:border-white/10 dark:bg-white/[0.03]">
-				<p className="mb-1 font-semibold">A chord looks like this:</p>
-				<p>
-					Hold <Key>caps lock</Key> + <Key>space</Key>, type <Key>/</Key> <Key>s</Key>, and let go.
-				</p>
-				<p className="text-muted-foreground">Safari opens. That's it.</p>
+				<p className="mb-2 font-semibold">A chord looks like this:</p>
+				<ol className="space-y-2">
+					<Instruction number={1} state="current">
+						Press <Key>caps lock</Key> and <Key>space</Key> together.
+					</Instruction>
+					<Instruction number={2} state="current">
+						Let go of caps lock but <Click>keep holding space</Click>.
+					</Instruction>
+					<Instruction number={3} state="current">
+						Type <Key>/</Key> <Key>s</Key>
+					</Instruction>
+					<Instruction number={4} state="current">
+						Let go of <Key>space</Key>.
+					</Instruction>
+				</ol>
+				<p className="mt-2 text-muted-foreground">Safari opens. That's it.</p>
 			</div>
 			<p className="text-[13.5px] leading-[21px] text-muted-foreground">
 				Setup takes about two minutes. We'll tell you what to click at every step, and by the end

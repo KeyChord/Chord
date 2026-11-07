@@ -14,9 +14,9 @@ import { readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { makeDmg } from "@chord/dev.improve.chord.configs.release.macos/make-dmg";
-import { isNotarized } from "@chord/dev.improve.chord.configs.release.macos/notarize";
 import { $ } from "bun";
 import { grantAccessibility, installDmg, launch, quit } from "#chord-app";
+import { checkDownload } from "#gatekeeper";
 import { createGolden, DEFAULT_IMAGE, GOLDEN_VM } from "#golden";
 import { Guest } from "#guest";
 import { JOURNEY_ENV, type JourneyState } from "#journey";
@@ -188,6 +188,20 @@ async function resolveDmg(): Promise<string> {
   return newest;
 }
 
+/**
+ * The DMG to test, checked on this Mac before a VM boots: nothing in the app may load code from
+ * outside it, and a production release must be notarized. Whether XProtect would refuse it doesn't
+ * depend on the VM, whose macOS may not run that check.
+ */
+async function resolveCheckedDmg(): Promise<{ dmg: string; notarized: boolean }> {
+  const dmg = await resolveDmg();
+  const notarized = await checkDownload(dmg, { requireNotarized: values.release === "prod" });
+  console.log(
+    `${dmg}: loads only from itself and the system; ${notarized ? "notarized" : "not notarized, so Gatekeeper won't check it"}`,
+  );
+  return { dmg, notarized };
+}
+
 /** Installs the DMG and grants Accessibility; the app is not started. */
 async function install(guest: Guest, dmg: string) {
   console.log(`installing ${dmg}`);
@@ -205,7 +219,7 @@ function testFiles(): string[] {
 }
 
 async function test() {
-  const dmg = await resolveDmg();
+  const { dmg } = await resolveCheckedDmg();
   const id = stamp();
   const artifacts = join(E2E_DIR, "runs", id);
   // A VM started by `up` is reused; otherwise each run gets a fresh clone.
@@ -268,7 +282,7 @@ async function test() {
 }
 
 async function up() {
-  const dmg = await resolveDmg();
+  const { dmg } = await resolveCheckedDmg();
   const id = stamp();
   const name = `chord-e2e-${id}`;
   const artifacts = join(E2E_DIR, "runs", id);
@@ -343,7 +357,9 @@ async function fresh() {
  */
 async function journey() {
   if (values.intel && values.build) throw new Error("--intel can't build here; pass --dmg or --release");
-  const dmg = values.published ? undefined : await resolveDmg();
+  // The published download is checked in the journey, once Safari has it.
+  const local = values.published ? undefined : await resolveCheckedDmg();
+  const dmg = local?.dmg;
   const id = stamp();
   const name = `chord-journey-${id}`;
   const artifacts = join(E2E_DIR, "runs", id);
@@ -370,7 +386,7 @@ async function journey() {
       host: vm.host,
       vncUrl: vm.vncUrl,
       siteUrl: server?.url ?? values.site!,
-      checkedByGatekeeper: dmg === undefined || (await isNotarized(dmg)),
+      checkedByGatekeeper: local?.notarized ?? true,
       intel: values.intel === true,
       artifacts,
     };

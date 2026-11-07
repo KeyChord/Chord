@@ -1,5 +1,23 @@
 [
 	{
+		"packageName": "@keychord/chords-aerospace",
+		"displayName": "AeroSpace Chords",
+		"description": "Global chords that run commands for the AeroSpace tiling window manager.",
+		"categories": [
+			"Window Management"
+		],
+		"url": "https://github.com/KeyChord/chords-aerospace"
+	},
+	{
+		"packageName": "@keychord/chords-betterdisplay",
+		"displayName": "BetterDisplay Chords",
+		"description": "Set the resolution of the display under the pointer with BetterDisplay.",
+		"categories": [
+			"Utilities"
+		],
+		"url": "https://github.com/KeyChord/chords-betterdisplay"
+	},
+	{
 		"packageName": "@keychord/chords-chromium",
 		"displayName": "Chromium Chords",
 		"description": "Chords for Google Chrome and other Chromium-based browsers, including Brave, Edge, Opera and Vivaldi.",
@@ -9,13 +27,40 @@
 		"url": "https://github.com/KeyChord/chords-chromium"
 	},
 	{
-		"packageName": "@keychord/chords-vscode",
-		"displayName": "VSCode Chords",
-		"description": "Chords for VSCode and its forks, including Cursor.",
+		"packageName": "@keychord/chords-click",
+		"displayName": "Click Chords",
+		"description": "Mouse clicks, drags and pointer moves by coordinates, in the focused window or on the screen.",
 		"categories": [
-			"Editors"
+			"Input"
 		],
-		"url": "https://github.com/KeyChord/chords-vscode"
+		"url": "https://github.com/KeyChord/chords-click"
+	},
+	{
+		"packageName": "@keychord/chords-dock",
+		"displayName": "Dock Chords",
+		"description": "Move keyboard focus to the macOS Dock and between its apps.",
+		"categories": [
+			"macOS"
+		],
+		"url": "https://github.com/KeyChord/chords-dock"
+	},
+	{
+		"packageName": "@keychord/chords-instagram",
+		"displayName": "Instagram Chords",
+		"description": "Chords for Instagram installed as a web app from Brave.",
+		"categories": [
+			"Social"
+		],
+		"url": "https://github.com/KeyChord/chords-instagram"
+	},
+	{
+		"packageName": "@keychord/chords-com.apple.ScreenContinuity",
+		"displayName": "iPhone Mirroring Chords",
+		"description": "Chords for iPhone Mirroring (com.apple.ScreenContinuity).",
+		"categories": [
+			"macOS"
+		],
+		"url": "https://github.com/KeyChord/chords-com.apple.ScreenContinuity"
 	},
 	{
 		"packageName": "@keychord/chords-jetbrains",
@@ -27,6 +72,78 @@
 		"url": "https://github.com/KeyChord/chords-jetbrains"
 	},
 	{
+		"packageName": "@keychord/chords-livesplit",
+		"displayName": "LiveSplit Chords",
+		"description": "Chords for the LiveSplit One desktop app.",
+		"categories": [
+			"Utilities"
+		],
+		"url": "https://github.com/KeyChord/chords-livesplit"
+	},
+	{
+		"packageName": "@keychord/chords-modifiers",
+		"displayName": "Modifier Chords",
+		"description": "Global chords that press a keyboard shortcut in whichever app is focused.",
+		"categories": [
+			"Input"
+		],
+		"url": "https://github.com/KeyChord/chords-modifiers"
+	},
+	{
+		"packageName": "@keychord/chords-monitors",
+		"displayName": "Monitor Chords",
+		"description": "Focus monitors by number, order or direction.",
+		"categories": [
+			"Window Management"
+		],
+		"url": "https://github.com/KeyChord/chords-monitors"
+	},
+	{
+		"packageName": "@keychord/chords-navigation",
+		"displayName": "Navigation Chords",
+		"description": "Go back, continue, dismiss dialogs and press numbered options in whichever app is focused, through Accessibility.",
+		"categories": [
+			"Input"
+		],
+		"url": "https://github.com/KeyChord/chords-navigation"
+	},
+	{
+		"packageName": "@keychord/chords-raycast",
+		"displayName": "Raycast Chords",
+		"description": "Chords for Raycast: open a query's first result and move through results, pages and sections.",
+		"categories": [
+			"Utilities"
+		],
+		"url": "https://github.com/KeyChord/chords-raycast"
+	},
+	{
+		"packageName": "@keychord/chords-spaces",
+		"displayName": "Spaces Chords",
+		"description": "Switch between macOS Spaces by direction or desktop number.",
+		"categories": [
+			"Window Management"
+		],
+		"url": "https://github.com/KeyChord/chords-spaces"
+	},
+	{
+		"packageName": "@keychord/chords-spotify",
+		"displayName": "Spotify Chords",
+		"description": "Chords for the Spotify desktop app.",
+		"categories": [
+			"Media"
+		],
+		"url": "https://github.com/KeyChord/chords-spotify"
+	},
+	{
+		"packageName": "@keychord/chords-com.apple.systempreferences",
+		"displayName": "System Preferences Chords",
+		"description": "Chords for System Preferences (com.apple.systempreferences).",
+		"categories": [
+			"macOS"
+		],
+		"url": "https://github.com/KeyChord/chords-com.apple.systempreferences"
+	},
+	{
 		"packageName": "@keychord/chords-terminal",
 		"displayName": "Terminal Chords",
 		"description": "Tab chords for basic terminals: Terminal, iTerm2, Ghostty, WezTerm, Alacritty and Hyper.",
@@ -34,6 +151,15 @@
 			"Terminals"
 		],
 		"url": "https://github.com/KeyChord/chords-terminal"
+	},
+	{
+		"packageName": "@keychord/chords-vscode",
+		"displayName": "VSCode Chords",
+		"description": "Chords for VSCode and its forks, including Cursor.",
+		"categories": [
+			"Editors"
+		],
+		"url": "https://github.com/KeyChord/chords-vscode"
 	},
 	{
 		"packageName": "@keychord/chords-warp",
@@ -45,12 +171,39 @@
 		"url": "https://github.com/KeyChord/chords-warp"
 	},
 	{
-		"packageName": "@keychord/chords-aerospace",
-		"displayName": "AeroSpace Chords",
-		"description": "Global chords that run commands for the AeroSpace tiling window manager.",
+		"packageName": "@keychord/chords-web",
+		"displayName": "Web Chords",
+		"description": "Global chords for the active tab in Chrome, Brave, Edge or Arc, such as scrolling.",
+		"categories": [
+			"Browsers"
+		],
+		"url": "https://github.com/KeyChord/chords-web"
+	},
+	{
+		"packageName": "@keychord/chords-whatsapp",
+		"displayName": "WhatsApp Chords",
+		"description": "Chords for the native WhatsApp app, covering chats, Info, groups, calls, settings and more.",
+		"categories": [
+			"Social"
+		],
+		"url": "https://github.com/KeyChord/chords-whatsapp"
+	},
+	{
+		"packageName": "@keychord/chords-windows",
+		"displayName": "Window Chords",
+		"description": "Resize, minimize, hide and quit the focused window or app, or move it to another Space.",
 		"categories": [
 			"Window Management"
 		],
-		"url": "https://github.com/KeyChord/chords-aerospace"
+		"url": "https://github.com/KeyChord/chords-windows"
+	},
+	{
+		"packageName": "@keychord/chords-youtube",
+		"displayName": "YouTube Chords",
+		"description": "Chords for YouTube installed as a web app from Brave.",
+		"categories": [
+			"Media"
+		],
+		"url": "https://github.com/KeyChord/chords-youtube"
 	}
 ]

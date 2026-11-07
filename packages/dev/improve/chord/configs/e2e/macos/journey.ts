@@ -35,6 +35,7 @@ interface Row {
  */
 export class Journey {
   private rows: Row[] = [];
+  private notes: string[] = [];
   private failed: string | undefined;
 
   private constructor(
@@ -44,8 +45,14 @@ export class Journey {
     readonly siteUrl: string,
     readonly checkedByGatekeeper: boolean,
     readonly intel: boolean,
-    private readonly artifacts: string,
+    readonly artifacts: string,
   ) {}
+
+  /** Adds a line to the top of `journey.md`, for what a reader needs to judge the run. */
+  async note(text: string) {
+    this.notes.push(text);
+    await this.writeReport();
+  }
 
   static async open(): Promise<Journey> {
     const file = process.env[JOURNEY_ENV];
@@ -119,6 +126,7 @@ export class Journey {
       "",
       `${this.checkedByGatekeeper ? "Checked by Gatekeeper." : "Not notarized, so without Gatekeeper's check."} ${total} s so far.`,
       "",
+      ...this.notes.flatMap((note) => [note, ""]),
       "| Step | Seconds | Result |",
       "| --- | --- | --- |",
       ...this.rows.map(

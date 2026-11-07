@@ -14,6 +14,7 @@ import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsBrowseIndexRouteImport } from './routes/settings/browse/index'
 import { Route as SettingsChordsIndexRouteImport } from './routes/settings/chords/index'
+import { Route as SettingsCommandLineIndexRouteImport } from './routes/settings/command-line/index'
 import { Route as SettingsConfigureIndexRouteImport } from './routes/settings/configure/index'
 import { Route as SettingsDangerIndexRouteImport } from './routes/settings/danger/index'
 import { Route as SettingsGeneralIndexRouteImport } from './routes/settings/general/index'
@@ -57,6 +58,12 @@ const SettingsChordsIndexRoute = SettingsChordsIndexRouteImport.update({
   path: '/chords/',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
+const SettingsCommandLineIndexRoute =
+  SettingsCommandLineIndexRouteImport.update({
+    id: '/command-line/',
+    path: '/command-line/',
+    getParentRoute: () => SettingsRouteRoute,
+  } as any)
 const SettingsConfigureIndexRoute = SettingsConfigureIndexRouteImport.update({
   id: '/configure/',
   path: '/configure/',
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
+  '/settings/command-line/': typeof SettingsCommandLineIndexRoute
   '/settings/configure/': typeof SettingsConfigureIndexRoute
   '/settings/danger/': typeof SettingsDangerIndexRoute
   '/settings/general/': typeof SettingsGeneralIndexRoute
@@ -117,6 +125,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/settings/browse': typeof SettingsBrowseIndexRoute
   '/settings/chords': typeof SettingsChordsIndexRoute
+  '/settings/command-line': typeof SettingsCommandLineIndexRoute
   '/settings/configure': typeof SettingsConfigureIndexRoute
   '/settings/danger': typeof SettingsDangerIndexRoute
   '/settings/general': typeof SettingsGeneralIndexRoute
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
+  '/settings/command-line/': typeof SettingsCommandLineIndexRoute
   '/settings/configure/': typeof SettingsConfigureIndexRoute
   '/settings/danger/': typeof SettingsDangerIndexRoute
   '/settings/general/': typeof SettingsGeneralIndexRoute
@@ -152,6 +162,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/settings/browse/'
     | '/settings/chords/'
+    | '/settings/command-line/'
     | '/settings/configure/'
     | '/settings/danger/'
     | '/settings/general/'
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/settings/browse'
     | '/settings/chords'
+    | '/settings/command-line'
     | '/settings/configure'
     | '/settings/danger'
     | '/settings/general'
@@ -183,6 +195,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/settings/browse/'
     | '/settings/chords/'
+    | '/settings/command-line/'
     | '/settings/configure/'
     | '/settings/danger/'
     | '/settings/general/'
@@ -250,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsChordsIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
+    '/settings/command-line/': {
+      id: '/settings/command-line/'
+      path: '/command-line'
+      fullPath: '/settings/command-line/'
+      preLoaderRoute: typeof SettingsCommandLineIndexRouteImport
+      parentRoute: typeof SettingsRouteRoute
+    }
     '/settings/configure/': {
       id: '/settings/configure/'
       path: '/configure'
@@ -306,6 +326,7 @@ interface SettingsRouteRouteChildren {
   SettingsIndexRoute: typeof SettingsIndexRoute
   SettingsBrowseIndexRoute: typeof SettingsBrowseIndexRoute
   SettingsChordsIndexRoute: typeof SettingsChordsIndexRoute
+  SettingsCommandLineIndexRoute: typeof SettingsCommandLineIndexRoute
   SettingsConfigureIndexRoute: typeof SettingsConfigureIndexRoute
   SettingsDangerIndexRoute: typeof SettingsDangerIndexRoute
   SettingsGeneralIndexRoute: typeof SettingsGeneralIndexRoute
@@ -319,6 +340,7 @@ const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
   SettingsBrowseIndexRoute: SettingsBrowseIndexRoute,
   SettingsChordsIndexRoute: SettingsChordsIndexRoute,
+  SettingsCommandLineIndexRoute: SettingsCommandLineIndexRoute,
   SettingsConfigureIndexRoute: SettingsConfigureIndexRoute,
   SettingsDangerIndexRoute: SettingsDangerIndexRoute,
   SettingsGeneralIndexRoute: SettingsGeneralIndexRoute,
