@@ -280,13 +280,15 @@ export function ChordsPageContent({
 		hintsByRawPattern[hint.rawPattern] = hint;
 	}
 	const activeChords: Chord[] = [...finderChords, ...activeAppChords, ...globalChords.map(c => c.chord)];
+	// A range hint offers its prefix as an option with no text of its own. Those
+	// entries go first so `findLast` reaches the key's own hint, as with `=` and `="1-9"`.
 	const baseHintSequences = Object.values(hintsByRawPattern).flatMap(hint =>
 		'keys' in hint.pattern
 			? [{ tokens: hint.pattern.keys.map(normalizeToken), description: hint.description }]
 			: 'range' in hint.pattern
 				? [{ tokens: hint.pattern.range.prefix.map(normalizeToken), description: '' }]
 				: [],
-	);
+	).toSorted((left, right) => Number(Boolean(left.description)) - Number(Boolean(right.description)));
 
 	const baseRangeHints = Object.values(hintsByRawPattern).flatMap(hint =>
 		'range' in hint.pattern
@@ -354,7 +356,6 @@ export function ChordsPageContent({
 	const hintSequences = [
 		...baseHintSequences.map(hint => ({ ...hint, tokens: [...commandPrefixTokens, ...hint.tokens] })),
 		...(commandPrefixTokens.length === 0 ? builtinHints : []),
-		...(commandPrefixTokens.length === 0 ? [{ tokens: ['1'], description: 'Loop chord' }] : []),
 	];
 	const rangeHints = baseRangeHints.flatMap(hint => getRangeHint(hint, commandPrefix) ?? []);
 	const floatingHint = hintSequences.findLast(hint =>

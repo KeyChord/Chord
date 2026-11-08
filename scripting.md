@@ -657,5 +657,5 @@ supported and use the same compact keycap display.
 
 The core `@keychord/chords-chord` package defines repeat-count help with
 `'?"1-9"' = { name = "Repeat count" }`. The panel extends this range to `0-9`
-after a numeric prefix. At the start of a sequence, `0` (Chord settings) and
-`1` (Loop chord) also keep their dedicated rows.
+after a numeric prefix. At the start of a sequence, `0` (Chord settings) keeps
+its dedicated row.

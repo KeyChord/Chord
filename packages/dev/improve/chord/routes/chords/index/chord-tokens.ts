@@ -114,8 +114,7 @@ export function getRangeHint(hint: { prefix: string[], keys: string[], descripti
 		: hint.keys;
 	return {
 		prefix: [...prefixTokens, ...hint.prefix],
-		// Keep the dedicated loop row at the start of a sequence.
-		keys: hint.isRepeatCount && prefixTokens.length === 0 ? keys.filter(key => key !== '1') : keys,
+		keys,
 		label: keys.length === 1 ? keys[0]! : `${keys[0]}-${keys.at(-1)}`,
 		description: hint.description,
 	};

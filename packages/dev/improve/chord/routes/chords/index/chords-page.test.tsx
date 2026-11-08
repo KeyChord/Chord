@@ -137,6 +137,58 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(html).toContain("Caps+Space closes the quote");
   });
 
+  test(`${layout} describes a key that also prefixes a range hint`, () => {
+    const path = "chords/macos.toml";
+    const html = renderToString(<ChordsPageContent
+      chordInputData={{ input: ["Equal"], quotes: [], inserting: false, blocks: [], openBlock: false }}
+      chordPanelData={{ isVisible: true, layout }}
+      frontmostData={{ filePickerActive: false }}
+      chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], packages: [{
+        name: "@fixture/test",
+        rawChordsFiles: {},
+        globalChords: [],
+        compiledChordsFiles: {
+          [path]: {
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [],
+            chords: [],
+            chordHints: [
+              { rawPattern: "=", pattern: { keys: ["Equal"] }, description: "Menu/Tray" },
+              { rawPattern: '="1-9"', pattern: { range: { prefix: ["Equal"], keys: ["Digit1", "Digit2"] } }, description: "Tray: Select Icon" },
+            ],
+          },
+        },
+      }] }}
+      chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+      chordMacrosData={{ entries: [] }}
+    />);
+    expect(html).toContain("Menu/Tray");
+  });
+
+  test(`${layout} shows one repeat-count row at the start of a sequence`, () => {
+    const path = "chords/com/leonsilicon/chord/macos.toml";
+    const html = renderToString(<ChordsPageContent
+      chordInputData={{ input: [], quotes: [], inserting: false, blocks: [], openBlock: false }}
+      chordPanelData={{ isVisible: true, layout }}
+      frontmostData={{ filePickerActive: false }}
+      chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], packages: [{
+        name: "@keychord/chords-chord",
+        rawChordsFiles: {},
+        globalChords: [],
+        compiledChordsFiles: {
+          [path]: {
+            name: "Chords", pathslug: path, meta: {}, handlers: [], executables: [],
+            chords: [],
+            chordHints: [{ rawPattern: '"1-9"', pattern: { range: { prefix: [], keys: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"] } }, description: "Repeat count" }],
+          },
+        },
+      }] }}
+      chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+      chordMacrosData={{ entries: [] }}
+    />);
+    expect(html).not.toContain(">1</kbd>");
+    if (layout === ChordLayout.SidebarLeft) expect(html).toContain(">1-9</kbd>");
+  });
+
   const renderInput = (chordInputData: Parameters<typeof ChordsPageContent>[0]["chordInputData"]) => renderToString(<ChordsPageContent
     chordInputData={chordInputData}
     chordPanelData={{ isVisible: true, layout }}

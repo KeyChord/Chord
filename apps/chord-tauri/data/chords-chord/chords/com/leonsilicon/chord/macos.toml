@@ -6,6 +6,9 @@ name = 'Chords'
 [chords]
 '?"1-9"' = { name = 'Repeat count' }
 
+# By convention `/` launches things. Many packages add to it and none owns it.
+'?/' = { name = 'Launch' }
+
 '?0' = { name = 'Chord' }
 
 '0,' = { name = 'Chord: Settings', builtin = { command = 'settings' } }

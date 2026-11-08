@@ -48,7 +48,7 @@ test('Enter inside a quote is typed rather than separating steps', () => {
 test('repeat-count ranges only continue an unfinished count', () => {
 	const hint = { prefix: [], keys: [...'123456789'], description: 'Repeat count', isRepeatCount: true };
 	const range = (input: string) => getRangeHint(hint, getCommandPrefix(tokens(input)));
-	expect(range('')!.keys).not.toContain('1');
+	expect(range('')!.keys).toContain('1');
 	expect(range('3')!.keys).toContain('0');
 	expect(range('3`i5`')).toBeNull();
 	expect(range('3ab⏎')).toBeNull();
