@@ -58,4 +58,5 @@ define_app_state! {
     permissions: super::permissions::AppPermissions,
     placeholder_chord_store: super::placeholder_chord_store::PlaceholderChordStore,
     settings: super::settings::AppSettings,
+    app_updater: super::updater::AppUpdater,
 }

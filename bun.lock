@@ -76,6 +76,7 @@
         "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
@@ -652,6 +653,7 @@
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
         "@tauri-apps/api": "^2.12.4",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
@@ -1003,6 +1005,24 @@
       "devDependencies": {
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
+      },
+    },
+    "packages/dev/improve/chord/routes/settings/_components/update-card": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.update-card",
+      "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/com.npmjs.utils-cn": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+        "@heroui/react": "^3.2.7",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "react-dom": "^19.3.1",
       },
     },
     "packages/dev/improve/chord/routes/settings/browse/index": {
@@ -1400,6 +1420,8 @@
     "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": ["@chord/dev.improve.chord.routes.settings._components.shortcut-keys@workspace:packages/dev/improve/chord/routes/settings/_components/shortcut-keys"],
 
     "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": ["@chord/dev.improve.chord.routes.settings._components.sync-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/sync-repo-button"],
+
+    "@chord/dev.improve.chord.routes.settings._components.update-card": ["@chord/dev.improve.chord.routes.settings._components.update-card@workspace:packages/dev/improve/chord/routes/settings/_components/update-card"],
 
     "@chord/dev.improve.chord.routes.settings.browse.index": ["@chord/dev.improve.chord.routes.settings.browse.index@workspace:packages/dev/improve/chord/routes/settings/browse/index"],
 

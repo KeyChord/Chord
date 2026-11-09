@@ -18,6 +18,7 @@
 		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
 		"@tauri-apps/api": "^2.12.4",
 		"lucide-react": "^1.57.0",
 		"react": "^19.3.1"

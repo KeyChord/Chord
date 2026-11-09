@@ -14,3 +14,4 @@ pub mod controller;
 pub mod permissions;
 pub mod placeholder_chord_store;
 pub mod settings;
+pub mod updater;

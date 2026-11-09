@@ -66,6 +66,7 @@
     "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.command-line-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",

@@ -1,6 +1,8 @@
 #![allow(unused)]
 mod app_mode;
 pub use app_mode::*;
+mod app_update;
+pub use app_update::*;
 mod chord_input;
 pub use chord_input::*;
 mod chord_execution;

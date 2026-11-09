@@ -627,9 +627,11 @@ the `com.leonsilicon.chord.beta` application identifier, while local development
 channel's settings, packages, caches, logs, and other application-scoped data separate. Each run
 replaces the previous assets, so the download URLs stay stable.
 
-Installed copies update themselves from `latest.json`, which the publish job writes beside the signed
-`.app.tar.gz` archives. They check at launch and once a day, install a higher version, and offer to
-restart into it. So raise `version` in `apps/chord-tauri/src-tauri/tauri.conf.json` and `Cargo.toml`
+Installed copies find updates in `latest.json`, which the publish job writes beside the signed
+`.app.tar.gz` archives. They check at launch and once a day, and offer a higher version on a card
+in the bottom left of Settings and in the tray menu. Nothing downloads until someone clicks Update,
+and the new build takes over on Restart or the next launch. So raise `version` in
+`apps/chord-tauri/src-tauri/tauri.conf.json` and `Cargo.toml`
 for every production release: the publish job refuses one that isn't higher than what's out. To try
 an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` set to another
 `latest.json`; what it lists must still carry this repository's updater signature.

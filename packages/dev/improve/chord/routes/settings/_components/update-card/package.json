@@ -1,0 +1,27 @@
+{
+  "name": "@chord/dev.improve.chord.routes.settings._components.update-card",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#update-card": "./update-card.tsx",
+    "#update-card-content": "./update-card-content.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/com.npmjs.utils-cn": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+    "@heroui/react": "^3.2.7",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "react-dom": "^19.3.1"
+  }
+}

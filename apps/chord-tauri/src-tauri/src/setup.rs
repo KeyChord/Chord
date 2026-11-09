@@ -11,11 +11,13 @@ use crate::app::keyboard::{AppKeyboard, AppKeyboardProvider};
 use crate::app::permissions::{AppPermissions, AppPermissionsProvider};
 use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChordStoreProvider};
 use crate::app::settings::{AppSettings, AppSettingsProvider};
+use crate::app::updater::{AppUpdater, AppUpdaterProvider};
 use crate::app::{AppHandleExt, AppSingleton};
 use crate::default_packages::load_default_packages;
 use crate::lock_file::AppLockFile;
 use crate::state::{
-    AppModeObservable, AppPermissionsObservable, AppSettingsObservable, ChordExecutionObservable,
+    AppModeObservable, AppPermissionsObservable, AppSettingsObservable, AppUpdateObservable,
+    ChordExecutionObservable,
     ChordInputObservable, ChordMacrosObservable, ChordPackageManagerObservable,
     ChordPackageStoreObservable, ChordPanelObservable, DesktopAppManagerObservable,
     FrontmostObservable, GitRepo, GitReposObservable, KeyboardObservable, Observable,
@@ -35,6 +37,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let app_mode_observable = AppModeObservable::new(app)?;
     let app_permissions_observable = AppPermissionsObservable::new(app)?;
     let app_settings_observable = AppSettingsObservable::new(app)?;
+    let app_update_observable = AppUpdateObservable::new(app)?;
     let chord_input_observable = ChordInputObservable::new(app)?;
     let chord_execution_observable = ChordExecutionObservable::new(app)?;
     let chord_macros_observable = ChordMacrosObservable::new(app)?;
@@ -76,6 +79,13 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
                 chord_package_store_observable,
             }
             .provide::<ChordPackageStore>(),
+        )
+        .add(
+            AppUpdaterProvider {
+                handle: handle.clone(),
+                app_update_observable,
+            }
+            .provide::<AppUpdater>(),
         )
         .add(
             ChordActionTaskRunnerProvider {
@@ -173,7 +183,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let settings = state.settings();
     settings.apply_all()?;
 
-    crate::updater::start(handle.clone());
+    state.app_updater().start();
 
     log::debug!("finished setup()");
 

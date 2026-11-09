@@ -2,6 +2,7 @@ import type {
   AppModeState,
   AppPermissionsState,
   AppSettingsState,
+  AppUpdateState,
   ChordInputState,
   ChordExecutionState,
   ChordMacrosState,
@@ -20,6 +21,7 @@ import { createStateQuery } from "#state-query";
 
 export interface TauriStates {
   "app-mode": AppModeState;
+  "app-update": AppUpdateState;
   keyboard: KeyboardState;
   "chord-panel": ChordPanelState;
   "chord-input": ChordInputState;
@@ -36,6 +38,7 @@ export interface TauriStates {
 
 const stateIds = [
   "app-mode",
+  "app-update",
   "keyboard",
   "chord-panel",
   "chord-input",
@@ -64,6 +67,7 @@ function createUseTauriState<K extends keyof TauriStates>(stateId: K) {
   };
 }
 
+export const useAppUpdateState = createUseTauriState("app-update");
 export const useKeyboardState = createUseTauriState("keyboard");
 export const useChordPanelState = createUseTauriState("chord-panel");
 export const useChordInputState = createUseTauriState("chord-input");

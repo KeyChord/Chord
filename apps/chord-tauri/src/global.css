@@ -16,6 +16,7 @@
 @import "@heroui/styles/components/list-box.css" layer(components);
 @import "@heroui/styles/components/modal.css" layer(components);
 @import "@heroui/styles/components/popover.css" layer(components);
+@import "@heroui/styles/components/progress-bar.css" layer(components);
 @import "@heroui/styles/components/select.css" layer(components);
 @import "@heroui/styles/components/spinner.css" layer(components);
 @import "@heroui/styles/components/switch.css" layer(components);

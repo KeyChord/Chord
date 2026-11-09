@@ -8,9 +8,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
-import { useSettingsState } from "@chord/dev.improve.chord.lib.state";
+import { useAppUpdateState, useSettingsState } from "@chord/dev.improve.chord.lib.state";
 import { LogStreamProvider } from "@chord/dev.improve.chord.routes.settings._components.log-stream";
 import { PermissionsDialog } from "@chord/dev.improve.chord.routes.settings._components.permissions-dialog";
+import { UpdateCard } from "@chord/dev.improve.chord.routes.settings._components.update-card";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   Command,
@@ -101,6 +102,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   );
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
   const settings = useSettingsState();
+  const appUpdate = useAppUpdateState();
   const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLogPage = pathname === "/settings/log" || pathname === "/settings/log/";
@@ -122,6 +124,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
 
   const isSidebarCollapsed = settings.data?.isSettingsSidebarCollapsed ?? false;
   const sidebarToggleLabel = isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar";
+  const hasUpdateCard = appUpdate.data !== undefined && appUpdate.data.status !== "idle";
 
   return (
     <div className="settings-window-shell relative flex min-h-0 h-full w-full">
@@ -151,7 +154,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
         {/* Fixed width, so the links are clipped as the sidebar closes instead of reflowing. */}
         <nav
           aria-label="Settings"
-          className="min-h-0 w-[calc(15.5rem-1px)] flex-1 overflow-y-auto px-2.5 pb-4 pt-1"
+          className={`min-h-0 w-[calc(15.5rem-1px)] flex-1 overflow-y-auto px-2.5 pt-1 ${hasUpdateCard ? "pb-24" : "pb-4"}`}
         >
           {navigationGroups.map((group) => (
             <Collapsible
@@ -219,13 +222,16 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
             className={
               isLogPage
                 ? "settings-page-content h-full w-full px-6 pb-6 pt-4"
-                : "settings-page-content mx-auto w-full max-w-[960px] px-6 pb-10 pt-4"
+                : `settings-page-content mx-auto w-full max-w-[960px] px-6 pt-4 ${isSidebarCollapsed && hasUpdateCard ? "pb-28" : "pb-10"}`
             }
           >
             {children}
           </div>
         </div>
       </main>
+
+      {/* Over the sidebar's corner, so collapsing the sidebar doesn't hide it. */}
+      <UpdateCard className="absolute bottom-3 left-3 z-10 w-[calc(15.5rem-1.5rem-1px)]" />
     </div>
   );
 }

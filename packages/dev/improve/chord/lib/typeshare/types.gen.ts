@@ -429,3 +429,22 @@ export enum AppModeState {
 	Chord = "chord",
 }
 
+/** How far Chord has got with a newer release. Nothing is downloaded until someone asks for it. */
+export type AppUpdateState = 
+	| { status: "idle", update?: undefined }
+	| { status: "available", update: {
+	version: string;
+}}
+	| { status: "downloading", update: {
+	version: string;
+	/** Unknown until the download reports its size. */
+	percent?: number;
+}}
+	| { status: "installing", update: {
+	version: string;
+}}
+	/** The new build is on disk and takes over the next time Chord starts. */
+	| { status: "ready", update: {
+	version: string;
+}};
+

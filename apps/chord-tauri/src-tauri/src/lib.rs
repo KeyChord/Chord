@@ -27,7 +27,6 @@ mod process;
 mod setup;
 mod state;
 mod tauri_app;
-mod updater;
 
 pub use tauri_app::*;
 

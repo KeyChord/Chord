@@ -116,6 +116,8 @@ pub trait Api {
     async fn toggle_hide_hint_panel_by_default() -> AppResult<()>;
     async fn toggle_settings_sidebar() -> AppResult<()>;
     async fn quit_app() -> AppResult<()>;
+    async fn install_update() -> AppResult<()>;
+    async fn restart_to_update() -> AppResult<()>;
     async fn get_current_states() -> AppResult<String>;
     async fn get_app_logs() -> AppResult<Vec<AppLogEntry>>;
     async fn run_chord_command(command: String) -> AppResult<ChordCommandOutput>;
