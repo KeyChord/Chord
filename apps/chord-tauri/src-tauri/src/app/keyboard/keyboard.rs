@@ -1,9 +1,10 @@
 use super::caps_lock_guard::CapsLockGuard;
 use super::caps_remap::{ProcessIdentity, RemapStore, SystemMappingTable};
+use super::caps_space_gap::{CapsSpaceGaps, KeyTime, milliseconds};
 use super::health::{Backoff, InputHealth};
 use super::secure_input::SecureInputState;
 use super::tap::{TapAction, TapEvent, TapHandle};
-use super::{caps_guardian, caps_hotkey};
+use super::{caps_guardian, caps_hotkey, key_catcher};
 use crate::app::AppHandleExt;
 use crate::app::permissions::InputPermissions;
 use crate::models::{AppKeyboardState, CapturedKeyEvent, Key, KeyEvent, KeyEventAction};
@@ -11,8 +12,9 @@ use anyhow::Result;
 use bitflags::bitflags;
 use keycode::KeyMappingCode;
 use nject::injectable;
+use objc2_core_graphics::{CGEventFlags, CGEventSource, CGEventSourceStateID};
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
-use std::sync::mpsc::{TrySendError, sync_channel};
+use std::sync::mpsc::{SyncSender, TrySendError, sync_channel};
 use std::sync::{Arc, Mutex, MutexGuard, Once, PoisonError};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
@@ -35,6 +37,15 @@ bitflags! {
       const FUNCTION        = 1 << 8;
   }
 }
+
+/// What the listeners hand to the thread that runs the controller.
+enum InputMessage {
+    Key(CapturedKeyEvent),
+    /// Ends Chord mode, in order with the keys queued before it.
+    CancelChord(&'static str),
+}
+
+type InputQueue = SyncSender<(u64, InputMessage)>;
 
 /// The listener threads currently owned by the supervisor.
 #[derive(Default)]
@@ -63,6 +74,32 @@ pub struct AppKeyboard {
     /// Whether this instance holds the Caps key mapping (see `caps_remap`).
     #[inject(AtomicBool::new(false))]
     holds_caps_remap: AtomicBool,
+
+    /// A tap replacement is under way (see `on_caps_event_missed_by_tap`).
+    #[inject(AtomicBool::new(false))]
+    tap_restart_pending: AtomicBool,
+
+    /// The queue to the controller thread, shared by every source of key events: the
+    /// tap, the hotkey fallback and the key catcher.
+    #[inject(Mutex::new(None))]
+    input_queue: Mutex<Option<InputQueue>>,
+
+    #[inject(AtomicBool::new(false))]
+    queue_trouble_reported: AtomicBool,
+
+    /// Chord is reading the chord in progress through its own key window, because the
+    /// tap cannot see it (see `key_catcher`).
+    #[inject(AtomicBool::new(false))]
+    catching_keys: AtomicBool,
+
+    /// How soon Space follows Caps on this person's keyboard (see `caps_space_gap`).
+    #[inject(CapsSpaceGaps::default())]
+    caps_space_gaps: CapsSpaceGaps,
+
+    /// The Caps press in progress went through the tap, so its release is the tap's
+    /// too. A press that arrived as a hotkey has its release left to the hotkey.
+    #[inject(AtomicBool::new(false))]
+    tap_has_caps_press: AtomicBool,
 
     handle: AppHandle,
 }
@@ -118,6 +155,9 @@ impl AppKeyboard {
     pub fn release_input(&self) {
         self.on_chord_mode_ended();
         self.release_caps_remap();
+        if let Some(summary) = self.caps_space_gaps.summary() {
+            log::info!("Caps+Space gaps this run: {summary}");
+        }
     }
 
     fn caps_remap_store(&self) -> Result<RemapStore> {
@@ -202,6 +242,7 @@ impl AppKeyboard {
         if let Some(enabled) = self.caps_lock_guard.chord_ended() {
             Self::apply_caps_lock(enabled);
         }
+        self.stop_catching_keys();
     }
 
     fn apply_caps_lock(enabled: bool) {
@@ -278,6 +319,10 @@ impl AppKeyboard {
         if listeners.tap.is_some() || !listeners.tap_backoff.ready(now) {
             return;
         }
+        self.start_tap(listeners, now);
+    }
+
+    fn start_tap(&self, listeners: &mut Listeners, now: Instant) {
         match self.spawn_tap() {
             Ok(tap) => {
                 if listeners.tap_backoff.failures() > 0 {
@@ -306,54 +351,221 @@ impl AppKeyboard {
         }
         match &current {
             SecureInputState::Disabled => {
-                log::warn!("Secure Input is disabled again; keyboard events reach Chord")
+                log::warn!("Secure Input is disabled again; the event tap sees every key")
             }
             enabled => log::warn!(
-                "Secure Input is {}; macOS withholds keyboard events from Chord until it is disabled",
+                "Secure Input is {}; macOS hides keys from the event tap, so Caps+Space goes through the hotkey fallback until it is disabled",
                 enabled.describe()
             ),
         }
+        let turned_on = listeners.secure_input == SecureInputState::Disabled;
         listeners.secure_input = current;
+        drop(listeners);
+        // A chord the tap was reading can no longer end: its keys, and the release of
+        // Space, are hidden from now on. Without this Chord mode would stay on and
+        // swallow keys once the tap sees them again.
+        if turned_on && !self.catching_keys.load(Ordering::SeqCst) {
+            self.cancel_chord("Secure Input was enabled during the chord");
+        }
+        // The same for a Caps press the tap was following: its release is hidden, and
+        // Caps would read as held, and Space as starting Chord, from then on.
+        if turned_on && self.tap_has_caps_press.swap(false, Ordering::SeqCst) {
+            self.ingest_as_owner(KeyEvent::Release(Key(KeyMappingCode::CapsLock)), None);
+        }
     }
 
-    /// Creates the tap and the thread that runs the controller for its events.
-    fn spawn_tap(&self) -> Result<TapHandle> {
-        let (tx, rx) = sync_channel::<(u64, CapturedKeyEvent)>(KEY_EVENT_QUEUE_CAPACITY);
+    /// The queue to the thread that runs the controller, started on first use. Keeping
+    /// listener callbacks minimal: controller work runs there instead.
+    fn input_queue(&self) -> Result<InputQueue> {
+        let mut queue = self
+            .input_queue
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Some(queue) = queue.as_ref() {
+            return Ok(queue.clone());
+        }
+        let (tx, rx) = sync_channel::<(u64, InputMessage)>(KEY_EVENT_QUEUE_CAPACITY);
         let handle = self.handle.clone();
-        // Keeping the tap callback minimal: controller work runs here instead.
         std::thread::Builder::new()
             .name("chord-key-events".into())
             .spawn(move || {
-                while let Ok((generation, event)) = rx.recv() {
-                    handle
-                        .app_state()
-                        .dev_lockfile_detector()
-                        .with_input_generation(generation, || {
-                            // In order with the controller, which decides the mode.
-                            handle
-                                .app_state()
-                                .keyboard()
-                                .handle_caps_event(&event.event);
-                            if let Err(error) =
-                                handle.app_state().app_controller().handle_key_event(&event)
-                            {
-                                log::error!("Failed to handle key event: {error:#}");
+                while let Ok((generation, message)) = rx.recv() {
+                    let state = handle.app_state();
+                    state.dev_lockfile_detector().with_input_generation(
+                        generation,
+                        || match message {
+                            InputMessage::Key(event) => {
+                                // In order with the controller, which decides the mode.
+                                state.keyboard().handle_caps_event(&event.event);
+                                if let Err(error) = state.app_controller().handle_key_event(&event)
+                                {
+                                    log::error!("Failed to handle key event: {error:#}");
+                                }
                             }
-                        });
+                            InputMessage::CancelChord(reason) => {
+                                if !state.app_controller().app_mode().is_chord() {
+                                    return;
+                                }
+                                log::warn!("Ending the chord in progress: {reason}");
+                                if let Err(error) = state.app_controller().set_idle_mode() {
+                                    log::error!("Failed to end the chord: {error:#}");
+                                }
+                            }
+                        },
+                    );
                 }
             })?;
+        *queue = Some(tx.clone());
+        Ok(tx)
+    }
 
+    fn enqueue(&self, queue: &InputQueue, generation: u64, message: InputMessage) {
+        let problem = match queue.try_send((generation, message)) {
+            Ok(()) => return,
+            Err(TrySendError::Full(_)) => {
+                "Dropping keyboard events because the bounded input queue is saturated"
+            }
+            Err(TrySendError::Disconnected(_)) => "Keyboard event handler thread is gone",
+        };
+        if !self.queue_trouble_reported.swap(true, Ordering::SeqCst) {
+            log::error!("{problem}");
+        }
+    }
+
+    /// Takes one key event from any listener: updates the tracked keyboard state,
+    /// decides whether the event reaches other applications, and queues it for the
+    /// controller. `caps_lock_on` comes with a Caps press: the lock state before it.
+    /// `event_ns` is the event's own timestamp, from the listeners that have one.
+    /// Runs on the listener threads, so it must stay cheap.
+    fn ingest(
+        &self,
+        queue: &InputQueue,
+        generation: u64,
+        event: KeyEvent,
+        caps_lock_on: Option<bool>,
+        event_ns: Option<u64>,
+    ) -> KeyEventAction {
+        let time = KeyTime {
+            event_ns,
+            arrived: Instant::now(),
+        };
+        let caps_released = event == KeyEvent::Release(Key(KeyMappingCode::CapsLock));
+        let input = CapturedKeyEvent {
+            event,
+            caps_armed: self.keyboard_state.is_caps_armed(),
+        };
+        let action = self.handle_key_event(&input);
+        if let Some(caps_lock_on) = caps_lock_on {
+            self.keyboard_state.arm_caps(caps_lock_on);
+            if caps_lock_on {
+                self.caps_space_gaps.caps_cleared();
+            } else {
+                self.caps_space_gaps.caps_pressed(time);
+            }
+        }
+        if input.activates_chord_mode() {
+            self.note_caps_space_gap(time);
+        }
+        self.enqueue(queue, generation, InputMessage::Key(input));
+        if caps_released {
+            self.caps_space_gaps.caps_cleared();
+            // Whichever listener saw the release, the hotkey fallback stops waiting
+            // for a Space after this press.
+            caps_hotkey::caps_released(&self.handle);
+        }
+        action
+    }
+
+    /// Space started Chord: records how soon after Caps it came. A new shortest gap
+    /// and a summary now and then go to the log; the rest would crowd it out.
+    fn note_caps_space_gap(&self, at: KeyTime) {
+        let Some(gap) = self.caps_space_gaps.space_followed(at) else {
+            return;
+        };
+        let (space_after, arrival) = (milliseconds(gap.gap), milliseconds(gap.arrival_gap));
+        log::debug!("Caps+Space: Space followed Caps by {space_after} (arrived {arrival} apart)");
+        if !gap.shortest_so_far && !gap.summary_due {
+            return;
+        }
+        let summary = self.caps_space_gaps.summary().unwrap_or_default();
+        if gap.shortest_so_far {
+            log::info!(
+                "Caps+Space: Space followed Caps by {space_after} (arrived {arrival} apart), the shortest so far; {summary}"
+            );
+        } else {
+            log::info!("Caps+Space gaps so far: {summary}");
+        }
+    }
+
+    /// Like `ingest`, for the listeners that are not under the event tap's deadline.
+    /// Returns `None` when this instance does not own input.
+    fn ingest_as_owner(&self, event: KeyEvent, caps_lock_on: Option<bool>) -> Option<()> {
+        let queue = self
+            .input_queue()
+            .inspect_err(|error| log::error!("Failed to start the key event queue: {error:#}"))
+            .ok()?;
+        self.handle
+            .app_state()
+            .dev_lockfile_detector()
+            .with_input_owner(|generation| {
+                self.ingest(&queue, generation, event, caps_lock_on, None);
+            })
+    }
+
+    /// Ends the chord in progress, in order with the keys already queued.
+    fn cancel_chord(&self, reason: &'static str) {
+        if !self
+            .handle
+            .app_state()
+            .app_controller()
+            .app_mode()
+            .is_chord()
+        {
+            return;
+        }
+        let Ok(queue) = self.input_queue() else {
+            return;
+        };
+        let detector = self.handle.app_state().dev_lockfile_detector();
+        detector.with_input_owner(|generation| {
+            self.enqueue(&queue, generation, InputMessage::CancelChord(reason));
+        });
+    }
+
+    /// Creates the tap, which feeds the controller queue.
+    fn spawn_tap(&self) -> Result<TapHandle> {
+        let queue = self.input_queue()?;
         let handle = self.handle.clone();
-        let mut queue_full_reported = false;
-        let mut disconnected_reported = false;
-        let sink = move |event: TapEvent| -> TapAction {
+        let sink = move |event: TapEvent, event_ns: u64| -> TapAction {
             let keyboard = handle.app_state().keyboard();
             handle
                 .app_state()
                 .dev_lockfile_detector()
                 .with_input_owner(|generation| {
-                    let event = match event {
-                        TapEvent::Key(event) => event,
+                    let (event, caps_lock_on) = match event {
+                        // A key that went down as a hotkey must come up as one: macOS
+                        // keeps a hotkey pressed until it sees the release, and reports
+                        // no further press of it. This happens when Secure Input ends
+                        // between the two, as it does when the app that held it loses
+                        // the keyboard to Chord's key window.
+                        TapEvent::Key(KeyEvent::Release(Key(KeyMappingCode::CapsLock)))
+                            if !keyboard.tap_has_caps_press.swap(false, Ordering::SeqCst) =>
+                        {
+                            return TapAction::Forward;
+                        }
+                        TapEvent::Key(KeyEvent::Release(Key(KeyMappingCode::Space)))
+                            if caps_hotkey::space_press_taken() =>
+                        {
+                            return TapAction::Forward;
+                        }
+                        TapEvent::Key(event) => (event, None),
+                        TapEvent::CapsPressed { caps_lock_on } => {
+                            keyboard.tap_has_caps_press.store(true, Ordering::SeqCst);
+                            (
+                                KeyEvent::Press(Key(KeyMappingCode::CapsLock)),
+                                Some(caps_lock_on),
+                            )
+                        }
                         TapEvent::RemappedCapsRepeat => return TapAction::Consume,
                         TapEvent::NativeCapsToggle => {
                             keyboard.on_native_caps_toggle();
@@ -363,29 +575,9 @@ impl AppKeyboard {
                         TapEvent::CapsLockChanged => return TapAction::ForwardAsCapsLockKey,
                         TapEvent::CapsLockRepeated => return TapAction::Consume,
                     };
-                    let input = CapturedKeyEvent {
-                        event,
-                        caps_pressed: keyboard.state().is_caps_pressed(),
-                    };
-                    let action = keyboard.handle_key_event(&input);
-                    match tx.try_send((generation, input)) {
-                        Ok(()) => {}
-                        Err(TrySendError::Full(_)) => {
-                            if !queue_full_reported {
-                                queue_full_reported = true;
-                                log::warn!(
-                                    "Dropping keyboard events because the bounded input queue is saturated"
-                                );
-                            }
-                        }
-                        Err(TrySendError::Disconnected(_)) => {
-                            if !disconnected_reported {
-                                disconnected_reported = true;
-                                log::error!("Keyboard event handler thread is gone");
-                            }
-                        }
-                    }
-                    action.into()
+                    keyboard
+                        .ingest(&queue, generation, event, caps_lock_on, Some(event_ns))
+                        .into()
                 })
                 .unwrap_or(TapAction::Forward)
         };
@@ -431,7 +623,9 @@ impl AppKeyboard {
             return KeyEventAction::Consume;
         }
 
-        if app_mode.is_chord() {
+        // While Chord reads a chord through its key window, every key is the chord's,
+        // including in the instant before the controller has switched modes.
+        if app_mode.is_chord() || self.catching_keys.load(Ordering::SeqCst) {
             return KeyEventAction::Consume;
         }
 
@@ -466,14 +660,168 @@ impl AppKeyboard {
         }
     }
 
-    /// A Caps press or release the tap could not see (Secure Input), delivered by
-    /// the hotkey fallback instead.
-    pub(super) fn handle_unseen_caps_event(&self, event: &KeyEvent) {
-        let detector = self.handle.app_state().dev_lockfile_detector();
-        detector.with_input_owner(|_generation| {
-            self.keyboard_state.handle_key_event(event);
-            self.handle_caps_event(event);
-        });
+    /// A Caps press or release that got past the tap, delivered by the hotkey
+    /// fallback instead. The tap swallows the key whenever it receives it, so the
+    /// hotkey doubles as a witness: `tap_received` is false when the tap never got
+    /// this event. Called on the main thread.
+    pub(super) fn handle_unseen_caps_event(&self, event: KeyEvent, tap_received: bool) {
+        let pressed = matches!(event, KeyEvent::Press(_));
+        if pressed {
+            // This press is the hotkey's, and so is its release.
+            self.tap_has_caps_press.store(false, Ordering::SeqCst);
+        }
+        // The lock state before the press, as on the event the tap would have seen.
+        let caps_lock_on = pressed.then(Self::caps_lock_flag);
+        self.ingest_as_owner(event, caps_lock_on);
+        if !tap_received {
+            self.on_caps_event_missed_by_tap();
+        }
+    }
+
+    /// Whether the keyboard reports Caps Lock as on. Unlike the key-state query, the
+    /// modifier flags stay correct under Secure Input.
+    fn caps_lock_flag() -> bool {
+        CGEventSource::flags_state(CGEventSourceStateID::HIDSystemState)
+            .contains(CGEventFlags::MaskAlphaShift)
+    }
+
+    /// The tap is registered but did not receive the Caps key. Under Secure Input
+    /// macOS hides every key from it, and the hotkey fallback takes over; otherwise the
+    /// tap is dead in a way macOS does not report (it still reads as enabled), so
+    /// replace it.
+    fn on_caps_event_missed_by_tap(&self) {
+        if SecureInputState::current() != SecureInputState::Disabled {
+            return;
+        }
+        if self.tap_restart_pending.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        log::error!(
+            "The keyboard event tap did not receive the Caps key although Secure Input is off; replacing the tap"
+        );
+        let handle = self.handle.clone();
+        let spawned = std::thread::Builder::new()
+            .name("chord-tap-restart".into())
+            .spawn(move || {
+                let keyboard = handle.app_state().keyboard();
+                keyboard.restart_tap(Instant::now());
+                keyboard.tap_restart_pending.store(false, Ordering::SeqCst);
+            });
+        if let Err(error) = spawned {
+            self.tap_restart_pending.store(false, Ordering::SeqCst);
+            log::error!("Failed to replace the keyboard event tap: {error:#}");
+        }
+    }
+
+    /// Space went down while the hotkey fallback had it registered: the tap is blind
+    /// and Caps is held. Returns whether the press is Chord's; otherwise the caller
+    /// gives it back to the focused app. Called on the main thread.
+    pub(super) fn handle_unseen_space_press(&self) -> bool {
+        let armed = self.keyboard_state.is_caps_armed();
+        let in_chord = self
+            .handle
+            .app_state()
+            .app_controller()
+            .app_mode()
+            .is_chord();
+        if !space_press_is_chords(armed, in_chord) {
+            return false;
+        }
+        if armed {
+            // Before the event is queued: the keys that follow Space must already
+            // find Chord's window, and the tap must stay out of the way.
+            self.start_catching_keys();
+        }
+        self.ingest_as_owner(KeyEvent::Press(Key(KeyMappingCode::Space)), None)
+            .is_some()
+    }
+
+    /// The Space press Chord took through the hotkey fallback ended. Called on the
+    /// main thread.
+    pub(super) fn handle_unseen_space_release(&self) {
+        // The controller ends the chord, or keeps it for insert mode, in order with
+        // the keys before this one; the keyboard goes back when it does.
+        self.ingest_as_owner(KeyEvent::Release(Key(KeyMappingCode::Space)), None);
+    }
+
+    /// A key that reached Chord's key window (see `key_catcher`). Called on the main
+    /// thread.
+    pub(super) fn handle_caught_event(&self, event: TapEvent) {
+        match event {
+            TapEvent::Key(event) => {
+                self.ingest_as_owner(event, None);
+            }
+            TapEvent::CapsPressed { caps_lock_on } => {
+                self.ingest_as_owner(
+                    KeyEvent::Press(Key(KeyMappingCode::CapsLock)),
+                    Some(caps_lock_on),
+                );
+            }
+            // Lock-state reports and repeats of the Caps key mean nothing to a chord.
+            TapEvent::RemappedCapsRepeat
+            | TapEvent::NativeCapsToggle
+            | TapEvent::CapsLockChanged
+            | TapEvent::CapsLockRepeated => {}
+        }
+    }
+
+    /// The key window lost the keyboard to another window while a chord was being
+    /// read through it. Called on the main thread.
+    pub(super) fn on_key_catcher_lost_focus(&self) {
+        self.cancel_chord("another window took the keyboard from Chord");
+    }
+
+    /// Whether Chord is reading the chord in progress through its own key window.
+    pub fn is_catching_keys(&self) -> bool {
+        self.catching_keys.load(Ordering::SeqCst)
+    }
+
+    /// Takes the keyboard for the chord that is starting, by giving a window of Chord's
+    /// own the key focus. The app in front stays in front. Called on the main thread.
+    fn start_catching_keys(&self) {
+        if self.catching_keys.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        // The OS key-state query is blind too, so the held keys are kept from events:
+        // the modifiers and Caps now, then every key that reaches the window.
+        let mut held = super::tap::held_modifier_keys(
+            CGEventSource::flags_state(CGEventSourceStateID::HIDSystemState).bits(),
+        );
+        if self.keyboard_state.is_caps_pressed() {
+            held.push(Key(KeyMappingCode::CapsLock));
+        }
+        self.keyboard_state.track_keys(held);
+        if let Err(error) = key_catcher::show(&self.handle) {
+            log::error!("Could not take the keyboard for the chord: {error:#}");
+        }
+    }
+
+    /// Gives the keyboard back to the app that had it. Safe from any thread, and when
+    /// nothing was taken.
+    fn stop_catching_keys(&self) {
+        if self.catching_keys.swap(false, Ordering::SeqCst) {
+            self.keyboard_state.stop_tracking_keys();
+            if objc2_foundation::MainThreadMarker::new().is_some() {
+                key_catcher::hide();
+            } else if let Err(error) = self.handle.run_on_main_thread(key_catcher::hide) {
+                log::error!("Failed to give the keyboard back after the chord: {error:#}");
+            }
+        }
+        caps_hotkey::chord_ended(&self.handle);
+    }
+
+    /// Replaces a running tap with a new one. Without a tap there is nothing to
+    /// replace: the supervisor starts one as soon as permissions allow.
+    fn restart_tap(&self, now: Instant) {
+        let mut listeners = self.listeners();
+        let Some(tap) = listeners.tap.take() else {
+            return;
+        };
+        // Input ownership follows the tap; the swap must not look like losing it.
+        self.health.set_tap_restarting(true);
+        tap.stop();
+        self.start_tap(&mut listeners, now);
+        self.health.set_tap_restarting(false);
     }
 
     #[allow(dead_code)]
@@ -515,3 +863,22 @@ impl AppKeyboard {
     }
 }
 
+/// Whether a Space press that reached the hotkey fallback belongs to Chord: it follows
+/// an armed Caps press, or a chord is being read and Space is one of its keys.
+fn space_press_is_chords(caps_armed: bool, in_chord: bool) -> bool {
+    caps_armed || in_chord
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn space_is_chords_only_after_an_armed_caps_press_or_inside_a_chord() {
+        assert!(space_press_is_chords(true, false));
+        assert!(space_press_is_chords(false, true));
+        assert!(space_press_is_chords(true, true));
+        // A stale registration: the press is handed back to the focused app.
+        assert!(!space_press_is_chords(false, false));
+    }
+}

@@ -1,4 +1,6 @@
-# Packages Chord installs, at these revisions, on first launch and when chords are reset.
+# Packages Chord installs, at these revisions, on first launch and when chords are reset. An
+# install with one at another revision sees this one as an update in Browse; Chord never moves an
+# installed package by itself.
 # Pin each to its mirror's commit, and run `vpx _e2e-macos journey --build` after changing one:
 # its last steps fail when a default package has chords this app can't load.
 #
@@ -41,10 +43,10 @@ rev = "2f2a63aa5a8add31147d563cac31de1ce0157849"
 git = "https://github.com/KeyChord/chords-com.apple.Spotlight"
 rev = "baecaa792d601efa13afe38f3fd0ff77aa8a9c0f"
 
-# Default sets that earlier versions of Chord installed, newest first. When Chord updates, an
-# install still on one of these revisions moves to the pins above. It gets the packages the
-# defaults gained after its set, and loses the ones they dropped, if those are still at the
-# revision Chord installed. Chord leaves anything it can't match alone.
+# Default sets that earlier versions of Chord installed, newest first. A package the defaults
+# dropped is removed while it's still at a revision listed here. Chord also uses these to find the
+# set that an install from before it recorded which defaults it had was set up with: that install
+# gets the packages the defaults gained after its set, and not the ones the user removed.
 
 [[previous]] # 2026-11-05, 219e75f6
 "KeyChord/chords-chord" = "6ba92be5776d36392565c3a5c113dba334213cd5"

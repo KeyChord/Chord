@@ -7,6 +7,7 @@
 //! and nothing tells the process.
 
 use super::caps_remap::REMAPPED_KEYCODE;
+use super::caps_space_gap::event_time_ns;
 use super::health::InputHealth;
 use crate::models::{Key, KeyEvent, KeyEventAction};
 use anyhow::{Context, Result, anyhow};
@@ -33,8 +34,11 @@ use std::time::{Duration, Instant};
 /// key, and Chord rewrites them to it (see `TapEvent::CapsLockChanged`).
 const CAPS_LOCK_KEYCODE: i64 = 0x39;
 
+/// macOS virtual keycode of Space.
+pub(super) const SPACE_KEYCODE: i64 = 0x31;
+
 /// Marker rdev puts on the events Chord itself posts; those must pass through untouched.
-const SYNTHETIC_EVENT_USER_DATA: [i64; 2] = [0xDEAD_BEEF, 0xDEAD_DEAD];
+pub(super) const SYNTHETIC_EVENT_USER_DATA: [i64; 2] = [0xDEAD_BEEF, 0xDEAD_DEAD];
 
 /// How often the tap thread wakes up to verify the tap is still enabled.
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_millis(250);
@@ -77,6 +81,11 @@ const HELD_STATE_MASK: u64 = NX_DEVICELCTLKEYMASK
 #[derive(Debug, PartialEq)]
 pub enum TapEvent {
     Key(KeyEvent),
+    /// The remapped Caps key (F20) went down. `caps_lock_on` is the lock state before
+    /// the press: with the key remapped, macOS never changes it on its own.
+    CapsPressed {
+        caps_lock_on: bool,
+    },
     /// An auto-repeat of the remapped Caps key (F20). Swallowed without reaching the
     /// controller: Caps never repeats.
     RemappedCapsRepeat,
@@ -114,7 +123,9 @@ impl From<KeyEventAction> for TapAction {
     }
 }
 
-pub type TapSink = Box<dyn FnMut(TapEvent) -> TapAction + Send>;
+/// Receives each decoded event with the time the keyboard driver stamped on it, in
+/// nanoseconds (see `caps_space_gap::event_time_ns`).
+pub type TapSink = Box<dyn FnMut(TapEvent, u64) -> TapAction + Send>;
 
 /// State handed to the C callback. Lives on the tap thread for as long as the
 /// tap exists; the callback only runs on that thread.
@@ -122,14 +133,22 @@ struct TapContext {
     tap: Option<CFRetained<CFMachPort>>,
     sink: TapSink,
     health: Arc<InputHealth>,
+    /// Set when the tap is being stopped: from then on it passes everything through,
+    /// so a replacement tap never handles the same event a second time.
+    stop: Arc<AtomicBool>,
     disabled_notifications: u32,
     /// Flags of the last keyboard event from a device, to tell what a flagsChanged
     /// event changed.
     previous_flags: Option<u64>,
+    /// Nanoseconds per Mach tick, as numerator and denominator.
+    timebase: (u32, u32),
 }
 
 impl TapContext {
     fn handle(&mut self, kind: CGEventType, event: NonNull<CGEvent>) -> KeyEventAction {
+        if self.stop.load(Ordering::Acquire) {
+            return KeyEventAction::Forward;
+        }
         if kind == CGEventType::TapDisabledByTimeout || kind == CGEventType::TapDisabledByUserInput
         {
             self.disabled_notifications += 1;
@@ -166,7 +185,29 @@ impl TapContext {
         let Some(decoded) = decoded else {
             return KeyEventAction::Forward;
         };
-        match (self.sink)(decoded) {
+        // SAFETY: reads the clock.
+        #[allow(deprecated)]
+        let now_ticks = unsafe { libc::mach_absolute_time() };
+        let event_ns = event_time_ns(
+            CGEvent::timestamp(Some(event)),
+            now_ticks,
+            self.timebase.0,
+            self.timebase.1,
+        );
+        let action = (self.sink)(decoded, event_ns);
+        // The hotkey fallback fires for every Caps event that is not swallowed here,
+        // and for Space while it has that registered. Counting the ones let through
+        // tells it those apart from the ones this tap never received.
+        if (kind == CGEventType::KeyDown || kind == CGEventType::KeyUp)
+            && action != TapAction::Consume
+        {
+            match keycode {
+                REMAPPED_KEYCODE => self.health.note_caps_event_forwarded(),
+                SPACE_KEYCODE => self.health.note_space_event_forwarded(),
+                _ => {}
+            }
+        }
+        match action {
             TapAction::Forward => KeyEventAction::Forward,
             TapAction::Consume => KeyEventAction::Consume,
             TapAction::ForwardAsCapsLockKey => {
@@ -209,7 +250,7 @@ fn key_from_keycode(keycode: i64) -> Option<Key> {
     Key::try_from(mac_keycode::Key::from_keycode(keycode)?).ok()
 }
 
-fn decode_tap_event(
+pub(super) fn decode_tap_event(
     kind: CGEventType,
     keycode: i64,
     flags: u64,
@@ -223,7 +264,9 @@ fn decode_tap_event(
         CGEventType::KeyDown | CGEventType::KeyUp if keycode == REMAPPED_KEYCODE => {
             Some(match (kind == CGEventType::KeyDown, autorepeat) {
                 (true, true) => TapEvent::RemappedCapsRepeat,
-                (true, false) => TapEvent::Key(KeyEvent::Press(caps)),
+                (true, false) => TapEvent::CapsPressed {
+                    caps_lock_on: flags & NX_ALPHASHIFTMASK != 0,
+                },
                 (false, _) => TapEvent::Key(KeyEvent::Release(caps)),
             })
         }
@@ -286,18 +329,80 @@ pub(super) fn decode_flags_changed(keycode: i64, flags: u64) -> Option<KeyEvent>
     })
 }
 
+/// The modifier keys held according to modifier flags, for a listener that starts
+/// partway through and never saw them go down.
+pub(super) fn held_modifier_keys(flags: u64) -> Vec<Key> {
+    use KeyMappingCode::*;
+    // Generic bit, then each side's device bit and key.
+    let modifiers = [
+        (
+            NX_SHIFTMASK,
+            NX_DEVICELSHIFTKEYMASK,
+            ShiftLeft,
+            NX_DEVICERSHIFTKEYMASK,
+            ShiftRight,
+        ),
+        (
+            NX_CONTROLMASK,
+            NX_DEVICELCTLKEYMASK,
+            ControlLeft,
+            NX_DEVICERCTLKEYMASK,
+            ControlRight,
+        ),
+        (
+            NX_ALTERNATEMASK,
+            NX_DEVICELALTKEYMASK,
+            AltLeft,
+            NX_DEVICERALTKEYMASK,
+            AltRight,
+        ),
+        (
+            NX_COMMANDMASK,
+            NX_DEVICELCMDKEYMASK,
+            MetaLeft,
+            NX_DEVICERCMDKEYMASK,
+            MetaRight,
+        ),
+    ];
+    let mut held = Vec::new();
+    for (generic, left_bit, left, right_bit, right) in modifiers {
+        if flags & left_bit != 0 {
+            held.push(Key(left));
+        }
+        if flags & right_bit != 0 {
+            held.push(Key(right));
+        }
+        // Virtual keyboards may omit the device-dependent bits.
+        if flags & (left_bit | right_bit) == 0 && flags & generic != 0 {
+            held.push(Key(left));
+        }
+    }
+    if flags & NX_SECONDARYFNMASK != 0 {
+        held.push(Key(Fn));
+    }
+    held
+}
+
 /// A running event tap thread. Dropping the handle does not stop the tap;
 /// call [`TapHandle::stop`].
 pub struct TapHandle {
     thread: JoinHandle<()>,
     stop: Arc<AtomicBool>,
+    run_loop: TapRunLoop,
 }
+
+/// The tap thread's run loop, kept to wake that thread when the tap is stopped.
+struct TapRunLoop(CFRetained<CFRunLoop>);
+
+// SAFETY: only `CFRunLoopStop` is called through it, which Core Foundation documents
+// as safe to call from any thread.
+unsafe impl Send for TapRunLoop {}
 
 impl TapHandle {
     /// Creates the tap on a dedicated thread and returns once it is enabled.
     pub fn spawn(health: Arc<InputHealth>, sink: TapSink) -> Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
-        let (ready_tx, ready_rx) = sync_channel::<Result<()>>(1);
+        let (ready_tx, ready_rx) = sync_channel::<Result<TapRunLoop>>(1);
         let thread = std::thread::Builder::new()
             .name("chord-key-tap".into())
             .spawn({
@@ -306,7 +411,11 @@ impl TapHandle {
             })
             .context("spawn keyboard event tap thread")?;
         match ready_rx.recv_timeout(START_TIMEOUT) {
-            Ok(Ok(())) => Ok(Self { thread, stop }),
+            Ok(Ok(run_loop)) => Ok(Self {
+                thread,
+                stop,
+                run_loop,
+            }),
             Ok(Err(error)) => {
                 let _ = thread.join();
                 Err(error)
@@ -314,7 +423,9 @@ impl TapHandle {
             Err(_) => {
                 stop.store(true, Ordering::Release);
                 let _ = thread.join();
-                Err(anyhow!("keyboard event tap did not start within {START_TIMEOUT:?}"))
+                Err(anyhow!(
+                    "keyboard event tap did not start within {START_TIMEOUT:?}"
+                ))
             }
         }
     }
@@ -323,8 +434,11 @@ impl TapHandle {
         self.thread.is_finished()
     }
 
+    /// Stops the tap and waits for its thread. The tap handles no event after the
+    /// flag is set, and the wake-up makes the thread notice it at once.
     pub fn stop(self) {
         self.stop.store(true, Ordering::Release);
+        self.run_loop.0.stop();
         let _ = self.thread.join();
     }
 }
@@ -333,14 +447,23 @@ fn run_tap(
     health: Arc<InputHealth>,
     sink: TapSink,
     stop: Arc<AtomicBool>,
-    ready_tx: std::sync::mpsc::SyncSender<Result<()>>,
+    ready_tx: std::sync::mpsc::SyncSender<Result<TapRunLoop>>,
 ) {
+    #[allow(deprecated)]
+    let mut timebase = libc::mach_timebase_info { numer: 1, denom: 1 };
+    // SAFETY: the output points to live storage.
+    #[allow(deprecated)]
+    unsafe {
+        libc::mach_timebase_info(&mut timebase)
+    };
     let mut context = Box::new(TapContext {
         tap: None,
         sink,
         health: health.clone(),
+        stop: stop.clone(),
         disabled_notifications: 0,
         previous_flags: None,
+        timebase: (timebase.numer.max(1), timebase.denom.max(1)),
     });
     let events_of_interest = (1u64 << CGEventType::KeyDown.0)
         | (1u64 << CGEventType::KeyUp.0)
@@ -381,7 +504,7 @@ fn run_tap(
     health.set_tap_running(true);
     health.set_tap_enabled(true);
     log::info!("Keyboard event tap started");
-    let _ = ready_tx.send(Ok(()));
+    let _ = ready_tx.send(Ok(TapRunLoop(run_loop.clone())));
 
     let started = Instant::now();
     let mut reenabled_by_watchdog = 0u32;
@@ -389,11 +512,8 @@ fn run_tap(
         if stop.load(Ordering::Acquire) {
             break None;
         }
-        let result = CFRunLoop::run_in_mode(
-            default_mode,
-            HEALTH_CHECK_INTERVAL.as_secs_f64(),
-            false,
-        );
+        let result =
+            CFRunLoop::run_in_mode(default_mode, HEALTH_CHECK_INTERVAL.as_secs_f64(), false);
         if result == CFRunLoopRunResult::Finished {
             break Some("the run loop has no sources left".to_string());
         }
@@ -616,7 +736,15 @@ mod tests {
                 false,
                 Some(OFF)
             ),
-            Some(TapEvent::Key(KeyEvent::Press(caps)))
+            Some(TapEvent::CapsPressed {
+                caps_lock_on: false
+            })
+        );
+        // The press carries the lock state from before it, which decides whether
+        // Space can follow it into Chord.
+        assert_eq!(
+            decode_tap_event(CGEventType::KeyDown, REMAPPED_KEYCODE, ON, false, Some(ON)),
+            Some(TapEvent::CapsPressed { caps_lock_on: true })
         );
         assert_eq!(
             decode_tap_event(CGEventType::KeyDown, REMAPPED_KEYCODE, OFF, true, Some(OFF)),
@@ -630,6 +758,44 @@ mod tests {
         assert_eq!(
             decode_tap_event(CGEventType::KeyDown, 0x00, OFF, true, Some(OFF)),
             Some(TapEvent::Key(KeyEvent::Press(key(KeyMappingCode::KeyA))))
+        );
+    }
+
+    #[test]
+    fn held_modifiers_are_read_from_the_flags() {
+        assert!(held_modifier_keys(OFF).is_empty());
+        assert!(
+            held_modifier_keys(ON).is_empty(),
+            "Caps Lock is not a held key"
+        );
+        assert_eq!(
+            held_modifier_keys(OFF | NX_SHIFTMASK | NX_DEVICELSHIFTKEYMASK),
+            [key(KeyMappingCode::ShiftLeft)]
+        );
+        assert_eq!(
+            held_modifier_keys(
+                NX_CONTROLMASK | NX_DEVICERCTLKEYMASK | NX_COMMANDMASK | NX_DEVICELCMDKEYMASK
+            ),
+            [
+                key(KeyMappingCode::ControlRight),
+                key(KeyMappingCode::MetaLeft)
+            ]
+        );
+        assert_eq!(
+            held_modifier_keys(NX_SHIFTMASK | NX_DEVICELSHIFTKEYMASK | NX_DEVICERSHIFTKEYMASK),
+            [
+                key(KeyMappingCode::ShiftLeft),
+                key(KeyMappingCode::ShiftRight)
+            ]
+        );
+        // Without device bits the left key stands for the modifier.
+        assert_eq!(
+            held_modifier_keys(NX_ALTERNATEMASK),
+            [key(KeyMappingCode::AltLeft)]
+        );
+        assert_eq!(
+            held_modifier_keys(NX_SECONDARYFNMASK),
+            [key(KeyMappingCode::Fn)]
         );
     }
 

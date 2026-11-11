@@ -252,11 +252,40 @@ guardian can start up to 10 seconds late after a quick relaunch. Its log is
 `<label>.log` next to the state file. A development launch re-registers the agent
 when the executable path changes.
 
-Secure Input hides keys from every event tap, so the owner also registers a Carbon
-hotkey for F20 (`caps_hotkey.rs`). It only fires while the tap cannot see the key;
-the tap swallows it otherwise. A Caps Lock toggle that macOS makes itself (keycode
-57 in the tap) means another app removed the mapping, and Chord installs it again.
-UTM's "Caps Lock as key" mode does this on launch.
+Only a Caps press made with Caps Lock off can start Chord with Space. With Caps Lock
+on, the press turns it off and a Space that follows is typed, which is how someone
+writing in capitals ends a word. The tap reads the lock state from the flags of the
+press.
+
+Secure Input hides key presses from every event tap, and a password field, Terminal's
+Secure Keyboard Entry, or an app that forgot to turn it off can have it on for hours.
+The owner therefore also registers a Carbon hotkey for F20 (`caps_hotkey.rs`), which
+macOS still delivers. It only fires while the tap cannot see the key; the tap swallows
+it otherwise. That makes it a witness too: a Caps event that reaches the hotkey while
+Secure Input is off means the tap has stopped receiving events, and the tap is
+replaced.
+
+While such a blind Caps press is held, Space is registered as a hotkey as well, so
+Caps+Space still starts Chord. macOS delivers hotkeys under Secure Input only for keys
+that type nothing, so the rest of the chord cannot arrive that way. For that chord, an
+invisible window of Chord's own takes the key focus without activating Chord
+(`key_catcher.rs`) and reads the keys as ordinary key events; the app in front stays
+in front and gets the keyboard back when the chord ends. The keys Chord simulates
+meanwhile land in that window and are passed on to the app in front. The Hint Panel is
+a separate window and never takes the keyboard. A Space press the hotkey swallowed
+that turns out not to be Chord's is posted back to the app.
+
+Registering Space takes about half a millisecond after Caps goes down, so under Secure
+Input a Space that arrives sooner is typed. Fingers are never that fast one after the
+other, but a keyboard reports its keys in slices (8 ms on a MacBook), and two keys
+pressed within one slice arrive together. To know how close real presses come,
+`caps_space_gap.rs` measures the gap on every activation, from the events' own
+timestamps, and logs a new shortest gap and a summary every 50 activations and on
+quit (`Caps+Space: Space followed Caps by …`).
+
+A Caps Lock toggle that macOS makes itself (keycode 57 in the tap) means another app
+removed the mapping, and Chord installs it again. UTM's "Caps Lock as key" mode does
+this on launch.
 
 Apps learn about Caps Lock changes from `flagsChanged` events. A real toggle sends
 one with keycode 57. `IOHIDSetModifierLockState` instead sends one with keycode 255
@@ -516,9 +545,12 @@ files })` replaces personal packages in `~/.chord/packages` and waits until they
 Fixture setup preserves the managed package directories and the default package, and records
 approval for each test package's exact path and canonical target before launching Chord.
 
-The eight tests cover shell and Bun handlers, completion by Space release and by Caps,
-swallowing chord input before it reaches the focused app, Caps remapping and toggling, crash
-recovery through the Caps guardian, and remap cleanup on quit. The VNC protocol unit tests
+The tests cover shell and Bun handlers, completion by Space release and by Caps,
+swallowing chord input before it reaches the focused app, Caps remapping and toggling, the
+rule that Caps+Space needs Caps Lock off, crash recovery through the Caps guardian, and remap
+cleanup on quit. `secure-input.e2e.ts` repeats the chord tests under Secure Input, held once
+by the app in front (Terminal's Secure Keyboard Entry) and once by a background app that
+never lets go (`secure-input-holder.swift`, compiled on the host). The VNC protocol unit tests
 run separately with `bun test packages/dev/improve/chord/configs/e2e/macos/vnc.test.ts`.
 
 ### The first run, from zero
@@ -637,8 +669,19 @@ an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` 
 `latest.json`; what it lists must still carry this repository's updater signature.
 
 Chord installs the packages pinned in `apps/chord-tauri/data/default-packages.toml` on first launch.
-When you change a pin, keep the set it replaces in that file's `[[previous]]` list: on its first
-launch after an update, Chord moves an install still on a previous set to the current one.
+It never moves an installed package to another commit by itself. Instead, **Settings → Browse →
+Updates** lists each built-in package installed at a different commit from its current pin, and each
+installed package that follows its repository whose mirror has a newer commit. It checks at launch,
+once a day, and on **Check Again**. Updating installs that exact commit.
+
+When the defaults gain a package, an existing install gets it once, on its first launch after the
+update; `builtin-packages.json` in the app data folder records which built-in packages it has had,
+so one the user removed stays removed. When you change the set, keep the one it replaces in the
+file's `[[previous]]` list. A package the defaults drop is removed while it's still at a revision
+listed there, and the list tells Chord which set an install from before `builtin-packages.json`
+was set up with. Pin a package that didn't change to the same commit as before: a new pin shows up
+as an update for everyone. The mirror sync keeps an unchanged package's mirror commit for the same
+reason.
 
 To promote a build to production, push its commit to `prod`, for example the current `dev`:
 

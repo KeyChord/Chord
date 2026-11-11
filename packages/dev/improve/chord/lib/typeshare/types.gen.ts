@@ -347,8 +347,38 @@ export interface GitRepo {
 	pinnedRev?: string;
 }
 
+export enum PackageUpdateSource {
+	/** A built-in package this version of Chord pins to another commit. */
+	BuiltIn = "builtIn",
+	/** An installed package whose repository has a newer commit. */
+	Latest = "latest",
+}
+
+export interface PackageUpdate {
+	slug: string;
+	/** The commit installed now. */
+	installedRev: string;
+	/** The commit updating moves to. */
+	rev: string;
+	source: PackageUpdateSource;
+}
+
+export interface PackageUpdateCheck {
+	checking: boolean;
+	/** When the last check finished, in milliseconds since the Unix epoch. */
+	checkedAt?: number;
+	/** Packages whose repository the last check couldn't reach. */
+	failed: string[];
+}
+
 export interface GitReposState {
 	repos: Record<string, GitRepo>;
+	/**
+	 * Newer revisions of installed packages, by repository slug. Chord never installs these by
+	 * itself; Browse lists them for the user to install.
+	 */
+	updates: Record<string, PackageUpdate>;
+	updateCheck: PackageUpdateCheck;
 }
 
 export interface HandlerChordAction {

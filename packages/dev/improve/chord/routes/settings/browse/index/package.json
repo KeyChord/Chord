@@ -3,6 +3,7 @@
 	"type": "module",
 	"private": true,
 	"imports": {
+		"#package-updates": "./package-updates.tsx",
 		"#settings-browse-page": "./settings-browse-page.tsx"
 	},
 	"exports": {
@@ -20,6 +21,7 @@
 		"@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
 		"@chord/dev.improve.chord.lib.github": "workspace:*",
 		"@chord/dev.improve.chord.lib.state": "workspace:*",
+		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
 		"@tauri-apps/plugin-opener": "^2.7.2",
 		"lucide-react": "^1.57.0",

@@ -26,9 +26,11 @@ import { officialChordReposData } from "@chord/dev.improve.chord.data.official-c
 import { getGitHubSlug } from "@chord/dev.improve.chord.lib.github";
 import { StateQueries, useGitRepoStoreState } from "@chord/dev.improve.chord.lib.state";
 import { OpenRepoButton } from "@chord/dev.improve.chord.routes.settings._components.open-repo-button";
+import type { GitReposState } from "@chord/dev.improve.chord.lib.typeshare";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Download, ExternalLink, FolderGit2, Search } from "lucide-react";
 import { useState } from "react";
+import { PackageUpdates } from "#package-updates";
 
 interface OfficialChordRepo {
   packageName: string;
@@ -44,22 +46,25 @@ const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
 const categories = [...new Set(officialChordRepos.flatMap((repo) => repo.categories))].sort(
   (a, b) => a.localeCompare(b, "en"),
 );
+const displayNames = new Map(
+  officialChordRepos.flatMap((repo) => {
+    const slug = getGitHubSlug(repo.url);
+    return slug ? [[slug.toLowerCase(), repo.displayName] as const] : [];
+  }),
+);
 // Official chord package mirrors and community chord package repos carry the `chordpack` topic.
 const communityChordPackagesUrl = "https://github.com/search?q=topic%3Achordpack&type=repositories";
 
 export function SettingsBrowsePage() {
   return (
     <StateQueries queries={[useGitRepoStoreState()]}>
-      {(gitRepoStoreData) => <SettingsBrowsePageContent repos={gitRepoStoreData.repos} />}
+      {(gitRepoStoreData) => <SettingsBrowsePageContent state={gitRepoStoreData} />}
     </StateQueries>
   );
 }
 
-export function SettingsBrowsePageContent({
-  repos,
-}: {
-  repos: NonNullable<ReturnType<typeof useGitRepoStoreState>["data"]>["repos"];
-}) {
+export function SettingsBrowsePageContent({ state }: { state: GitReposState }) {
+  const { repos } = state;
   const [searchInput, setSearchInput] = useState("");
   const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
   const [category, setCategory] = useState("all");
@@ -119,26 +124,33 @@ export function SettingsBrowsePageContent({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3 border-b pb-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <h2 className="text-base font-semibold">Browse</h2>
-            <p className="text-sm text-muted-foreground">Official chord repos for popular apps.</p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void installAll();
-            }}
-            disabled={isPending || missingRepos.length === 0}
-          >
-            <Download />
-            Install All
-          </Button>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold">Browse</h2>
+          <p className="text-sm text-muted-foreground">Official chord repos for popular apps.</p>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            void installAll();
+          }}
+          disabled={isPending || missingRepos.length === 0}
+        >
+          <Download />
+          Install All
+        </Button>
+      </div>
 
+      <PackageUpdates
+        repos={repos}
+        updates={state.updates}
+        updateCheck={state.updateCheck}
+        displayNames={displayNames}
+      />
+
+      <div className="space-y-3 border-b pb-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -320,8 +332,8 @@ function CommunityChordPackages() {
             <AlertDialogTitle>Only install chords you trust</AlertDialogTitle>
             <AlertDialogDescription>
               Community chord packages aren't reviewed. Their chords run with unrestricted access to
-              your computer, so only install packages from authors you trust or after auditing
-              their code. Download them manually and approve them in the Chords tab.
+              your computer, so only install packages from authors you trust or after auditing their
+              code. Download them manually and approve them in the Chords tab.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

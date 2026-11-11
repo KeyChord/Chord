@@ -293,6 +293,31 @@ fn materialize_repo_url_head(repo_label: &str, url: &str, repo_base: &Path) -> R
     materialize_result
 }
 
+/// The commit `url`'s HEAD points to, read over the transport that clones packages without
+/// downloading any objects. Only `checkout`'s configuration is used; it can be any repository.
+pub(crate) fn remote_head_sha(checkout: &Path, url: &str) -> Result<String> {
+    let repo = open_repo(checkout)
+        .with_context(|| format!("Failed to open repository at {}", checkout.display()))?;
+    let remote = repo
+        .remote_at(url)?
+        .with_fetch_tags(gix::remote::fetch::Tags::None)
+        .with_refspecs(Some("HEAD"), gix::remote::Direction::Fetch)?;
+    let (ref_map, _handshake) = remote
+        .connect(gix::remote::Direction::Fetch)?
+        .ref_map(gix::progress::Discard, Default::default())?;
+    ref_map
+        .remote_refs
+        .iter()
+        .find_map(|reference| {
+            let (name, target, peeled) = reference.unpack();
+            (name == "HEAD")
+                .then(|| peeled.or(target))
+                .flatten()
+                .map(|id| id.to_string())
+        })
+        .with_context(|| format!("{url} has no commit at HEAD"))
+}
+
 pub fn materialize_repo_head(repo_ref: &GitHubRepoRef, repos_root: &Path) -> Result<GitRepo> {
     let repo_base = repo_ref.local_abspath(repos_root, "");
     let rev = materialize_repo_url_head(&repo_ref.slug(), &repo_ref.url(), &repo_base)?;
@@ -520,6 +545,36 @@ mod tests {
             })
             .unwrap();
         assert_eq!(repo_head_sha(&quarantined).unwrap(), head_rev);
+    }
+
+    #[test]
+    fn reads_the_remote_head_without_fetching_it() {
+        let fixture = TestRepository::new();
+        let first_rev = fixture.commit("first", "first");
+        let checkout = fixture.root.join("cache").join(&first_rev);
+        materialize_repo_url_at_revision("test/repo", &fixture.source_url(), &checkout, &first_rev)
+            .unwrap();
+        assert_eq!(
+            remote_head_sha(&checkout, &fixture.source_url()).unwrap(),
+            first_rev
+        );
+
+        let second_rev = fixture.commit("second", "second");
+        assert_eq!(
+            remote_head_sha(&checkout, &fixture.source_url()).unwrap(),
+            second_rev
+        );
+        // The checkout neither moved nor received the new commit.
+        assert_eq!(repo_head_sha(&checkout).unwrap(), first_rev);
+        assert!(
+            open_repo(&checkout)
+                .unwrap()
+                .find_object(gix::ObjectId::from_hex(second_rev.as_bytes()).unwrap())
+                .is_err()
+        );
+        assert!(
+            remote_head_sha(&checkout, &fixture.root.join("missing").to_string_lossy()).is_err()
+        );
     }
 
     #[test]

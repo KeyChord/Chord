@@ -44,6 +44,30 @@ session.test("a plain Caps tap toggles Caps Lock", async () => {
   }
 });
 
+session.test("with Caps Lock on, Caps then Space turns it off and types the space", async () => {
+  const recorder = await session.openRecorder(`${MARKERS}/typed`);
+  try {
+    const { vnc } = session;
+    await vnc.type("a");
+    await vnc.press(Keysym.CapsLock);
+    await vnc.type("b");
+    // Someone typing in capitals ends the word this way. Had Chord started, it would
+    // have swallowed the keys typed while Space was down.
+    vnc.key(Keysym.CapsLock, true);
+    await Bun.sleep(40);
+    vnc.key(Keysym.Space, true);
+    await Bun.sleep(40);
+    await vnc.type("c");
+    vnc.key(Keysym.Space, false);
+    vnc.key(Keysym.CapsLock, false);
+    await Bun.sleep(80);
+    await vnc.type("d\n");
+    expect(await session.waitForFile(`${MARKERS}/typed`)).toBe("aB cd\n");
+  } finally {
+    await recorder.close();
+  }
+});
+
 session.test("the Caps guardian gives the Caps key back after a crash", async () => {
   await ensureRunning();
   const pid = (await session.pid())!;

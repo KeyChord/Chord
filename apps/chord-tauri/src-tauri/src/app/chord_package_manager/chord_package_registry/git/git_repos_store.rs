@@ -3,13 +3,17 @@ use crate::app::state::AppSingleton;
 use crate::git::{
     GitHubRepoRef, materialize_repo_at_revision, materialize_repo_head, repo_head_sha,
 };
-use crate::state::{GitRepo, GitReposObservable, GitReposState, Observable};
+use crate::state::{
+    GitRepo, GitReposObservable, GitReposState, Observable, PackageUpdateCheck, PackageUpdateSource,
+};
 use anyhow::{Context, Result};
 use nject::injectable;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 use tauri::{AppHandle, Manager, Wry};
 use tauri_plugin_store::{Store, StoreExt};
 
@@ -19,7 +23,18 @@ use tauri_plugin_store::{Store, StoreExt};
 pub struct GitReposStore {
     observable: GitReposObservable,
     handle: AppHandle,
+    /// Whether an update check is running, so a second one waits for the next.
+    #[inject(AtomicBool::new(false))]
+    checking: AtomicBool,
 }
+
+/// The built-in packages an install has had, so that Chord installs a new one once and leaves
+/// one the user removed alone.
+const BUILTIN_PACKAGES_STORE: &str = "builtin-packages.json";
+const OFFERED_KEY: &str = "offered";
+
+/// How long a check waits for one package's repository.
+const REMOTE_HEAD_TIMEOUT: Duration = Duration::from_secs(60);
 
 impl GitReposStore {
     pub(in super::super) fn init(&self) -> Result<()> {
@@ -56,7 +71,7 @@ impl GitReposStore {
             rewrite_repos(self.store()?.as_ref(), &repos)?;
         }
 
-        self.observable.set_state(|_| GitReposState { repos })?;
+        self.observable.set_state(|prev| prev.with_repos(repos))?;
         Ok(())
     }
 
@@ -83,16 +98,16 @@ impl GitReposStore {
         self.store()?.set(key.clone(), serde_json::to_value(&repo)?);
         self.save()?;
         self.observable.set_state(|prev| {
-            let mut next = prev;
-            next.repos.insert(key, repo);
-            next
+            let mut repos = prev.repos.clone();
+            repos.insert(key, repo);
+            prev.with_repos(repos)
         })?;
         Ok(())
     }
 
     fn replace_all(&self, repos: HashMap<String, GitRepo>) -> Result<()> {
         rewrite_repos(self.store()?.as_ref(), &repos)?;
-        self.observable.set_state(|_| GitReposState { repos })?;
+        self.observable.set_state(|prev| prev.with_repos(repos))?;
         Ok(())
     }
 
@@ -109,7 +124,7 @@ impl GitReposStore {
 
         self.store()?.delete(&id);
         self.save()?;
-        self.observable.set_state(|_| GitReposState { repos })?;
+        self.observable.set_state(|prev| prev.with_repos(repos))?;
         log::debug!(
             "Removed active repository {}; retained immutable cache entry at {}",
             id,
@@ -254,15 +269,19 @@ impl GitReposStore {
                 .set(repo.slug.clone(), serde_json::to_value(repo)?);
         }
         self.save()?;
-        self.observable.set_state(|_| GitReposState {
-            repos: current_repos,
-        })?;
+        self.observable
+            .set_state(|prev| prev.with_repos(current_repos))?;
         Ok(())
     }
 
-    /// Moves an install that an earlier Chord set up off the default revisions this one has
-    /// replaced (`[[previous]]` in data/default-packages.toml). Returns whether anything changed.
-    pub fn upgrade_default_repos(&self) -> Result<bool> {
+    fn builtin_packages_store(&self) -> Result<Arc<Store<Wry>>> {
+        Ok(self.handle.store(BUILTIN_PACKAGES_STORE)?)
+    }
+
+    /// Installs the built-in packages this install hasn't had yet, and removes the ones Chord
+    /// no longer ships that are still at the commit it installed. Every other installed package
+    /// stays where it is: updating one is up to the user (see `check_updates`).
+    pub fn reconcile_default_repos(&self, first_run: bool) -> Result<()> {
         let installed = self
             .observable
             .get_state()?
@@ -270,24 +289,163 @@ impl GitReposStore {
             .values()
             .map(|repo| (repo.slug.clone(), repo.pinned_rev.clone()))
             .collect::<Vec<_>>();
-        let upgrade = crate::default_packages::plan_default_package_upgrade(&installed)?;
-        if upgrade.is_empty() {
-            return Ok(false);
+        let store = self.builtin_packages_store()?;
+        let offered = if first_run {
+            Some(Vec::new())
+        } else {
+            store
+                .get(OFFERED_KEY)
+                .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+        };
+        let plan = crate::default_packages::plan_default_packages(&installed, offered.as_deref())?;
+        if !plan.install.is_empty() || !plan.remove.is_empty() {
+            log::info!(
+                "Installing the new built-in packages {:?}, removing {:?}",
+                plan.install
+                    .iter()
+                    .map(|spec| format!("{}@{}", spec.repo_ref.slug(), spec.rev))
+                    .collect::<Vec<_>>(),
+                plan.remove
+            );
         }
-        log::info!(
-            "Upgrading the default packages: pinning {:?}, removing {:?}",
-            upgrade
-                .pin
-                .iter()
-                .map(|spec| format!("{}@{}", spec.repo_ref.slug(), spec.rev))
-                .collect::<Vec<_>>(),
-            upgrade.remove
-        );
-        self.ensure_pinned_repos(upgrade.pin)?;
-        for slug in &upgrade.remove {
+        if !plan.install.is_empty() {
+            self.ensure_pinned_repos(plan.install)?;
+        }
+        for slug in &plan.remove {
             self.remove_repo(slug)?;
         }
-        Ok(true)
+        // Saved last, so a launch that couldn't download a new package tries again.
+        if offered.as_ref() != Some(&plan.offered) {
+            store.set(OFFERED_KEY, serde_json::to_value(&plan.offered)?);
+            store.save()?;
+        }
+        Ok(())
+    }
+
+    /// Looks for newer commits of the installed packages and lists them in the state. Never
+    /// installs one. Returns at once if another check is running.
+    pub async fn check_updates(&self) -> Result<()> {
+        if self
+            .checking
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return Ok(());
+        }
+        let result = self.run_update_check().await;
+        self.checking.store(false, Ordering::SeqCst);
+        if result.is_err() {
+            self.observable.set_state(|prev| GitReposState {
+                update_check: PackageUpdateCheck {
+                    checking: false,
+                    ..prev.update_check.clone()
+                },
+                ..prev
+            })?;
+        }
+        result
+    }
+
+    async fn run_update_check(&self) -> Result<()> {
+        self.observable.set_state(|prev| GitReposState {
+            update_check: PackageUpdateCheck {
+                checking: true,
+                ..prev.update_check.clone()
+            },
+            ..prev
+        })?;
+        let repos = self.observable.get_state()?.repos;
+        let plan =
+            super::plan_update_check(&repos, &crate::default_packages::load_default_packages()?);
+        let mut updates = plan.built_in;
+        let mut failed = Vec::new();
+        let lookups = plan
+            .latest
+            .into_iter()
+            .map(|candidate| {
+                let checkout = candidate.checkout.clone();
+                let url = candidate.url.clone();
+                let lookup = tauri::async_runtime::spawn_blocking(move || {
+                    crate::git::remote_head_sha(&checkout, &url)
+                });
+                (candidate, lookup)
+            })
+            .collect::<Vec<_>>();
+        for (candidate, lookup) in lookups {
+            let head = match tokio::time::timeout(REMOTE_HEAD_TIMEOUT, lookup).await {
+                Ok(Ok(head)) => head,
+                Ok(Err(error)) => Err(anyhow::anyhow!("{error}")),
+                Err(_) => Err(anyhow::anyhow!("No answer within {REMOTE_HEAD_TIMEOUT:?}")),
+            };
+            match head {
+                Ok(head) => updates.extend(candidate.update_to(head)),
+                Err(error) => {
+                    log::warn!("Couldn't check {} for updates: {error:#}", candidate.slug);
+                    failed.push(candidate.slug);
+                }
+            }
+        }
+        failed.sort();
+        let checked_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis() as f64;
+        self.observable.set_state(|prev| {
+            // A package the check couldn't reach keeps the update an earlier check found.
+            let mut next = prev
+                .updates
+                .iter()
+                .filter(|(slug, _)| failed.contains(*slug))
+                .map(|(slug, update)| (slug.clone(), update.clone()))
+                .collect::<HashMap<_, _>>();
+            next.extend(
+                updates
+                    .iter()
+                    .map(|update| (update.slug.clone(), update.clone())),
+            );
+            let repos = prev.repos.clone();
+            GitReposState {
+                updates: next,
+                update_check: PackageUpdateCheck {
+                    checking: false,
+                    checked_at: Some(checked_at),
+                    failed: failed.clone(),
+                },
+                ..prev
+            }
+            // Drops whatever was installed or removed while the check ran.
+            .with_repos(repos)
+        })?;
+        Ok(())
+    }
+
+    /// Moves a package to the commit its listed update found.
+    pub fn install_update(&self, slug: &str) -> Result<GitRepo> {
+        let state = self.observable.get_state()?;
+        let update = state
+            .updates
+            .get(slug)
+            .cloned()
+            .with_context(|| format!("{slug} has no update to install"))?;
+        let current = state
+            .repos
+            .get(slug)
+            .with_context(|| format!("Repository {slug} has not been added yet"))?;
+        anyhow::ensure!(
+            current.linked_local_path.is_none(),
+            "Unlink {slug} before updating it"
+        );
+        let repo_ref = GitHubRepoRef::parse(slug)?;
+        let rev = crate::git::normalize_revision(&update.rev)?;
+        let repos_root = self.github_repos_dir()?;
+        materialize_repo_at_revision(&repo_ref, &repo_ref.local_abspath(&repos_root, &rev), &rev)?;
+        let mut repo = match update.source {
+            PackageUpdateSource::BuiltIn => repo_ref.into_pinned_repo(&repos_root, rev),
+            PackageUpdateSource::Latest => repo_ref.into_repo_at_revision(&repos_root, rev),
+        };
+        repo.is_monorepo = current.is_monorepo;
+        detect_monorepo(&PackageStore::for_app(&self.handle)?, &mut repo)?;
+        self.upsert(repo.clone())?;
+        Ok(repo)
     }
 
     pub fn set_local_link(&self, slug: &str, path: Option<String>) -> Result<GitRepo> {

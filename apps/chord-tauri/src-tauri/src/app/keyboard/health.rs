@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 /// Live status of the keyboard event tap, written by the tap thread and read
@@ -7,11 +7,40 @@ use std::time::{Duration, Instant};
 pub struct InputHealth {
     tap_running: AtomicBool,
     tap_enabled: AtomicBool,
+    /// Set while the tap is being replaced, so the swap is not read as an outage.
+    tap_restarting: AtomicBool,
+    /// How many events of the remapped Caps key the tap received and let through.
+    caps_events_forwarded: AtomicU64,
+    /// The same for Space.
+    space_events_forwarded: AtomicU64,
 }
 
 impl InputHealth {
+    /// The tap exists, or is being replaced right now.
     pub fn tap_running(&self) -> bool {
-        self.tap_running.load(Ordering::Acquire)
+        self.tap_running.load(Ordering::Acquire) || self.tap_restarting.load(Ordering::Acquire)
+    }
+
+    pub(super) fn set_tap_restarting(&self, restarting: bool) {
+        self.tap_restarting.store(restarting, Ordering::Release);
+    }
+
+    /// The tap received an event of the remapped Caps key and did not swallow it.
+    pub(super) fn note_caps_event_forwarded(&self) {
+        self.caps_events_forwarded.fetch_add(1, Ordering::AcqRel);
+    }
+
+    pub(super) fn caps_events_forwarded(&self) -> u64 {
+        self.caps_events_forwarded.load(Ordering::Acquire)
+    }
+
+    /// The tap received a Space event and did not swallow it.
+    pub(super) fn note_space_event_forwarded(&self) {
+        self.space_events_forwarded.fetch_add(1, Ordering::AcqRel);
+    }
+
+    pub(super) fn space_events_forwarded(&self) -> u64 {
+        self.space_events_forwarded.load(Ordering::Acquire)
     }
 
     pub fn tap_enabled(&self) -> bool {

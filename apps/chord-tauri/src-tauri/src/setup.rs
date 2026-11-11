@@ -13,7 +13,6 @@ use crate::app::placeholder_chord_store::{PlaceholderChordStore, PlaceholderChor
 use crate::app::settings::{AppSettings, AppSettingsProvider};
 use crate::app::updater::{AppUpdater, AppUpdaterProvider};
 use crate::app::{AppHandleExt, AppSingleton};
-use crate::default_packages::load_default_packages;
 use crate::lock_file::AppLockFile;
 use crate::state::{
     AppModeObservable, AppPermissionsObservable, AppSettingsObservable, AppUpdateObservable,
@@ -174,6 +173,7 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
             log::error!("Failed to load chord packages: {error:#}");
         }
         tauri_app::scripting::mark_chord_packages_ready(&packages_handle);
+        check_package_updates(packages_handle).await;
     });
 
     // Create tray
@@ -194,28 +194,30 @@ async fn load_chord_packages(handle: AppHandle) -> anyhow::Result<()> {
     let state = handle.app_state();
     let store = &state.chord_package_manager().registry.git.git_repos_store;
     let is_first_run = !store.has_persisted_state()?;
-
-    if cfg!(debug_assertions) || is_first_run {
-        log::debug!(
-            "Syncing default packages (development: {}, first run: {})",
-            cfg!(debug_assertions),
-            is_first_run
-        );
-        let sync_result = load_default_packages()
-            .and_then(|default_packages| store.ensure_pinned_repos(default_packages));
-        if let Err(error) = sync_result {
-            log::error!(
-                "Failed to sync the default packages; loading the existing active repositories: {error:#}"
-            );
-        }
-    } else if let Err(error) = store.upgrade_default_repos() {
+    if let Err(error) = store.reconcile_default_repos(is_first_run) {
         // Offline, say: the next launch tries again.
-        log::error!("Failed to upgrade the default packages; loading the existing ones: {error:#}");
+        log::error!(
+            "Failed to install the built-in packages (first run: {is_first_run}); loading the existing ones: {error:#}"
+        );
     }
 
     let chord_pm = state.chord_package_manager();
     chord_pm.reload_all().await?;
     Ok(())
+}
+
+/// Looks for package updates at launch and once a day. Browse lists them; installing one is up
+/// to the user.
+async fn check_package_updates(handle: AppHandle) {
+    const CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+    loop {
+        let state = handle.app_state();
+        let store = &state.chord_package_manager().registry.git.git_repos_store;
+        if let Err(error) = store.check_updates().await {
+            log::warn!("Couldn't check for package updates: {error:#}");
+        }
+        tokio::time::sleep(CHECK_INTERVAL).await;
+    }
 }
 
 struct Managed {

@@ -128,8 +128,23 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
         .targets([
             logging::history_target(),
             logging::stdout_target(),
+            // Only the file carries the time: the other targets show entries live.
             Target::new(TargetKind::LogDir {
                 file_name: Some("chords".into()),
+            })
+            .format(|out, message, _record| {
+                let now = tauri_plugin_log::TimezoneStrategy::UseLocal.get_now();
+                out.finish(format_args!(
+                    "{}-{:02}-{:02} {:02}:{:02}:{:02}.{:03} {}",
+                    now.year(),
+                    u8::from(now.month()),
+                    now.day(),
+                    now.hour(),
+                    now.minute(),
+                    now.second(),
+                    now.millisecond(),
+                    message
+                ))
             }),
             logging::webview_target(),
         ])

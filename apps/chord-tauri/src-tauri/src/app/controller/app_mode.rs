@@ -82,10 +82,13 @@ impl AppController {
 
     pub fn set_idle_mode(&self) -> Result<()> {
         self.mode.store(AppMode::Idle, Ordering::SeqCst);
+        // First, and whatever fails below: the keyboard and Caps Lock go back to how
+        // they were. Hiding the panel can take a while, and what is typed meanwhile
+        // is no longer Chord's.
+        self.handle.app_state().keyboard().on_chord_mode_ended();
         self.observable.set_state(|_| AppModeState::Idle)?;
         let chord_mode_manager = self.handle.app_state().chord_mode_manager();
         chord_mode_manager.ensure_inactive()?;
-        self.handle.app_state().keyboard().on_chord_mode_ended();
         Ok(())
     }
 

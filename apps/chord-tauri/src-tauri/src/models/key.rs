@@ -20,18 +20,21 @@ pub enum KeyEvent {
     Release(Key),
 }
 
-/// Physical modifier state at capture time, before controller work is queued.
+/// A key event with the Caps state at capture time, before controller work is queued.
 /// Reading the live Caps state later loses fast Caps+Space presses when Caps
 /// has already been released by the time the controller processes Space.
 #[derive(Debug)]
 pub struct CapturedKeyEvent {
     pub event: KeyEvent,
-    pub caps_pressed: bool,
+    /// Caps is held, and went down while Caps Lock was off. A press made with Caps
+    /// Lock on only turns it off: someone typing in capitals who follows that with a
+    /// space must get the space.
+    pub caps_armed: bool,
 }
 
 impl CapturedKeyEvent {
     pub fn activates_chord_mode(&self) -> bool {
-        self.caps_pressed && self.event == KeyEvent::Press(Key(Space))
+        self.caps_armed && self.event == KeyEvent::Press(Key(Space))
     }
 }
 
@@ -47,7 +50,7 @@ mod captured_input_tests {
         let (tx, rx) = sync_channel(2);
         tx.send(CapturedKeyEvent {
             event: KeyEvent::Press(Key(Space)),
-            caps_pressed: caps.load(Ordering::SeqCst),
+            caps_armed: caps.load(Ordering::SeqCst),
         })
         .unwrap();
         caps.store(false, Ordering::SeqCst);
@@ -59,14 +62,14 @@ mod captured_input_tests {
         let caps = AtomicBool::new(false);
         let input = CapturedKeyEvent {
             event: KeyEvent::Press(Key(Space)),
-            caps_pressed: caps.load(Ordering::SeqCst),
+            caps_armed: caps.load(Ordering::SeqCst),
         };
         caps.store(true, Ordering::SeqCst);
         assert!(!input.activates_chord_mode());
         assert!(
             !CapturedKeyEvent {
                 event: KeyEvent::Release(Key(Space)),
-                caps_pressed: true,
+                caps_armed: true,
             }
             .activates_chord_mode()
         );

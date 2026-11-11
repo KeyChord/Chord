@@ -8,7 +8,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
-import { useAppUpdateState, useSettingsState } from "@chord/dev.improve.chord.lib.state";
+import {
+  useAppUpdateState,
+  useGitRepoStoreState,
+  useSettingsState,
+} from "@chord/dev.improve.chord.lib.state";
 import { LogStreamProvider } from "@chord/dev.improve.chord.routes.settings._components.log-stream";
 import { PermissionsDialog } from "@chord/dev.improve.chord.routes.settings._components.permissions-dialog";
 import { UpdateCard } from "@chord/dev.improve.chord.routes.settings._components.update-card";
@@ -103,6 +107,11 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
   const settings = useSettingsState();
   const appUpdate = useAppUpdateState();
+  const gitRepos = useGitRepoStoreState();
+  // Browse lists these; the count says there's something to look at.
+  const packageUpdateCount = Object.keys(gitRepos.data?.updates ?? {}).filter(
+    (slug) => gitRepos.data?.repos[slug],
+  ).length;
   const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isLogPage = pathname === "/settings/log" || pathname === "/settings/log/";
@@ -128,14 +137,16 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="settings-window-shell relative flex min-h-0 h-full w-full">
-      {/* Beside the traffic lights, where it stays put whether the sidebar is open or not. */}
+      {/* Beside the traffic lights, where it stays put whether the sidebar is open or not.
+          Their centres sit 26px from the top (`traffic_light_position` in settings_ui.rs),
+          so this 28px button starts 14px above that. */}
       <button
         type="button"
         aria-controls="settings-sidebar"
         aria-expanded={!isSidebarCollapsed}
         aria-label={sidebarToggleLabel}
         title={sidebarToggleLabel}
-        className="absolute left-[84px] top-[17px] z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute left-[84px] top-[12px]z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
           toggleSidebarMutation.mutate();
         }}
@@ -189,6 +200,14 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
                         >
                           <Icon className="size-4 shrink-0" strokeWidth={1.8} />
                           <span>{item.label}</span>
+                          {item.to === "/settings/browse" && packageUpdateCount > 0 ? (
+                            <span
+                              aria-label={`${packageUpdateCount} package update${packageUpdateCount === 1 ? "" : "s"}`}
+                              className="ml-auto min-w-5 rounded-full bg-foreground/10 px-1.5 text-center text-[11px] font-semibold tabular-nums"
+                            >
+                              {packageUpdateCount}
+                            </span>
+                          ) : null}
                         </Link>
                       </li>
                     );

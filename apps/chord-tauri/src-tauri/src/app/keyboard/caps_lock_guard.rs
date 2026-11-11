@@ -6,6 +6,9 @@
 //! - A plain tap (no Space while held) toggles Caps Lock. Turning it off happens at
 //!   key-down, like macOS; turning it on waits for release, because at key-down Chord
 //!   cannot know whether Space will follow and make the press an activation.
+//! - Only a press made with Caps Lock off can be an activation. With Caps Lock on, the
+//!   press turns it off and a Space that follows is typed: someone writing in capitals
+//!   ends the word that way (see `AppKeyboardState::arm_caps`).
 //! - Normal mode keeps Caps Lock off, and Chord's exit restores the state from before
 //!   it started. Toggles made while typing in insert mode are not kept.
 

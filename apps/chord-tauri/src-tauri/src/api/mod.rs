@@ -68,6 +68,10 @@ pub trait Api {
     async fn reset_default_chords() -> AppResult<()>;
     async fn remove_git_repo(repo: String) -> AppResult<()>;
     async fn sync_git_repo(repo: String) -> AppResult<GitRepo>;
+    /// Looks for newer commits of the installed packages; they appear in the git-repos state.
+    async fn check_package_updates() -> AppResult<()>;
+    /// Installs the listed updates of these repositories (slugs).
+    async fn update_packages(repos: Vec<String>) -> AppResult<()>;
     async fn set_git_repo_local_link(repo: String, path: Option<String>) -> AppResult<GitRepo>;
     async fn reload_chords() -> AppResult<()>;
     async fn set_package_approvals(identities: Vec<String>, approved: bool) -> AppResult<()>;
