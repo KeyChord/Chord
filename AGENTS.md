@@ -16,7 +16,7 @@ Prefer Bun APIs over `node:*` in Chord handlers and Bun scripts. Use `Bun.file` 
 
 Chord is an app that enables users to assign key sequences to computer actions, such as simulating shortcuts, running shell commands, and executing JavaScript through the embedded Bun runtime provided by the [rbun](https://github.com/KeyChord/rbun) crate (see `development.md`).
 
-In contrast to shortcuts which are a combination of one or more modifier keys and a letter/number/symbol, chord key combinations are always a sequence of two or more letter/number/symbol keys.
+In contrast to shortcuts which are a combination of one or more modifier keys and a letter/number/symbol, chord key combinations are always a sequence of one or more letter/number/symbol keys.
 
 # Monorepo layout
 

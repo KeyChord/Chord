@@ -223,14 +223,15 @@ For example, the Spotlight package and the Raycast package both define `'/(.*)'`
 
 ### Requiring a Chord version
 
-A chord file can require Chord versions with a semver requirement under `[meta]`:
+A chord file can require Chord versions with a semver requirement in `chord` under `[meta]`. `version` is the package's own version, which Chord doesn't check:
 
 ```toml
 [meta]
-version = ">=0.3"
+chord = ">=0.2.5"
+version = "1.2.0"
 ```
 
-A Chord that doesn't satisfy it leaves the whole file out and reports `requires Chord >=0.3, but this is Chord 0.2.3` among the package's errors in Settings. Chord checks this before anything else in the file, so newer syntax can't cause a different error first. Use it when a file relies on a feature that older Chord would ignore, such as `fallback`. The syntax is Cargo's: `>=0.3` is a minimum, and a bare `0.3` means `^0.3`. Pre-release builds, such as a nightly of the next version, count as that version. Releases before this check ignore `version`.
+A Chord that doesn't satisfy `chord` leaves the whole file out and reports `requires Chord >=0.2.5, but this is Chord 0.2.4` among the package's errors in Settings. Chord checks this before anything else in the file, so newer syntax can't cause a different error first. Use it when a file relies on a feature that older Chord would ignore, such as `fallback`. The syntax is Cargo's: `>=0.3` is a minimum, and a bare `0.3` means `^0.3`. Pre-release builds, such as a nightly of the next version, count as that version. Releases before 0.2.5 ignore both keys. Chord 0.2.5 read `version` as this requirement and ignores `chord`, so it skips a file whose package version it doesn't satisfy, such as `version = "1.2.0"`.
 
 Handlers receive the entered sequence as `this.input` (for example, `hsr12`), alongside `this.focusedAppId`, `this.focusedWindowId`, and `this.event`. This also works for CLI execution. `this.focusedWindowId` is the Core Graphics window number (the `windowId` of `getAppWindows`) of the focused application's focused, else main, window when the completed input started running. It is `null` for callbacks that run while typing (`@init` and keyboard events) and when no window can be identified.
 

@@ -124,21 +124,22 @@ impl ParsedChordsFile {
         Ok(meta)
     }
 
-    /// `[meta] version` is a semver requirement on Chord, such as `">=0.3"`, with Cargo's
-    /// syntax: a bare `"0.3"` means `^0.3`. A file this Chord doesn't satisfy is left out with an
-    /// error instead of loading with the features it relies on silently ignored.
+    /// `[meta] chord` is a semver requirement on Chord, such as `">=0.3"`, with Cargo's syntax:
+    /// a bare `"0.3"` means `^0.3`. A file this Chord doesn't satisfy is left out with an error
+    /// instead of loading with the features it relies on silently ignored. `[meta] version` is the
+    /// package's own version, which Chord doesn't check.
     fn check_chord_version(
         meta: &HashMap<String, TomlValue>,
         chord: &semver::Version,
     ) -> Result<()> {
-        let Some(requirement) = meta.get("version") else {
+        let Some(requirement) = meta.get("chord") else {
             return Ok(());
         };
         let requirement = requirement
             .as_str()
-            .context("`version` in [meta] must be a string, such as \">=0.3\"")?;
+            .context("`chord` in [meta] must be a string, such as \">=0.3\"")?;
         let parsed = semver::VersionReq::parse(requirement).with_context(|| {
-            format!("`version` in [meta] is not a valid version requirement: {requirement:?}")
+            format!("`chord` in [meta] is not a valid version requirement: {requirement:?}")
         })?;
         // A pre-release build, such as a nightly of the next version, has that version's
         // features. Semver would otherwise exclude it from every requirement without a pre-release.
@@ -399,7 +400,7 @@ impl ParsedChordsFile {
     }
 }
 
-/// The running Chord's version, which `[meta] version` requirements are checked against.
+/// The running Chord's version, which `[meta] chord` requirements are checked against.
 fn chord_version() -> Result<semver::Version> {
     semver::Version::parse(env!("CARGO_PKG_VERSION")).context("Chord's own version is not semver")
 }
@@ -1080,8 +1081,8 @@ name = "t"
     }
 
     #[test]
-    fn meta_version_is_a_requirement_on_the_running_chord() {
-        let meta = |requirement: TomlValue| HashMap::from([("version".to_string(), requirement)]);
+    fn meta_chord_is_a_requirement_on_the_running_chord() {
+        let meta = |requirement: TomlValue| HashMap::from([("chord".to_string(), requirement)]);
         let version = |version: &str| semver::Version::parse(version).unwrap();
         let check = |requirement: &str, chord: &str| {
             ParsedChordsFile::check_chord_version(&meta(requirement.into()), &version(chord))
@@ -1104,6 +1105,9 @@ name = "t"
         for invalid in [meta(TomlValue::Integer(1)), meta("at least 1.3".into())] {
             assert!(ParsedChordsFile::check_chord_version(&invalid, &version("9.0.0")).is_err());
         }
+        // `version` is the package's own version, not a requirement.
+        let package_version = HashMap::from([("version".to_string(), "999.0.0".into())]);
+        assert!(ParsedChordsFile::check_chord_version(&package_version, &version("0.1.0")).is_ok());
     }
 
     #[test]
@@ -1112,7 +1116,7 @@ name = "t"
         let error = r#"
 name = "t"
 [meta]
-version = ">=999"
+chord = ">=999"
 [on.menu]
 kind = "future"
 file = "menu"
@@ -1126,9 +1130,11 @@ file = "menu"
         );
 
         let current = format!(">={}", env!("CARGO_PKG_VERSION"));
-        let file: ParsedChordsFile = format!("name = 't'\n[meta]\nversion = '{current}'")
-            .parse()
-            .unwrap();
-        assert_eq!(file.meta["version"].as_str(), Some(current.as_str()));
+        let file: ParsedChordsFile =
+            format!("name = 't'\n[meta]\nchord = '{current}'\nversion = '999.0.0'")
+                .parse()
+                .unwrap();
+        assert_eq!(file.meta["chord"].as_str(), Some(current.as_str()));
+        assert_eq!(file.meta["version"].as_str(), Some("999.0.0"));
     }
 }

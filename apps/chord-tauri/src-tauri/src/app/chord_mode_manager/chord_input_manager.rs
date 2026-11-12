@@ -134,9 +134,6 @@ impl ChordInputManager {
             .resolve_named(sequence)?
             .with_context(|| format!("`{sequence}` references an undefined macro"))?;
         let input = Key::parse_sequence(&resolved)?;
-        if input.len() < 2 {
-            bail!("a chord sequence must contain at least two keys");
-        }
         self.end_active_task();
         self.reset_matching_chords()?;
         let dispatch = self.resolve_dispatch(&input, &[], &[ChordEventTrigger::Input], None)?;
