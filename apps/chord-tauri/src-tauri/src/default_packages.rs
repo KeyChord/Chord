@@ -76,6 +76,12 @@ pub fn load_default_packages() -> anyhow::Result<Vec<PinnedGitRepoSpec>> {
     pinned_specs(default_packages_file()?)
 }
 
+/// The package names of Chord's current defaults, sorted. These built-in packages rank below
+/// every package the user installed, wherever it came from.
+pub fn builtin_package_names() -> anyhow::Result<Vec<String>> {
+    Ok(default_packages_file()?.packages.into_keys().collect())
+}
+
 /// The upgrade for an install whose repositories are these `(slug, pinned revision)` pairs.
 pub fn plan_default_package_upgrade(
     installed: &[(String, Option<String>)],

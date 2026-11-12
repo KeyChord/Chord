@@ -9,10 +9,8 @@ import {
   columnFilteringFeature,
   createExpandedRowModel,
   createFilteredRowModel,
-  createSortedRowModel,
   globalFilteringFeature,
   rowExpandingFeature,
-  rowSortingFeature,
   Subscribe,
   tableFeatures,
   useTable,
@@ -79,27 +77,46 @@ export function listLibraryChords(
     .toSorted((a, b) => Number(b.personal) - Number(a.personal));
 }
 
+/**
+ * Where a package ranks. Chord's core package always comes first and personal packages follow
+ * it; the user orders installed packages, which always rank above built-in ones.
+ */
+export type PackageRank = "core" | "personal" | "installed" | "builtin";
+
+export const CORE_PACKAGE = "@keychord/chords-chord";
+
 export interface LibraryPackage {
   name: string;
   personal: boolean;
+  rank: PackageRank;
   chords: LibraryChord[];
   fileCount: number;
   appLabels: string[];
   appId?: string;
 }
 
+/** Keeps the native rank order of `packages`, highest first. */
 export function listLibraryPackages(
   packages: ChordPackage[],
   personalNames: Set<string>,
   apps: Record<string, DesktopAppMetadata>,
+  builtinNames: Set<string> = new Set(),
 ): LibraryPackage[] {
   return packages
-    .map((pkg) => {
+    .map((pkg): LibraryPackage => {
       const chords = listLibraryChords([pkg], personalNames, apps);
       const appIds = new Set(chords.map((row) => row.appId));
+      const personal = personalNames.has(pkg.name);
       return {
         name: pkg.name,
-        personal: personalNames.has(pkg.name),
+        personal,
+        rank: (pkg.name === CORE_PACKAGE
+          ? "core"
+          : personal
+            ? "personal"
+            : builtinNames.has(pkg.name)
+              ? "builtin"
+              : "installed"),
         chords,
         fileCount: new Set([
           ...Object.keys(pkg.rawChordsFiles),
@@ -109,7 +126,78 @@ export function listLibraryPackages(
         appId: appIds.size === 1 ? chords[0]?.appId : undefined,
       };
     })
-    .toSorted((a, b) => Number(b.personal) - Number(a.personal));
+    .toSorted((a, b) => rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank));
+}
+
+const rankOrder: PackageRank[] = ["core", "personal", "installed", "builtin"];
+
+const rankable = (rank: PackageRank) => rank === "installed" || rank === "builtin";
+
+/**
+ * The order to save after moving one package up (-1) or down (1) within its group, or undefined
+ * when it is already at the edge. Installed packages stay above built-in ones.
+ */
+export function movePackage(
+  packages: LibraryPackage[],
+  name: string,
+  offset: -1 | 1,
+): string[] | undefined {
+  const ranked = packages.filter((pkg) => rankable(pkg.rank));
+  const index = ranked.findIndex((pkg) => pkg.name === name);
+  const target = ranked[index + offset];
+  if (index === -1 || !target || target.rank !== ranked[index]!.rank) return undefined;
+  const names = ranked.map((pkg) => pkg.name);
+  names[index] = target.name;
+  names[index + offset] = name;
+  return names;
+}
+
+const rankGroups: Partial<Record<PackageRank, { label: string; description: string }>> = {
+  installed: {
+    label: "Installed",
+    description: "When two packages define the same chord, the higher one runs.",
+  },
+  builtin: {
+    label: "Built-in",
+    description: "Chord's default packages. Installed packages always override them.",
+  },
+};
+
+type PackageOrder = {
+  move: (name: string, offset: -1 | 1) => void;
+  pending: boolean;
+};
+
+function RankControls({
+  entry,
+  packages,
+  order,
+}: {
+  entry: LibraryPackage;
+  packages: LibraryPackage[];
+  order?: PackageOrder;
+}) {
+  if (!order || !rankable(entry.rank)) return null;
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {([-1, 1] as const).map((offset) => {
+        const Icon = offset === -1 ? ChevronUp : ChevronDown;
+        return (
+          <Button
+            key={offset}
+            variant="ghost"
+            type="button"
+            size="icon-xs"
+            aria-label={`Move ${entry.name} ${offset === -1 ? "up" : "down"}`}
+            disabled={order.pending || !movePackage(packages, entry.name, offset)}
+            onClick={() => order.move(entry.name, offset)}
+          >
+            <Icon size={14} />
+          </Button>
+        );
+      })}
+    </span>
+  );
 }
 
 type PersonalEditor = ReturnType<typeof usePersonalChordsEditor>;
@@ -119,8 +207,6 @@ const packageFeatures = tableFeatures({
   columnFilteringFeature,
   globalFilteringFeature,
   filteredRowModel: createFilteredRowModel(),
-  rowSortingFeature,
-  sortedRowModel: createSortedRowModel(),
   rowExpandingFeature,
   expandedRowModel: createExpandedRowModel(),
 });
@@ -387,12 +473,15 @@ export function ChordLibrary({
   packages,
   apps,
   personalDirnames,
+  order,
 }: {
   packages: LibraryPackage[];
   apps: Record<string, DesktopAppMetadata>;
   personalDirnames: Record<string, string>;
+  /** Lets the user rank packages; rows stay in the given rank order. */
+  order?: PackageOrder;
 }) {
-  // Keep drafts outside table rows so search, sorting, and collapse preserve unsaved changes.
+  // Keep drafts outside table rows so search and collapse preserve unsaved changes.
   const editor = usePersonalChordsEditor();
   const detailsPrefix = useId();
   const columns = useMemo<ColumnDef<typeof packageFeatures, LibraryPackage>[]>(
@@ -400,7 +489,6 @@ export function ChordLibrary({
       {
         accessorKey: "name",
         header: "Package name",
-        sortFn: (a, b) => a.original.name.localeCompare(b.original.name),
         cell: ({ row }) => (
           <PackageName
             row={row}
@@ -409,8 +497,13 @@ export function ChordLibrary({
           />
         ),
       },
+      {
+        id: "rank",
+        header: () => <span className="sr-only">Rank</span>,
+        cell: ({ row }) => <RankControls entry={row.original} packages={packages} order={order} />,
+      },
     ],
-    [apps, detailsPrefix],
+    [apps, detailsPrefix, packages, order],
   );
   const table = useTable({
     features: packageFeatures,
@@ -419,8 +512,6 @@ export function ChordLibrary({
     getRowId: (entry) => entry.name,
     getRowCanExpand: () => true,
     autoResetExpanded: false,
-    enableSortingRemoval: false,
-    sortDescFirst: false,
     globalFilterFn: (row, _columnId, value: string) =>
       [row.original.name, ...row.original.appLabels].some((label) =>
         label.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
@@ -459,55 +550,38 @@ export function ChordLibrary({
       <div className="chord-library-scroll">
         <table className="chord-library-table package-library-table">
           <caption className="sr-only">
-            Your chord packages; expand a package to view its chords grouped by app
+            Your chord packages, highest rank first; expand a package to view its chords grouped
+            by app
           </caption>
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
-                {group.headers.map((header) => {
-                  const sorted = header.column.getIsSorted();
-                  return (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      aria-sort={
-                        header.column.getCanSort()
-                          ? sorted === "asc"
-                            ? "ascending"
-                            : sorted === "desc"
-                              ? "descending"
-                              : "none"
-                          : undefined
-                      }
-                    >
-                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          className="inline-flex h-auto items-center gap-1.5 p-0 text-xs"
-                          onClick={header.column.getToggleSortingHandler()}
-                        >
-                          <table.FlexRender header={header} />{" "}
-                          {sorted === "desc" ? (
-                            <ChevronDown size={13} />
-                          ) : (
-                            <ChevronUp size={13} className={!sorted ? "opacity-40" : ""} />
-                          )}
-                        </Button>
-                      ) : (
-                        <table.FlexRender header={header} />
-                      )}
-                    </th>
-                  );
-                })}
+                {group.headers.map((header) => (
+                  <th key={header.id} scope="col">
+                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                  </th>
+                ))}
               </tr>
             ))}
           </thead>
           <tbody>
-            {visibleRows.map((row) => {
+            {visibleRows.map((row, index) => {
               const expanded = table.state.expanded === true || !!table.state.expanded[row.id];
+              const rank = row.original.rank;
+              const group = rankGroups[rank];
+              const startsGroup = visibleRows[index - 1]?.original.rank !== rank;
               return (
                 <Fragment key={row.id}>
+                  {group && startsGroup && (
+                    <tr className="package-library-group">
+                      <th scope="colgroup" colSpan={row.getAllCells().length}>
+                        <span className="block text-xs font-medium">{group.label}</span>
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {group.description}
+                        </span>
+                      </th>
+                    </tr>
+                  )}
                   <tr className="package-library-row" data-expanded={expanded}>
                     {row.getAllCells().map((cell) => (
                       <td

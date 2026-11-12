@@ -13,7 +13,11 @@ struct ChordPackageInfo {
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordPackageManagerState {
+    /// Loaded packages, highest rank first: Chord's core package, personal packages, installed
+    /// packages in the user's order, then built-in packages.
     pub packages: Vec<ChordPackage>,
+    /// Names of Chord's built-in (default) packages, which rank below every installed package.
+    pub builtin_packages: Vec<String>,
     /// Problems from the last reload, by package name. Files that failed are left out of their
     /// package, which otherwise stays loaded.
     pub errors: HashMap<String, Vec<String>>,

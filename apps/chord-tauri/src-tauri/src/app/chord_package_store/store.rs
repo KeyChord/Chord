@@ -1,67 +1,57 @@
 use crate::state::{ChordPackageStoreObservable, ChordPackageStoreState, Observable};
 use anyhow::Result;
 use nject::injectable;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Wry};
 use tauri_plugin_store::{Store, StoreExt};
-use typeshare::typeshare;
 
+const ORDER_KEY: &str = "order";
+
+/// The user's ranking of installed and built-in packages, by package name, highest first.
+/// Chord's protected core package and personal packages are not part of it (see
+/// `chord_package_manager::rank_packages`).
 #[injectable]
 pub struct ChordPackageStore {
     handle: AppHandle,
     observable: ChordPackageStoreObservable,
 }
 
-#[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ChordPackageStoreEntry {
-    pub priority: u32,
-}
-
 impl ChordPackageStore {
-    pub fn store(&self) -> Result<Arc<Store<Wry>>> {
-        let store = self.handle.store("chord-package-registry.json")?;
-        Ok(store)
+    fn store(&self) -> Result<Arc<Store<Wry>>> {
+        Ok(self.handle.store("chord-package-order.json")?)
     }
 
-    pub fn entries(&self) -> Result<HashMap<String, ChordPackageStoreEntry>> {
+    /// Names in the saved order, including packages that are not loaded right now (an
+    /// unmounted local folder keeps its place for when it comes back).
+    pub fn order(&self) -> Result<Vec<String>> {
         Ok(self
             .store()?
-            .entries()
+            .get(ORDER_KEY)
+            .and_then(|value| serde_json::from_value::<Vec<String>>(value).ok())
+            .unwrap_or_default())
+    }
+
+    pub fn set_order(&self, order: Vec<String>) -> Result<()> {
+        let mut seen = std::collections::HashSet::new();
+        let order: Vec<String> = order
             .into_iter()
-            .filter_map(|(k, v)| {
-                serde_json::from_value::<ChordPackageStoreEntry>(v.clone())
-                    .ok()
-                    .map(|entry| (k.to_string(), entry))
-            })
-            .collect())
-    }
-
-    pub fn entry(&self, shortcut: &str) -> Result<Option<ChordPackageStoreEntry>> {
-        Ok(self.entries()?.get(shortcut).cloned())
-    }
-
-    fn save(&self) -> Result<()> {
-        self.store()?.save()?;
-        self.observable.try_set_state(|state| Ok(ChordPackageStoreState {
-            entries: self.entries()?,
-        }))?;
+            .filter(|name| seen.insert(name.clone()))
+            .collect();
+        if order == self.order()? {
+            return Ok(());
+        }
+        let store = self.store()?;
+        store.set(ORDER_KEY, serde_json::to_value(&order)?);
+        store.save()?;
+        self.observable
+            .set_state(|_| ChordPackageStoreState { order })?;
         Ok(())
     }
 
-    pub fn set(&self, shortcut: &str, entry: ChordPackageStoreEntry) -> Result<()> {
-        let value = serde_json::to_value(entry)?;
-        self.store()?.set(shortcut, value);
-        self.save()?;
-        Ok(())
-    }
-
-    pub fn remove(&self, shortcut: &str) -> Result<()> {
-        self.store()?.delete(shortcut);
-        self.save()?;
+    pub(super) fn publish(&self) -> Result<()> {
+        let order = self.order()?;
+        self.observable
+            .set_state(|_| ChordPackageStoreState { order })?;
         Ok(())
     }
 }

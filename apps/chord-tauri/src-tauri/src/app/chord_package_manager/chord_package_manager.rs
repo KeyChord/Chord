@@ -669,17 +669,29 @@ impl ChordPackageManager {
         loading_roots.extend(next_roots.clone());
         *self.package_roots.write() = loading_roots;
 
-        // Packages earlier in the order win within each scope, so personal packages come first,
-        // in their own priority order.
-        let personal_ranks = personal_packages
+        // Packages earlier in the order win within each scope (see `rank_packages`).
+        let personal_names = personal_packages
             .iter()
             .filter_map(|state| state.name.clone())
-            .enumerate()
-            .map(|(rank, name)| (name, rank))
-            .collect::<HashMap<_, _>>();
-        let mut raw_chord_packages = raw_chord_packages.into_iter().collect::<Vec<_>>();
-        raw_chord_packages
-            .sort_by_key(|(name, _)| personal_ranks.get(name).copied().unwrap_or(usize::MAX));
+            .collect::<Vec<_>>();
+        let saved_order = self.saved_package_order();
+        let (ranked, order) = rank_packages(
+            raw_chord_packages.keys().cloned(),
+            &personal_names,
+            &saved_order,
+            &builtin_packages(),
+        );
+        if order != saved_order {
+            // Remember where newly seen packages went, so a later install lands above them.
+            if let Err(error) = self.handle.app_state().chord_package_store().set_order(order) {
+                log::warn!("Failed to save the package order: {error:#}");
+            }
+        }
+        let mut raw_chord_packages = raw_chord_packages;
+        let raw_chord_packages = ranked
+            .iter()
+            .filter_map(|name| raw_chord_packages.remove_entry(name))
+            .collect::<Vec<_>>();
 
         let mut chord_packages = OrderMap::new();
         let mut package_errors = HashMap::new();
@@ -763,6 +775,7 @@ impl ChordPackageManager {
             errors: package_errors,
             personal_packages,
             third_party_packages,
+            builtin_packages: builtin_packages().into_iter().collect(),
         });
 
         if let Err(error) =
@@ -777,6 +790,55 @@ impl ChordPackageManager {
 
     pub fn get_package_by_name(&self, package_name: &str) -> Option<ChordPackage> {
         self.packages.read().get(package_name).cloned()
+    }
+
+    fn saved_package_order(&self) -> Vec<String> {
+        self.handle
+            .app_state()
+            .chord_package_store()
+            .order()
+            .inspect_err(|error| log::warn!("Failed to read the package order: {error:#}"))
+            .unwrap_or_default()
+    }
+
+    /// Saves the user's ranking of installed and built-in packages and applies it without a
+    /// reload, so running loops and package workers carry on. Names Chord ranks on its own
+    /// (core and personal packages) or doesn't know are kept but have no effect.
+    pub async fn set_package_order(&self, order: Vec<String>) -> Result<()> {
+        let _reload_guard = self.reload_lock.lock().await;
+        let store = self.handle.app_state().chord_package_store();
+        store.set_order(merge_package_order(&store.order()?, order))?;
+        let state = self.observable.get_state()?;
+        let personal_names = state
+            .personal_packages
+            .iter()
+            .filter_map(|state| state.name.clone())
+            .collect::<Vec<_>>();
+        let saved_order = self.saved_package_order();
+        let packages = {
+            let mut packages = self.packages.write();
+            let (ranked, _) = rank_packages(
+                packages.keys().cloned(),
+                &personal_names,
+                &saved_order,
+                &builtin_packages(),
+            );
+            let mut reordered = OrderMap::new();
+            for name in ranked {
+                if let Some(package) = packages.get(&name) {
+                    reordered.insert(name, package.clone());
+                }
+            }
+            *packages = reordered;
+            packages.values().cloned().collect::<Vec<_>>()
+        };
+        // Executable claims follow package priority.
+        self.update_executable_app_ids();
+        self.observable.set_state(|mut state| {
+            state.packages = packages;
+            state
+        })?;
+        Ok(())
     }
 
     /// The app ID a loaded chords file claims for a bare executable with this file name.
@@ -1119,6 +1181,88 @@ impl ChordPackageManager {
     }
 }
 
+fn builtin_packages() -> HashSet<String> {
+    crate::default_packages::builtin_package_names()
+        .inspect_err(|error| log::error!("Failed to read Chord's default packages: {error:#}"))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|name| name != CORE_CHORD_PACKAGE)
+        .collect()
+}
+
+/// Ranks packages, highest first, without priority numbers:
+///
+/// 1. Chord's protected core package. No other package can use its `0` namespace anyway.
+/// 2. Personal packages in `~/.chord/packages`, in folder-name order.
+/// 3. Installed packages, in the user's saved order. One the order doesn't list yet, such as a
+///    package installed since, goes above the others.
+/// 4. Built-in packages (Chord's defaults), in the user's saved order. An installed package
+///    always overrides a built-in one.
+///
+/// `saved` is the user's order. Returns the ranked names and the saved order with newly seen
+/// packages added; names that aren't loaded right now keep their place in it.
+fn rank_packages(
+    names: impl IntoIterator<Item = String>,
+    personal: &[String],
+    saved: &[String],
+    builtins: &HashSet<String>,
+) -> (Vec<String>, Vec<String>) {
+    let names = names.into_iter().collect::<HashSet<_>>();
+    let mut seen = HashSet::new();
+    let saved = saved
+        .iter()
+        .filter(|name| seen.insert(name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let ranked_by_user = |name: &String| name != CORE_CHORD_PACKAGE && !personal.contains(name);
+    let mut new = names
+        .iter()
+        .filter(|name| ranked_by_user(*name) && !saved.contains(*name))
+        .cloned()
+        .collect::<Vec<_>>();
+    new.sort();
+    let (new_builtins, new_installed): (Vec<_>, Vec<_>) =
+        new.into_iter().partition(|name| builtins.contains(name));
+    let order = new_installed
+        .into_iter()
+        .chain(saved)
+        .chain(new_builtins)
+        .collect::<Vec<_>>();
+
+    let loaded = |name: &&String| names.contains(*name) && ranked_by_user(*name);
+    let ranked = names
+        .get(CORE_CHORD_PACKAGE)
+        .into_iter()
+        .chain(personal.iter().filter(|name| names.contains(*name)))
+        .chain(order.iter().filter(loaded).filter(|name| !builtins.contains(*name)))
+        .chain(order.iter().filter(loaded).filter(|name| builtins.contains(*name)))
+        .cloned()
+        .collect();
+    (ranked, order)
+}
+
+/// Applies a new order for some packages, such as the loaded ones Settings shows, to the saved
+/// order. A saved package missing from `order` stays right after the package it followed.
+fn merge_package_order(saved: &[String], order: Vec<String>) -> Vec<String> {
+    let given = order.iter().cloned().collect::<HashSet<_>>();
+    let mut following = HashMap::<Option<String>, Vec<String>>::new();
+    let mut previous = None;
+    for name in saved {
+        if given.contains(name) {
+            previous = Some(name.clone());
+        } else {
+            following.entry(previous.clone()).or_default().push(name.clone());
+        }
+    }
+    let mut merged = following.remove(&None).unwrap_or_default();
+    for name in order {
+        let after = following.remove(&Some(name.clone())).unwrap_or_default();
+        merged.push(name);
+        merged.extend(after);
+    }
+    merged
+}
+
 fn collect_matching_chord_contexts<'a>(
     packages: impl IntoIterator<Item = &'a ChordPackage>,
     event: &ChordInputEvent,
@@ -1154,7 +1298,12 @@ fn collect_matching_chord_contexts<'a>(
             }
         }
     }
-    contexts
+    // A fallback chord, such as a launcher's `/(.*)`, yields to every ordinary chord in every
+    // scope and package. Fallbacks keep the same scope and package order among themselves.
+    let (ordinary, fallbacks): (Vec<_>, Vec<_>) = contexts
+        .into_iter()
+        .partition(|(_, reference)| !reference.chord.fallback);
+    ordinary.into_iter().chain(fallbacks).collect()
 }
 
 #[cfg(test)]
@@ -1248,6 +1397,84 @@ mod executable_app_ids_tests {
         ] {
             assert_eq!(chords_file_app_id(Path::new(path)), None, "{path}");
         }
+    }
+}
+
+#[cfg(test)]
+mod package_rank_tests {
+    use super::*;
+
+    fn rank(
+        names: &[&str],
+        personal: &[&str],
+        saved: &[&str],
+        builtins: &[&str],
+    ) -> (Vec<String>, Vec<String>) {
+        let owned = |names: &[&str]| names.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+        rank_packages(
+            owned(names),
+            &owned(personal),
+            &owned(saved),
+            &owned(builtins).into_iter().collect(),
+        )
+    }
+
+    #[test]
+    fn installed_packages_override_built_ins_and_follow_the_saved_order() {
+        let (ranked, order) = rank(
+            &["finder", "raycast", CORE_CHORD_PACKAGE, "mine", "warp", "spotlight"],
+            &["mine"],
+            &["spotlight", "warp", "finder", "raycast"],
+            &["finder", "spotlight"],
+        );
+        // A built-in ranked above an installed package by the user still comes after it.
+        assert_eq!(
+            ranked,
+            [CORE_CHORD_PACKAGE, "mine", "warp", "raycast", "spotlight", "finder"]
+        );
+        assert_eq!(order, ["spotlight", "warp", "finder", "raycast"]);
+    }
+
+    #[test]
+    fn new_installs_go_on_top_and_new_built_ins_go_last() {
+        let (ranked, order) = rank(
+            &["warp", "raycast", "rift", "finder", "spotlight"],
+            &[],
+            &["warp", "finder", "gone"],
+            &["finder", "spotlight"],
+        );
+        assert_eq!(ranked, ["raycast", "rift", "warp", "finder", "spotlight"]);
+        // A package that isn't loaded right now keeps its place for when it returns.
+        assert_eq!(order, ["raycast", "rift", "warp", "finder", "gone", "spotlight"]);
+
+        let (ranked, again) = rank(
+            &["warp", "raycast", "rift", "finder", "spotlight"],
+            &[],
+            &order.iter().map(String::as_str).collect::<Vec<_>>(),
+            &["finder", "spotlight"],
+        );
+        assert_eq!(again, order, "a saved order is stable");
+        assert_eq!(ranked, ["raycast", "rift", "warp", "finder", "spotlight"]);
+    }
+
+    #[test]
+    fn core_and_personal_packages_are_not_ranked_by_the_user() {
+        let (ranked, order) = rank(
+            &["mine", CORE_CHORD_PACKAGE, "warp"],
+            &["mine"],
+            &["warp", "mine", "warp", CORE_CHORD_PACKAGE],
+            &[],
+        );
+        assert_eq!(ranked, [CORE_CHORD_PACKAGE, "mine", "warp"]);
+        assert_eq!(order, ["warp", "mine", CORE_CHORD_PACKAGE], "duplicates are dropped");
+    }
+
+    #[test]
+    fn reordering_loaded_packages_keeps_offline_ones_beside_their_neighbors() {
+        let saved = ["offline-first", "warp", "offline-a", "raycast", "offline-b"]
+            .map(String::from);
+        let merged = merge_package_order(&saved, vec!["raycast".into(), "warp".into()]);
+        assert_eq!(merged, ["offline-first", "raycast", "offline-b", "warp", "offline-a"]);
     }
 }
 
@@ -1368,6 +1595,75 @@ mod file_picker_tests {
         let matches =
             collect_matching_chord_contexts([&finder], &event("0gh", "dev.fixture"), true);
         assert!(matches.is_empty());
+    }
+
+    fn global_package(name: &str, bindings: &str) -> ChordPackage {
+        let parsed: ParsedChordsFile = format!("name = '{name}'\n[chords]\n{bindings}")
+            .parse()
+            .unwrap();
+        let path = PathBuf::from("chords/macos.toml");
+        ChordPackage {
+            name: name.into(),
+            js_package: None,
+            raw_chords_files: HashMap::new(),
+            compiled_chords_files: HashMap::new(),
+            global_chords: parsed
+                .chords
+                .into_iter()
+                .map(|chord| ChordReference {
+                    package_name: name.into(),
+                    chords_file_pathslug: path.clone(),
+                    chord,
+                })
+                .collect(),
+        }
+    }
+
+    fn names(matches: &[(ChordPackage, ChordReference)]) -> Vec<&str> {
+        matches.iter().map(|(_, reference)| reference.chord.name.as_str()).collect()
+    }
+
+    #[test]
+    fn ordinary_chords_beat_fallbacks_from_higher_ranked_packages() {
+        let raycast = global_package(
+            "raycast",
+            "'/(.*)' = { name = 'Raycast', shell = 'true', fallback = true }",
+        );
+        let spotlight = global_package(
+            "spotlight",
+            "'/(.*)' = { name = 'Spotlight', shell = 'true', fallback = true }",
+        );
+        let finder = global_package("finder", "'/f' = { name = 'Finder', shell = 'true' }");
+        let host = package(
+            "host",
+            "dev.fixture",
+            "'/(.*)' = { name = 'Host launcher', shell = 'true', fallback = true }",
+        );
+        let order = [&host, &raycast, &spotlight, &finder];
+
+        let matches = collect_matching_chord_contexts(order, &event("/f", "dev.fixture"), false);
+        assert_eq!(names(&matches), ["Finder", "Host launcher", "Raycast", "Spotlight"]);
+
+        // Fallbacks keep scope and package order: the app's own launcher, then the higher rank.
+        let matches = collect_matching_chord_contexts(order, &event("/calc", "dev.fixture"), false);
+        assert_eq!(names(&matches), ["Host launcher", "Raycast", "Spotlight"]);
+        let matches =
+            collect_matching_chord_contexts(order, &event("/calc", "dev.elsewhere"), false);
+        assert_eq!(names(&matches), ["Raycast", "Spotlight"]);
+    }
+
+    #[test]
+    fn a_package_prefers_its_own_ordinary_chord_over_its_fallback() {
+        let launcher = global_package(
+            "launcher",
+            "'/(.*)' = { name = 'Launch', shell = 'true', fallback = true }\n\
+             '/f' = { name = 'Finder', shell = 'true' }",
+        );
+        let input = event("/f", "dev.fixture");
+        let resolved = launcher.resolve_chord_from_input_event(&input).unwrap();
+        assert_eq!(resolved.chord.name, "Finder");
+        let resolved = launcher.resolve_chord_from_input_event(&event("/calc", "dev.fixture"));
+        assert_eq!(resolved.unwrap().chord.name, "Launch");
     }
 }
 

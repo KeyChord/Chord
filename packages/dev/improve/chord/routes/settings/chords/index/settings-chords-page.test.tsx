@@ -10,7 +10,7 @@ import type {
 const previousWindow = globalThis.window;
 globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { SettingsChordsPageContent } = await import("#settings-chords-page");
-const { listLibraryChords, listLibraryPackages } = await import("#chord-library");
+const { listLibraryChords, listLibraryPackages, movePackage } = await import("#chord-library");
 afterAll(() => {
   globalThis.window = previousWindow;
 });
@@ -35,6 +35,7 @@ function pkg(name: string): ChordPackage {
             trigger: { keys: ["/", "t"] },
             index: 0,
             actions: [],
+            fallback: false,
           },
         ],
       },
@@ -42,11 +43,16 @@ function pkg(name: string): ChordPackage {
   };
 }
 
-function render(packages: ChordPackage[], thirdPartyPackages: ThirdPartyPackage[] = []) {
+function render(
+  packages: ChordPackage[],
+  thirdPartyPackages: ThirdPartyPackage[] = [],
+  builtinPackages: string[] = [],
+) {
   const state: ChordPackageManagerState = {
     packages,
     errors: {},
     thirdPartyPackages,
+    builtinPackages,
     personalPackages: [{ dirname: "work", name: "@me/work" }],
   };
   const client = new QueryClient();
@@ -217,4 +223,53 @@ test("app-scoped chords use friendly names while global chords remain available 
   expect(global[0]?.appId).toBeUndefined();
   expect(global[0]?.appLabel).toBe("Every app");
   expect(global[1]?.appId).toBe("com.apple.finder");
+});
+
+test("packages keep their native rank, with installed ones above built-ins", () => {
+  const names = ["@keychord/chords-chord", "@keychord/raycast", "@me/work", "@keychord/warp", "@keychord/finder", "@keychord/spotlight"];
+  const rows = listLibraryPackages(
+    names.map(pkg),
+    new Set(["@me/work"]),
+    {},
+    new Set(["@keychord/finder", "@keychord/spotlight"]),
+  );
+  expect(rows.map((row) => [row.name, row.rank])).toEqual([
+    ["@keychord/chords-chord", "core"],
+    ["@me/work", "personal"],
+    ["@keychord/raycast", "installed"],
+    ["@keychord/warp", "installed"],
+    ["@keychord/finder", "builtin"],
+    ["@keychord/spotlight", "builtin"],
+  ]);
+
+  // Moves stay within their group, and the saved order lists only packages the user ranks.
+  expect(movePackage(rows, "@keychord/warp", -1)).toEqual([
+    "@keychord/warp",
+    "@keychord/raycast",
+    "@keychord/finder",
+    "@keychord/spotlight",
+  ]);
+  expect(movePackage(rows, "@keychord/warp", 1)).toBeUndefined();
+  expect(movePackage(rows, "@keychord/finder", -1)).toBeUndefined();
+  expect(movePackage(rows, "@keychord/raycast", -1)).toBeUndefined();
+  expect(movePackage(rows, "@keychord/chords-chord", 1)).toBeUndefined();
+  expect(movePackage(rows, "@me/work", 1)).toBeUndefined();
+});
+
+test("the library groups installed and built-in packages with move controls", () => {
+  const html = render(
+    ["@keychord/chords-chord", "@keychord/raycast", "@keychord/warp", "@keychord/finder"].map(pkg),
+    [],
+    ["@keychord/finder"],
+  );
+  const installed = html.indexOf(">Installed<");
+  const builtin = html.indexOf(">Built-in<");
+  expect(installed).toBeGreaterThan(html.indexOf('aria-label="Show chords in @keychord/chords-chord"'));
+  expect(builtin).toBeGreaterThan(html.indexOf('aria-label="Show chords in @keychord/warp"'));
+  expect(builtin).toBeLessThan(html.indexOf('aria-label="Show chords in @keychord/finder"'));
+  expect(html).toContain("Installed packages always override them.");
+  expect(html).not.toContain('aria-label="Move @keychord/chords-chord up"');
+  expect(html).toMatch(/aria-label="Move @keychord\/raycast up"[^>]*disabled/);
+  expect(html).toMatch(/aria-label="Move @keychord\/warp up"(?![^>]*disabled)/);
+  expect(html).toMatch(/aria-label="Move @keychord\/finder down"[^>]*disabled/);
 });

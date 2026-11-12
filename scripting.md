@@ -210,6 +210,28 @@ The event name refers to an entry in `[on]`. Every event specifier accepts an ar
 
 Chord keys are literal except for parenthesized regex sections. For example, `hs.(\d+)` matches `hs.12` and captures `12` as `$1`; the dot outside parentheses needs no backslash. Regex syntax, including escaped dots, nested groups, alternatives, and quantifiers, belongs inside the parentheses. Patterns match the entire entered sequence automatically, so no outer `^` or `$` is needed. The same rule applies to regex help hints; compact help ranges retain their special display behavior.
 
+### Which chord runs
+
+When several chords match the completed input, the first one in this order runs:
+
+1. **Ordinary chords before fallbacks.** `fallback = true` marks a catch-all that runs only when no ordinary chord matches, whichever packages define them. Launchers use it: `'/(.*)' = { name = 'Launch: $1', fallback = true, … }` opens `/calendar` in the launcher, while `/f` still opens Finder.
+2. **The focused app before every app.** A file picker's Finder chords come first, then the focused app's chords file, then global chords.
+3. **Package rank.** Chord's core package comes first, then your personal packages in `~/.chord/packages` (by folder name), then the packages you installed, then Chord's built-in default packages. Installed packages always override built-in ones. Rank installed packages, and built-in ones among themselves, under **Settings → Chords → Packages**. A newly installed package starts at the top.
+4. **Within one package, order isn't defined.** Chord reads a chords file's `[chords]` table without its file order, so don't rely on which of two overlapping chords in one package runs. Keep their patterns apart, or make the catch-all a fallback.
+
+For example, the Spotlight package and the Raycast package both define `'/(.*)'` with `fallback = true`. Spotlight's is built in, so once you install the Raycast package, `/calendar` searches Raycast instead.
+
+### Requiring a Chord version
+
+A chord file can require Chord versions with a semver requirement under `[meta]`:
+
+```toml
+[meta]
+version = ">=0.3"
+```
+
+A Chord that doesn't satisfy it leaves the whole file out and reports `requires Chord >=0.3, but this is Chord 0.2.3` among the package's errors in Settings. Chord checks this before anything else in the file, so newer syntax can't cause a different error first. Use it when a file relies on a feature that older Chord would ignore, such as `fallback`. The syntax is Cargo's: `>=0.3` is a minimum, and a bare `0.3` means `^0.3`. Pre-release builds, such as a nightly of the next version, count as that version. Releases before this check ignore `version`.
+
 Handlers receive the entered sequence as `this.input` (for example, `hsr12`), alongside `this.focusedAppId`, `this.focusedWindowId`, and `this.event`. This also works for CLI execution. `this.focusedWindowId` is the Core Graphics window number (the `windowId` of `getAppWindows`) of the focused application's focused, else main, window when the completed input started running. It is `null` for callbacks that run while typing (`@init` and keyboard events) and when no window can be identified.
 
 | Trigger           | When it calls the handler                                                                     |

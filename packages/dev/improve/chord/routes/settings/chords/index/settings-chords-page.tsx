@@ -1,4 +1,6 @@
-import { ChordLibrary, listLibraryPackages } from "#chord-library";
+import { ChordLibrary, listLibraryPackages, movePackage } from "#chord-library";
+import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
+import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { PackageApprovals } from "#package-approvals";
 import {
   Collapsible,
@@ -57,8 +59,19 @@ export function SettingsChordsPageContent({
       packages.filter((pkg) => !personalNames.has(pkg.name)),
       personalNames,
       apps,
+      new Set(chordPackageManagerData.builtinPackages ?? []),
     );
-  }, [packages, personalPackages, apps]);
+  }, [packages, personalPackages, apps, chordPackageManagerData.builtinPackages]);
+  const { mutate: setPackageOrder, isPending: orderPending } = useMutation({
+    mutationFn: (order: string[]) => taurpc.setPackageOrder(order),
+  });
+  const order = {
+    move: (name: string, offset: -1 | 1) => {
+      const next = movePackage(libraryPackages, name, offset);
+      if (next) setPackageOrder(next);
+    },
+    pending: orderPending,
+  };
   // Trust warnings lead only when there is a decision to make. Otherwise, someone new would meet
   // "can run arbitrary code" before seeing a single chord.
   const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
@@ -89,7 +102,12 @@ export function SettingsChordsPageContent({
         className="space-y-7"
       >
         {needsApproval ? approvals : null}
-        <ChordLibrary packages={libraryPackages} apps={apps} personalDirnames={{}} />
+        <ChordLibrary
+          packages={libraryPackages}
+          apps={apps}
+          personalDirnames={{}}
+          order={order}
+        />
         {needsApproval ? null : approvals}
         <Collapsible className="group/sources preference-disclosure">
           <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-5 py-4 text-sm font-normal">

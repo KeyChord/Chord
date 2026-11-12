@@ -71,6 +71,9 @@ pub trait Api {
     async fn set_git_repo_local_link(repo: String, path: Option<String>) -> AppResult<GitRepo>;
     async fn reload_chords() -> AppResult<()>;
     async fn set_package_approvals(identities: Vec<String>, approved: bool) -> AppResult<()>;
+    // Ranks installed and built-in packages by name, highest first. Installed packages still
+    // rank above built-in ones, and Chord's core and personal packages keep their places.
+    async fn set_package_order(order: Vec<String>) -> AppResult<()>;
     async fn set_chord_macro(
         target: ChordMacroName,
         sequence: String,

@@ -124,6 +124,32 @@ impl ParsedChordsFile {
         Ok(meta)
     }
 
+    /// `[meta] version` is a semver requirement on Chord, such as `">=0.3"`, with Cargo's
+    /// syntax: a bare `"0.3"` means `^0.3`. A file this Chord doesn't satisfy is left out with an
+    /// error instead of loading with the features it relies on silently ignored.
+    fn check_chord_version(
+        meta: &HashMap<String, TomlValue>,
+        chord: &semver::Version,
+    ) -> Result<()> {
+        let Some(requirement) = meta.get("version") else {
+            return Ok(());
+        };
+        let requirement = requirement
+            .as_str()
+            .context("`version` in [meta] must be a string, such as \">=0.3\"")?;
+        let parsed = semver::VersionReq::parse(requirement).with_context(|| {
+            format!("`version` in [meta] is not a valid version requirement: {requirement:?}")
+        })?;
+        // A pre-release build, such as a nightly of the next version, has that version's
+        // features. Semver would otherwise exclude it from every requirement without a pre-release.
+        let release = semver::Version::new(chord.major, chord.minor, chord.patch);
+        anyhow::ensure!(
+            parsed.matches(&release),
+            "requires Chord {requirement}, but this is Chord {chord}. Update Chord to load it."
+        );
+        Ok(())
+    }
+
     fn parse_handlers(table: &Table) -> Result<HashMap<String, ChordsFileHandler>> {
         let mut handlers = HashMap::new();
         if let Some(handlers_val) = table.get("on") {
@@ -356,14 +382,26 @@ impl ParsedChordsFile {
         let actions = Self::parse_actions(key, chord)?;
         let trigger = Self::parse_trigger(key, chord)?;
         let chord_name = chord.get("name").and_then(|n| n.as_str());
+        let fallback = match chord.get("fallback") {
+            None => false,
+            Some(value) => value
+                .as_bool()
+                .with_context(|| format!("`fallback` in chord {key:?} must be true or false"))?,
+        };
         Ok(Chord {
             raw_trigger: raw_trigger.to_string(),
             trigger,
             name: chord_name.unwrap_or_default().to_string(),
             index,
             actions,
+            fallback,
         })
     }
+}
+
+/// The running Chord's version, which `[meta] version` requirements are checked against.
+fn chord_version() -> Result<semver::Version> {
+    semver::Version::parse(env!("CARGO_PKG_VERSION")).context("Chord's own version is not semver")
 }
 
 /// Only parenthesized sections are regex; the surrounding chord keys are literal.
@@ -429,6 +467,8 @@ impl ParsedChordsFile {
             .and_then(|v| v.as_str())
             .context("the `name` property must be present")?;
         let meta = Self::parse_meta(root)?;
+        // Before anything else: a file for a newer Chord may use syntax this one rejects.
+        Self::check_chord_version(&meta, &chord_version()?)?;
         let handlers = Self::parse_handlers(root)?;
         let imports = Self::parse_imports(root)?;
         let executables = Self::parse_executables(root)?;
@@ -1015,5 +1055,80 @@ file = "menu"
         let message = format!("{error:#}");
         assert!(message.contains("handler menu"), "{message}");
         assert!(message.contains("swift"), "{message}");
+    }
+
+    #[test]
+    fn chords_opt_into_the_fallback_tier_with_a_boolean() {
+        let file: ParsedChordsFile = r#"
+name = "t"
+[chords]
+'/f' = { name = 'Finder', shell = 'open -a Finder' }
+'/(.*)' = { name = 'Launch $1', shell = 'true', fallback = true }
+'/x(.*)' = { name = 'Invalid', shell = 'true', fallback = 'yes' }
+"#
+        .parse()
+        .unwrap();
+        // Chords come out of the TOML table sorted by trigger, not in file order.
+        let mut chords: Vec<_> = file
+            .chords
+            .iter()
+            .map(|chord| (chord.raw_trigger.as_str(), chord.fallback))
+            .collect();
+        chords.sort();
+        // A non-boolean value is a parse error, so that chord is left out like any other.
+        assert_eq!(chords, [("/(.*)", true), ("/f", false)]);
+    }
+
+    #[test]
+    fn meta_version_is_a_requirement_on_the_running_chord() {
+        let meta = |requirement: TomlValue| HashMap::from([("version".to_string(), requirement)]);
+        let version = |version: &str| semver::Version::parse(version).unwrap();
+        let check = |requirement: &str, chord: &str| {
+            ParsedChordsFile::check_chord_version(&meta(requirement.into()), &version(chord))
+        };
+        assert!(check(">=0.3", "0.3.0").is_ok());
+        assert!(check(">=0.3", "1.2.0").is_ok());
+        assert!(check(">=1.3", "1.2.9").is_err());
+        // A bare version is a caret requirement, as in Cargo.
+        assert!(check("0.3", "0.3.4").is_ok());
+        assert!(check("0.3", "0.4.0").is_err());
+        // A nightly of the next version has that version's features.
+        assert!(check(">=0.3", "0.3.0-nightly.4").is_ok());
+        assert!(check(">=0.2", "0.3.0-nightly.4").is_ok());
+        assert_eq!(
+            format!("{:#}", check(">=1.3", "1.2.9").unwrap_err()),
+            "requires Chord >=1.3, but this is Chord 1.2.9. Update Chord to load it."
+        );
+
+        assert!(ParsedChordsFile::check_chord_version(&HashMap::new(), &version("0.1.0")).is_ok());
+        for invalid in [meta(TomlValue::Integer(1)), meta("at least 1.3".into())] {
+            assert!(ParsedChordsFile::check_chord_version(&invalid, &version("9.0.0")).is_err());
+        }
+    }
+
+    #[test]
+    fn a_file_for_a_newer_chord_is_rejected_before_its_other_contents() {
+        // Without the requirement, the unknown handler kind would be the error.
+        let error = r#"
+name = "t"
+[meta]
+version = ">=999"
+[on.menu]
+kind = "future"
+file = "menu"
+"#
+        .parse::<ParsedChordsFile>()
+        .unwrap_err();
+        let message = format!("{error:#}");
+        assert!(
+            message.starts_with("requires Chord >=999, but this is Chord "),
+            "{message}"
+        );
+
+        let current = format!(">={}", env!("CARGO_PKG_VERSION"));
+        let file: ParsedChordsFile = format!("name = 't'\n[meta]\nversion = '{current}'")
+            .parse()
+            .unwrap();
+        assert_eq!(file.meta["version"].as_str(), Some(current.as_str()));
     }
 }

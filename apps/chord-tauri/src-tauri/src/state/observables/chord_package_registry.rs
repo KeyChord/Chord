@@ -1,15 +1,13 @@
-use crate::app::chord_package_manager::ChordPackage;
-use crate::app::chord_package_store::ChordPackageStoreEntry;
 use crate::define_observable;
 use serde::Serialize;
-use std::collections::HashMap;
 use typeshare::typeshare;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordPackageStoreState {
-    pub entries: HashMap<String, ChordPackageStoreEntry>,
+    /// The user's ranking of installed and built-in packages, by name, highest first.
+    pub order: Vec<String>,
 }
 
 define_observable! {

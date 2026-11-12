@@ -715,6 +715,7 @@ dependencies = [
  "rbun",
  "rdev",
  "regex",
+ "semver",
  "serde",
  "serde_json",
  "shlex",

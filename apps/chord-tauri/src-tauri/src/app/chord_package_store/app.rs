@@ -15,6 +15,6 @@ pub struct ChordPackageStoreProvider {
 
 impl AppSingleton for ChordPackageStore {
     fn init(&self) -> anyhow::Result<()> {
-        Ok(())
+        self.publish()
     }
 }

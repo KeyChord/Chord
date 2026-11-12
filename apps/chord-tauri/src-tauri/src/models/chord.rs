@@ -40,6 +40,10 @@ pub struct Chord {
 
     /// A list of actions (as fallbacks) to execute when the chord is triggered
     pub actions: Vec<ChordAction>,
+
+    /// A catch-all, such as the `/(.*)` launcher: it runs only when no ordinary chord matches,
+    /// whichever packages define them.
+    pub fallback: bool,
 }
 
 impl Chord {

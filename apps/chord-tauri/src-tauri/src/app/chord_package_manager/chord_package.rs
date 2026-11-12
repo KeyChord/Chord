@@ -92,16 +92,25 @@ impl ChordPackage {
         &self,
         event: &ChordInputEvent,
     ) -> Option<ChordReference> {
-        self.matching_app_chords(event)
+        let runnable = |reference: &ChordReference| {
+            reference
+                .chord
+                .actions
+                .iter()
+                .any(|action| action.trigger() == ChordEventTrigger::Input)
+        };
+        let matches: Vec<_> = self
+            .matching_app_chords(event)
             .into_iter()
             .chain(self.matching_global_chords(event))
-            .find(|reference| {
-                reference
-                    .chord
-                    .actions
-                    .iter()
-                    .any(|action| action.trigger() == ChordEventTrigger::Input)
-            })
+            .filter(runnable)
+            .collect();
+        // Same rule as the cross-package resolver: a fallback runs only when nothing else does.
+        matches
+            .iter()
+            .find(|reference| !reference.chord.fallback)
+            .or_else(|| matches.first())
+            .cloned()
     }
 
     pub fn resolve_task(

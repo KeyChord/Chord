@@ -62,6 +62,11 @@ export interface Chord {
 	index: number;
 	/** A list of actions (as fallbacks) to execute when the chord is triggered */
 	actions: ChordAction[];
+	/**
+	 * A catch-all, such as the `/(.*)` launcher: it runs only when no ordinary chord matches,
+	 * whichever packages define them.
+	 */
+	fallback: boolean;
 }
 
 export interface ChordInputEvent {
@@ -266,7 +271,13 @@ export interface ThirdPartyPackage {
 }
 
 export interface ChordPackageManagerState {
+	/**
+	 * Loaded packages, highest rank first: Chord's core package, personal packages, installed
+	 * packages in the user's order, then built-in packages.
+	 */
 	packages: ChordPackage[];
+	/** Names of Chord's built-in (default) packages, which rank below every installed package. */
+	builtinPackages: string[];
 	/**
 	 * Problems from the last reload, by package name. Files that failed are left out of their
 	 * package, which otherwise stays loaded.
@@ -278,12 +289,9 @@ export interface ChordPackageManagerState {
 	thirdPartyPackages: ThirdPartyPackage[];
 }
 
-export interface ChordPackageStoreEntry {
-	priority: number;
-}
-
 export interface ChordPackageStoreState {
-	entries: Record<string, ChordPackageStoreEntry>;
+	/** The user's ranking of installed and built-in packages, by name, highest first. */
+	order: string[];
 }
 
 export enum ChordLayout {
