@@ -97,7 +97,7 @@ function LaunchOnLoginCardContent({
           <SettingSwitchRow
             id="hide-hint-panel-by-default"
             label="Hide Hint Panel by default"
-            description="Start chord mode with the Hint Panel hidden. Press Shift+Tab to reveal it when needed."
+            description="Start chord mode with the Hint Panel hidden. Press Tab to reveal it when needed."
             checked={settings.isChordPanelHiddenByDefault}
             disabled={toggleHideHintPanelByDefaultMutation.isPending}
             onCheckedChange={() => {

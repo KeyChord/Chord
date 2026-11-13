@@ -221,7 +221,7 @@ impl ChordModePanel {
     pub fn preload(&self) -> Result<()> {
         log::info!("Preloading chorder panel");
 
-        if self.ensure_visible()? {
+        if self.ensure_visible(true)? {
             self.prepare_surface_before_reveal()?;
             self.ensure_hidden()?;
         }
@@ -404,9 +404,11 @@ impl ChordModePanel {
         Ok(true)
     }
 
-    pub fn ensure_visible(&self) -> Result<bool> {
+    /// Orders the panel's window in. `is_hint_panel_visible` is whether the Hint Panel
+    /// is drawn in it; a hidden one is a `toggle` away.
+    pub fn ensure_visible(&self, is_hint_panel_visible: bool) -> Result<bool> {
         self.observable.set_state(|prev| ChordPanelState {
-            is_visible: true,
+            is_visible: is_hint_panel_visible,
             ..prev
         })?;
         self.show()?;

@@ -189,6 +189,21 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     if (layout === ChordLayout.SidebarLeft) expect(html).toContain(">1-9</kbd>");
   });
 
+  test(`${layout} moves a hidden Hint Panel off screen until Tab shows it`, () => {
+    const render = (isVisible: boolean) => renderToString(<ChordsPageContent
+      chordInputData={{ input: [], quotes: [], inserting: false, blocks: [], openBlock: false }}
+      chordPanelData={{ isVisible, layout }}
+      frontmostData={{ filePickerActive: false }}
+      chordPackageManagerData={{ packages: [], errors: {}, personalPackages: [], thirdPartyPackages: [], builtinPackages: [] }}
+      chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+      chordMacrosData={{ entries: [] }}
+    />);
+    const offScreen = layout === ChordLayout.FloatingBottom ? "translateY(calc(100% + 40px))" : "translateX(calc(-100% - 40px))";
+    expect(render(false)).toContain(`transform:${offScreen};opacity:0`);
+    expect(render(true)).not.toContain(offScreen);
+    expect(render(true)).toContain("opacity:1");
+  });
+
   const renderInput = (chordInputData: Parameters<typeof ChordsPageContent>[0]["chordInputData"]) => renderToString(<ChordsPageContent
     chordInputData={chordInputData}
     chordPanelData={{ isVisible: true, layout }}

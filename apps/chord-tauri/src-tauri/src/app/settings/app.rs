@@ -20,6 +20,9 @@ impl AppSingleton for AppSettings {
         if let Err(error) = self.refresh_cli_installation() {
             log::warn!("Could not refresh command line installation: {error:#}");
         }
+        if let Err(error) = self.load_preferences() {
+            log::warn!("Could not restore the saved preferences: {error:#}");
+        }
         if let Err(error) = self.load_settings_sidebar() {
             log::warn!("Could not restore the Settings sidebar: {error:#}");
         }

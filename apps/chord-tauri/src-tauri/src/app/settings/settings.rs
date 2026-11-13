@@ -56,6 +56,13 @@ impl AppSettings {
         })
     }
 
+    /// Whether chord mode starts with the Hint Panel hidden; Tab reveals it.
+    pub fn is_hint_panel_hidden_by_default(&self) -> bool {
+        self.observable
+            .get_state()
+            .is_ok_and(|state| state.is_chord_panel_hidden_by_default)
+    }
+
     pub fn load_settings_sidebar(&self) -> anyhow::Result<()> {
         let collapsed = Self::read_bool_setting(
             &self.handle,
@@ -137,7 +144,6 @@ impl AppSettings {
     fn apply_state(&self, state: &AppSettingsState) -> anyhow::Result<()> {
         self.apply_menu_bar_icon_visibility(state.show_menu_bar_icon)?;
         self.apply_dock_icon_visibility(state.show_dock_icon)?;
-        // self.apply_hint_panel_visibility(!state.is_chord_panel_hidden_by_default)?;
         Ok(())
     }
 
@@ -156,39 +162,27 @@ impl AppSettings {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn load_state(handle: &AppHandle) -> anyhow::Result<AppSettingsState> {
+    /// Restores what `save_state` wrote. Without it every launch starts from the defaults,
+    /// and the next toggle saves those defaults over the other preferences.
+    pub fn load_preferences(&self) -> anyhow::Result<()> {
         let defaults = AppSettingsState::default();
-
-        Ok(AppSettingsState {
-            cli_command: defaults.cli_command,
-            is_cli_installed: defaults.is_cli_installed,
-            bundle_ids_needing_relaunch: defaults.bundle_ids_needing_relaunch,
-            show_menu_bar_icon: Self::read_bool_setting(
-                handle,
-                SHOW_MENU_BAR_ICON_KEY,
-                defaults.show_menu_bar_icon,
-            )?,
-            show_dock_icon: Self::read_bool_setting(
-                handle,
-                SHOW_DOCK_ICON_KEY,
-                defaults.show_dock_icon,
-            )?,
-            is_chord_panel_hidden_by_default: Self::read_bool_setting(
-                handle,
-                HIDE_HINT_PANEL_BY_DEFAULT_KEY,
-                defaults.is_chord_panel_hidden_by_default,
-            )?,
-            is_onboarding_complete: Self::read_bool_setting(
-                handle,
-                ONBOARDING_COMPLETE_KEY,
-                defaults.is_onboarding_complete,
-            )?,
-            is_settings_sidebar_collapsed: Self::read_bool_setting(
-                handle,
-                SETTINGS_SIDEBAR_COLLAPSED_KEY,
-                defaults.is_settings_sidebar_collapsed,
-            )?,
+        let show_menu_bar_icon = Self::read_bool_setting(
+            &self.handle,
+            SHOW_MENU_BAR_ICON_KEY,
+            defaults.show_menu_bar_icon,
+        )?;
+        let show_dock_icon =
+            Self::read_bool_setting(&self.handle, SHOW_DOCK_ICON_KEY, defaults.show_dock_icon)?;
+        let is_chord_panel_hidden_by_default = Self::read_bool_setting(
+            &self.handle,
+            HIDE_HINT_PANEL_BY_DEFAULT_KEY,
+            defaults.is_chord_panel_hidden_by_default,
+        )?;
+        self.observable.set_state(|state| AppSettingsState {
+            show_menu_bar_icon,
+            show_dock_icon,
+            is_chord_panel_hidden_by_default,
+            ..state
         })
     }
 

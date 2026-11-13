@@ -5,7 +5,7 @@ use crate::app::chord_runner::release_chord_sequences;
 use crate::app::state::AppSingleton;
 use crate::models::{
     ChordEventTrigger, ChordInputEvent, ChordKeyboardEvent, ChordMacroName, ChordMacros, Key,
-    KeyEvent, MetaChordCommand, expand_typed_reference, select_escape,
+    KeyEvent, MetaChordCommand, expand_typed_reference, has_pending_escape, select_escape,
 };
 use crate::state::{
     ChordExecutionObservable, ChordInputObservable, ChordInputState, ChordMacrosObservable,
@@ -188,23 +188,6 @@ impl ChordInputManager {
             return self.dispatch_current_buffer(&press_triggers, &event);
         }
         let is_shift_pressed = event.shift_key;
-        if Self::should_toggle_indicator_for_tab_event(key_event, is_shift_pressed) {
-            if matches!(key_event, KeyEvent::Press(_)) {
-                self.handle
-                    .app_state()
-                    .chord_mode_manager()
-                    .panel
-                    .toggle()?;
-            }
-            return self.dispatch_current_buffer(
-                if matches!(key_event, KeyEvent::Press(_)) {
-                    &press_triggers
-                } else {
-                    &[ChordEventTrigger::Keyup]
-                },
-                &event,
-            );
-        }
         if Key::modifiers().contains(key)
             || device_keys
                 .iter()
@@ -272,12 +255,20 @@ impl ChordInputManager {
                 self.dispatch_current_buffer(&press_triggers, &event)?;
             }
             KeyEvent::Press(Key(KeyMappingCode::Tab)) => {
-                // Typed escapes other than complete macro references expand only on Tab.
                 let state = self.observable.get_state()?;
-                let selected = select_escape(&state.input, &self.sequence.lock().macros)?;
-                if let Some(input) = selected {
-                    let blocks = rebase_blocks(state.blocks, &state.input, &input);
-                    self.edit_buffer(input, blocks, state.open_block, state.quotes, false)?;
+                if tab_toggles_hint_panel(&state.input) {
+                    self.handle
+                        .app_state()
+                        .chord_mode_manager()
+                        .panel
+                        .toggle()?;
+                } else {
+                    // Typed escapes other than complete macro references expand only on Tab.
+                    let selected = select_escape(&state.input, &self.sequence.lock().macros)?;
+                    if let Some(input) = selected {
+                        let blocks = rebase_blocks(state.blocks, &state.input, &input);
+                        self.edit_buffer(input, blocks, state.open_block, state.quotes, false)?;
+                    }
                 }
                 self.dispatch_current_buffer(&press_triggers, &event)?;
             }
@@ -607,13 +598,6 @@ impl ChordInputManager {
         state.has_loose_keys() && state.selected_input_event.is_none()
     }
 
-    fn should_toggle_indicator_for_tab_event(key_event: &KeyEvent, is_shift_pressed: bool) -> bool {
-        matches!(
-            key_event,
-            KeyEvent::Press(Key(KeyMappingCode::Tab)) | KeyEvent::Release(Key(KeyMappingCode::Tab))
-        ) && is_shift_pressed
-    }
-
     /// Backspace removes the last key after the blocks, else the whole last block.
     fn next_key_buffer_for_key_press(key_buffer: &[Key], blocks: &[u32], key: &Key) -> Vec<Key> {
         let mut next_key_buffer = key_buffer.to_vec();
@@ -869,6 +853,12 @@ fn type_into_quote(
     }
 }
 
+/// Tab shows or hides the Hint Panel, unless a typed escape waits for it: then Tab
+/// belongs to the escape, whether or not anything matches what was typed.
+fn tab_toggles_hint_panel(input: &[Key]) -> bool {
+    !has_pending_escape(input)
+}
+
 fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
     match key_event {
         KeyEvent::Press(key) => held_keys.insert(*key),
@@ -1068,6 +1058,25 @@ mod tests {
         // A block left empty is dropped.
         assert_eq!(rebase_blocks(vec![1, 3], &keys("gde"), &keys("gxy")), vec![1]);
         assert_eq!(rebase_blocks(vec![1], &keys("g"), &keys("x")), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn tab_toggles_the_hint_panel_unless_an_escape_waits_for_it() {
+        // Typing produces each character's key; escapes are never parsed as notation.
+        let typed = |input: &str| -> Vec<Key> {
+            input
+                .chars()
+                .map(|c| c.to_string().parse().unwrap())
+                .collect()
+        };
+        // An empty buffer, ordinary keys, and a numbered buffer, which needs no Tab.
+        for input in ["", "gd", r"b\1c"] {
+            assert!(tab_toggles_hint_panel(&typed(input)), "{input}");
+        }
+        // The escape keeps Tab even when nothing matches what was typed.
+        for input in [r"\", r"a\u", r"a\up", r"gd\zz", r"\size="] {
+            assert!(!tab_toggles_hint_panel(&typed(input)), "{input}");
+        }
     }
 
     #[test]

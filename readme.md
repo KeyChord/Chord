@@ -25,6 +25,8 @@ _Only <kbd>␣</kbd> needs to stay pressed; you should release <kbd>⇪</kbd> af
 
 In _Chord Mode_, any keys you type will be intercepted by Chord as input. These key events won't be passed to the focused application.
 
+While _Chord Mode_ is active, the _Hint Panel_ shows what you've typed and which keys can come next. Press <kbd>Tab</kbd> to hide it, and again to show it. To start with it hidden, turn on **Hide Hint Panel by default** in Chord's settings (General → Application).
+
 ## Triggering a Chord
 
 > Chords can only be triggered in _Chord Mode_, so make sure to keep <kbd>␣</kbd> held down!

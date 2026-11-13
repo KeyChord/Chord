@@ -1,3 +1,4 @@
+use crate::app::AppHandleExt;
 use crate::app::chord_mode_manager::{ChordInputManager, ChordModePanel, NativeSurfaceRect};
 use crate::models::{Key, KeyEvent};
 use crate::state::{
@@ -92,7 +93,12 @@ impl ChordModeManager {
 
     pub fn ensure_active(&self) -> Result<()> {
         log::debug!("Activating Chord Mode");
-        if self.panel.ensure_visible()? {
+        let is_hint_panel_hidden = self
+            .handle
+            .app_state()
+            .settings()
+            .is_hint_panel_hidden_by_default();
+        if self.panel.ensure_visible(!is_hint_panel_hidden)? {
             let _ = self.panel.prepare_surface_before_reveal();
             self.panel.reveal()?;
         }

@@ -134,7 +134,9 @@ For example, `'a\up'` matches `a` followed by the Up arrow. In chord mode, a typ
 escape never expands on its own: `\up` stays three keys, and the input stays pending,
 until Tab replaces it with the highlighted suggestion. Any unambiguous prefix works,
 so `\u` then Tab enters the Up arrow, as does `\up` then Tab. Numbered buffer
-references (`\1`–`\9`) are the exception and need no Tab. Backslash is reserved for
+references (`\1`–`\9`) are the exception and need no Tab. Tab belongs to an escape
+only while one is waiting for it; otherwise Tab shows or hides the Hint Panel.
+Backslash is reserved for
 special keys and macro references; bare or unknown escapes cannot define chords or
 help hints. Inside parenthesized regex sections, backslash keeps its regex meaning
 (for example, `(\d+)`). Use literal TOML strings (single quotes) to preserve
