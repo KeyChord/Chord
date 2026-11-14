@@ -657,12 +657,17 @@ release, so `https://github.com/KeyChord/Chord/releases/latest` always serves pr
 the `com.leonsilicon.chord.beta` application identifier, while local development uses
 `com.leonsilicon.chord.development` and production uses `com.leonsilicon.chord`. This keeps each
 channel's settings, packages, caches, logs, and other application-scoped data separate. Each run
-replaces the previous assets, so the download URLs stay stable.
+replaces the previous disk images, so their download URLs stay stable.
 
 Installed copies find updates in `latest.json`, which the publish job writes beside the signed
 `.app.tar.gz` archives. They check at launch and once a day, and offer a higher version on a card
 in the bottom left of Settings and in the tray menu. Nothing downloads until someone clicks Update,
-and the new build takes over on Restart or the next launch. So raise `version` in
+which checks again first and installs the newest release; the new build takes over on Restart or
+the next launch. Each archive is named after its version and a hash of its contents, such as
+`Chord-0.2.9-aarch64-<hash>.app.tar.gz`, and is never replaced or deleted: a copy that can't check
+again still downloads exactly the bytes its signature covers. (Through 0.2.8 every release
+overwrote `Chord-<arch>.app.tar.gz`, so an offer older than the newest release failed with "The
+signature verification failed".) So raise `version` in
 `apps/chord-tauri/src-tauri/tauri.conf.json` and `Cargo.toml`
 for every production release: the publish job refuses one that isn't higher than what's out. To try
 an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` set to another
@@ -751,7 +756,7 @@ refuse it for every new user.
 | --- | --- |
 | `APPLE_DEVELOPER_CERTIFICATE_FILE_BASE64`, `APPLE_DEVELOPER_CERTIFICATE_PASSWORD` | Signs with a Developer ID certificate instead of ad-hoc |
 | `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` | Notarizes and staples the app and the disk image |
-| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater archive (`Chord-<arch>.app.tar.gz` and its `.sig`) |
+| `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Produces the signed updater archive and the signature that `latest.json` carries |
 
 The updater artifact is only built when `TAURI_SIGNING_PRIVATE_KEY` is set: Tauri fails the build if
 an updater bundle is requested while `plugins.updater.pubkey` is configured without a private key.

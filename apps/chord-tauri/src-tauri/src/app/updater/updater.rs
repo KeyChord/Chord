@@ -69,6 +69,12 @@ impl AppUpdater {
         if self.state()?.is_applying() {
             return Ok(());
         }
+        let update = self.fetch().await?;
+        self.record_check(update)
+    }
+
+    /// Reads `latest.json`: the newest release, if it's newer than this build.
+    async fn fetch(&self) -> Result<Option<Update>> {
         let mut builder = self.handle.updater_builder();
         if let Some(endpoint) = std::env::var(ENDPOINT_ENV)
             .ok()
@@ -77,8 +83,7 @@ impl AppUpdater {
             log::info!("Checking for updates at {endpoint}");
             builder = builder.endpoints(vec![Url::parse(&endpoint)?])?;
         }
-        let update = builder.build()?.check().await?;
-        self.record_check(update)
+        Ok(builder.build()?.check().await?)
     }
 
     fn record_check(&self, update: Option<Update>) -> Result<()> {
@@ -103,13 +108,50 @@ impl AppUpdater {
         self.refresh_tray()
     }
 
-    /// Downloads and installs the release on offer. Chord keeps running the old build until it
+    /// Downloads and installs the newest release. Chord keeps running the old build until it
     /// restarts. Returns once that's done, and does nothing if there's no update to start.
     pub async fn install(&self) -> Result<()> {
-        let Some(update) = self.begin_install()? else {
+        let result = self.try_install().await;
+        if let Err(error) = &result {
+            log::error!("Couldn't install the Chord update: {error:#}");
+        }
+        result
+    }
+
+    async fn try_install(&self) -> Result<()> {
+        let Some(offered) = self.begin_install()? else {
             return Ok(());
         };
+        let offered_version = offered.version.clone();
+        // The offer is from the last check, up to a day old, and a newer release may be out.
+        // Ask again, so this installs the newest one and not one that was superseded.
+        let update = match self.fetch().await {
+            Ok(Some(update)) => update,
+            Ok(None) => {
+                log::info!(
+                    "Chord {} is no longer offered; nothing newer than {} is published",
+                    offered.version,
+                    offered.current_version
+                );
+                *self.found.lock().expect("poisoned") = None;
+                return self.publish(AppUpdateState::Idle);
+            }
+            Err(error) => {
+                log::warn!(
+                    "Couldn't check for a newer release before updating; installing the offered {}: {error:#}",
+                    offered.version
+                );
+                offered
+            }
+        };
+        *self.found.lock().expect("poisoned") = Some(update.clone());
         let version = update.version.clone();
+        if version != offered_version {
+            self.publish(AppUpdateState::Downloading {
+                version: version.clone(),
+                percent: None,
+            })?;
+        }
         log::info!("Installing Chord {version} over {}", update.current_version);
         match self.download_and_install(update).await {
             Ok(()) => {
@@ -187,8 +229,8 @@ impl AppUpdater {
             Ok(AppUpdateState::Available { .. }) => {
                 let handle = self.handle.clone();
                 tauri::async_runtime::spawn(async move {
+                    // `install` has logged the failure.
                     if let Err(error) = handle.app_state().app_updater().install().await {
-                        log::error!("Couldn't install the Chord update: {error:#}");
                         handle
                             .dialog()
                             .message(format!("Chord couldn't install the update: {error:#}"))
