@@ -146,24 +146,17 @@ impl ChordInputManager {
         self.reset_matching_chords()
     }
 
+    /// Starts following the keys held for a chord, from the modifiers already held as
+    /// Chord mode begins.
+    pub fn begin(&self, held_modifiers: Vec<Key>) {
+        *self.held_keys.lock() = held_modifiers.into_iter().collect();
+    }
+
     // Called only while Chord mode is active.
     pub fn handle_key_event(&self, key_event: &KeyEvent) -> Result<()> {
-        let fresh_press = should_handle_held_key_event(&mut self.held_keys.lock(), key_event);
+        let event = track_key_event(&mut self.held_keys.lock(), key_event);
+        let fresh_press = !event.repeat;
         let (KeyEvent::Press(key) | KeyEvent::Release(key)) = key_event;
-        let keyboard = self.handle.app_state().keyboard();
-        let Some(mut device_keys) = keyboard.state().keys() else {
-            return Ok(());
-        };
-        // Account for the event even if the OS key-state query has not caught up yet.
-        match key_event {
-            KeyEvent::Press(_) => {
-                if !device_keys.contains(key) {
-                    device_keys.push(*key);
-                }
-            }
-            KeyEvent::Release(_) => device_keys.retain(|held| held != key),
-        }
-        let event = ChordKeyboardEvent::new(key_event, &device_keys, !fresh_press);
         let press_triggers = [ChordEventTrigger::Keydown, ChordEventTrigger::Keypress];
         // Releasing Shift makes the block typed while it was held solid.
         if !event.shift_key {
@@ -189,7 +182,9 @@ impl ChordInputManager {
         }
         let is_shift_pressed = event.shift_key;
         if Key::modifiers().contains(key)
-            || device_keys
+            || self
+                .held_keys
+                .lock()
                 .iter()
                 .any(|key| Key::non_shift_modifiers().contains(key))
         {
@@ -859,6 +854,17 @@ fn tab_toggles_hint_panel(input: &[Key]) -> bool {
     !has_pending_escape(input)
 }
 
+/// Records `key_event` in `held_keys` and returns its handler event, with the
+/// modifiers held as of that event. The held keys follow the event order, as in
+/// insert mode. The OS key-state query cannot stand in: it reads the keyboard later
+/// than the event, and from the session, which never receives the keys Chord
+/// consumes, so Shift pressed during a chord would read as released.
+fn track_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> ChordKeyboardEvent {
+    let fresh = should_handle_held_key_event(held_keys, key_event);
+    let held: Vec<Key> = held_keys.iter().copied().collect();
+    ChordKeyboardEvent::new(key_event, &held, !fresh)
+}
+
 fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEvent) -> bool {
     match key_event {
         KeyEvent::Press(key) => held_keys.insert(*key),
@@ -998,6 +1004,26 @@ mod tests {
         assert_eq!(backspace("gdef", &[1, 3]), ("gde".into(), vec![1, 3]));
         assert_eq!(backspace("gde", &[1, 3]), ("g".into(), vec![1]));
         assert_eq!(backspace("g", &[1]), ("".into(), vec![]));
+    }
+
+    #[test]
+    fn handler_events_take_modifiers_from_the_keys_held_in_event_order() {
+        use KeyEvent::{Press, Release};
+        use KeyMappingCode::*;
+        let mut held = HashSet::new();
+        let mut track = |event: KeyEvent| track_key_event(&mut held, &event);
+        // Shift+; then Shift released before `;`: the press is shifted, the release not.
+        assert!(track(Press(Key(ShiftLeft))).shift_key);
+        let semicolon = track(Press(Key(Semicolon)));
+        assert!(semicolon.shift_key && !semicolon.repeat);
+        assert!(!track(Release(Key(ShiftLeft))).shift_key);
+        assert!(!track(Release(Key(Semicolon))).shift_key);
+        // A press of a key already held is a repeat.
+        assert!(!track(Press(Key(KeyL))).repeat);
+        assert!(track(Press(Key(KeyL))).repeat);
+        // Modifiers held as Chord mode began count from the first key.
+        let mut held = HashSet::from([Key(ShiftRight)]);
+        assert!(track_key_event(&mut held, &Press(Key(KeyG))).shift_key);
     }
 
     #[test]

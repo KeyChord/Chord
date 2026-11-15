@@ -93,6 +93,8 @@ impl ChordModeManager {
 
     pub fn ensure_active(&self) -> Result<()> {
         log::debug!("Activating Chord Mode");
+        self.input_manager
+            .begin(crate::app::keyboard::AppKeyboard::held_modifier_keys());
         let is_hint_panel_hidden = self
             .handle
             .app_state()

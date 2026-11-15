@@ -11,6 +11,8 @@ const previousWindow = globalThis.window;
 globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { SettingsChordsPageContent } = await import("#settings-chords-page");
 const { listLibraryChords, listLibraryPackages, movePackage } = await import("#chord-library");
+const { listPlaceholders, PlaceholderChordsCardContent } =
+  await import("@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card");
 afterAll(() => {
   globalThis.window = previousWindow;
 });
@@ -27,6 +29,7 @@ function pkg(name: string): ChordPackage {
         meta: {},
         handlers: [],
         executables: [],
+        placeholders: [],
         chordHints: [],
         chords: [
           {
@@ -272,4 +275,29 @@ test("the library groups installed and built-in packages with move controls", ()
   expect(html).toMatch(/aria-label="Move @keychord\/raycast up"[^>]*disabled/);
   expect(html).toMatch(/aria-label="Move @keychord\/warp up"(?![^>]*disabled)/);
   expect(html).toMatch(/aria-label="Move @keychord\/finder down"[^>]*disabled/);
+});
+
+test("placeholders list each declared <name> with its keys and default", () => {
+  const rift = pkg("@keychord/chords-rift");
+  const placeholder = { name: "p", label: "Window management prefix", default: ";", assigned: "-" };
+  rift.compiledChordsFiles["chords/macos.toml"]!.placeholders = [placeholder];
+  const entries = listPlaceholders([pkg("@keychord/finder"), rift]);
+  expect(entries).toEqual([
+    { packageName: "@keychord/chords-rift", pathslug: "chords/macos.toml", placeholder },
+  ]);
+
+  const card = (rows: typeof entries) =>
+    renderToString(
+      <QueryClientProvider client={new QueryClient()}>
+        <PlaceholderChordsCardContent entries={rows} apps={{}} />
+      </QueryClientProvider>,
+    ).replaceAll("<!-- -->", "");
+  const html = card(entries);
+  expect(html).toContain("Window management prefix");
+  expect(html).toContain("&lt;p&gt;");
+  expect(html).toMatch(/Default <code[^>]*>;<\/code>/);
+  expect(html).toMatch(/<input[^>]*value="-"/);
+  expect(html).toContain("Use default");
+  // Nothing to configure, so no card.
+  expect(card([])).toBe("");
 });

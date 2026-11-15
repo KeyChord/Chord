@@ -272,9 +272,13 @@ fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
         .collect()
 }
 
-fn parse_package_chords_file(path: &Path, contents: &str) -> Result<ParsedChordsFile> {
-    contents
-        .parse()
+/// `assigned` holds the user's placeholder values for this file, by placeholder name.
+fn parse_package_chords_file(
+    path: &Path,
+    contents: &str,
+    assigned: &HashMap<String, String>,
+) -> Result<ParsedChordsFile> {
+    ParsedChordsFile::parse_with_placeholders(contents, assigned)
         .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
@@ -369,7 +373,7 @@ name = "System Preferences"
 'gwa' = { name = "Goto: Wallpaper" }
 'gwa' = { name = "Goto: Wallet & Apple Pay" }
 "#;
-        let error = parse_package_chords_file(path, contents).unwrap_err();
+        let error = parse_package_chords_file(path, contents, &HashMap::new()).unwrap_err();
         let details = format!("{error:#}");
         assert!(details.contains(&path.display().to_string()));
         assert!(details.contains("duplicate key"));
@@ -397,7 +401,7 @@ file = 42
         toml::from_str::<RawChordsFile>(contents).unwrap();
         let error = format!(
             "{:#}",
-            parse_package_chords_file(path, contents).unwrap_err()
+            parse_package_chords_file(path, contents, &HashMap::new()).unwrap_err()
         );
         assert!(error.contains("chords/macos.toml"));
         assert!(error.contains("handler must have the file key"));
@@ -438,6 +442,7 @@ file = 42
         let parsed = parse_package_chords_file(
             Path::new("chords/macos.toml"),
             "name = 'Valid'\n[chords]\n'/,' = { shell = 'open -b com.apple.systempreferences' }",
+            &HashMap::new(),
         )
         .unwrap();
         assert_eq!(parsed.chords.len(), 1);
@@ -889,6 +894,17 @@ impl ChordPackageManager {
         let mut global_chords = Vec::new();
         let mut parsed_chords_files = HashMap::new();
         let mut errors = Vec::new();
+        // Without the saved values, files still load with their placeholder defaults.
+        let assigned_placeholders = self
+            .handle
+            .app_state()
+            .placeholder_chord_store()
+            .assigned_for_package(&name)
+            .unwrap_or_else(|error| {
+                log::warn!("couldn't read placeholder values for {name}: {error:#}");
+                HashMap::new()
+            });
+        let no_assigned_placeholders = HashMap::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
             let Ok(raw) = toml::from_str::<RawChordsFile>(&contents)
@@ -904,7 +920,12 @@ impl ChordPackageManager {
             let parsed = if is_core_chords_file(&name, &path) {
                 ParsedChordsFile::parse_core(&contents)
                     .with_context(|| format!("Failed to parse protected core file {}", path.display()))
-            } else { parse_package_chords_file(&path, &contents) };
+            } else {
+                let assigned = assigned_placeholders
+                    .get(path.to_string_lossy().as_ref())
+                    .unwrap_or(&no_assigned_placeholders);
+                parse_package_chords_file(&path, &contents, assigned)
+            };
             match parsed {
                 Ok(parsed) => {
                     parsed_chords_files.insert(path, parsed);
@@ -1150,6 +1171,7 @@ impl ChordPackageManager {
             executables: chords_file.executables.clone(),
             chords,
             chord_hints,
+            placeholders: chords_file.placeholders.clone(),
         })
     }
 
@@ -1324,6 +1346,7 @@ mod executable_app_ids_tests {
                     executables: parsed.executables,
                     chords: parsed.chords,
                     chord_hints: parsed.chord_hints,
+                    placeholders: parsed.placeholders,
                 };
                 (path, file)
             })
@@ -1494,6 +1517,7 @@ mod file_picker_tests {
             meta: parsed.meta,
             chords: parsed.chords,
             chord_hints: parsed.chord_hints,
+            placeholders: parsed.placeholders,
             handlers: vec![],
             executables: parsed.executables,
         };

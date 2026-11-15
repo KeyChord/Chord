@@ -25,6 +25,7 @@
 		"@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.personal-chords": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
 		"lucide-react": "^1.57.0",
 		"react": "^19.3.1",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",

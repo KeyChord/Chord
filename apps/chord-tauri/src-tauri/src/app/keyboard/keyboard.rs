@@ -678,6 +678,14 @@ impl AppKeyboard {
         }
     }
 
+    /// The modifier keys held right now, by the keyboard's own flags. They include
+    /// keys Chord consumed and stay correct under Secure Input.
+    pub fn held_modifier_keys() -> Vec<Key> {
+        super::tap::held_modifier_keys(
+            CGEventSource::flags_state(CGEventSourceStateID::HIDSystemState).bits(),
+        )
+    }
+
     /// Whether the keyboard reports Caps Lock as on. Unlike the key-state query, the
     /// modifier flags stay correct under Secure Input.
     fn caps_lock_flag() -> bool {
@@ -782,15 +790,6 @@ impl AppKeyboard {
         if self.catching_keys.swap(true, Ordering::SeqCst) {
             return;
         }
-        // The OS key-state query is blind too, so the held keys are kept from events:
-        // the modifiers and Caps now, then every key that reaches the window.
-        let mut held = super::tap::held_modifier_keys(
-            CGEventSource::flags_state(CGEventSourceStateID::HIDSystemState).bits(),
-        );
-        if self.keyboard_state.is_caps_pressed() {
-            held.push(Key(KeyMappingCode::CapsLock));
-        }
-        self.keyboard_state.track_keys(held);
         if let Err(error) = key_catcher::show(&self.handle) {
             log::error!("Could not take the keyboard for the chord: {error:#}");
         }
@@ -800,7 +799,6 @@ impl AppKeyboard {
     /// nothing was taken.
     fn stop_catching_keys(&self) {
         if self.catching_keys.swap(false, Ordering::SeqCst) {
-            self.keyboard_state.stop_tracking_keys();
             if objc2_foundation::MainThreadMarker::new().is_some() {
                 key_catcher::hide();
             } else if let Err(error) = self.handle.run_on_main_thread(key_catcher::hide) {

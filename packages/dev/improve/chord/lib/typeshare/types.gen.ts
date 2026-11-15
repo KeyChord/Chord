@@ -223,6 +223,22 @@ export interface CompiledChordsFileHandler {
 	handlerId: string;
 }
 
+/**
+ * A `<name>` in chord and hint keys that a chords file declares under `[placeholders]`, such as
+ * `p = { name = 'Prefix', default = ';' }` for keys like `'<p>q'`. Chord replaces it with the
+ * value the user set in Settings, or else the default. A chord or hint that uses a placeholder
+ * with neither is left out. Angle brackets around an undeclared name stay literal keys.
+ */
+export interface ChordsFilePlaceholder {
+	/** The name between the angle brackets: `p` for `<p>`. */
+	name: string;
+	/** What the placeholder is for, shown in Settings. */
+	label?: string;
+	default?: string;
+	/** The user's value from Settings, which replaces the default. */
+	assigned?: string;
+}
+
 /** A chords file that has imports inlined. */
 export interface CompiledChordsFile {
 	name: string;
@@ -232,6 +248,8 @@ export interface CompiledChordsFile {
 	executables: string[];
 	chords: Chord[];
 	chordHints: ChordHint[];
+	/** This file's own placeholders. An imported file's are listed with that file. */
+	placeholders: ChordsFilePlaceholder[];
 }
 
 export interface ChordReference {
@@ -416,6 +434,8 @@ export interface ParsedChordsFile {
 	executables: string[];
 	chords: Chord[];
 	chordHints: ChordHint[];
+	/** The `[placeholders]` this file declares, with the values its chords were expanded with. */
+	placeholders: ChordsFilePlaceholder[];
 	/**
 	 * This is the object exposed to the JS handler. This maximizes compatibility so that even if
 	 * our internal representation changes, a user's scripts will continue to work because it only

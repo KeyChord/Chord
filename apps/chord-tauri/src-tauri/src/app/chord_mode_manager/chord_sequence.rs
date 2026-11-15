@@ -592,6 +592,7 @@ mod tests {
             executables: parsed.executables,
             chords: parsed.chords,
             chord_hints: parsed.chord_hints,
+            placeholders: parsed.placeholders,
         };
         ChordPackage {
             name: "@fixture/test".into(),

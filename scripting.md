@@ -223,6 +223,24 @@ When several chords match the completed input, the first one in this order runs:
 
 For example, the Spotlight package and the Raycast package both define `'/(.*)'` with `fallback = true`. Spotlight's is built in, so once you install the Raycast package, `/calendar` searches Raycast instead.
 
+### Placeholders
+
+A chords file can let people choose some of its keys. Declare each placeholder under `[placeholders]` and write it as `<name>` in chord and hint keys:
+
+```toml
+[placeholders]
+p = { name = 'Window management prefix', default = ';' }
+
+[chords]
+'?<p>j' = { name = 'Join' }
+'<p>jl' = { name = 'Join: Left', shell = 'rift-cli execute layout join-window left' }
+'<p>q' = { name = 'Quit Window', shell = 'rift-cli execute window close' }
+```
+
+Chord replaces `<p>` with the keys chosen under **Settings → Chords → Placeholders**, or else with `default`, before reading the key. These chords are `;jl` and `;q` until someone sets `<p>` to `-`, when they become `-jl` and `-q`. `name` labels the placeholder in Settings, and `p = ';'` is short for a default without a label. A placeholder without a default leaves out every chord and hint that uses it until someone chooses keys for it.
+
+A value is a plain key sequence: no spaces, `?`, parentheses, quotes, angle brackets or `\` escapes. The expanded key follows every other rule: a global chord still needs a symbol first, and a value that starts a chord with `0`, Chord's reserved prefix, fails the whole file with an error in Settings. Settings saves each value by package, file and placeholder name, so it carries over when the package loads from another source. Only declared names are replaced. Since `<` isn't a key, Chord versions without placeholders skip these chords as invalid key sequences.
+
 ### Requiring a Chord version
 
 A chord file can require Chord versions with a semver requirement in `chord` under `[meta]`. `version` is the package's own version, which Chord doesn't check:

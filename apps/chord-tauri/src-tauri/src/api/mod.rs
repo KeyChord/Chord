@@ -106,13 +106,15 @@ pub trait Api {
         new_shortcut: String,
     ) -> AppResult<()>;
     async fn set_placeholder_chord_binding(
-        file_path: String,
-        sequence_template: String,
+        package_name: String,
+        pathslug: String,
+        placeholder: String,
         sequence: String,
     ) -> AppResult<()>;
     async fn remove_placeholder_chord_binding(
-        file_path: String,
-        sequence_template: String,
+        package_name: String,
+        pathslug: String,
+        placeholder: String,
     ) -> AppResult<()>;
     async fn relaunch_app(bundle_id: String) -> AppResult<()>;
     async fn install_cli() -> AppResult<()>;

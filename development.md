@@ -650,14 +650,19 @@ in under `packages/dev/improve/chord/configs/release/macos/@assets/dmg`; change 
 `dmg-background.swift` and running `vpx _gen-dmg-background`.
 
 Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
-which builds the app for Apple Silicon and Intel and uploads the DMGs to the rolling release of the
-same name. Both architectures must succeed before publishing. `beta` is published as a prerelease;
-[`prod`](https://github.com/KeyChord/Chord/releases/tag/prod) is marked as the repository's latest
-release, so `https://github.com/KeyChord/Chord/releases/latest` always serves production. Beta uses
+which builds the app for Apple Silicon and Intel and creates a new GitHub release for that version.
+Both architectures must succeed and all assets must upload before the draft is published.
+Production releases are tagged `v<version>` and titled `Chord <version>`; beta prereleases are
+tagged `v<version>-beta` and titled `Chord <version> Beta`. Each gets its own publication date and
+retains its downloads. Production is marked as the repository's latest release, so
+`https://github.com/KeyChord/Chord/releases/latest` always serves production. Beta uses
 the `com.leonsilicon.chord.beta` application identifier, while local development uses
 `com.leonsilicon.chord.development` and production uses `com.leonsilicon.chord`. This keeps each
-channel's settings, packages, caches, logs, and other application-scoped data separate. Each run
-replaces the previous disk images, so their download URLs stay stable.
+channel's settings, packages, caches, logs, and other application-scoped data separate. Production
+download links stay stable through `releases/latest/download/<asset>`. The rolling `beta` release
+keeps its disk images and `latest.json` current for existing links and installed beta apps; the
+manifest points at archives on the new versioned prerelease. The old rolling `prod` release and
+all older updater archives remain available for pending downloads.
 
 Installed copies find updates in `latest.json`, which the publish job writes beside the signed
 `.app.tar.gz` archives. They check at launch and once a day, and offer a higher version on a card
@@ -669,7 +674,9 @@ again still downloads exactly the bytes its signature covers. (Through 0.2.8 eve
 overwrote `Chord-<arch>.app.tar.gz`, so an offer older than the newest release failed with "The
 signature verification failed".) So raise `version` in
 `apps/chord-tauri/src-tauri/tauri.conf.json` and `Cargo.toml`
-for every production release: the publish job refuses one that isn't higher than what's out. To try
+for every release on a channel: the publish job refuses one that isn't higher than what's out on
+that channel or would reuse an existing release tag. An interrupted draft can be retried from its
+original commit. Promoting the same version from beta to production is allowed. To try
 an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` set to another
 `latest.json`; what it lists must still carry this repository's updater signature.
 

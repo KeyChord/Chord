@@ -1,12 +1,11 @@
 name: release
 
-# Every push to `beta` or `prod` publishes a downloadable build to the rolling
-# release of the same name: `beta` is a prerelease built with the beta channel
-# identity, and `prod` is the latest release built with the production identity
-# from tauri.conf.json. The disk images and latest.json are replaced in place,
-# so the download URLs and the updater endpoints are stable; updater archives
-# never are (see the publish job). Promoting a build to production means
-# pushing its commit to `prod`.
+# Every push to `beta` or `prod` publishes a new versioned release: `v<version>-beta`
+# is a prerelease built with the beta identity, and `v<version>` is the latest
+# release built with the production identity from tauri.conf.json. Raise the app
+# version before each release on a channel. Published releases and their assets
+# are never replaced. The rolling `beta` release only keeps existing beta download
+# and updater URLs working. Promoting a build means pushing its commit to `prod`.
 #
 # Signing: each Apple / Tauri signing step is gated on its secret (these live at
 # the org level). With them present the build is Developer ID signed and
@@ -29,7 +28,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  RELEASE_TAG: ${{ github.ref_name }}
+  RELEASE_CHANNEL: ${{ github.ref_name }}
 
 jobs:
   build:
@@ -228,7 +227,7 @@ jobs:
         run: |
           set -euo pipefail
           channel_config=""
-          if [ "$RELEASE_TAG" = beta ]; then
+          if [ "$RELEASE_CHANNEL" = beta ]; then
             channel_config="src-tauri/tauri.beta.conf.json"
           fi
           bun tauri build \
@@ -296,7 +295,7 @@ jobs:
           # the ubuntu publish job to read.
           if bun "$scripts/_notarize.ts" --check "$PWD/$app" "$dmg"; then
             echo notarized > "$out/gatekeeper.txt"
-          elif [ "$RELEASE_TAG" = beta ]; then
+          elif [ "$RELEASE_CHANNEL" = beta ]; then
             echo unsigned > "$out/gatekeeper.txt"
           else
             echo "::error::this build isn't fully notarized, so it can't be released; the reason is above"
@@ -314,7 +313,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    # A manual run from any other branch would publish a release named after it.
+    # Manual runs from other branches only produce build artifacts.
     if: ${{ github.ref_name == 'beta' || github.ref_name == 'prod' }}
     needs: build
     permissions:
@@ -328,13 +327,14 @@ jobs:
           path: assets
           merge-multiple: true
 
-      - name: Publish rolling release
+      - name: Publish versioned release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           ls -la assets
           short="${GITHUB_SHA:0:7}"
+          version="$(jq -er .version apps/chord-tauri/src-tauri/tauri.conf.json)"
           # Say which it is rather than hardcoding a claim: the signing steps are
           # secret-gated, so an unsigned build is possible if a secret is removed.
           # The verdict comes from the macOS build job (spctl is not on ubuntu).
@@ -346,34 +346,49 @@ jobs:
           rm -f assets/gatekeeper.txt
           # Production is the repository's latest release, which the production
           # updater endpoint (releases/latest) resolves to; beta never is.
-          if [ "$RELEASE_TAG" = prod ]; then
-            title="Chord"
+          if [ "$RELEASE_CHANNEL" = prod ]; then
+            tag="v$version"
+            title="Chord $version"
             channel="production"
+            endpoint="https://github.com/KeyChord/Chord/releases/latest/download/latest.json"
             flags=(--prerelease=false --latest)
           else
-            title="Chord Beta"
+            tag="v$version-beta"
+            title="Chord $version Beta"
             channel="beta"
+            endpoint="https://github.com/KeyChord/Chord/releases/download/beta/latest.json"
             flags=(--prerelease --latest=false)
           fi
           download="Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel."
-          notes="Automatic $channel build from \`$RELEASE_TAG\` @ ${short}. $download $gatekeeper"
+          notes="Automatic $channel build from \`$RELEASE_CHANNEL\` @ ${short}. $download $gatekeeper"
 
           # What installed copies of Chord read to update themselves. The updater only installs a
-          # higher version, so a production release that doesn't raise it would reach nobody.
-          version="$(jq -r .version apps/chord-tauri/src-tauri/tauri.conf.json)"
-          published="$(curl -fsSL "https://github.com/KeyChord/Chord/releases/download/$RELEASE_TAG/latest.json" 2>/dev/null | jq -r '.version // empty' || true)"
-          if [ "$RELEASE_TAG" = prod ] && [ -n "$published" ] \
+          # higher version. Read the moving endpoint, not the retired rolling production release.
+          status="$(curl -sSL -o published.json -w '%{http_code}' "$endpoint")"
+          case "$status" in
+            200) published="$(jq -er .version published.json)" ;;
+            404) published="" ;;
+            *) echo "::error::couldn't read the published $channel version (HTTP $status)"; exit 1 ;;
+          esac
+          if [ -n "$published" ] \
             && [ "$(printf '%s\n%s\n' "$published" "$version" | sort -V | tail -n1)" != "$version" -o "$published" = "$version" ]; then
             echo "::error::version $version isn't above the published $published; raise it in apps/chord-tauri/src-tauri/tauri.conf.json and Cargo.toml"
+            exit 1
+          fi
+          # Only an unfinished draft from this exact commit can be resumed. Published releases
+          # never get their dates, tags, or assets changed by a later run.
+          existing="$(gh release view "$tag" --json isDraft,targetCommitish 2>/dev/null || true)"
+          if [ -n "$existing" ] && ! jq -e --arg sha "$GITHUB_SHA" \
+            '.isDraft and .targetCommitish == $sha' <<<"$existing" >/dev/null; then
+            echo "::error::$tag already exists; raise the app version for a new release"
             exit 1
           fi
           # An installed copy keeps the release it was offered, signature included, until it
           # checks again (at launch, then daily). If the archive at that URL were replaced in
           # between, the download would no longer match the signature and the update would fail.
-          # So each archive is named after its version and contents, and none is ever replaced
-          # or removed. That includes the commit-free Chord-<arch>.app.tar.gz from 0.2.8 and
-          # before, which copies offered one of those releases may still download.
-          base="https://github.com/KeyChord/Chord/releases/download/$RELEASE_TAG"
+          # Each manifest points directly at its versioned release. Keep all older releases,
+          # including the rolling prod/beta archives that installed copies may still download.
+          base="https://github.com/KeyChord/Chord/releases/download/$tag"
           mkdir -p archives manifest
           declare -A url signature
           for arch in aarch64 x86_64; do
@@ -391,7 +406,7 @@ jobs:
           done
           jq -n \
             --arg version "$version" \
-            --arg notes "Chord $version from \`$RELEASE_TAG\` @ ${short}." \
+            --arg notes "Chord $version from \`$RELEASE_CHANNEL\` @ ${short}." \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg arm "${signature[aarch64]}" \
             --arg arm_url "${url[aarch64]}" \
@@ -403,41 +418,29 @@ jobs:
             }}' > manifest/latest.json
           jq '{version, pub_date, platforms: (.platforms | keys)}' manifest/latest.json
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            # Move the rolling tag onto this commit, then refresh the release.
-            git tag -f "$RELEASE_TAG" "$GITHUB_SHA"
-            git push -f origin "refs/tags/$RELEASE_TAG"
-            gh release edit "$RELEASE_TAG" --title "$title" --notes "$notes" "${flags[@]}"
-          else
+          if [ -z "$existing" ]; then
             # Pin the tag to the commit that was actually built rather than
-            # whatever the default branch points at by the time this runs.
-            gh release create "$RELEASE_TAG" \
+            # whatever the default branch points at by the time this runs. Keep
+            # it a draft until both architectures and their manifest are uploaded.
+            gh release create "$tag" --draft \
               --target "$GITHUB_SHA" \
               --title "$title" \
               --notes "$notes" \
-              "${flags[@]}"
+              --latest=false
           fi
-          # An archive's name fixes its contents, so `--clobber` only lets a re-run
-          # upload the same bytes again.
-          gh release upload "$RELEASE_TAG" archives/* --clobber
-          # `--clobber` replaces the previous build's disk images in place. Their names
-          # are commit-free, so the download URLs are stable across releases.
-          gh release upload "$RELEASE_TAG" assets/* --clobber
-          # Last, so nobody reads a manifest whose archives aren't uploaded yet.
-          gh release upload "$RELEASE_TAG" manifest/latest.json --clobber
+          # Replacement is safe only while the release is still an unpublished draft.
+          gh release upload "$tag" archives/* assets/* manifest/latest.json --clobber
+          gh release edit "$tag" --draft=false --title "$title" --notes "$notes" "${flags[@]}"
 
-          # Delete anything left from an older naming scheme; otherwise the
-          # release accumulates a stale set of assets on every push. Updater
-          # archives stay (see above).
-          keep="$(cd assets && ls; echo latest.json)"
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' \
-            | while read -r existing; do
-                case "$existing" in
-                  *.app.tar.gz | *.app.tar.gz.sig) continue ;;
-                esac
-                if ! grep -qxF "$existing" <<<"$keep"; then
-                  echo "removing stale asset $existing"
-                  gh release delete-asset "$RELEASE_TAG" "$existing" --yes
-                fi
-              done
-          gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name'
+          if [ "$RELEASE_CHANNEL" = beta ]; then
+            # Existing beta apps have this endpoint compiled in. Its manifest now
+            # points to the versioned release; leave all its older archives alone.
+            if ! gh release view beta >/dev/null 2>&1; then
+              gh release create beta --target "$GITHUB_SHA" \
+                --title "Chord Beta downloads" --notes "Downloads and updater endpoint for the latest versioned beta release." \
+                --prerelease --latest=false
+            fi
+            gh release upload beta assets/* --clobber
+            gh release upload beta manifest/latest.json --clobber
+          fi
+          gh release view "$tag" --json assets --jq '.assets[].name'

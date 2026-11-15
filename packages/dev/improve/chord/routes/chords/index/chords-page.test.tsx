@@ -75,7 +75,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
           globalChords: [],
           compiledChordsFiles: {
             [path]: {
-              name, pathslug: path, meta: {}, handlers: [], executables: [],
+              name, pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
               chords: [{ rawTrigger: "gh", trigger: { keys: ["KeyG", "KeyH"] }, name, index: 0, actions: [], fallback: false }],
               chordHints: [{ rawPattern: "gh", pattern: { keys: ["KeyG", "KeyH"] }, description: name }],
             },
@@ -107,7 +107,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         globalChords: [],
         compiledChordsFiles: {
           [path]: {
-            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [],
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
             chords: [{ rawTrigger: "/w]", trigger: { keys: ["Slash", "KeyW", "BracketRight"] }, name: "Close tab", index: 0, actions: [], fallback: false }],
             chordHints: [],
           },
@@ -149,7 +149,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         globalChords: [],
         compiledChordsFiles: {
           [path]: {
-            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [],
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
             chords: [],
             chordHints: [
               { rawPattern: "=", pattern: { keys: ["Equal"] }, description: "Menu/Tray" },
@@ -176,7 +176,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         globalChords: [],
         compiledChordsFiles: {
           [path]: {
-            name: "Chords", pathslug: path, meta: {}, handlers: [], executables: [],
+            name: "Chords", pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
             chords: [],
             chordHints: [{ rawPattern: '"1-9"', pattern: { range: { prefix: [], keys: ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9"] } }, description: "Repeat count" }],
           },

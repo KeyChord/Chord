@@ -1,8 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
-use device_query::{DeviceQuery, DeviceState};
 use keycode::KeyMappingCode;
 use nject::injectable;
-use parking_lot::Mutex;
 use crate::models::{Key, KeyEvent};
 use crate::state::KeyboardObservable;
 
@@ -15,10 +13,6 @@ pub struct AppKeyboardState {
     is_caps_armed: AtomicBool,
     #[inject(AtomicBool::new(false))]
     is_shift_pressed: AtomicBool,
-    /// The keys held according to the events Chord received, kept while the OS
-    /// key-state query cannot be trusted; see `track_keys`.
-    #[inject(Mutex::new(None))]
-    tracked_keys: Mutex<Option<Vec<Key>>>,
 
     observable: KeyboardObservable
 }
@@ -28,7 +22,6 @@ impl AppKeyboardState {
         self.is_caps_pressed.store(false, Ordering::SeqCst);
         self.is_caps_armed.store(false, Ordering::SeqCst);
         self.is_shift_pressed.store(false, Ordering::SeqCst);
-        *self.tracked_keys.lock() = None;
     }
 
     pub fn is_caps_pressed(&self) -> bool {
@@ -69,36 +62,5 @@ impl AppKeyboardState {
             },
             _ => ()
         }
-        if let Some(keys) = self.tracked_keys.lock().as_mut() {
-            match key_event {
-                KeyEvent::Press(key) => {
-                    if !keys.contains(key) {
-                        keys.push(*key);
-                    }
-                }
-                KeyEvent::Release(key) => keys.retain(|held| held != key),
-            }
-        }
-    }
-
-    /// Starts keeping the held keys from Chord's own events, beginning with `held`.
-    /// Under Secure Input the OS key-state query reports nothing as held, so a chord
-    /// read through Chord's key window (see `key_catcher`) cannot use it.
-    pub fn track_keys(&self, held: Vec<Key>) {
-        *self.tracked_keys.lock() = Some(held);
-    }
-
-    pub fn stop_tracking_keys(&self) {
-        *self.tracked_keys.lock() = None;
-    }
-
-    /// The keys held right now. Only key events call this, and they only arrive once the event
-    /// tap runs, so Accessibility is granted by then. It must not be checked once at startup: a
-    /// new user grants it while Chord is running, and every key they typed would be ignored.
-    pub fn keys(&self) -> Option<Vec<Key>> {
-        if let Some(keys) = self.tracked_keys.lock().as_ref() {
-            return Some(keys.clone());
-        }
-        Some(DeviceState {}.get_keys().into_iter().map(|k| Key::from(k)).collect())
     }
 }

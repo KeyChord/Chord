@@ -7,10 +7,17 @@ use tauri_plugin_store::{Store, StoreExt};
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
 
+/// The user's value for one placeholder in one chords file. Keyed by package name and pathslug,
+/// not by location, so it carries over when the same package loads from another source (a local
+/// folder, a monorepo or its GitHub mirror). Entries in an older key shape are ignored.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
 pub struct PlaceholderChordStoreKey {
-    pub file_path: String,
-    pub sequence_template: String,
+    pub package: String,
+    /// The chords file's pathslug, such as `chords/macos.toml`.
+    pub file: String,
+    /// The name between the angle brackets: `p` for `<p>`.
+    pub placeholder: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -45,12 +52,21 @@ impl PlaceholderChordStore {
             .collect())
     }
 
-    #[allow(dead_code)]
-    pub fn entry(
+    /// A package's saved values, by chords file pathslug and then placeholder name.
+    pub fn assigned_for_package(
         &self,
-        key: &PlaceholderChordStoreKey,
-    ) -> anyhow::Result<Option<PlaceholderChordStoreEntry>> {
-        Ok(self.entries()?.get(key).cloned())
+        package: &str,
+    ) -> anyhow::Result<HashMap<String, HashMap<String, String>>> {
+        let mut files: HashMap<String, HashMap<String, String>> = HashMap::new();
+        for (key, entry) in self.entries()? {
+            if key.package == package {
+                files
+                    .entry(key.file)
+                    .or_default()
+                    .insert(key.placeholder, entry.sequence);
+            }
+        }
+        Ok(files)
     }
 
     fn serialize_key(key: &PlaceholderChordStoreKey) -> String {
@@ -83,15 +99,9 @@ impl PlaceholderChordStore {
     }
 }
 
+/// Trims surrounding whitespace and checks the value the same way the chords file parser does.
 pub fn normalize_placeholder_sequence(sequence: &str) -> anyhow::Result<String> {
-    let normalized = sequence.trim().to_ascii_lowercase();
-    if normalized.is_empty() {
-        anyhow::bail!("placeholder sequence cannot be empty");
-    }
-
-    if !normalized.chars().all(|ch| ch.is_ascii_lowercase()) {
-        anyhow::bail!("placeholder sequence must only contain letters a-z");
-    }
-
-    Ok(normalized)
+    let normalized = sequence.trim();
+    crate::models::validate_placeholder_value(normalized)?;
+    Ok(normalized.to_owned())
 }

@@ -16,6 +16,7 @@ import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._co
 import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { LocalFoldersCard } from "@chord/dev.improve.chord.routes.settings._components.local-folders-card";
 import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
+import { PlaceholderChordsCard } from "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card";
 import {
   Tabs,
   TabsContent,
@@ -108,6 +109,7 @@ export function SettingsChordsPageContent({
           personalDirnames={{}}
           order={order}
         />
+        <PlaceholderChordsCard />
         {needsApproval ? null : approvals}
         <Collapsible className="group/sources preference-disclosure">
           <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-5 py-4 text-sm font-normal">

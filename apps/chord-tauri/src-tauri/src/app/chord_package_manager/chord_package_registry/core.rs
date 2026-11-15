@@ -99,6 +99,7 @@ fn compile_core_contents(contents: &str) -> Result<ChordPackage> {
         executables: parsed.executables,
         chords: parsed.chords,
         chord_hints: parsed.chord_hints,
+        placeholders: parsed.placeholders,
     };
     let package = ChordPackage {
         name: CORE_CHORD_PACKAGE.into(),
