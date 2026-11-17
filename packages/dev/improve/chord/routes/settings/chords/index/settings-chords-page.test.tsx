@@ -10,9 +10,10 @@ import type {
 const previousWindow = globalThis.window;
 globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { SettingsChordsPageContent } = await import("#settings-chords-page");
-const { listLibraryChords, listLibraryPackages, movePackage } = await import("#chord-library");
-const { listPlaceholders, PlaceholderChordsCardContent } =
-  await import("@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card");
+const { applyPackageOrder, ChordLibrary, listLibraryChords, listLibraryPackages, movePackage } =
+  await import("#chord-library");
+const { listPlaceholders, PackagePlaceholders } =
+  await import("@chord/dev.improve.chord.routes.settings._components.package-placeholders");
 afterAll(() => {
   globalThis.window = previousWindow;
 });
@@ -50,6 +51,7 @@ function render(
   packages: ChordPackage[],
   thirdPartyPackages: ThirdPartyPackage[] = [],
   builtinPackages: string[] = [],
+  configurePackage?: string,
 ) {
   const state: ChordPackageManagerState = {
     packages,
@@ -59,7 +61,10 @@ function render(
     personalPackages: [{ dirname: "work", name: "@me/work" }],
   };
   const client = new QueryClient();
-  client.setQueryData(["tauri-observable-states"], { "chord-package-manager": state });
+  client.setQueryData(["tauri-observable-states"], {
+    "chord-package-manager": state,
+    settings: { defaultGlobalPrefixForPlaceholders: ";" },
+  });
   client.setQueryData(["personal-packages"], {
     root: "/Users/me/.chord/packages",
     packages: [
@@ -68,12 +73,12 @@ function render(
   });
   return renderToString(
     <QueryClientProvider client={client}>
-      <SettingsChordsPageContent chordPackageManagerData={state} />
+      <SettingsChordsPageContent chordPackageManagerData={state} configurePackage={configurePackage} />
     </QueryClientProvider>,
   ).replaceAll("<!-- -->", "");
 }
 
-test("Packages lists installed packages while My Chords keeps personal editing separate", () => {
+test("Packages lists installed packages while Local Chords keeps personal editing separate", () => {
   const packages = [pkg("@keychord/finder"), pkg("@me/work"), pkg("@keychord/terminal")];
   const rows = listLibraryPackages(packages, new Set(["@me/work"]), {});
   expect(rows.map((row) => row.name)).toEqual([
@@ -85,26 +90,39 @@ test("Packages lists installed packages while My Chords keeps personal editing s
   const html = render(packages);
   expect(html).toContain('role="tablist"');
   expect(html).toMatch(/role="tab"[^>]*>Packages</);
-  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
+  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
+  expect(html).toContain("Default Global Prefix for Placeholders");
+  expect(html).toMatch(/<input[^>]+maxLength="1"[^>]+value=";"/i);
   expect(html).toContain("2 packages");
   expect(html).toContain('aria-label="Show chords in @keychord/finder" aria-expanded="false"');
   expect(html).not.toContain('aria-label="Show chords in @me/work"');
-  expect(html).toContain('aria-label="My Chords"');
+  expect(html).toContain('aria-label="Local Chords"');
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   expect(html).not.toContain('title="@me/work action"');
   expect(html).not.toContain('title="@keychord/finder action"');
 });
 
-test("My Chords remains editable when no external packages are installed", () => {
+test("Local Chords remains editable when no external packages are installed", () => {
   const html = render([pkg("@me/work")]);
   expect(html).not.toContain('aria-label="Show chords in @me/work"');
   expect(html).toContain("Your package library is empty");
-  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
+  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   expect(html).toContain("Manage sources");
 });
 
-test("an empty personal package stays editable in My Chords", () => {
+test("opening a package for configuration expands only that package", () => {
+  const finder = "@keychord/chords-finder";
+  const terminal = "@keychord/chords-terminal";
+  const html = render([pkg(finder), pkg(terminal)], [], [], terminal);
+
+  expect(html).toContain(`aria-label="Hide chords in ${terminal}" aria-expanded="true"`);
+  expect(html).toContain(`title="${terminal} action"`);
+  expect(html).toContain(`aria-label="Show chords in ${finder}" aria-expanded="false"`);
+  expect(html).not.toContain(`title="${finder} action"`);
+});
+
+test("an empty personal package stays editable in Local Chords", () => {
   const empty = { ...pkg("@me/work"), compiledChordsFiles: {} };
   const html = render([pkg("@keychord/finder"), empty]);
   expect(html).not.toContain('aria-label="Show chords in @me/work"');
@@ -246,20 +264,52 @@ test("packages keep their native rank, with installed ones above built-ins", () 
   ]);
 
   // Moves stay within their group, and the saved order lists only packages the user ranks.
-  expect(movePackage(rows, "@keychord/warp", -1)).toEqual([
+  const moved = [
+    "@keychord/warp",
+    "@keychord/raycast",
+    "@keychord/finder",
+    "@keychord/spotlight",
+  ];
+  expect(movePackage(rows, "@keychord/warp", "@keychord/raycast", "before")).toEqual(moved);
+  expect(movePackage(rows, "@keychord/raycast", "@keychord/warp", "after")).toEqual(moved);
+  expect(movePackage(rows, "@keychord/spotlight", "@keychord/finder", "before")).toEqual([
+    "@keychord/raycast",
+    "@keychord/warp",
+    "@keychord/spotlight",
+    "@keychord/finder",
+  ]);
+  // Dropping a package where it already is changes nothing.
+  expect(movePackage(rows, "@keychord/warp", "@keychord/raycast", "after")).toBeUndefined();
+  expect(movePackage(rows, "@keychord/raycast", "@keychord/warp", "before")).toBeUndefined();
+  expect(movePackage(rows, "@keychord/warp", "@keychord/warp", "before")).toBeUndefined();
+  // Packages never cross groups, and core and personal packages aren't ranked.
+  expect(movePackage(rows, "@keychord/finder", "@keychord/warp", "after")).toBeUndefined();
+  expect(movePackage(rows, "@keychord/raycast", "@keychord/finder", "before")).toBeUndefined();
+  expect(movePackage(rows, "@keychord/chords-chord", "@keychord/raycast", "after")).toBeUndefined();
+  expect(movePackage(rows, "@me/work", "@keychord/raycast", "after")).toBeUndefined();
+
+  // While the order saves, the rows show it.
+  expect(applyPackageOrder(rows, moved).map((row) => row.name)).toEqual([
+    "@keychord/chords-chord",
+    "@me/work",
     "@keychord/warp",
     "@keychord/raycast",
     "@keychord/finder",
     "@keychord/spotlight",
   ]);
-  expect(movePackage(rows, "@keychord/warp", 1)).toBeUndefined();
-  expect(movePackage(rows, "@keychord/finder", -1)).toBeUndefined();
-  expect(movePackage(rows, "@keychord/raycast", -1)).toBeUndefined();
-  expect(movePackage(rows, "@keychord/chords-chord", 1)).toBeUndefined();
-  expect(movePackage(rows, "@me/work", 1)).toBeUndefined();
 });
 
-test("the library groups installed and built-in packages with move controls", () => {
+test("moves among many packages land exactly where they are dropped", () => {
+  const names = ["a", "b", "c", "d", "e"];
+  const rows = listLibraryPackages(names.map(pkg), new Set(), {});
+  expect(movePackage(rows, "a", "d", "after")).toEqual(["b", "c", "d", "a", "e"]);
+  expect(movePackage(rows, "a", "d", "before")).toEqual(["b", "c", "a", "d", "e"]);
+  expect(movePackage(rows, "e", "b", "before")).toEqual(["a", "e", "b", "c", "d"]);
+  expect(movePackage(rows, "e", "a", "before")).toEqual(["e", "a", "b", "c", "d"]);
+  expect(movePackage(rows, "a", "e", "after")).toEqual(["b", "c", "d", "e", "a"]);
+});
+
+test("the library groups installed and built-in packages with drag handles", () => {
   const html = render(
     ["@keychord/chords-chord", "@keychord/raycast", "@keychord/warp", "@keychord/finder"].map(pkg),
     [],
@@ -271,33 +321,66 @@ test("the library groups installed and built-in packages with move controls", ()
   expect(builtin).toBeGreaterThan(html.indexOf('aria-label="Show chords in @keychord/warp"'));
   expect(builtin).toBeLessThan(html.indexOf('aria-label="Show chords in @keychord/finder"'));
   expect(html).toContain("Installed packages always override them.");
-  expect(html).not.toContain('aria-label="Move @keychord/chords-chord up"');
-  expect(html).toMatch(/aria-label="Move @keychord\/raycast up"[^>]*disabled/);
-  expect(html).toMatch(/aria-label="Move @keychord\/warp up"(?![^>]*disabled)/);
-  expect(html).toMatch(/aria-label="Move @keychord\/finder down"[^>]*disabled/);
+  expect(html).not.toContain('aria-label="Reorder @keychord/chords-chord"');
+  for (const name of ["@keychord/raycast", "@keychord/warp", "@keychord/finder"]) {
+    expect(html).toMatch(new RegExp(`aria-label="Reorder ${name}"[^>]*title="Drag to reorder"`));
+  }
+  expect(html).toContain("press the Up or Down arrow key");
+  expect(html).not.toMatch(/aria-label="Move [^"]*(up|down)"/);
 });
 
-test("placeholders list each declared <name> with its keys and default", () => {
+test("placeholders list each token with its keys and default", () => {
   const rift = pkg("@keychord/chords-rift");
-  const placeholder = { name: "p", label: "Window management prefix", default: ";", assigned: "-" };
-  rift.compiledChordsFiles["chords/macos.toml"]!.placeholders = [placeholder];
+  const placeholder = { name: "<>", label: "Window management prefix", default: ";", assigned: "-" };
+  const named = { name: "<mode>" };
+  rift.compiledChordsFiles["chords/macos.toml"]!.placeholders = [placeholder, named];
   const entries = listPlaceholders([pkg("@keychord/finder"), rift]);
   expect(entries).toEqual([
     { packageName: "@keychord/chords-rift", pathslug: "chords/macos.toml", placeholder },
+    { packageName: "@keychord/chords-rift", pathslug: "chords/macos.toml", placeholder: named },
   ]);
 
-  const card = (rows: typeof entries) =>
+  const section = (rows: typeof entries) =>
     renderToString(
       <QueryClientProvider client={new QueryClient()}>
-        <PlaceholderChordsCardContent entries={rows} apps={{}} />
+        <PackagePlaceholders entries={rows} apps={{}} />
       </QueryClientProvider>,
     ).replaceAll("<!-- -->", "");
-  const html = card(entries);
+  const html = section(entries);
   expect(html).toContain("Window management prefix");
-  expect(html).toContain("&lt;p&gt;");
+  expect(html).toContain("&lt;&gt;");
+  expect(html).toContain('text-foreground">&lt;mode&gt;</span>');
   expect(html).toMatch(/Default <code[^>]*>;<\/code>/);
   expect(html).toMatch(/<input[^>]*value="-"/);
   expect(html).toContain("Use default");
-  // Nothing to configure, so no card.
-  expect(card([])).toBe("");
+  // Nothing to configure, so no section.
+  expect(section([])).toBe("");
+});
+
+test("placeholders are configured inside their package, not in a separate section", () => {
+  const rift = pkg("@keychord/chords-rift");
+  rift.compiledChordsFiles["chords/macos.toml"]!.placeholders = [
+    { name: "<>", label: "Window management prefix", default: ";" },
+  ];
+  const unset = pkg("@keychord/chords-menu");
+  unset.compiledChordsFiles["chords/macos.toml"]!.placeholders = [{ name: "<mode>" }];
+  const rows = listLibraryPackages([rift, unset, pkg("@keychord/finder")], new Set(), {});
+  expect(rows.map((row) => row.placeholders.length)).toEqual([1, 1, 0]);
+
+  // The Chords page has no standalone placeholder section any more.
+  const page = render([rift]);
+  expect(page).not.toContain("Window management prefix");
+  expect(page).toContain("1 placeholder");
+
+  // Collapsed packages flag a placeholder whose chords stay off until it gets keys.
+  const html = renderToString(
+    <QueryClientProvider client={new QueryClient()}>
+      <ChordLibrary packages={rows} apps={{}} personalDirnames={{}} />
+    </QueryClientProvider>,
+  ).replaceAll("<!-- -->", "");
+  expect(html.match(/needs keys/g)).toHaveLength(1);
+  // Placeholder fields render only once their package is expanded.
+  expect(html).not.toContain("Window management prefix");
+  // Without onReorder, there is nothing to drag.
+  expect(html).not.toContain('aria-label="Reorder');
 });

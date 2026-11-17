@@ -68,9 +68,9 @@
         "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": "workspace:*",
@@ -864,6 +864,23 @@
         "@types/react-dom": "^19.3.0",
       },
     },
+    "packages/dev/improve/chord/routes/settings/_components/package-placeholders": {
+      "name": "@chord/dev.improve.chord.routes.settings._components.package-placeholders",
+      "dependencies": {
+        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+      },
+    },
     "packages/dev/improve/chord/routes/settings/_components/permissions-card": {
       "name": "@chord/dev.improve.chord.routes.settings._components.permissions-card",
       "dependencies": {
@@ -918,25 +935,6 @@
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
         "react-dom": "^19.3.1",
-      },
-    },
-    "packages/dev/improve/chord/routes/settings/_components/placeholder-chords-card": {
-      "name": "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card",
-      "dependencies": {
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
-        "@chord/dev.improve.chord.lib.state": "workspace:*",
-        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
-        "react": "^19.3.1",
-      },
-      "devDependencies": {
-        "@types/react": "^19.3.0",
-        "@types/react-dom": "^19.3.0",
       },
     },
     "packages/dev/improve/chord/routes/settings/_components/quit-chord-card": {
@@ -1040,6 +1038,7 @@
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
+        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
         "@tauri-apps/plugin-opener": "^2.7.2",
         "lucide-react": "^1.57.0",
@@ -1070,8 +1069,8 @@
         "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
+        "@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.personal-chords": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
@@ -1404,13 +1403,13 @@
 
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": ["@chord/dev.improve.chord.routes.settings._components.open-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/open-repo-button"],
 
+    "@chord/dev.improve.chord.routes.settings._components.package-placeholders": ["@chord/dev.improve.chord.routes.settings._components.package-placeholders@workspace:packages/dev/improve/chord/routes/settings/_components/package-placeholders"],
+
     "@chord/dev.improve.chord.routes.settings._components.permissions-card": ["@chord/dev.improve.chord.routes.settings._components.permissions-card@workspace:packages/dev/improve/chord/routes/settings/_components/permissions-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": ["@chord/dev.improve.chord.routes.settings._components.permissions-dialog@workspace:packages/dev/improve/chord/routes/settings/_components/permissions-dialog"],
 
     "@chord/dev.improve.chord.routes.settings._components.personal-chords": ["@chord/dev.improve.chord.routes.settings._components.personal-chords@workspace:packages/dev/improve/chord/routes/settings/_components/personal-chords"],
-
-    "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": ["@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card@workspace:packages/dev/improve/chord/routes/settings/_components/placeholder-chords-card"],
 
     "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": ["@chord/dev.improve.chord.routes.settings._components.quit-chord-card@workspace:packages/dev/improve/chord/routes/settings/_components/quit-chord-card"],
 

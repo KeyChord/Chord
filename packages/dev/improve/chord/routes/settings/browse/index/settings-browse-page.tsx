@@ -55,15 +55,22 @@ const displayNames = new Map(
 // Official chord package mirrors and community chord package repos carry the `chordpack` topic.
 const communityChordPackagesUrl = "https://github.com/search?q=topic%3Achordpack&type=repositories";
 
-export function SettingsBrowsePage() {
+type BrowsePageProps = { onConfigure: (packageName: string) => void };
+
+export function SettingsBrowsePage({ onConfigure }: BrowsePageProps) {
   return (
     <StateQueries queries={[useGitRepoStoreState()]}>
-      {(gitRepoStoreData) => <SettingsBrowsePageContent state={gitRepoStoreData} />}
+      {(gitRepoStoreData) => (
+        <SettingsBrowsePageContent state={gitRepoStoreData} onConfigure={onConfigure} />
+      )}
     </StateQueries>
   );
 }
 
-export function SettingsBrowsePageContent({ state }: { state: GitReposState }) {
+export function SettingsBrowsePageContent({
+  state,
+  onConfigure,
+}: BrowsePageProps & { state: GitReposState }) {
   const { repos } = state;
   const [searchInput, setSearchInput] = useState("");
   const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
@@ -260,21 +267,32 @@ export function SettingsBrowsePageContent({ state }: { state: GitReposState }) {
                       {isInstalling ? "Installing..." : "Install"}
                     </Button>
                   ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        removeGitRepoMutation.mutate(installedRepo.slug, {
-                          onSuccess: () => {
-                            toast.success(`Uninstalled ${repo.displayName}.`);
-                          },
-                        });
-                      }}
-                      disabled={isPending}
-                    >
-                      {isRemoving ? "Uninstalling..." : "Uninstall"}
-                    </Button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="text-destructive underline"
+                        onClick={() => {
+                          removeGitRepoMutation.mutate(installedRepo.slug, {
+                            onSuccess: () => {
+                              toast.success(`Uninstalled ${repo.displayName}.`);
+                            },
+                          });
+                        }}
+                        disabled={isPending}
+                      >
+                        {isRemoving ? "Uninstalling..." : "Uninstall"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => onConfigure(repo.packageName)}
+                        disabled={isRemoving}
+                      >
+                        Configure
+                      </Button>
+                    </div>
                   )}
                 </div>
 

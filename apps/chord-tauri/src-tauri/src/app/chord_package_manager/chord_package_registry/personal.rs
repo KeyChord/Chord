@@ -25,7 +25,7 @@ fn starter_contents(dirname: &str) -> String {
 # another package, this one runs.
 #
 # Chords that start with a symbol work in every app, for example:
-#   "/q" = {{ name = "Force Quit", shortcut = "cmd+opt+esc" }}
+#   "/n" = {{ name = "Notes", shell = "open -a Notes" }}
 #   "/t" = {{ name = "Terminal", shell = "open -a Terminal" }}
 #
 # Chords for a single app go in chords/<bundle ID, with / for .>/macos.toml,

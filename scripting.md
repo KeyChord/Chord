@@ -80,7 +80,7 @@ A repeated or looped chord calls its built handler once per iteration; the build
 (the module's default export) still runs only when the configuration loads. Chord
 selects the focused window once, when the completed input starts running, and passes it
 to every iteration and every chord of the run as `this.focusedWindowId`. Use it, rather
-than reading focus inside the handler, for actions that target a window: `3/ws]` then
+than reading focus inside the handler, for actions that target a window: `3;ws]` then
 moves one window three Spaces even though focus moves to another window after the first
 move. Handlers that should follow focus, such as window cycling, can ignore it.
 
@@ -94,15 +94,15 @@ own. It holds comma-separated options whose digits count hundreds of millisecond
   executes `ab` three times, 500 ms apart. Several digits are used in order and repeat,
   and `0` executes the next chord immediately.
 
-`` 3`d2,i130`/ws] `` waits 200 ms, executes `/ws]`, waits 100 ms, executes it again,
+`` 3`d2,i130`;ws] `` waits 200 ms, executes `;ws]`, waits 100 ms, executes it again,
 waits 300 ms, and executes it a third time. The final `0` only matters in a loop. Each
 option appears at most once, in either order. Only a leading block is config; a
 backtick later in the input is an ordinary key. Unclosed, unknown, or repeated
 options stay pending.
 
 After a repeat count or config block, Enter separates consecutive chords.
-`` 3`i13`/w]⏎/w] `` (⏎ is the Enter key, `\n` in text) executes `/w]`, waits 100 ms,
-executes `/w]` again, waits 300 ms, and repeats that sequence three times; `1ab⏎cd`
+`` 3`i13`;w]⏎;w] `` (⏎ is the Enter key, `\n` in text) executes `;w]`, waits 100 ms,
+executes `;w]` again, waits 300 ms, and repeats that sequence three times; `1ab⏎cd`
 loops `ab` then `cd`. Everywhere else Enter is an ordinary key: it enters the chord
 buffer and triggers can contain it. Every chord in a sequence
 must resolve before anything runs, and each one keeps its own initialization values.
@@ -123,7 +123,7 @@ usual: release Space to run it, or add a config block such as `` `i1` `` to type
 one character every 100 ms (the same digits as above; without a block the text
 is typed immediately). A quote's block takes only `i`; delay the whole input instead,
 as in `` `d5`'hi' ``. A quote can stand alone, follow a repeat count (`3'hi'`),
-or be one step of an Enter-separated sequence (`` 2`i5`'hi'⏎/w] ``). Backspace
+or be one step of an Enter-separated sequence (`` 2`i5`'hi'⏎;w] ``). Backspace
 over a closing quote reopens it in insert mode with its text. Elsewhere `'` is an
 ordinary key. Text is typed with a US keyboard layout. In TOML and CLI text
 notation, `'hello'` writes the keys between the quotes, unshifted.
@@ -145,12 +145,12 @@ backslashes. Backspace continues to edit the chord buffer.
 ### Macros and temporary buffers
 
 Complete `0b<digit><sequence>` to save a sequence in one of nine numbered buffers.
-For example, `0b11720x864` saves `1720x864` in buffer 1, and `/wd\1` then executes
-the same chord as `/wd1720x864`.
+For example, `0b11720x864` saves `1720x864` in buffer 1, and `;wd\1` then executes
+the same chord as `;wd1720x864`.
 
 For a named macro, use `0=<name>=<sequence>`. For example, after
-`0=window-dimensions=1720x864`, typing `/wd\window-dimensions=` enters `/wd1720x864`
-as soon as the closing `=` is typed, and typing `/wd\win` and pressing Tab does the
+`0=window-dimensions=1720x864`, typing `;wd\window-dimensions=` enters `;wd1720x864`
+as soon as the closing `=` is typed, and typing `;wd\win` and pressing Tab does the
 same. Both insert the macro's complete expansion, so later redefinitions do not
 change input that was already entered. In TOML or CLI text, a complete named
 reference such as `a\window-dimensions=b` expands to `a1720x864b`. Names can
@@ -168,7 +168,7 @@ longer macro name.
 
 Typing `\` in chord mode shows matching macros and their saved sequences before
 special-key escapes. Suggestions narrow as you type, including inside a longer
-chord such as `/wd\win`. Both overlay layouts show these suggestions and highlight
+chord such as `;wd\win`. Both overlay layouts show these suggestions and highlight
 the one Tab inserts: a special key typed exactly, otherwise the first named macro or
 special key that matches.
 
@@ -216,30 +216,35 @@ Chord keys are literal except for parenthesized regex sections. For example, `hs
 
 When several chords match the completed input, the first one in this order runs:
 
-1. **Ordinary chords before fallbacks.** `fallback = true` marks a catch-all that runs only when no ordinary chord matches, whichever packages define them. Launchers use it: `'/(.*)' = { name = 'Launch: $1', fallback = true, … }` opens `/calendar` in the launcher, while `/f` still opens Finder.
+1. **Ordinary chords before fallbacks.** `fallback = true` marks a catch-all that runs only when no ordinary chord matches, whichever packages define them. Launchers use it: `'<>(.*)' = { name = 'Launch: $1', fallback = true, … }` opens `/calendar` in the launcher, while `/f` still opens Finder.
 2. **The focused app before every app.** A file picker's Finder chords come first, then the focused app's chords file, then global chords.
 3. **Package rank.** Chord's core package comes first, then your personal packages in `~/.chord/packages` (by folder name), then the packages you installed, then Chord's built-in default packages. Installed packages always override built-in ones. Rank installed packages, and built-in ones among themselves, under **Settings → Chords → Packages**. A newly installed package starts at the top.
 4. **Within one package, order isn't defined.** Chord reads a chords file's `[chords]` table without its file order, so don't rely on which of two overlapping chords in one package runs. Keep their patterns apart, or make the catch-all a fallback.
 
-For example, the Spotlight package and the Raycast package both define `'/(.*)'` with `fallback = true`. Spotlight's is built in, so once you install the Raycast package, `/calendar` searches Raycast instead.
+For example, Spotlight and Raycast both define `'<>(.*)'` with `fallback = true` and default `<>` to `/`. Spotlight's is built in, so once you install the Raycast package, `/calendar` searches Raycast instead.
 
 ### Placeholders
 
-A chords file can let people choose some of its keys. Declare each placeholder under `[placeholders]` and write it as `<name>` in chord and hint keys:
+A chords file can let people choose some of its keys. Use `<>` for a package prefix or a named token such as `<mode>` when the file has several configurable keys. Declare each token with its angle brackets under `[placeholders]` and use it as written in chord and hint keys.
 
 ```toml
 [placeholders]
-p = { name = 'Window management prefix', default = ';' }
+"<>" = { name = 'Window management prefix', default = 'r' }
 
 [chords]
-'?<p>j' = { name = 'Join' }
-'<p>jl' = { name = 'Join: Left', shell = 'rift-cli execute layout join-window left' }
-'<p>q' = { name = 'Quit Window', shell = 'rift-cli execute window close' }
+'?<>' = { name = 'Rift' }
+'?<>j' = { name = 'Join' }
+'<>jl' = { name = 'Join: Left', shell = 'rift-cli execute layout join-window left' }
+'<>q' = { name = 'Quit Window', shell = 'rift-cli execute window close' }
 ```
 
-Chord replaces `<p>` with the keys chosen under **Settings → Chords → Placeholders**, or else with `default`, before reading the key. These chords are `;jl` and `;q` until someone sets `<p>` to `-`, when they become `-jl` and `-q`. `name` labels the placeholder in Settings, and `p = ';'` is short for a default without a label. A placeholder without a default leaves out every chord and hint that uses it until someone chooses keys for it.
+When `default` is one ASCII letter, Chord prepends the symbol from **Settings → Chords → Default Global Prefix for Placeholders**, which starts at `;`. With this setting, the example binds `;rjl` and `;rq` and shows hints at `;r` and `;rj`. Changing the setting to `=` makes the package default `=r`.
 
-A value is a plain key sequence: no spaces, `?`, parentheses, quotes, angle brackets or `\` escapes. The expanded key follows every other rule: a global chord still needs a symbol first, and a value that starts a chord with `0`, Chord's reserved prefix, fails the whole file with an error in Settings. Settings saves each value by package, file and placeholder name, so it carries over when the package loads from another source. Only declared names are replaced. Since `<` isn't a key, Chord versions without placeholders skip these chords as invalid key sequences.
+Other `default` values are literal key sequences, such as `/` for launchers. A bare string is always literal, including a single letter in `"<mode>" = 'm'`. A value entered in a package's **Placeholders** section takes precedence over its default and moves its chords and hints together. A placeholder with no default stays inactive until someone chooses keys for it.
+
+To update an existing file, quote each declaration with its full token. For example, change `mode = ...` to `"<mode>" = ...`. To adopt the package prefix convention, change `p = ...` to `"<>" = ...` and use `<>` throughout the file's chord and hint keys.
+
+A value is a plain key sequence: no spaces, `?`, parentheses, quotes, angle brackets or `\` escapes. The expanded key follows every other rule: a global chord still needs a symbol first, and a value that starts a chord with `0`, Chord's reserved prefix, fails the whole file with an error in Settings. Settings saves each value by package, file and placeholder token, so it carries over when the package loads from another source. Chord expands only declared tokens. Since `<` isn't a key, Chord versions without placeholders skip these chords as invalid key sequences.
 
 ### Requiring a Chord version
 

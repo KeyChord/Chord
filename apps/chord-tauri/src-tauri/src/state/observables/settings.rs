@@ -1,4 +1,5 @@
 use crate::define_observable;
+use crate::models::DEFAULT_GLOBAL_PLACEHOLDER_PREFIX;
 use serde::Serialize;
 use typeshare::typeshare;
 
@@ -15,6 +16,7 @@ pub struct AppSettingsState {
     /// The guided first-run setup has been finished or skipped.
     pub is_onboarding_complete: bool,
     pub is_settings_sidebar_collapsed: bool,
+    pub default_global_prefix_for_placeholders: char,
 }
 
 impl Default for AppSettingsState {
@@ -33,6 +35,7 @@ impl Default for AppSettingsState {
             is_chord_panel_hidden_by_default: false,
             is_onboarding_complete: false,
             is_settings_sidebar_collapsed: false,
+            default_global_prefix_for_placeholders: DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
         }
     }
 }

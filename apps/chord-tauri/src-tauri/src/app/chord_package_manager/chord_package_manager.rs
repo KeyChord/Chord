@@ -5,6 +5,7 @@ use crate::app::chord_package_manager::chord_package_registry::{
 use crate::app::chord_package_manager::{
     ChordJsPackage, ChordPackage, ChordReference, chords_file_app_id,
 };
+use crate::app::placeholder_chord_store::FilePlaceholderAssignments;
 use crate::app::state::AppSingleton;
 use crate::models::{
     Chord, ChordAction, ChordEventTrigger, ChordInput, ChordInputEvent, ChordsFileImportOverride,
@@ -51,6 +52,9 @@ pub struct ChordPackageManager {
     #[inject(Mutex::new(None))]
     last_reload_error: Mutex<Option<String>>,
 
+    #[inject(Mutex::new(HashMap::new()))]
+    loaded_placeholder_settings: Mutex<HashMap<String, PackagePlaceholderSettings>>,
+
     /// App IDs that chords files claim for bare executables through `executables`, keyed by
     /// executable file name.
     #[inject(RwLock::new(HashMap::new()))]
@@ -58,6 +62,12 @@ pub struct ChordPackageManager {
 
     observable: ChordPackageManagerObservable,
     handle: AppHandle,
+}
+
+#[derive(PartialEq)]
+struct PackagePlaceholderSettings {
+    default_global_prefix: char,
+    assigned: FilePlaceholderAssignments,
 }
 
 struct ChordInputEventContext {
@@ -277,8 +287,9 @@ fn parse_package_chords_file(
     path: &Path,
     contents: &str,
     assigned: &HashMap<String, String>,
+    default_global_prefix: char,
 ) -> Result<ParsedChordsFile> {
-    ParsedChordsFile::parse_with_placeholders(contents, assigned)
+    ParsedChordsFile::parse_with_placeholders(contents, assigned, default_global_prefix)
         .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
@@ -373,7 +384,7 @@ name = "System Preferences"
 'gwa' = { name = "Goto: Wallpaper" }
 'gwa' = { name = "Goto: Wallet & Apple Pay" }
 "#;
-        let error = parse_package_chords_file(path, contents, &HashMap::new()).unwrap_err();
+        let error = parse_package_chords_file(path, contents, &HashMap::new(), ';').unwrap_err();
         let details = format!("{error:#}");
         assert!(details.contains(&path.display().to_string()));
         assert!(details.contains("duplicate key"));
@@ -401,7 +412,7 @@ file = 42
         toml::from_str::<RawChordsFile>(contents).unwrap();
         let error = format!(
             "{:#}",
-            parse_package_chords_file(path, contents, &HashMap::new()).unwrap_err()
+            parse_package_chords_file(path, contents, &HashMap::new(), ';').unwrap_err()
         );
         assert!(error.contains("chords/macos.toml"));
         assert!(error.contains("handler must have the file key"));
@@ -443,6 +454,7 @@ file = 42
             Path::new("chords/macos.toml"),
             "name = 'Valid'\n[chords]\n'/,' = { shell = 'open -b com.apple.systempreferences' }",
             &HashMap::new(),
+            ';',
         )
         .unwrap();
         assert_eq!(parsed.chords.len(), 1);
@@ -700,6 +712,18 @@ impl ChordPackageManager {
 
         let mut chord_packages = OrderMap::new();
         let mut package_errors = HashMap::new();
+        let mut next_placeholder_settings = HashMap::new();
+        let app_state = self.handle.app_state();
+        let default_global_prefix = app_state
+            .settings()
+            .default_global_prefix_for_placeholders()?;
+        let mut assignments = app_state
+            .placeholder_chord_store()
+            .assigned_by_package()
+            .unwrap_or_else(|error| {
+                log::warn!("couldn't read placeholder values: {error:#}");
+                HashMap::new()
+            });
         let previous_packages = self.packages.read().clone();
         let previous_errors = self
             .observable
@@ -714,10 +738,16 @@ impl ChordPackageManager {
             .ok()
             .and_then(|sources| std::fs::canonicalize(sources).ok());
         for (package_name, raw_chord_package) in raw_chord_packages {
+            let placeholder_settings = PackagePlaceholderSettings {
+                default_global_prefix,
+                assigned: assignments.remove(&package_name).unwrap_or_default(),
+            };
             // Adding one pack used to restart every package's worker, which takes a while for
             // each under Rosetta.
             let kept = previous_packages.get(&package_name).filter(|_| {
                 !raw_chord_package.js_files_contents.is_empty()
+                    && self.loaded_placeholder_settings.lock().get(&package_name)
+                        == Some(&placeholder_settings)
                     && can_keep_loaded_package(
                         &raw_chord_package.root,
                         previous_roots.get(&package_name).map(PathBuf::as_path),
@@ -729,12 +759,17 @@ impl ChordPackageManager {
             if let Some(package) = kept {
                 log::debug!("keeping package {package_name}: same pinned revision, worker running");
                 let errors = previous_errors.get(&package_name).cloned().unwrap_or_default();
+                next_placeholder_settings.insert(package_name.clone(), placeholder_settings);
                 package_errors.insert(package_name, errors);
                 chord_packages.insert(package.name.clone(), package.clone());
                 continue;
             }
-            match self.load_package(raw_chord_package).await {
+            match self
+                .load_package(raw_chord_package, &placeholder_settings)
+                .await
+            {
                 Ok((package, errors)) => {
+                    next_placeholder_settings.insert(package_name.clone(), placeholder_settings);
                     package_errors.insert(package_name, errors);
                     chord_packages.insert(package.name.clone(), package);
                 }
@@ -772,6 +807,7 @@ impl ChordPackageManager {
 
         *self.packages.write() = chord_packages;
         *self.package_roots.write() = next_roots;
+        *self.loaded_placeholder_settings.lock() = next_placeholder_settings;
         self.update_executable_app_ids();
         self.handle.app_state().chord_mode_manager().configure_meta_commands(hints, halt_template)?;
         package_errors.retain(|_, errors| !errors.is_empty());
@@ -880,6 +916,7 @@ impl ChordPackageManager {
     async fn load_package(
         &self,
         raw_chord_package: RawChordPackage,
+        placeholder_settings: &PackagePlaceholderSettings,
     ) -> Result<(ChordPackage, Vec<String>)> {
         let name = raw_chord_package.package_name();
         log::debug!("loading package {}", name);
@@ -894,16 +931,6 @@ impl ChordPackageManager {
         let mut global_chords = Vec::new();
         let mut parsed_chords_files = HashMap::new();
         let mut errors = Vec::new();
-        // Without the saved values, files still load with their placeholder defaults.
-        let assigned_placeholders = self
-            .handle
-            .app_state()
-            .placeholder_chord_store()
-            .assigned_for_package(&name)
-            .unwrap_or_else(|error| {
-                log::warn!("couldn't read placeholder values for {name}: {error:#}");
-                HashMap::new()
-            });
         let no_assigned_placeholders = HashMap::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
@@ -921,10 +948,16 @@ impl ChordPackageManager {
                 ParsedChordsFile::parse_core(&contents)
                     .with_context(|| format!("Failed to parse protected core file {}", path.display()))
             } else {
-                let assigned = assigned_placeholders
+                let assigned = placeholder_settings
+                    .assigned
                     .get(path.to_string_lossy().as_ref())
                     .unwrap_or(&no_assigned_placeholders);
-                parse_package_chords_file(&path, &contents, assigned)
+                parse_package_chords_file(
+                    &path,
+                    &contents,
+                    assigned,
+                    placeholder_settings.default_global_prefix,
+                )
             };
             match parsed {
                 Ok(parsed) => {

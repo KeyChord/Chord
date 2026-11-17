@@ -73,7 +73,7 @@
     "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.permissions-card": "workspace:*",
-    "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.quit-chord-card": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": "workspace:*",
     "@chord/dev.improve.chord.routes.settings._components.reset-chords-card": "workspace:*",

@@ -117,6 +117,15 @@
 		"url": "https://github.com/KeyChord/chords-raycast"
 	},
 	{
+		"packageName": "@keychord/chords-rift",
+		"displayName": "Rift Chords",
+		"description": "Global chords that run commands for the Rift tiling window manager.",
+		"categories": [
+			"Window Management"
+		],
+		"url": "https://github.com/KeyChord/chords-rift"
+	},
+	{
 		"packageName": "@keychord/chords-spaces",
 		"displayName": "Spaces Chords",
 		"description": "Switch between macOS Spaces by direction or desktop number.",

@@ -25,16 +25,16 @@
 		"@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.personal-chords": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card": "workspace:*",
+		"@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
 		"lucide-react": "^1.57.0",
 		"react": "^19.3.1",
+		"react-dom": "^19.3.1",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0",
-		"react-dom": "^19.3.1"
+		"@types/react-dom": "^19.3.0"
 	}
 }

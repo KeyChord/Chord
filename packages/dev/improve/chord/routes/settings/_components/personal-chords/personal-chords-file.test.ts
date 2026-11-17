@@ -53,5 +53,5 @@ test("new files name their app and start with an empty chords table", () => {
   const contents = newChordsFileContents("com.apple.finder");
   expect(contents.startsWith('name = "com.apple.finder"\n')).toBe(true);
   expect(contents.endsWith("[chords]\n")).toBe(true);
-  expect(newChordsFileContents("")).toContain('"/q" = {');
+  expect(newChordsFileContents("")).toContain('"/n" = {');
 });

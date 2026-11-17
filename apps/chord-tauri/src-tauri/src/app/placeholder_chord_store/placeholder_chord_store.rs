@@ -7,6 +7,9 @@ use tauri_plugin_store::{Store, StoreExt};
 
 pub const PLACEHOLDER_CHORDS_STORE_PATH: &str = "placeholder-chords.json";
 
+/// Saved values by chords file pathslug and then placeholder token.
+pub type FilePlaceholderAssignments = HashMap<String, HashMap<String, String>>;
+
 /// The user's value for one placeholder in one chords file. Keyed by package name and pathslug,
 /// not by location, so it carries over when the same package loads from another source (a local
 /// folder, a monorepo or its GitHub mirror). Entries in an older key shape are ignored.
@@ -16,7 +19,7 @@ pub struct PlaceholderChordStoreKey {
     pub package: String,
     /// The chords file's pathslug, such as `chords/macos.toml`.
     pub file: String,
-    /// The name between the angle brackets: `p` for `<p>`.
+    /// The complete placeholder token. Older entries store a bare name.
     pub placeholder: String,
 }
 
@@ -52,21 +55,19 @@ impl PlaceholderChordStore {
             .collect())
     }
 
-    /// A package's saved values, by chords file pathslug and then placeholder name.
-    pub fn assigned_for_package(
+    pub fn assigned_by_package(
         &self,
-        package: &str,
-    ) -> anyhow::Result<HashMap<String, HashMap<String, String>>> {
-        let mut files: HashMap<String, HashMap<String, String>> = HashMap::new();
+    ) -> anyhow::Result<HashMap<String, FilePlaceholderAssignments>> {
+        let mut packages = HashMap::<String, FilePlaceholderAssignments>::new();
         for (key, entry) in self.entries()? {
-            if key.package == package {
-                files
-                    .entry(key.file)
-                    .or_default()
-                    .insert(key.placeholder, entry.sequence);
-            }
+            packages
+                .entry(key.package)
+                .or_default()
+                .entry(key.file)
+                .or_default()
+                .insert(key.placeholder, entry.sequence);
         }
-        Ok(files)
+        Ok(packages)
     }
 
     fn serialize_key(key: &PlaceholderChordStoreKey) -> String {
@@ -91,10 +92,22 @@ impl PlaceholderChordStore {
         Ok(())
     }
 
-    pub fn remove(&self, key: &PlaceholderChordStoreKey) -> anyhow::Result<()> {
-        let serialized_key = Self::serialize_key(key);
-        self.store()?.delete(serialized_key);
-        self.save()?;
+    pub fn remove(
+        &self,
+        key: PlaceholderChordStoreKey,
+        legacy_name: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let store = self.store()?;
+        let serialized_key = Self::serialize_key(&key);
+        if let Some(legacy_name) = legacy_name {
+            let legacy_key = PlaceholderChordStoreKey {
+                placeholder: legacy_name.to_owned(),
+                ..key
+            };
+            store.delete(Self::serialize_key(&legacy_key));
+        }
+        store.delete(serialized_key);
+        store.save()?;
         Ok(())
     }
 }

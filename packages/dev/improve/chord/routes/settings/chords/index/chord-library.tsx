@@ -16,12 +16,18 @@ import {
   useTable,
 } from "@chord/com.npmjs.tanstack__react-table";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
+import {
+  listPlaceholders,
+  PackagePlaceholders,
+  placeholderNeedsKeys,
+  type PlaceholderEntry,
+} from "@chord/dev.improve.chord.routes.settings._components.package-placeholders";
 import { usePersonalChordsEditor } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
 import {
   Braces,
   ChevronDown,
-  ChevronUp,
   Command,
+  GripVertical,
   Keyboard,
   Pencil,
   Package,
@@ -29,7 +35,17 @@ import {
   Terminal,
   X,
 } from "lucide-react";
-import { Fragment, useId, useMemo } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+} from "react";
+import { flushSync } from "react-dom";
 
 export interface LibraryChord {
   id: string;
@@ -90,6 +106,7 @@ export interface LibraryPackage {
   personal: boolean;
   rank: PackageRank;
   chords: LibraryChord[];
+  placeholders: PlaceholderEntry[];
   fileCount: number;
   appLabels: string[];
   appId?: string;
@@ -118,6 +135,7 @@ export function listLibraryPackages(
               ? "builtin"
               : "installed"),
         chords,
+        placeholders: listPlaceholders([pkg]),
         fileCount: new Set([
           ...Object.keys(pkg.rawChordsFiles),
           ...Object.keys(pkg.compiledChordsFiles),
@@ -133,23 +151,44 @@ const rankOrder: PackageRank[] = ["core", "personal", "installed", "builtin"];
 
 const rankable = (rank: PackageRank) => rank === "installed" || rank === "builtin";
 
+export type DropPlace = "before" | "after";
+
 /**
- * The order to save after moving one package up (-1) or down (1) within its group, or undefined
- * when it is already at the edge. Installed packages stay above built-in ones.
+ * The order to save after moving package `name` before or after `target`, or undefined when the
+ * two are in different groups or nothing would change. Installed packages stay above built-in
+ * ones, and the order lists only the packages the user ranks.
  */
 export function movePackage(
   packages: LibraryPackage[],
   name: string,
-  offset: -1 | 1,
+  target: string,
+  place: DropPlace,
 ): string[] | undefined {
   const ranked = packages.filter((pkg) => rankable(pkg.rank));
-  const index = ranked.findIndex((pkg) => pkg.name === name);
-  const target = ranked[index + offset];
-  if (index === -1 || !target || target.rank !== ranked[index]!.rank) return undefined;
-  const names = ranked.map((pkg) => pkg.name);
-  names[index] = target.name;
-  names[index + offset] = name;
-  return names;
+  const rank = ranked.find((pkg) => pkg.name === name)?.rank;
+  if (!rank || name === target || ranked.find((pkg) => pkg.name === target)?.rank !== rank) {
+    return undefined;
+  }
+  const group = ranked.filter((pkg) => pkg.rank === rank).map((pkg) => pkg.name);
+  const moved = group.filter((other) => other !== name);
+  moved.splice(moved.indexOf(target) + (place === "after" ? 1 : 0), 0, name);
+  if (moved.every((other, index) => other === group[index])) return undefined;
+  const next = moved.values();
+  return ranked.map((pkg) => (pkg.rank === rank ? next.next().value! : pkg.name));
+}
+
+/**
+ * Shows `packages` in a saved `order` before Chord reports it back. Packages the order doesn't
+ * name keep their place.
+ */
+export function applyPackageOrder(packages: LibraryPackage[], order: string[]): LibraryPackage[] {
+  const position = new Map(order.map((name, index) => [name, index]));
+  const listed = (pkg: LibraryPackage) => rankable(pkg.rank) && position.has(pkg.name);
+  const sorted = packages
+    .filter(listed)
+    .toSorted((a, b) => position.get(a.name)! - position.get(b.name)!)
+    .values();
+  return packages.map((pkg) => (listed(pkg) ? sorted.next().value! : pkg));
 }
 
 const rankGroups: Partial<Record<PackageRank, { label: string; description: string }>> = {
@@ -163,41 +202,53 @@ const rankGroups: Partial<Record<PackageRank, { label: string; description: stri
   },
 };
 
-type PackageOrder = {
-  move: (name: string, offset: -1 | 1) => void;
-  pending: boolean;
-};
+interface Drop {
+  target: string;
+  place: DropPlace;
+  /** The order to save if the package is dropped here. */
+  order: string[];
+}
 
-function RankControls({
-  entry,
-  packages,
-  order,
-}: {
-  entry: LibraryPackage;
-  packages: LibraryPackage[];
-  order?: PackageOrder;
-}) {
-  if (!order || !rankable(entry.rank)) return null;
-  return (
-    <span className="inline-flex items-center gap-0.5">
-      {([-1, 1] as const).map((offset) => {
-        const Icon = offset === -1 ? ChevronUp : ChevronDown;
-        return (
-          <Button
-            key={offset}
-            variant="ghost"
-            type="button"
-            size="icon-xs"
-            aria-label={`Move ${entry.name} ${offset === -1 ? "up" : "down"}`}
-            disabled={order.pending || !movePackage(packages, entry.name, offset)}
-            onClick={() => order.move(entry.name, offset)}
-          >
-            <Icon size={14} />
-          </Button>
-        );
-      })}
-    </span>
-  );
+interface DragState {
+  name: string;
+  rank: PackageRank;
+  /** The pointer's latest viewport y. */
+  y: number;
+  scroller: HTMLElement;
+  drop?: Drop;
+  /** The pending auto-scroll frame, while the pointer rests near the scroller's edge. */
+  frame?: number;
+}
+
+/** The nearest ancestor that scrolls vertically, where dragging near an edge scrolls. */
+function scrollParent(node: HTMLElement): HTMLElement {
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    const { overflowY } = getComputedStyle(parent);
+    if (
+      (overflowY === "auto" || overflowY === "scroll") &&
+      parent.scrollHeight > parent.clientHeight
+    ) {
+      return parent;
+    }
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+}
+
+const autoScrollEdge = 48;
+
+/** Pixels to scroll this frame: faster the closer the pointer is to (or past) an edge. */
+function autoScrollStep({ scroller, y }: DragState): number {
+  const { top, bottom } =
+    scroller === document.scrollingElement
+      ? { top: 0, bottom: window.innerHeight }
+      : scroller.getBoundingClientRect();
+  const past =
+    y < top + autoScrollEdge
+      ? y - (top + autoScrollEdge)
+      : y > bottom - autoScrollEdge
+        ? y - (bottom - autoScrollEdge)
+        : 0;
+  return Math.max(-24, Math.min(24, Math.round(past / 3)));
 }
 
 type PersonalEditor = ReturnType<typeof usePersonalChordsEditor>;
@@ -461,6 +512,19 @@ function PackageName({
               {entry.chords.length} chord{entry.chords.length === 1 ? "" : "s"}
               {" · "}
               {entry.fileCount} file{entry.fileCount === 1 ? "" : "s"}
+              {entry.placeholders.length > 0 && (
+                <>
+                  {" · "}
+                  {entry.placeholders.length} placeholder
+                  {entry.placeholders.length === 1 ? "" : "s"}
+                </>
+              )}
+              {entry.placeholders.some(placeholderNeedsKeys) && (
+                <>
+                  {" · "}
+                  <span className="text-amber-800 dark:text-amber-300">needs keys</span>
+                </>
+              )}
             </span>
           </span>
         </Button>
@@ -473,17 +537,150 @@ export function ChordLibrary({
   packages,
   apps,
   personalDirnames,
-  order,
+  configurePackage,
+  onReorder,
 }: {
   packages: LibraryPackage[];
   apps: Record<string, DesktopAppMetadata>;
   personalDirnames: Record<string, string>;
-  /** Lets the user rank packages; rows stay in the given rank order. */
-  order?: PackageOrder;
+  configurePackage?: string;
+  /**
+   * Lets the user drag installed and built-in packages within their group, and receives the
+   * order to save. Rows stay in the given rank order.
+   */
+  onReorder?: (order: string[]) => void;
 }) {
   // Keep drafts outside table rows so search and collapse preserve unsaved changes.
   const editor = usePersonalChordsEditor();
   const detailsPrefix = useId();
+  const hintId = useId();
+  const tableRef = useRef<HTMLTableElement>(null);
+  const configureRowRef = useRef<HTMLTableRowElement>(null);
+  // Pointer moves read and update this without waiting for a render; `dragging` mirrors it.
+  const dragRef = useRef<DragState | null>(null);
+  const [dragging, setDragging] = useState<{ name: string; drop?: Drop } | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+
+  function save(name: string, { target, place, order }: Drop) {
+    onReorder?.(order);
+    setAnnouncement(`Moved ${name} ${place === "before" ? "above" : "below"} ${target}.`);
+  }
+
+  /** Where the dragged package would land: between the visible packages of its group. */
+  function findDrop(drag: DragState): Drop | undefined {
+    const rows = tableRef.current?.querySelectorAll<HTMLTableRowElement>(
+      `tr.package-library-row[data-rank="${drag.rank}"]`,
+    );
+    // An expanded package's chords move with it, so its details row counts toward its middle.
+    const blocks = [...(rows ?? [])].map((row) => {
+      const details = row.nextElementSibling;
+      const last = details instanceof HTMLElement && !details.hidden ? details : row;
+      const { top } = row.getBoundingClientRect();
+      const { bottom } = last.getBoundingClientRect();
+      return { name: row.dataset.package!, middle: (top + bottom) / 2 };
+    });
+    const slot = blocks.filter((block) => block.middle < drag.y).length;
+    const target = blocks[Math.min(slot, blocks.length - 1)];
+    if (!target) return undefined;
+    const place: DropPlace = slot < blocks.length ? "before" : "after";
+    const order = movePackage(packages, drag.name, target.name, place);
+    return order && { target: target.name, place, order };
+  }
+
+  function track() {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const drop = findDrop(drag);
+    drag.drop = drop;
+    setDragging((shown) =>
+      shown?.drop?.target === drop?.target && shown?.drop?.place === drop?.place
+        ? shown
+        : { name: drag.name, drop },
+    );
+  }
+
+  function autoScroll() {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const step = autoScrollStep(drag);
+    const before = drag.scroller.scrollTop;
+    drag.scroller.scrollTop += step;
+    // Stop at rest or at either end; the next pointer move starts it again.
+    drag.frame =
+      step !== 0 && drag.scroller.scrollTop !== before
+        ? requestAnimationFrame(autoScroll)
+        : undefined;
+  }
+
+  function end(commit: boolean) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    dragRef.current = null;
+    if (drag.frame !== undefined) cancelAnimationFrame(drag.frame);
+    setDragging(null);
+    if (commit && drag.drop) save(drag.name, drag.drop);
+  }
+
+  function startDrag(event: PointerEvent<HTMLButtonElement>, entry: LibraryPackage) {
+    if (event.button !== 0 || dragRef.current) return;
+    // Keep the press from selecting text or starting a native drag.
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      name: entry.name,
+      rank: entry.rank,
+      y: event.clientY,
+      scroller: scrollParent(event.currentTarget),
+    };
+    setDragging({ name: entry.name });
+  }
+
+  function moveDrag(event: PointerEvent<HTMLButtonElement>) {
+    const drag = dragRef.current;
+    if (!drag) return;
+    drag.y = event.clientY;
+    track();
+    if (drag.frame === undefined) autoScroll();
+  }
+
+  /** Arrow keys on a focused handle move its package one place within its group. */
+  function stepDrag(event: KeyboardEvent<HTMLButtonElement>, entry: LibraryPackage) {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const up = event.key === "ArrowUp";
+    const group = table
+      .getRowModel()
+      .rows.map((row) => row.original)
+      .filter((pkg) => pkg.rank === entry.rank);
+    const target = group[group.findIndex((pkg) => pkg.name === entry.name) + (up ? -1 : 1)];
+    if (!target) return;
+    const place: DropPlace = up ? "before" : "after";
+    const order = movePackage(packages, entry.name, target.name, place);
+    if (!order) return;
+    // Moving the row can blur its handle, so render the new order now and focus it again.
+    const handle = event.currentTarget;
+    flushSync(() => save(entry.name, { target: target.name, place, order }));
+    handle.focus();
+  }
+
+  const isDragging = dragging !== null;
+  useEffect(() => {
+    if (!isDragging) return;
+    const cancel = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      end(false);
+    };
+    // Scrolling moves rows under a resting pointer, so the drop target can change.
+    window.addEventListener("scroll", track, { capture: true, passive: true });
+    window.addEventListener("keydown", cancel, true);
+    return () => {
+      window.removeEventListener("scroll", track, { capture: true });
+      window.removeEventListener("keydown", cancel, true);
+    };
+  });
+
   const columns = useMemo<ColumnDef<typeof packageFeatures, LibraryPackage>[]>(
     () => [
       {
@@ -497,13 +694,8 @@ export function ChordLibrary({
           />
         ),
       },
-      {
-        id: "rank",
-        header: () => <span className="sr-only">Rank</span>,
-        cell: ({ row }) => <RankControls entry={row.original} packages={packages} order={order} />,
-      },
     ],
-    [apps, detailsPrefix, packages, order],
+    [apps, detailsPrefix],
   );
   const table = useTable({
     features: packageFeatures,
@@ -512,6 +704,7 @@ export function ChordLibrary({
     getRowId: (entry) => entry.name,
     getRowCanExpand: () => true,
     autoResetExpanded: false,
+    initialState: configurePackage ? { expanded: { [configurePackage]: true } } : undefined,
     globalFilterFn: (row, _columnId, value: string) =>
       [row.original.name, ...row.original.appLabels].some((label) =>
         label.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
@@ -519,6 +712,14 @@ export function ChordLibrary({
   });
   const visibleRows = table.getRowModel().rows;
   const search = String(table.state.globalFilter ?? "");
+  const hasConfigurePackage = packages.some((pkg) => pkg.name === configurePackage);
+
+  useEffect(() => {
+    if (!hasConfigurePackage) return;
+    // Let the settings shell reset its scroll position before revealing the selected row.
+    const frame = requestAnimationFrame(() => configureRowRef.current?.scrollIntoView());
+    return () => cancelAnimationFrame(frame);
+  }, [configurePackage, hasConfigurePackage]);
 
   return (
     <section aria-label="Chord packages">
@@ -547,15 +748,31 @@ export function ChordLibrary({
           {visibleRows.length} package{visibleRows.length === 1 ? "" : "s"}
         </span>
       </div>
+      {onReorder && (
+        <p id={hintId} className="sr-only">
+          Drag to reorder, or press the Up or Down arrow key. When two packages define the same
+          chord, the higher one runs.
+        </p>
+      )}
+      <p className="sr-only" aria-live="polite">
+        {announcement}
+      </p>
       <div className="chord-library-scroll">
-        <table className="chord-library-table package-library-table">
+        <table
+          ref={tableRef}
+          className="chord-library-table package-library-table"
+          data-dragging={isDragging || undefined}
+        >
           <caption className="sr-only">
-            Your chord packages, highest rank first; expand a package to view its chords grouped
-            by app
+            Your chord packages, highest rank first; expand a package to view its placeholders
+            and its chords grouped by app
           </caption>
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
+                <th scope="col">
+                  <span className="sr-only">Order</span>
+                </th>
                 {group.headers.map((header) => (
                   <th key={header.id} scope="col">
                     {header.isPlaceholder ? null : <table.FlexRender header={header} />}
@@ -570,11 +787,12 @@ export function ChordLibrary({
               const rank = row.original.rank;
               const group = rankGroups[rank];
               const startsGroup = visibleRows[index - 1]?.original.rank !== rank;
+              const drop = dragging?.drop?.target === row.id ? dragging.drop.place : undefined;
               return (
                 <Fragment key={row.id}>
                   {group && startsGroup && (
                     <tr className="package-library-group">
-                      <th scope="colgroup" colSpan={row.getAllCells().length}>
+                      <th scope="colgroup" colSpan={row.getAllCells().length + 1}>
                         <span className="block text-xs font-medium">{group.label}</span>
                         <span className="block text-[11px] font-normal text-muted-foreground">
                           {group.description}
@@ -582,32 +800,63 @@ export function ChordLibrary({
                       </th>
                     </tr>
                   )}
-                  <tr className="package-library-row" data-expanded={expanded}>
+                  <tr
+                    ref={row.id === configurePackage ? configureRowRef : undefined}
+                    className="package-library-row"
+                    data-expanded={expanded}
+                    data-package={row.id}
+                    data-rank={rank}
+                    data-dragging={dragging?.name === row.id || undefined}
+                    // An expanded package's line goes under its chords instead.
+                    data-drop={
+                      drop === "before" || (drop === "after" && !expanded) ? drop : undefined
+                    }
+                  >
+                    <td className="package-library-handle-cell">
+                      {onReorder && rankable(rank) && (
+                        // The shared Button drops `title` and handles presses itself.
+                        <button
+                          type="button"
+                          className="package-library-handle"
+                          aria-label={`Reorder ${row.id}`}
+                          aria-describedby={hintId}
+                          title="Drag to reorder"
+                          onPointerDown={(event) => startDrag(event, row.original)}
+                          onPointerMove={moveDrag}
+                          onPointerUp={() => end(true)}
+                          onPointerCancel={() => end(false)}
+                          onLostPointerCapture={() => end(false)}
+                          onKeyDown={(event) => stepDrag(event, row.original)}
+                        >
+                          <GripVertical size={16} strokeWidth={1.8} aria-hidden="true" />
+                        </button>
+                      )}
+                    </td>
                     {row.getAllCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className={
-                          cell.column.id === "name"
-                            ? undefined
-                            : "text-[13px] text-muted-foreground"
-                        }
-                      >
+                      <td key={cell.id}>
                         <table.FlexRender cell={cell} />
                       </td>
                     ))}
                   </tr>
-                  <tr className="package-library-details" hidden={!expanded}>
-                    <td colSpan={row.getAllCells().length}>
+                  <tr
+                    className="package-library-details"
+                    hidden={!expanded}
+                    data-drop={drop === "after" && expanded ? drop : undefined}
+                  >
+                    <td colSpan={row.getAllCells().length + 1}>
                       <div
                         id={`${detailsPrefix}-${encodeURIComponent(row.id)}`}
-                        className="package-library-details-content"
+                        className="package-library-details-content space-y-6"
                       >
                         {expanded && (
-                          <PackageChords
-                            editor={editor}
-                            rows={row.original.chords}
-                            personalDirnames={personalDirnames}
-                          />
+                          <>
+                            <PackagePlaceholders entries={row.original.placeholders} apps={apps} />
+                            <PackageChords
+                              editor={editor}
+                              rows={row.original.chords}
+                              personalDirnames={personalDirnames}
+                            />
+                          </>
                         )}
                       </div>
                     </td>

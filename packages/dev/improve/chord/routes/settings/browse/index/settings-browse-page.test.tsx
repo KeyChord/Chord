@@ -35,7 +35,7 @@ function render(repos: Repos, fields: Partial<GitReposState> = {}) {
 	};
 	return renderToString(
 		<QueryClientProvider client={new QueryClient()}>
-			<SettingsBrowsePageContent state={state} />
+			<SettingsBrowsePageContent state={state} onConfigure={() => {}} />
 		</QueryClientProvider>,
 	).replaceAll('<!-- -->', '');
 }
@@ -54,6 +54,7 @@ test('each repo lists its categories, description, slug and install action', () 
 	expect(chromium).toContain('>KeyChord/chords-chromium</span>');
 	expect(chromium).toContain('Install</button>');
 	expect(chromium).not.toContain('Uninstall');
+	expect(chromium).not.toContain('Configure');
 });
 
 test('categories appear once each as filters after All', () => {
@@ -64,7 +65,7 @@ test('categories appear once each as filters after All', () => {
 	expect(labels).toEqual(['All', ...categories.sort((a, b) => a.localeCompare(b, 'en'))]);
 });
 
-test('installed repos show their commit and uninstall action; linked and pinned repos say so', () => {
+test('installed repos show Uninstall to the left of Configure and indicate linked or pinned repos', () => {
 	const html = render({
 		'KeyChord/chords-vscode': gitRepo('chords-vscode', { headShortSha: 'abc1234' }),
 		'KeyChord/chords-terminal': gitRepo('chords-terminal', { headShortSha: 'def5678', linkedLocalPath: '/src/chords-terminal' }),
@@ -73,7 +74,7 @@ test('installed repos show their commit and uninstall action; linked and pinned 
 
 	const vscode = listing(html, 'VSCode Chords');
 	expect(vscode).toContain('>abc1234</span>');
-	expect(vscode).toContain('Uninstall</button>');
+	expect(vscode).toMatch(/<button[^>]*class="[^"]*text-destructive underline[^"]*"[^>]*>Uninstall<\/button><button[^>]*data-variant="default"[^>]*>Configure<\/button>/);
 
 	const terminal = listing(html, 'Terminal Chords');
 	expect(terminal).not.toContain('def5678');

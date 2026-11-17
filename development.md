@@ -382,7 +382,7 @@ resolution, start in `~/.chord/packages`. The layout is:
   revisions distinct while retaining the backing checkouts below `.sources/`.
 - Other visible folders (including manually added symlinks and scoped packages)
   require approval in Chords → Packages → Third-Party Packages before their chords
-  or handlers load. Chord approves packages it creates through My Chords, including
+  or handlers load. Chord approves packages it creates through Local Chords, including
   a newly created default package. Existing folders are never approved implicitly.
 - `.sources/github.com/<owner>/<repo>/<full-commit>/` contains downloaded checkouts.
   GitHub names are case-insensitive. Different owners, repositories and commits

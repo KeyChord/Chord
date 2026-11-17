@@ -618,7 +618,88 @@
 }
 
 .package-library-table > thead > tr > th:first-child {
-  width: 100%;
+  width: 34px;
+}
+.package-library-table td.package-library-handle-cell {
+  padding: 0 0 0 6px;
+}
+.package-library-handle {
+  display: inline-flex;
+  width: 24px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #b4b4b4;
+  cursor: grab;
+  touch-action: none;
+  transition:
+    color 100ms ease,
+    background 100ms ease;
+}
+.package-library-row:hover .package-library-handle,
+.package-library-handle:focus-visible {
+  color: #666;
+}
+.package-library-handle:hover {
+  background: rgb(0 0 0 / 5%);
+}
+.package-library-handle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--focus) 30%, transparent);
+  outline-offset: 1px;
+}
+.package-library-table[data-dragging],
+.package-library-table[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.chord-library-table tbody tr.package-library-row[data-dragging] {
+  background: rgb(0 0 0 / 5%);
+}
+.package-library-row[data-dragging] > td > * {
+  opacity: 0.5;
+}
+/* The line shows where a dragged package will land. */
+.package-library-table tr[data-drop] > td {
+  position: relative;
+}
+.package-library-table tr[data-drop] > td::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--focus);
+  pointer-events: none;
+}
+.package-library-table tr[data-drop="before"] > td::after {
+  top: -1px;
+}
+.package-library-table tr[data-drop="after"] > td::after {
+  bottom: -1px;
+}
+.package-library-table tr[data-drop] > td:first-child::after {
+  left: 6px;
+  border-top-left-radius: 2px;
+  border-bottom-left-radius: 2px;
+}
+.package-library-table tr[data-drop] > td:last-child::after {
+  right: 6px;
+  border-top-right-radius: 2px;
+  border-bottom-right-radius: 2px;
+}
+.dark .package-library-handle {
+  color: #6f6f6f;
+}
+.dark .package-library-row:hover .package-library-handle,
+.dark .package-library-handle:focus-visible {
+  color: #bdbdbd;
+}
+.dark .package-library-handle:hover {
+  background: rgb(255 255 255 / 6%);
+}
+.dark .chord-library-table tbody tr.package-library-row[data-dragging] {
+  background: rgb(255 255 255 / 6%);
 }
 .package-library-name {
   display: flex;

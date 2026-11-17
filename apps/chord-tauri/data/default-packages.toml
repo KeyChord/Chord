@@ -8,45 +8,55 @@
 
 [packages."@keychord/chords-chord"]
 git = "https://github.com/KeyChord/chords-chord"
-rev = "1b9d92ab1cec81ea3b61cfa78f367957e8b69214"
+rev = "0fdb58e52044f75f6f89fce8243e8c8bd4ad3206"
 
 # The menu bar, plus the system chords (force quit, lock, volume, brightness) that used to be
 # in chords-os.
 [packages."@keychord/chords-menu"]
 git = "https://github.com/KeyChord/chords-menu"
-rev = "4c297eec8f2153a272b4fc6edcf09cbb192e431c"
+rev = "2cca8b753e62193e7abb9ff609bfb36f3dd3b627"
 
 # Only names for Apple's apps; each app's chords are a package of its own.
 [packages."@keychord/chords-com.apple"]
 git = "https://github.com/KeyChord/chords-com.apple"
-rev = "9010297dace1157131de9814cba5b92054a68c41"
+rev = "4fe5b6328d5aeb4b18f4faeb51040e2eb05143a5"
 
 [packages."@keychord/chords-com.apple.finder"]
 git = "https://github.com/KeyChord/chords-com.apple.finder"
-rev = "5932147fb0eabcafd96f47a77dbe1ca807e180a1"
+rev = "d2d31c8566584c151a615a60c639d0c8cd32efc7"
 
 [packages."@keychord/chords-com.apple.Safari"]
 git = "https://github.com/KeyChord/chords-com.apple.Safari"
-rev = "24da767c2f33fe419705227280d6377fa8dabafe"
+rev = "3b858d47100440807a9fc296beb76ed339d8fce9"
 
 [packages."@keychord/chords-com.apple.ActivityMonitor"]
 git = "https://github.com/KeyChord/chords-com.apple.ActivityMonitor"
-rev = "d909f915d09958ed8950df6d6139f62cb54a6d0c"
+rev = "f247a89a5c5ee04f88ef643e558e16c05f42e275"
 
 [packages."@keychord/chords-com.apple.AccessibilityInspector"]
 git = "https://github.com/KeyChord/chords-com.apple.AccessibilityInspector"
-rev = "2f2a63aa5a8add31147d563cac31de1ce0157849"
+rev = "649819aa07e97e9d5c1dfef5280a4cfd87e419e1"
 
 # The built-in `/` launcher, which opens Spotlight's top result for a query. It is a fallback
 # chord, so other `/` chords win, and an installed launcher such as chords-raycast replaces it.
 [packages."@keychord/chords-com.apple.Spotlight"]
 git = "https://github.com/KeyChord/chords-com.apple.Spotlight"
-rev = "baecaa792d601efa13afe38f3fd0ff77aa8a9c0f"
+rev = "06af4b44924e53bf5c5f23c664172a96aef030d4"
 
 # Default sets that earlier versions of Chord installed, newest first. A package the defaults
 # dropped is removed while it's still at a revision listed here. Chord also uses these to find the
 # set that an install from before it recorded which defaults it had was set up with: that install
 # gets the packages the defaults gained after its set, and not the ones the user removed.
+
+[[previous]] # 2026-11-18, 819e45bf (Chord 0.2.11)
+"KeyChord/chords-chord" = "1b9d92ab1cec81ea3b61cfa78f367957e8b69214"
+"KeyChord/chords-menu" = "4c297eec8f2153a272b4fc6edcf09cbb192e431c"
+"KeyChord/chords-com.apple" = "9010297dace1157131de9814cba5b92054a68c41"
+"KeyChord/chords-com.apple.finder" = "5932147fb0eabcafd96f47a77dbe1ca807e180a1"
+"KeyChord/chords-com.apple.Safari" = "24da767c2f33fe419705227280d6377fa8dabafe"
+"KeyChord/chords-com.apple.ActivityMonitor" = "d909f915d09958ed8950df6d6139f62cb54a6d0c"
+"KeyChord/chords-com.apple.AccessibilityInspector" = "2f2a63aa5a8add31147d563cac31de1ce0157849"
+"KeyChord/chords-com.apple.Spotlight" = "baecaa792d601efa13afe38f3fd0ff77aa8a9c0f"
 
 [[previous]] # 2026-11-05, 219e75f6
 "KeyChord/chords-chord" = "6ba92be5776d36392565c3a5c113dba334213cd5"

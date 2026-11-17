@@ -162,10 +162,10 @@ export function PersonalChordsContent({
   const current = currentFile(listing.packages, selected);
 
   return (
-    <section aria-label="My Chords" className="space-y-3">
+    <section aria-label="Local Chords" className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold">My Chords</h3>
+          <h3 className="text-sm font-semibold">Local Chords</h3>
           <p className="text-sm text-muted-foreground">
             Your chords take priority over installed packages. Save to apply your changes.
           </p>
@@ -256,7 +256,7 @@ function PackageSection({
         <Package className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
         <h3 className="min-w-0 truncate text-sm font-semibold">{pkg.dirname}</h3>
         <span className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground">
-          My Chords
+          Local Chords
         </span>
         {state?.name && state.name !== pkg.dirname && (
           <span className="truncate text-xs text-muted-foreground">loads as {state.name}</span>

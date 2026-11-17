@@ -62,15 +62,15 @@ pub struct CompiledChordsFile {
     pub placeholders: Vec<ChordsFilePlaceholder>,
 }
 
-/// A `<name>` in chord and hint keys that a chords file declares under `[placeholders]`, such as
-/// `p = { name = 'Prefix', default = ';' }` for keys like `'<p>q'`. Chord replaces it with the
+/// A `<>` or `<name>` token that a chords file declares under `[placeholders]`, such as
+/// `"<>" = { name = 'Prefix', default = ';' }` for keys like `'<>q'`. Chord replaces it with the
 /// value the user set in Settings, or else the default. A chord or hint that uses a placeholder
-/// with neither is left out. Angle brackets around an undeclared name stay literal keys.
+/// with neither is left out. Undeclared tokens are left as written.
 #[typeshare]
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChordsFilePlaceholder {
-    /// The name between the angle brackets: `p` for `<p>`.
+    /// The complete placeholder token, including the angle brackets.
     pub name: String,
     /// What the placeholder is for, shown in Settings.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -86,6 +86,34 @@ impl ChordsFilePlaceholder {
     pub fn value(&self) -> Option<&str> {
         self.assigned.as_deref().or(self.default.as_deref())
     }
+}
+
+pub const DEFAULT_GLOBAL_PLACEHOLDER_PREFIX: char = ';';
+
+fn placeholder_name_content(name: &str) -> Option<&str> {
+    name.strip_prefix('<')?
+        .strip_suffix('>')
+        .filter(|content| !content.contains(['<', '>']))
+}
+
+/// Older saved assignments used bare names. The old package prefix `p` follows `<>` when
+/// the file no longer declares `<p>`.
+pub(crate) fn legacy_placeholder_name(name: &str, declares_named_p: bool) -> Option<&str> {
+    match placeholder_name_content(name)? {
+        "" if declares_named_p => None,
+        "" => Some("p"),
+        content => Some(content),
+    }
+}
+
+pub fn parse_global_placeholder_prefix(value: &str) -> Result<char> {
+    let mut chars = value.chars();
+    let symbol = chars.next().filter(|symbol| {
+        chars.next().is_none() && symbol.is_ascii_punctuation() && !matches!(*symbol, '\'' | '`')
+    });
+    let symbol = symbol.context("Choose one symbol that can start a chord")?;
+    validate_placeholder_value(value)?;
+    Ok(symbol)
 }
 
 /// A placeholder value is a plain key sequence. Characters that mean something else in a chord
@@ -107,9 +135,8 @@ pub fn validate_placeholder_value(value: &str) -> Result<()> {
 fn expand_placeholders(key: &str, placeholders: &[ChordsFilePlaceholder]) -> Option<String> {
     let mut expanded = key.to_owned();
     for placeholder in placeholders {
-        let token = format!("<{}>", placeholder.name);
-        if expanded.contains(&token) {
-            expanded = expanded.replace(&token, placeholder.value()?);
+        if expanded.contains(&placeholder.name) {
+            expanded = expanded.replace(&placeholder.name, placeholder.value()?);
         }
     }
     Some(expanded)
@@ -503,20 +530,24 @@ impl FromStr for ParsedChordsFile {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::parse(s, false, &HashMap::new())
+        Self::parse_with_placeholders(s, &HashMap::new(), DEFAULT_GLOBAL_PLACEHOLDER_PREFIX)
     }
 }
 
 impl ParsedChordsFile {
-    /// Parses a package's chords file with the user's placeholder values (by placeholder name)
+    /// Parses a package's chords file with the user's placeholder values (by placeholder token)
     /// for this file. Placeholders without one use the file's defaults.
-    pub fn parse_with_placeholders(s: &str, assigned: &HashMap<String, String>) -> Result<Self> {
-        Self::parse(s, false, assigned)
+    pub fn parse_with_placeholders(
+        s: &str,
+        assigned: &HashMap<String, String>,
+        default_global_prefix: char,
+    ) -> Result<Self> {
+        Self::parse(s, false, assigned, default_global_prefix)
     }
 
     /// Only the registry's protected core file may opt into the meta namespace.
     pub(crate) fn parse_core(s: &str) -> Result<Self> {
-        let parsed = Self::parse(s, true, &HashMap::new())?;
+        let parsed = Self::parse(s, true, &HashMap::new(), DEFAULT_GLOBAL_PLACEHOLDER_PREFIX)?;
         anyhow::ensure!(
             parsed.handlers.is_empty() && parsed.imports.is_empty(),
             "the protected core file must be self-contained"
@@ -524,12 +555,12 @@ impl ParsedChordsFile {
         Ok(parsed)
     }
 
-    /// `[placeholders]` maps each name to `{ name = '<label>', default = '<keys>' }`, or to just
-    /// the default as a string. A default that isn't a valid value fails the file; a stored value
-    /// that isn't is ignored, so the default applies.
+    /// A single letter in `default` inherits the global symbol. A bare string is literal.
+    /// Invalid declarations fail the file. An invalid saved value falls back to the default.
     fn parse_placeholders(
         table: &Table,
         assigned: &HashMap<String, String>,
+        default_global_prefix: char,
     ) -> Result<Vec<ChordsFilePlaceholder>> {
         let Some(value) = table.get("placeholders") else {
             return Ok(Vec::new());
@@ -538,38 +569,56 @@ impl ParsedChordsFile {
         let mut placeholders = Vec::new();
         for (name, value) in declared {
             anyhow::ensure!(
-                !name.is_empty() && !name.contains(['<', '>']),
-                "invalid placeholder name {name:?}"
+                placeholder_name_content(name).is_some(),
+                "invalid placeholder name {name:?}: use the full token, such as `<>` or `<name>`"
             );
             let string = |field: &str| -> Result<Option<String>> {
                 value
                     .get(field)
                     .map(|v| {
                         v.as_str().map(str::to_owned).with_context(|| {
-                            format!("`{field}` of placeholder <{name}> must be a string")
+                            format!("`{field}` of placeholder {name} must be a string")
                         })
                     })
                     .transpose()
             };
             let (label, default) = match value {
                 Value::String(default) => (None, Some(default.clone())),
-                Value::Table(_) => (string("name")?, string("default")?),
-                _ => anyhow::bail!(
-                    "placeholder <{name}> must be a table such as {{ name = 'Prefix', default = ';' }}"
-                ),
+                Value::Table(fields) => {
+                    anyhow::ensure!(
+                        !fields.contains_key("default_letter"),
+                        "placeholder {name}: use `default` for a prefix letter"
+                    );
+                    let default = string("default")?.map(|value| match value.as_bytes() {
+                        [letter] if letter.is_ascii_alphabetic() => {
+                            format!(
+                                "{default_global_prefix}{}",
+                                letter.to_ascii_lowercase() as char
+                            )
+                        }
+                        _ => value,
+                    });
+                    (string("name")?, default)
+                }
+                _ => anyhow::bail!("placeholder {name} must be a table or a string default"),
             };
             if let Some(default) = &default {
                 validate_placeholder_value(default)
-                    .with_context(|| format!("invalid default for placeholder <{name}>"))?;
+                    .with_context(|| format!("invalid default for placeholder {name}"))?;
             }
-            let assigned = assigned.get(name).and_then(|value| {
-                validate_placeholder_value(value)
-                    .inspect_err(|error| {
-                        log::warn!("ignoring the saved value for placeholder <{name}>: {error:#}")
-                    })
-                    .ok()
-                    .map(|()| value.clone())
-            });
+            let assigned = assigned
+                .get(name)
+                .or_else(|| {
+                    assigned.get(legacy_placeholder_name(name, declared.contains_key("<p>"))?)
+                })
+                .and_then(|value| {
+                    validate_placeholder_value(value)
+                        .inspect_err(|error| {
+                            log::warn!("ignoring the saved value for placeholder {name}: {error:#}")
+                        })
+                        .ok()
+                        .map(|()| value.clone())
+                });
             placeholders.push(ChordsFilePlaceholder {
                 name: name.clone(),
                 label,
@@ -580,7 +629,12 @@ impl ParsedChordsFile {
         Ok(placeholders)
     }
 
-    fn parse(s: &str, core: bool, assigned_placeholders: &HashMap<String, String>) -> Result<Self> {
+    fn parse(
+        s: &str,
+        core: bool,
+        assigned_placeholders: &HashMap<String, String>,
+        default_global_prefix: char,
+    ) -> Result<Self> {
         let value: toml::Value = toml::from_str(s)?;
         let root = value.as_table().context("root must be a table")?;
         let name = root
@@ -593,7 +647,8 @@ impl ParsedChordsFile {
         let handlers = Self::parse_handlers(root)?;
         let imports = Self::parse_imports(root)?;
         let executables = Self::parse_executables(root)?;
-        let placeholders = Self::parse_placeholders(root, assigned_placeholders)?;
+        let placeholders =
+            Self::parse_placeholders(root, assigned_placeholders, default_global_prefix)?;
 
         let mut chords = Vec::new();
         let mut chord_hints = Vec::new();
@@ -1272,11 +1327,11 @@ file = "menu"
     const PREFIXED: &str = r#"
 name = "Rift"
 [placeholders]
-p = { name = "Window management prefix", default = ";" }
+"<>" = { name = "Window management prefix", default = ";" }
 [chords]
-"?<p>j" = { name = "Join" }
-"<p>jl" = { name = "Join Left", shell = "true" }
-"<p>q" = { name = "Quit", shell = "true" }
+"?<>j" = { name = "Join" }
+"<>jl" = { name = "Join Left", shell = "true" }
+"<>q" = { name = "Quit", shell = "true" }
 "#;
 
     fn triggers(file: &ParsedChordsFile) -> Vec<&str> {
@@ -1298,7 +1353,7 @@ p = { name = "Window management prefix", default = ";" }
         assert_eq!(
             file.placeholders,
             [ChordsFilePlaceholder {
-                name: "p".into(),
+                name: "<>".into(),
                 label: Some("Window management prefix".into()),
                 default: Some(";".into()),
                 assigned: None,
@@ -1307,9 +1362,49 @@ p = { name = "Window management prefix", default = ";" }
     }
 
     #[test]
+    fn letter_defaults_follow_the_global_prefix_and_keep_package_overrides() {
+        let source = PREFIXED.replace("default = \";\"", "default = \"R\"");
+        let defaults: ParsedChordsFile = source.parse().unwrap();
+        assert_eq!(triggers(&defaults), [";rjl", ";rq"]);
+
+        let custom =
+            ParsedChordsFile::parse_with_placeholders(&source, &HashMap::new(), '=').unwrap();
+        assert_eq!(triggers(&custom), ["=rjl", "=rq"]);
+        assert_eq!(custom.chord_hints[0].raw_pattern, "=rj");
+
+        let assigned = HashMap::from([("<>".to_owned(), "-".to_owned())]);
+        let file = ParsedChordsFile::parse_with_placeholders(&source, &assigned, '=').unwrap();
+        assert_eq!(triggers(&file), ["-jl", "-q"]);
+        assert_eq!(file.placeholders[0].default.as_deref(), Some("=r"));
+        assert_eq!(file.placeholders[0].value(), Some("-"));
+
+        for prefix in [";", "/", "=r", "rt"] {
+            let literal = PREFIXED.replace("default = \";\"", &format!("default = {prefix:?}"));
+            let file =
+                ParsedChordsFile::parse_with_placeholders(&literal, &HashMap::new(), '=').unwrap();
+            assert_eq!(file.placeholders[0].value(), Some(prefix));
+        }
+    }
+
+    #[test]
+    fn global_prefix_is_one_usable_punctuation_key() {
+        for value in [";", "=", "-", "/", "."] {
+            assert!(parse_global_placeholder_prefix(value).is_ok(), "{value:?}");
+        }
+        for value in ["", ";=", "a", "0", " ", "'", "`", "?", "(", "\\"] {
+            assert!(parse_global_placeholder_prefix(value).is_err(), "{value:?}");
+        }
+    }
+
+    #[test]
     fn an_assigned_value_replaces_the_default() {
-        let assigned = HashMap::from([("p".to_string(), "-".to_string())]);
-        let file = ParsedChordsFile::parse_with_placeholders(PREFIXED, &assigned).unwrap();
+        let assigned = HashMap::from([("<>".to_string(), "-".to_string())]);
+        let file = ParsedChordsFile::parse_with_placeholders(
+            PREFIXED,
+            &assigned,
+            DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
+        )
+        .unwrap();
         assert_eq!(triggers(&file), ["-jl", "-q"]);
         assert_eq!(file.chord_hints[0].raw_pattern, "-j");
         assert_eq!(file.placeholders[0].assigned.as_deref(), Some("-"));
@@ -1317,10 +1412,67 @@ p = { name = "Window management prefix", default = ";" }
     }
 
     #[test]
+    fn full_tokens_take_precedence_over_legacy_saved_names() {
+        let mut assigned = HashMap::from([("p".to_owned(), "-".to_owned())]);
+        let parse = |source: &str, assigned: &HashMap<String, String>| {
+            ParsedChordsFile::parse_with_placeholders(
+                source,
+                assigned,
+                DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
+            )
+            .unwrap()
+        };
+        assert_eq!(triggers(&parse(PREFIXED, &assigned)), ["-jl", "-q"]);
+
+        let both = r#"
+name = "t"
+[placeholders]
+"<>" = ";"
+"<p>" = "/"
+[chords]
+"<>q" = { shell = "true" }
+"<>x<p>" = { shell = "true" }
+"#;
+        assert_eq!(triggers(&parse(both, &assigned)), [";q", ";x-"]);
+
+        assigned.insert("<>".to_owned(), "=".to_owned());
+        assigned.insert("<p>".to_owned(), "/".to_owned());
+        assert_eq!(triggers(&parse(both, &assigned)), ["=q", "=x/"]);
+    }
+
+    #[test]
+    fn a_hint_can_label_the_placeholder_itself() {
+        let source = format!("{PREFIXED}'?<>' = {{ name = 'Rift' }}\n");
+        for (assigned, sequence) in [
+            (HashMap::new(), ";"),
+            (HashMap::from([("<>".to_owned(), "=r".to_owned())]), "=r"),
+        ] {
+            let file = ParsedChordsFile::parse_with_placeholders(
+                &source,
+                &assigned,
+                DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
+            )
+            .unwrap();
+            let keys = Key::parse_sequence(sequence).unwrap();
+            assert!(file.chord_hints.iter().any(|hint| {
+                hint.raw_pattern == sequence
+                    && hint.description == "Rift"
+                    && matches!(&hint.pattern, ChordHintPattern::Keys(pattern) if pattern == &keys)
+            }));
+            assert!(!file.chords.iter().any(|chord| chord.trigger.matches(&keys)));
+        }
+    }
+
+    #[test]
     fn an_invalid_saved_value_falls_back_to_the_default() {
-        for value in ["", "a b", "(x)", "<p>", "?", r"\up"] {
-            let assigned = HashMap::from([("p".to_string(), value.to_string())]);
-            let file = ParsedChordsFile::parse_with_placeholders(PREFIXED, &assigned).unwrap();
+        for value in ["", "a b", "(x)", "<>", "?", r"\up"] {
+            let assigned = HashMap::from([("<>".to_string(), value.to_string())]);
+            let file = ParsedChordsFile::parse_with_placeholders(
+                PREFIXED,
+                &assigned,
+                DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
+            )
+            .unwrap();
             assert_eq!(triggers(&file), [";jl", ";q"], "{value:?}");
             assert_eq!(file.placeholders[0].assigned, None, "{value:?}");
         }
@@ -1331,7 +1483,7 @@ p = { name = "Window management prefix", default = ";" }
         let file: ParsedChordsFile = r#"
 name = "t"
 [placeholders]
-mode = { name = "Dark Mode" }
+"<mode>" = { name = "Dark Mode" }
 [chords]
 "dm<mode>" = { name = "Dark Mode", shell = "true" }
 "x" = { name = "Other", shell = "true" }
@@ -1342,16 +1494,17 @@ mode = { name = "Dark Mode" }
         // Indexes stay what they would be with every chord present.
         assert_eq!(file.chords[0].index, 1);
 
-        let assigned = HashMap::from([("mode".to_string(), "k".to_string())]);
+        let assigned = HashMap::from([("<mode>".to_string(), "k".to_string())]);
         let file = ParsedChordsFile::parse_with_placeholders(
             r#"
 name = "t"
 [placeholders]
-mode = { name = "Dark Mode" }
+"<mode>" = { name = "Dark Mode" }
 [chords]
 "dm<mode>" = { name = "Dark Mode", shell = "true" }
 "#,
             &assigned,
+            DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
         )
         .unwrap();
         assert_eq!(triggers(&file), ["dmk"]);
@@ -1369,8 +1522,13 @@ mode = { name = "Dark Mode" }
 
     #[test]
     fn expanded_keys_still_respect_the_reserved_zero_prefix() {
-        let assigned = HashMap::from([("p".to_string(), "0".to_string())]);
-        let error = ParsedChordsFile::parse_with_placeholders(PREFIXED, &assigned).unwrap_err();
+        let assigned = HashMap::from([("<>".to_string(), "0".to_string())]);
+        let error = ParsedChordsFile::parse_with_placeholders(
+            PREFIXED,
+            &assigned,
+            DEFAULT_GLOBAL_PLACEHOLDER_PREFIX,
+        )
+        .unwrap_err();
         assert!(
             format!("{error:#}").contains("0 prefix is reserved"),
             "{error:#}"
@@ -1380,19 +1538,47 @@ mode = { name = "Dark Mode" }
     #[test]
     fn invalid_declarations_fail_the_file() {
         for declaration in [
-            "p = { default = 'a b' }",
-            "p = 1",
-            "p = { name = 2 }",
+            "p = ';'",
+            "'<p' = ';'",
+            "'p>' = ';'",
+            "'<<p>>' = ';'",
+            "'<>' = { default = 'a b' }",
+            "'<>' = { default = 3 }",
+            "'<>' = 1",
+            "'<>' = { name = 2 }",
             "'' = ';'",
         ] {
             let source = format!("name = 't'\n[placeholders]\n{declaration}");
             assert!(source.parse::<ParsedChordsFile>().is_err(), "{declaration}");
         }
         let short: ParsedChordsFile =
-            "name = 't'\n[placeholders]\np = ';'\n[chords]\n'<p>q' = { shell = 'true' }"
+            "name = 't'\n[placeholders]\n'<>' = ';'\n[chords]\n'<>q' = { shell = 'true' }"
                 .parse()
                 .unwrap();
         assert_eq!(triggers(&short), [";q"]);
         assert_eq!(short.placeholders[0].label, None);
+    }
+
+    #[test]
+    fn a_bare_string_is_literal_even_when_it_is_a_single_letter() {
+        let file: ParsedChordsFile = r#"
+name = "t"
+[placeholders]
+"<mode>" = "m"
+[chords]
+"dm<mode>" = { shell = "true" }
+"#
+        .parse()
+        .unwrap();
+        assert_eq!(triggers(&file), ["dmm"]);
+    }
+
+    #[test]
+    fn obsolete_default_letter_points_to_default() {
+        let error = PREFIXED
+            .replace("default = \";\"", "default_letter = \"r\"")
+            .parse::<ParsedChordsFile>()
+            .unwrap_err();
+        assert!(error.to_string().contains("use `default`"));
     }
 }

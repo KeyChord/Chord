@@ -138,7 +138,7 @@ Then, you need to quit and restart Chord, and manually approve it in the Chords 
 
 In **Chords → Packages → Third-Party Packages**, choose **Review & Approve…**, review the package path and warning, then choose **Approve and Enable**. Until you approve it, Chord does not enable any of its chords or load its handlers. Approval persists across restarts; use **Revoke Approval** under **Approved packages** to disable it again.
 
-Official packages live under `~/.chord/packages/@keychord/` and do not require this approval. Every package outside that folder is untrusted by default, even if its `package.json` claims an `@keychord` name. Chord approves personal packages when you create them through **My Chords**; existing folders require approval.
+Official packages live under `~/.chord/packages/@keychord/` and do not require this approval. Every package outside that folder is untrusted by default, even if its `package.json` claims an `@keychord` name. Chord approves personal packages when you create them through **Local Chords**; existing folders require approval.
 
 ## Chord Scripts
 

@@ -39,7 +39,7 @@ export function newChordsFileContents(appId: string): string {
     return `name = "Personal"
 
 # Chords that start with a symbol work in every app, for example:
-#   "/q" = { name = "Force Quit", shortcut = "cmd+opt+esc" }
+#   "/n" = { name = "Notes", shell = "open -a Notes" }
 #   "/t" = { name = "Terminal", shell = "open -a Terminal" }
 [chords]
 `;

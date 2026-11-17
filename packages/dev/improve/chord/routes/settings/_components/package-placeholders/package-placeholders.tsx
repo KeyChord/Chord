@@ -7,21 +7,9 @@ import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
-import {
-  StateQueries,
-  useChordPackageManagerState,
-  useDesktopAppManagerState,
-} from "@chord/dev.improve.chord.lib.state";
 import { AppIcon } from "@chord/dev.improve.chord.routes.settings._components.app-icon";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 export interface PlaceholderEntry {
   packageName: string;
@@ -49,48 +37,41 @@ export function listPlaceholders(packages: ChordPackage[]): PlaceholderEntry[] {
   );
 }
 
-/** Lets the user choose the keys a package's `<name>` placeholders stand for. */
-export function PlaceholderChordsCard() {
-  return (
-    <StateQueries queries={[useChordPackageManagerState(), useDesktopAppManagerState()]}>
-      {(chordPackageManagerData, desktopAppManagerData) => (
-        <PlaceholderChordsCardContent
-          entries={listPlaceholders(chordPackageManagerData.packages)}
-          apps={desktopAppManagerData.appsMetadata}
-        />
-      )}
-    </StateQueries>
-  );
+/** A placeholder with no default and no chosen keys leaves its chords off. */
+export function placeholderNeedsKeys({ placeholder }: PlaceholderEntry): boolean {
+  return placeholder.assigned === undefined && placeholder.default === undefined;
 }
 
-export function PlaceholderChordsCardContent({
+/** Lets the user choose the keys a package's placeholders stand for. */
+export function PackagePlaceholders({
   entries,
   apps,
 }: {
   entries: PlaceholderEntry[];
   apps: Record<string, DesktopAppMetadata>;
 }) {
+  const headingId = useId();
   if (entries.length === 0) return null;
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>Placeholders</CardTitle>
-        <CardDescription>
-          Choose the keys that packages use for placeholders in their chords, such as a prefix
+    <section aria-labelledby={headingId} className="space-y-2">
+      <div className="px-3 pt-1">
+        <h3 id={headingId} className="text-sm font-medium">
+          Placeholders
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Choose the keys this package&apos;s chords use for each placeholder, such as a prefix
           shared by every chord. Saving reloads the package&apos;s chords.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 pt-0">
-        {entries.map((entry) => (
-          <PlaceholderRow
-            // Remount when the saved value changes, so the draft starts from it.
-            key={`${entry.packageName}:${entry.pathslug}:${entry.placeholder.name}:${entry.placeholder.assigned ?? ""}`}
-            entry={entry}
-            app={entry.appId ? apps[entry.appId] : undefined}
-          />
-        ))}
-      </CardContent>
-    </Card>
+        </p>
+      </div>
+      {entries.map((entry) => (
+        <PlaceholderRow
+          // Remount when the saved value or its inherited default changes.
+          key={`${entry.pathslug}:${entry.placeholder.name}:${entry.placeholder.assigned ?? entry.placeholder.default ?? ""}`}
+          entry={entry}
+          app={entry.appId ? apps[entry.appId] : undefined}
+        />
+      ))}
+    </section>
   );
 }
 
@@ -98,6 +79,7 @@ function PlaceholderRow({ entry, app }: { entry: PlaceholderEntry; app?: Desktop
   const { packageName, pathslug, placeholder } = entry;
   const current = placeholder.assigned ?? placeholder.default ?? "";
   const [draft, setDraft] = useState(current);
+  const inputId = useId();
   const save = useMutation({
     mutationFn: (sequence: string) =>
       taurpc.setPlaceholderChordBinding(packageName, pathslug, placeholder.name, sequence),
@@ -108,24 +90,29 @@ function PlaceholderRow({ entry, app }: { entry: PlaceholderEntry; app?: Desktop
   const pending = save.isPending || reset.isPending;
   const trimmed = draft.trim();
   const dirty = trimmed !== current;
-  const appLabel = entry.appId ? app?.displayName?.trim() || entry.appId : "Every app";
-  const label = placeholder.label?.trim() || `<${placeholder.name}>`;
-  const inputId = `placeholder-${packageName}-${pathslug}-${placeholder.name}`;
+  const appLabel = entry.appId ? app?.displayName?.trim() || entry.appId : undefined;
+  const label = placeholder.label?.trim() || placeholder.name;
 
   return (
     <div className="rounded-lg border bg-background/80 px-3 py-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex min-w-0 items-center gap-2">
-            <AppIcon appMetadata={app} label={appLabel} tooltip={entry.appId} />
+            {appLabel && <AppIcon appMetadata={app} label={appLabel} tooltip={entry.appId} />}
             <label htmlFor={inputId} className="min-w-0 truncate text-sm">
               <span className="font-medium text-foreground">{label}</span>
-              <span className="mx-2 text-muted-foreground">·</span>
-              <span className="text-muted-foreground">{packageName}</span>
+              {appLabel && (
+                <>
+                  <span className="mx-2 text-muted-foreground">·</span>
+                  <span className="text-muted-foreground">{appLabel}</span>
+                </>
+              )}
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline" className="font-mono">{`<${placeholder.name}>`}</Badge>
+            <Badge variant="outline" className="font-mono">
+              {placeholder.name}
+            </Badge>
             <span>
               {placeholder.default === undefined ? (
                 "No default: its chords are off until you choose keys"

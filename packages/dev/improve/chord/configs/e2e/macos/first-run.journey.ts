@@ -291,7 +291,7 @@ journey.step("finishing leaves Chord ready, and starting at login", async () => 
   await screen.clickText(button("Continue"));
   await screen.waitForText("You're all set");
   await screen.clickText(button("Finish"));
-  await screen.waitForText("My Chords", { timeoutMs: 15_000 });
+  await screen.waitForText("Local Chords", { timeoutMs: 15_000 });
   const store = await guest.readFile(
     `${guest.home}/Library/Application Support/com.leonsilicon.chord/app-state.json`,
   );

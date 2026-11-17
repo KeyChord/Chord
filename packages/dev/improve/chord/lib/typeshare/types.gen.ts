@@ -26,6 +26,7 @@ export interface AppSettingsState {
 	/** The guided first-run setup has been finished or skipped. */
 	isOnboardingComplete: boolean;
 	isSettingsSidebarCollapsed: boolean;
+	defaultGlobalPrefixForPlaceholders: string;
 }
 
 export enum BuiltinChordKind {
@@ -224,13 +225,13 @@ export interface CompiledChordsFileHandler {
 }
 
 /**
- * A `<name>` in chord and hint keys that a chords file declares under `[placeholders]`, such as
- * `p = { name = 'Prefix', default = ';' }` for keys like `'<p>q'`. Chord replaces it with the
+ * A `<>` or `<name>` token that a chords file declares under `[placeholders]`, such as
+ * `"<>" = { name = 'Prefix', default = ';' }` for keys like `'<>q'`. Chord replaces it with the
  * value the user set in Settings, or else the default. A chord or hint that uses a placeholder
- * with neither is left out. Angle brackets around an undeclared name stay literal keys.
+ * with neither is left out. Undeclared tokens are left as written.
  */
 export interface ChordsFilePlaceholder {
-	/** The name between the angle brackets: `p` for `<p>`. */
+	/** The complete placeholder token, including the angle brackets. */
 	name: string;
 	/** What the placeholder is for, shown in Settings. */
 	label?: string;

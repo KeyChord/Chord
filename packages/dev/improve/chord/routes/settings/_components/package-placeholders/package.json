@@ -1,9 +1,9 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.placeholder-chords-card",
+	"name": "@chord/dev.improve.chord.routes.settings._components.package-placeholders",
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#placeholder-chords-card": "./placeholder-chords-card.tsx"
+		"#package-placeholders": "./package-placeholders.tsx"
 	},
 	"exports": {
 		".": "./+.ts"
@@ -13,9 +13,7 @@
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
 		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"react": "^19.3.1"

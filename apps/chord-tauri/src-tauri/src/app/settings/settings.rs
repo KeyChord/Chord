@@ -1,4 +1,5 @@
 use crate::app::settings::settings_ui::SettingsUi;
+use crate::models::{DEFAULT_GLOBAL_PLACEHOLDER_PREFIX, parse_global_placeholder_prefix};
 use crate::startup::APP_STATE_STORE_PATH;
 use crate::state::{AppSettingsObservable, AppSettingsState, Observable};
 use crate::tray::TRAY_ID;
@@ -61,6 +62,33 @@ impl AppSettings {
         self.observable
             .get_state()
             .is_ok_and(|state| state.is_chord_panel_hidden_by_default)
+    }
+
+    pub fn default_global_prefix_for_placeholders(&self) -> anyhow::Result<char> {
+        Ok(self
+            .observable
+            .get_state()?
+            .default_global_prefix_for_placeholders)
+    }
+
+    pub fn set_default_global_prefix_for_placeholders(&self, value: &str) -> anyhow::Result<()> {
+        let symbol = parse_global_placeholder_prefix(value)?;
+        self.observable.try_set_state(|mut state| {
+            let store = self.handle.store(APP_STATE_STORE_PATH)?;
+            let key = DEFAULT_GLOBAL_PREFIX_FOR_PLACEHOLDERS_KEY;
+            let previous = store.get(key);
+            store.set(key, symbol.to_string());
+            if let Err(error) = store.save() {
+                if let Some(previous) = previous {
+                    store.set(key, previous);
+                } else {
+                    store.delete(key);
+                }
+                return Err(error).context("failed to save the default global prefix");
+            }
+            state.default_global_prefix_for_placeholders = symbol;
+            Ok(state)
+        })
     }
 
     pub fn load_settings_sidebar(&self) -> anyhow::Result<()> {
@@ -178,10 +206,20 @@ impl AppSettings {
             HIDE_HINT_PANEL_BY_DEFAULT_KEY,
             defaults.is_chord_panel_hidden_by_default,
         )?;
+        let store = self.handle.store(APP_STATE_STORE_PATH)?;
+        let default_global_prefix_for_placeholders = store
+            .get(DEFAULT_GLOBAL_PREFIX_FOR_PLACEHOLDERS_KEY)
+            .and_then(|value| {
+                value
+                    .as_str()
+                    .and_then(|value| parse_global_placeholder_prefix(value).ok())
+            })
+            .unwrap_or(DEFAULT_GLOBAL_PLACEHOLDER_PREFIX);
         self.observable.set_state(|state| AppSettingsState {
             show_menu_bar_icon,
             show_dock_icon,
             is_chord_panel_hidden_by_default,
+            default_global_prefix_for_placeholders,
             ..state
         })
     }
@@ -234,3 +272,4 @@ const SHOW_DOCK_ICON_KEY: &str = "showDockIcon";
 const HIDE_HINT_PANEL_BY_DEFAULT_KEY: &str = "hideGuideByDefault";
 const ONBOARDING_COMPLETE_KEY: &str = "onboardingComplete";
 const SETTINGS_SIDEBAR_COLLAPSED_KEY: &str = "settingsSidebarCollapsed";
+const DEFAULT_GLOBAL_PREFIX_FOR_PLACEHOLDERS_KEY: &str = "defaultGlobalPrefixForPlaceholders";
