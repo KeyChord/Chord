@@ -4,6 +4,7 @@ use super::caps_space_gap::{CapsSpaceGaps, KeyTime, milliseconds};
 use super::health::{Backoff, InputHealth};
 use super::secure_input::SecureInputState;
 use super::tap::{TapAction, TapEvent, TapHandle};
+use super::thread_priority::{InputThreadPriority, raise_current_thread};
 use super::{caps_guardian, caps_hotkey, key_catcher};
 use crate::app::AppHandleExt;
 use crate::app::permissions::InputPermissions;
@@ -389,6 +390,8 @@ impl AppKeyboard {
         std::thread::Builder::new()
             .name("chord-key-events".into())
             .spawn(move || {
+                // Decides the mode and runs the chord: what a key press is waiting for.
+                raise_current_thread(InputThreadPriority::Initiated);
                 while let Ok((generation, message)) = rx.recv() {
                     let state = handle.app_state();
                     state.dev_lockfile_detector().with_input_generation(

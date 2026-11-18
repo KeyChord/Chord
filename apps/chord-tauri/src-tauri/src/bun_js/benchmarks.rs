@@ -71,6 +71,7 @@ impl Fixture {
             },
             None,
             ACTION_TIMEOUT,
+            Arc::default(),
         )
         .await
         .unwrap()

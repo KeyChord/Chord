@@ -56,6 +56,8 @@ pub(super) struct PackageSupervisor {
     slots: Semaphore,
     stopped: AtomicBool,
     stop_notice: Notify,
+    /// Told by a worker that failed or was stopped, and when the package is unloaded.
+    worker_ended: Arc<Notify>,
 }
 
 impl PackageSupervisor {
@@ -66,12 +68,14 @@ impl PackageSupervisor {
         handle: Option<AppHandle>,
         action_timeout: Duration,
     ) -> Result<Arc<Self>> {
+        let worker_ended = Arc::new(Notify::new());
         let worker = PackageWorker::spawn(
             executable,
             name.clone(),
             config.clone(),
             handle.clone(),
             action_timeout,
+            worker_ended.clone(),
         )
         .await?;
         let supervisor = Arc::new(Self {
@@ -94,30 +98,32 @@ impl PackageSupervisor {
             slots: Semaphore::new(QUEUE_CAPACITY),
             stopped: AtomicBool::new(false),
             stop_notice: Notify::new(),
+            worker_ended: worker_ended.clone(),
         });
         let weak = Arc::downgrade(&supervisor);
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(HEALTH_INTERVAL);
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            // Replaces a failed worker as soon as it fails, so the next chord finds a
+            // ready one. Each failed attempt waits out its backoff before the next.
             loop {
-                interval.tick().await;
-                let Some(supervisor) = weak.upgrade() else {
-                    break;
-                };
-                if supervisor.stopped.load(Ordering::Acquire) {
-                    break;
-                }
-                // Recovery never queues behind a busy handler. The transport
-                // actor already bounds that handler's execution time.
-                if let Ok(mut state) = supervisor.state.try_lock() {
-                    let _ = supervisor.ensure_ready(&mut state, false).await;
+                worker_ended.notified().await;
+                loop {
+                    let Some(supervisor) = weak.upgrade() else {
+                        return;
+                    };
+                    if supervisor.stopped.load(Ordering::Acquire) {
+                        return;
+                    }
+                    let mut state = supervisor.state.lock().await;
+                    if supervisor.ensure_ready(&mut state).await.is_ok() {
+                        break;
+                    }
                 }
             }
         });
         Ok(supervisor)
     }
 
-    async fn ensure_ready(&self, state: &mut State, wait: bool) -> Result<()> {
+    async fn ensure_ready(&self, state: &mut State) -> Result<()> {
         ensure!(
             !self.stopped.load(Ordering::Acquire),
             "package {} was unloaded",
@@ -128,9 +134,6 @@ impl PackageSupervisor {
         }
         state.observe_failure();
         if Instant::now() < state.restart_at {
-            if !wait {
-                return Ok(());
-            }
             tokio::select! {
                 _ = tokio::time::sleep_until(state.restart_at) => {},
                 _ = self.stop_notice.notified() => {},
@@ -149,6 +152,7 @@ impl PackageSupervisor {
                 self.config.clone(),
                 self.handle.clone(),
                 self.action_timeout,
+                self.worker_ended.clone(),
             )
             .await?;
             // Publish before registration, so abort/shutdown can stop startup
@@ -229,7 +233,7 @@ impl PackageSupervisor {
             // are already reflected in the next background restoration.
             return Ok(serde_json::Value::Null);
         }
-        self.ensure_ready(&mut state, true).await?;
+        self.ensure_ready(&mut state).await?;
         let registration = matches!(request, Request::Register { .. }).then(|| request.clone());
         match &mut request {
             Request::Invoke { action, .. } => {
@@ -286,6 +290,7 @@ impl PackageSupervisor {
     pub(super) fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         self.stop_notice.notify_waiters();
+        self.worker_ended.notify_one();
         self.abort();
     }
 }
@@ -494,7 +499,7 @@ export default function(label) {{
                 .to_string()
                 .contains("was unloaded")
         );
-        tokio::time::sleep(HEALTH_INTERVAL + Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(1_100)).await;
         assert_eq!(
             supervisor.active.lock().process.child.lock().id(),
             final_pid

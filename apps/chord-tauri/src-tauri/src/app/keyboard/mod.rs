@@ -14,4 +14,5 @@ pub mod health;
 mod key_catcher;
 mod secure_input;
 mod tap;
+mod thread_priority;
 pub mod voice_over;

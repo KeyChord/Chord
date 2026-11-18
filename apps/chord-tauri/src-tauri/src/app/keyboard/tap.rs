@@ -9,6 +9,7 @@
 use super::caps_remap::REMAPPED_KEYCODE;
 use super::caps_space_gap::event_time_ns;
 use super::health::InputHealth;
+use super::thread_priority::{InputThreadPriority, raise_current_thread};
 use crate::models::{Key, KeyEvent, KeyEventAction};
 use anyhow::{Context, Result, anyhow};
 use keycode::KeyMappingCode;
@@ -449,6 +450,8 @@ fn run_tap(
     stop: Arc<AtomicBool>,
     ready_tx: std::sync::mpsc::SyncSender<Result<TapRunLoop>>,
 ) {
+    // macOS holds every key until this thread answers.
+    raise_current_thread(InputThreadPriority::Interactive);
     #[allow(deprecated)]
     let mut timebase = libc::mach_timebase_info { numer: 1, denom: 1 };
     // SAFETY: the output points to live storage.

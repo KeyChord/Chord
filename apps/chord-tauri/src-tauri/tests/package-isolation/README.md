@@ -23,6 +23,14 @@ Each worker has a bounded queue (64 requests) and IPC messages are limited to 1 
 Setup/health requests have a 15-second deadline; actions and lifecycle callbacks
 have a five-minute deadline to allow interactive native UI.
 
+An idle worker is not polled. The GUI learns that a worker died from its closed
+connection, and a liveness check travels with each action and lifecycle callback,
+answered within the 15-second deadline, so a worker stuck in package code since
+its last request does not get the five minutes. In the worker, a timer that is
+never due holds Bun's event loop open, so the loop itself serves the package's
+timers, sockets and native callbacks and sleeps in between; the Cocoa main loop
+waits for the next event with no time limit.
+
 This is fault isolation, not a permissions sandbox: packages retain the user's
 filesystem/process access. Intentionally hostile code and machine-wide resource
 exhaustion are outside this guarantee.
@@ -39,6 +47,11 @@ import aborts, factory exits, handler aborts, native SIGSEGV, process-group abor
 unresolved promises, lifecycle aborts, timer aborts, ordinary exceptions,
 cross-request JavaScript object identity, handler context, lifecycle unsubscribe,
 package/native path resolution, and continued execution in a healthy worker.
+
+Three more regressions cover the idle path (`an_idle_worker_`, `a_worker_stuck_`,
+`a_worker_keeps_answering_`; same environment, `--ignored`): wake-ups of an idle
+worker, package timers running between requests, a stuck worker failing the next
+action promptly, and more than 64 requests in a row.
 
 The transport regression intentionally checks a single disposable process; the
 supervisor recovery regression additionally verifies background replacement,

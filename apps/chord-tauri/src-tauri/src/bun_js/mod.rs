@@ -434,13 +434,9 @@ async fn execute_package_request(
                 }
                 .map(|_| serde_json::Value::Null);
             }
-            Request::Ping => {
-                // A plain VM tick drains microtasks but does not poll Bun's I/O/timer loop.
-                // Awaiting a short native timer drives that loop without parking on a
-                // package's long-lived interval, server, or idle native callback.
-                let turn: rbun::Promise = ctx.eval("Bun.sleep(1)")?;
-                turn.into_future::<Value>().await?;
-            }
+            // Answering shows the VM's thread is free; the worker's event loop runs
+            // on its own (see `package_worker::serve`).
+            Request::Ping => {}
         }
         Ok::<_, anyhow::Error>(serde_json::Value::Null)
     }

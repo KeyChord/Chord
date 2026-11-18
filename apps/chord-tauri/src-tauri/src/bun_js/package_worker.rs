@@ -12,11 +12,10 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{Notify, mpsc, oneshot};
 
 const SETUP_TIMEOUT: Duration = Duration::from_secs(15);
 const ACTION_TIMEOUT: Duration = Duration::from_secs(300);
-const HEALTH_INTERVAL: Duration = Duration::from_secs(1);
 const QUEUE_CAPACITY: usize = 64;
 
 mod supervisor;
@@ -53,6 +52,18 @@ impl Drop for Process {
     }
 }
 
+/// A worker that did not answer within the time it was given.
+#[derive(Debug)]
+struct Stalled(Duration);
+
+impl std::fmt::Display for Stalled {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "no reply within {} seconds", self.0.as_secs())
+    }
+}
+
+impl std::error::Error for Stalled {}
+
 struct Work {
     request: Request,
     reply: oneshot::Sender<Result<serde_json::Value>>,
@@ -64,6 +75,8 @@ pub(crate) struct PackageWorker {
     tx: mpsc::Sender<Work>,
     process: Arc<Process>,
     failure: Arc<Mutex<Option<String>>>,
+    /// Told when this worker fails or is stopped, so its owner can replace it.
+    failed: Arc<Notify>,
 }
 
 impl Drop for PackageWorker {
@@ -79,6 +92,7 @@ impl PackageWorker {
         config: WorkerConfig,
         handle: Option<AppHandle>,
         action_timeout: Duration,
+        failed: Arc<Notify>,
     ) -> Result<Arc<Self>> {
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await?;
         let token = uuid::Uuid::new_v4().to_string();
@@ -139,6 +153,7 @@ impl PackageWorker {
             tx,
             process: process.clone(),
             failure: failure.clone(),
+            failed: failed.clone(),
         });
         tokio::task::spawn_blocking(move || {
             let mut pressed = HashSet::new();
@@ -176,56 +191,96 @@ impl PackageWorker {
             }
         });
         tokio::spawn(async move {
+            // What ended the worker, when it was not a request that did.
+            let mut ended = None;
             loop {
-                let work = match tokio::time::timeout(HEALTH_INTERVAL, rx.recv()).await {
-                    Ok(Some(work)) => Some(work),
-                    Ok(None) => break,
-                    Err(_) => None,
+                // An idle worker owes no reply, so its socket only becomes readable
+                // when the process has gone: the kernel closes it however it died.
+                let mut unexpected = [0_u8; 1];
+                let work = tokio::select! {
+                    biased;
+                    work = rx.recv() => match work {
+                        Some(work) => work,
+                        None => break,
+                    },
+                    read = control.peek(&mut unexpected) => {
+                        ended = Some(match read {
+                            Ok(0) => "closed its connection".to_string(),
+                            Ok(_) => "sent a reply nobody asked for".to_string(),
+                            Err(error) => format!("{error:#}"),
+                        });
+                        break;
+                    }
                 };
-                let request = work
-                    .as_ref()
-                    .map(|work| &work.request)
-                    .unwrap_or(&Request::Ping);
+                let request = &work.request;
                 let deadline =
                     if matches!(request, Request::Invoke { .. } | Request::Lifecycle { .. }) {
                         action_timeout
                     } else {
                         SETUP_TIMEOUT.min(action_timeout)
                     };
-                let exchange = tokio::time::timeout(deadline, async {
-                    write_async(&mut control, request).await?;
-                    read_async::<Response>(&mut control).await
-                })
+                // A handler may take minutes, so a worker stuck since its last request
+                // (a package timer that never returns, say) must not be given that
+                // long. The liveness check travels with the action and is answered
+                // first, within the short deadline.
+                let checked = deadline > SETUP_TIMEOUT;
+                let prompt = SETUP_TIMEOUT.min(deadline);
+                let exchange = async {
+                    tokio::time::timeout(prompt, async {
+                        if checked {
+                            write_async(&mut control, &Request::Ping).await?;
+                        }
+                        write_async(&mut control, request).await?;
+                        if checked {
+                            read_async::<Response>(&mut control).await?;
+                        }
+                        Ok::<_, anyhow::Error>(())
+                    })
+                    .await
+                    .map_err(|_| Stalled(prompt))??;
+                    tokio::time::timeout(deadline, read_async::<Response>(&mut control))
+                        .await
+                        .map_err(|_| Stalled(deadline))?
+                }
                 .await;
                 match exchange {
-                    Ok(Ok(response)) => {
-                        if let Some(work) = work {
-                            let _ = work.reply.send(response.result.map_err(anyhow::Error::msg));
-                        }
+                    Ok(response) => {
+                        let _ = work.reply.send(response.result.map_err(anyhow::Error::msg));
                     }
-                    error => {
-                        let status = process.child.lock().try_wait().ok().flatten();
-                        let reason = match error {
-                            Err(_) => format!(
+                    Err(error) => {
+                        let reason = match error.downcast_ref::<Stalled>() {
+                            Some(Stalled(deadline)) => format!(
                                 "package {name} timed out after {} seconds",
                                 deadline.as_secs()
                             ),
-                            Ok(Err(error)) => format!(
-                                "package {name} worker exited or disconnected ({status:?}): {error:#}"
-                            ),
-                            Ok(Ok(_)) => unreachable!(),
+                            None => {
+                                let status = process.child.lock().try_wait().ok().flatten();
+                                format!(
+                                    "package {name} worker exited or disconnected ({status:?}): {error:#}"
+                                )
+                            }
                         };
                         log::error!("{reason}; worker terminated");
                         *failure.lock() = Some(reason.clone());
-                        process.stop();
-                        if let Some(work) = work {
-                            let _ = work.reply.send(Err(anyhow::Error::msg(reason)));
-                        }
+                        let _ = work.reply.send(Err(anyhow::Error::msg(reason)));
                         break;
                     }
                 }
             }
+            if let Some(ended) = ended {
+                let mut failure = failure.lock();
+                // A worker stopped on purpose (reload, cancellation) is not news.
+                if failure.is_none() {
+                    let status = process.child.lock().try_wait().ok().flatten();
+                    let reason = format!(
+                        "package {name} worker exited or disconnected ({status:?}): {ended}"
+                    );
+                    log::error!("{reason}; worker terminated");
+                    *failure = Some(reason);
+                }
+            }
             process.stop();
+            failed.notify_one();
             let _ = tokio::task::spawn_blocking(move || {
                 let _ = process.child.lock().wait();
             })
@@ -252,6 +307,7 @@ impl PackageWorker {
     fn stop(&self) {
         *self.failure.lock() = Some(format!("package {} worker stopped", self.name));
         self.process.stop();
+        self.failed.notify_one();
     }
 }
 
@@ -446,11 +502,12 @@ pub async fn serve(address: String, token: String) -> Result<()> {
         // the child process: an abruptly closed parent must not leave an orphan runtime.
         std::process::exit(0);
     });
-    // Keep one async context open. rbun's driver waits on Bun's native I/O/timer loop
-    // and the receiver's waker, so background timers and add-on callbacks run without
-    // a polling timer or a new context acquisition every ten milliseconds.
+    // Keep one async context open, with Bun's event loop held open for as long as
+    // the worker lives: the loop then serves the package's timers, sockets and
+    // native add-on callbacks between requests, and sleeps when none is due.
     super::with_package_js(config, host, move |ctx| {
         Box::pin(async move {
+            let _keep_alive = ctx.keep_event_loop_alive()?;
             while let Some(request) = incoming.recv().await {
                 let result = super::execute_package_request(ctx.clone(), request).await;
                 write_async(
@@ -503,6 +560,7 @@ mod tests {
                 },
                 None,
                 Duration::from_millis(500),
+                Arc::default(),
             )
             .await
             .unwrap()
@@ -736,6 +794,153 @@ export default function() {
             .unwrap();
         replacement.stop();
         healthy.stop();
+    }
+
+    /// How often the kernel has woken a process from idle since it started.
+    #[cfg(target_os = "macos")]
+    fn wakeups(pid: u32) -> u64 {
+        // SAFETY: plain data, filled in by the call below.
+        let mut info: libc::rusage_info_v2 = unsafe { std::mem::zeroed() };
+        // SAFETY: the buffer matches the requested flavor.
+        let status = unsafe {
+            libc::proc_pid_rusage(
+                pid as i32,
+                libc::RUSAGE_INFO_V2,
+                (&mut info as *mut libc::rusage_info_v2).cast(),
+            )
+        };
+        assert_eq!(status, 0, "failed to sample process {pid}");
+        info.ri_interrupt_wkups + info.ri_pkg_idle_wkups
+    }
+
+    /// A worker with production deadlines, where a liveness check travels with each action.
+    async fn production_worker(fixture: &Fixture) -> Arc<PackageWorker> {
+        let executable = PathBuf::from(
+            std::env::var_os("CHORD_PACKAGE_TEST_HOST")
+                .expect("set CHORD_PACKAGE_TEST_HOST to the freshly built chord executable"),
+        );
+        PackageWorker::spawn(
+            &executable,
+            "isolation-fixture".into(),
+            WorkerConfig {
+                root: fixture.0.clone(),
+                cwd: fixture.0.clone(),
+            },
+            None,
+            ACTION_TIMEOUT,
+            Arc::default(),
+        )
+        .await
+        .unwrap()
+    }
+
+    /// Nothing asks an idle worker whether it is alive, so nothing but the package's
+    /// own timers may wake it, and those must run without a request to nudge them.
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    #[ignore = "takes 45 s and requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn an_idle_worker_sleeps_and_still_runs_the_packages_timers() {
+        let fixture = Fixture::new();
+        let quiet = production_worker(&fixture).await;
+        let quiet_id = register(
+            &quiet,
+            fixture.module("quiet", "export default () => () => {};"),
+        )
+        .await
+        .unwrap();
+        quiet.request(invoke(&quiet_id, "warm")).await.unwrap();
+        let pid = quiet.process.child.lock().id();
+        // Bun collects garbage about once a second, on seven threads, for some 30 s
+        // after the last activity, then stops: measured, 9 wake-ups a second, then 0.
+        tokio::time::sleep(Duration::from_secs(40)).await;
+        let before = wakeups(pid);
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        let woken = wakeups(pid) - before;
+        eprintln!("idle worker: {woken} wake-ups in 5 s");
+        // Pinged every second with a 50 ms main-thread tick, this was over 100.
+        assert!(woken < 20, "an idle worker woke {woken} times in 5 s");
+        // Asleep, it still answers at once, and the liveness check goes with the action.
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            quiet.request(invoke(&quiet_id, "after-idle")),
+        )
+        .await
+        .expect("an idle worker did not wake for a request")
+        .unwrap();
+
+        // A timer that does not hold the event loop open, like a package's
+        // background refresh: it must keep running between requests.
+        let ticks = fixture.0.join("ticks");
+        let timers = production_worker(&fixture).await;
+        let source = format!(
+            r#"
+let count = 0;
+export default () => {{
+    setInterval(() => {{ Bun.write({path}, String(++count)); }}, 20).unref();
+    return () => {{}};
+}};
+"#,
+            path = serde_json::to_string(&ticks).unwrap()
+        );
+        register(&timers, fixture.module("timers", &source))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        let count: u32 = std::fs::read_to_string(&ticks)
+            .expect("the package's timer never ran")
+            .parse()
+            .unwrap();
+        assert!(count >= 5, "the package's timer ran {count} times in 600 ms");
+        quiet.stop();
+        timers.stop();
+    }
+
+    /// The worker serves every request from one long poll of its task. Tokio's
+    /// per-poll operation budget ran out after 64 of them and the worker went silent.
+    #[tokio::test]
+    #[ignore = "requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn a_worker_keeps_answering_past_tokios_operation_budget() {
+        let fixture = Fixture::new();
+        for worker in [fixture.worker().await, production_worker(&fixture).await] {
+            let id = register(
+                &worker,
+                fixture.module("quiet", "export default () => () => {};"),
+            )
+            .await
+            .unwrap();
+            for request in 0..300 {
+                worker
+                    .request(invoke(&id, "again"))
+                    .await
+                    .unwrap_or_else(|error| panic!("request {request} failed: {error:#}"));
+            }
+            worker.stop();
+        }
+    }
+
+    /// A worker stuck in package code while idle fails the next action within the
+    /// setup deadline, not the minutes an action is allowed.
+    #[tokio::test]
+    #[ignore = "takes 15 s and requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn a_worker_stuck_while_idle_fails_the_next_action_promptly() {
+        let fixture = Fixture::new();
+        let worker = production_worker(&fixture).await;
+        let id = register(
+            &worker,
+            fixture.module(
+                "stuck",
+                "export default () => { setTimeout(() => { while (true) {} }, 50); return () => {}; };",
+            ),
+        )
+        .await
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let started = std::time::Instant::now();
+        let error = worker.request(invoke(&id, "any")).await.unwrap_err();
+        assert!(error.to_string().contains("timed out after 15 seconds"), "{error:#}");
+        assert!(started.elapsed() < SETUP_TIMEOUT + Duration::from_secs(5));
+        assert!(worker.request(Request::Ping).await.is_err());
+        worker.stop();
     }
 
     #[tokio::test]

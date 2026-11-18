@@ -28,18 +28,27 @@ where
     #[cfg(target_os = "macos")]
     let main_loop = MainLoop::new(package_ui);
 
-    let worker = std::thread::spawn(move || {
-        let mut builder = if package_ui {
-            tokio::runtime::Builder::new_current_thread()
-        } else {
-            tokio::runtime::Builder::new_multi_thread()
-        };
-        let runtime = builder.enable_all().build()?;
-        runtime.block_on(task())
+    let finished = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let worker = std::thread::spawn({
+        let finished = finished.clone();
+        move || {
+            // Also on a panic: the main thread must never be left waiting.
+            let _finished = Finished {
+                flag: finished,
+                package_ui,
+            };
+            let mut builder = if package_ui {
+                tokio::runtime::Builder::new_current_thread()
+            } else {
+                tokio::runtime::Builder::new_multi_thread()
+            };
+            let runtime = builder.enable_all().build()?;
+            runtime.block_on(task())
+        }
     });
 
     #[cfg(target_os = "macos")]
-    while !worker.is_finished() {
+    while !finished.load(std::sync::atomic::Ordering::Acquire) {
         main_loop.tick();
     }
 
@@ -48,6 +57,56 @@ where
     let result = worker.join();
     chords_lib::native_input::release_standalone_mouse();
     result.unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+}
+
+/// Marks the worker thread as done when it ends, however it ends.
+struct Finished {
+    flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    package_ui: bool,
+}
+
+impl Drop for Finished {
+    fn drop(&mut self) {
+        self.flag.store(true, std::sync::atomic::Ordering::Release);
+        #[cfg(target_os = "macos")]
+        if self.package_ui {
+            wake_application();
+        }
+    }
+}
+
+/// Makes the package worker's main thread, which waits for the next event with no
+/// time limit, return and notice that the worker thread is done.
+#[cfg(target_os = "macos")]
+fn wake_application() {
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType};
+    use objc2_foundation::NSPoint;
+
+    // SAFETY: an event may be created on any thread.
+    let event = unsafe {
+        NSEvent::otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2(
+            NSEventType::ApplicationDefined,
+            NSPoint::new(0.0, 0.0),
+            NSEventModifierFlags::empty(),
+            0.0,
+            0,
+            None,
+            0,
+            0,
+            0,
+        )
+    };
+    let Some(event) = event else {
+        return;
+    };
+    // SAFETY: the application object exists (`MainLoop::new` made it), and AppKit
+    // documents `postEvent:atStart:` as callable from other threads.
+    unsafe {
+        let application: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+        let _: () = msg_send![application, postEvent: &*event, atStart: false];
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -88,14 +147,15 @@ impl MainLoop {
 
     fn tick(&self) {
         objc2::rc::autoreleasepool(|_| {
-            // Bound the wait so worker completion (including failure) exits promptly.
-            let deadline = objc2_foundation::NSDate::dateWithTimeIntervalSinceNow(
-                if self.application.is_some() {
-                    0.05
-                } else {
-                    0.01
-                },
-            );
+            // A package worker lives as long as the app and sits idle most of that
+            // time, so it waits for the next event with no time limit; the worker
+            // thread posts one when it ends (see `Finished`). A CLI run is short and
+            // bounds the wait instead.
+            let deadline = if self.application.is_some() {
+                objc2_foundation::NSDate::distantFuture()
+            } else {
+                objc2_foundation::NSDate::dateWithTimeIntervalSinceNow(0.01)
+            };
             if let Some(application) = &self.application {
                 let event = application.nextEventMatchingMask_untilDate_inMode_dequeue(
                     objc2_app_kit::NSEventMask::Any,
