@@ -444,3 +444,25 @@ jobs:
             gh release upload beta manifest/latest.json --clobber
           fi
           gh release view "$tag" --json assets --jq '.assets[].name'
+
+  deploy-website:
+    if: ${{ github.ref == 'refs/heads/prod' }}
+    needs: publish
+    permissions: {}
+    runs-on: ubuntu-latest
+    environment: website-deploy
+    steps:
+      - name: Create website workflow token
+        id: website-token
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.WEBSITE_DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.WEBSITE_DEPLOY_APP_PRIVATE_KEY }}
+          owner: KeyChord
+          repositories: trychord.app
+          permission-actions: write
+
+      - name: Redeploy trychord.app
+        env:
+          GH_TOKEN: ${{ steps.website-token.outputs.token }}
+        run: gh api --method POST repos/KeyChord/trychord.app/actions/workflows/deploy.yaml/dispatches -f ref=prod

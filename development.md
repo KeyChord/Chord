@@ -664,6 +664,13 @@ keeps its disk images and `latest.json` current for existing links and installed
 manifest points at archives on the new versioned prerelease. The old rolling `prod` release and
 all older updater archives remain available for pending downloads.
 
+After publishing a production release, the `deploy-website` job starts the `deploy.yaml` workflow
+on `KeyChord/trychord.app`'s `prod` branch. The Chord repository's `website-deploy` environment is
+restricted to `prod` and provides `WEBSITE_DEPLOY_APP_CLIENT_ID` (a variable) and
+`WEBSITE_DEPLOY_APP_PRIVATE_KEY` (a secret). The private GitHub App is installed on
+`KeyChord/trychord.app` with Actions read and write access. If dispatch fails after publication,
+rerun the failed job to retry the deploy.
+
 Installed copies find updates in `latest.json`, which the publish job writes beside the signed
 `.app.tar.gz` archives. They check at launch and once a day, and offer a higher version on a card
 in the bottom left of Settings and in the tray menu. Nothing downloads until someone clicks Update,
