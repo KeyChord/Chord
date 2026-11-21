@@ -41,13 +41,14 @@ function render(repos: Repos, fields: Partial<GitReposState> = {}) {
 }
 
 function listing(html: string, name: string) {
-	const match = html.match(new RegExp(`<article[^>]*><div[^>]*><div[^>]*><h3[^>]*>${name}</h3>.*?</article>`));
+	const match = html.match(new RegExp(`<tr[^>]*><td[^>]*><div[^>]*><h3[^>]*>${name}</h3>.*?</tr>`));
 	expect(match).not.toBeNull();
 	return match![0];
 }
 
 test('each repo lists its categories, description, slug and install action', () => {
 	const html = render({});
+	expect(html).toMatch(/<thead[^>]*><tr><th[^>]*>Repository<\/th><th[^>]*>Category<\/th><th[^>]*>Actions<\/th>/);
 	const chromium = listing(html, 'Chromium Chords');
 	expect(chromium).toContain('>Browsers</span>');
 	expect(chromium).toContain('Chords for Google Chrome');
@@ -84,16 +85,10 @@ test('installed repos show Uninstall to the left of Configure and indicate linke
 	expect(listing(html, 'Chromium Chords')).toContain('Install</button>');
 });
 
-test('install all is disabled once every repo is installed', () => {
-	const installAllButton = (html: string) => html.match(/<button[^>]*>(?:(?!<button).)*?Install All<\/button>/)![0];
-	expect(installAllButton(render({}))).not.toContain('disabled=""');
-
-	const all = Object.fromEntries(
-		officialChordReposData
-			.map(repo => repo.url.split('/').at(-1)!)
-			.map(name => [`KeyChord/${name}`, gitRepo(name)]),
-	);
-	expect(installAllButton(render(all))).toContain('disabled=""');
+test('Browse offers individual installs without an Install All button', () => {
+	const html = render({});
+	expect(html).toContain('Install</button>');
+	expect(html).not.toContain('Install All');
 });
 
 test('community packages are behind a trust warning, not a direct link', () => {

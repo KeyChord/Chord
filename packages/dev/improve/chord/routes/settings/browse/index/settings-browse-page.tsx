@@ -1,5 +1,13 @@
 import { toast } from "@chord/dev.improve.chord.components.ui.toast";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
+import {
+  type ColumnDef,
+  columnFilteringFeature,
+  createFilteredRowModel,
+  globalFilteringFeature,
+  tableFeatures,
+  useTable,
+} from "@chord/com.npmjs.tanstack__react-table";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
   AlertDialog,
@@ -29,7 +37,8 @@ import { OpenRepoButton } from "@chord/dev.improve.chord.routes.settings._compon
 import type { GitReposState } from "@chord/dev.improve.chord.lib.typeshare";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Download, ExternalLink, FolderGit2, Search } from "lucide-react";
-import { useState } from "react";
+import { useMemo } from "react";
+import { CategoryFilter } from "#category-filter";
 import { PackageUpdates } from "#package-updates";
 
 interface OfficialChordRepo {
@@ -46,6 +55,19 @@ const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
 const categories = [...new Set(officialChordRepos.flatMap((repo) => repo.categories))].sort(
   (a, b) => a.localeCompare(b, "en"),
 );
+const categoryOptions = [
+  { value: "all", label: "All" },
+  ...categories.map((category) => ({ value: category, label: category })),
+];
+const browseFeatures = tableFeatures({
+  columnFilteringFeature,
+  globalFilteringFeature,
+  filteredRowModel: createFilteredRowModel(),
+});
+type BrowseRepo = OfficialChordRepo & {
+  slug: string;
+  installedRepo?: GitReposState["repos"][string];
+};
 const displayNames = new Map(
   officialChordRepos.flatMap((repo) => {
     const slug = getGitHubSlug(repo.url);
@@ -72,82 +94,124 @@ export function SettingsBrowsePageContent({
   onConfigure,
 }: BrowsePageProps & { state: GitReposState }) {
   const { repos } = state;
-  const [searchInput, setSearchInput] = useState("");
-  const [installFilter, setInstallFilter] = useState<InstallFilter>("all");
-  const [category, setCategory] = useState("all");
-
-  const installedRepos = new Map(
-    Object.values(repos).map((repo) => [repo.slug.toLowerCase(), repo]),
-  );
-  const addGitRepoMutation = useMutation({
+  const data = useMemo(() => {
+    const installedRepos = new Map(Object.values(repos).map((repo) => [repo.slug.toLowerCase(), repo]));
+    return officialChordRepos.map((repo): BrowseRepo => {
+      const slug = getGitHubSlug(repo.url) ?? repo.url;
+      return { ...repo, slug, installedRepo: installedRepos.get(slug.toLowerCase()) };
+    });
+  }, [repos]);
+  const { mutate: install, isPending: installing, variables: installingUrl } = useMutation({
     mutationFn: taurpc.addGitRepo,
   });
-  const removeGitRepoMutation = useMutation({
+  const { mutate: uninstall, isPending: uninstalling, variables: uninstallingSlug } = useMutation({
     mutationFn: (slug: string) => taurpc.removeGitRepo(slug),
   });
-  const isPending = addGitRepoMutation.isPending || removeGitRepoMutation.isPending;
+  const isPending = installing || uninstalling;
+  const columns = useMemo<ColumnDef<typeof browseFeatures, BrowseRepo>[]>(
+    () => [
+      {
+        id: "repository",
+        header: "Repository",
+        accessorFn: (repo) =>
+          `${repo.displayName} ${repo.slug} ${repo.description} ${repo.categories.join(" ")}`.toLowerCase(),
+        cell: ({ row }) => <RepositoryDetails repo={row.original} />,
+      },
+      {
+        id: "category",
+        header: "Category",
+        accessorFn: (repo) => repo.categories,
+        filterFn: (row, _id, value: string) => row.original.categories.includes(value),
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-1">
+            {row.original.categories.map((name) => (
+              <Badge key={name} variant="outline" className="whitespace-nowrap">
+                {name}
+              </Badge>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        accessorFn: (repo) => Boolean(repo.installedRepo),
+        filterFn: (row, _id, value: InstallFilter) =>
+          Boolean(row.original.installedRepo) === (value === "installed"),
+        cell: ({ row }) => {
+          const repo = row.original;
+          const { installedRepo } = repo;
+          const isInstalling = installing && installingUrl === repo.url;
+          const isUninstalling = uninstalling && uninstallingSlug === installedRepo?.slug;
 
-  function getInstalledRepo(repo: OfficialChordRepo) {
-    const slug = getGitHubSlug(repo.url);
-    return slug ? installedRepos.get(slug.toLowerCase()) : undefined;
-  }
-
-  const missingRepos = officialChordRepos.filter((repo) => !getInstalledRepo(repo));
-  const normalizedSearch = searchInput.trim().toLowerCase();
-  const filteredRepos = officialChordRepos.filter((repo) => {
-    const isInstalled = Boolean(getInstalledRepo(repo));
-    if (installFilter === "installed" && !isInstalled) {
-      return false;
-    }
-    if (installFilter === "not-installed" && isInstalled) {
-      return false;
-    }
-    if (category !== "all" && !repo.categories.includes(category)) {
-      return false;
-    }
-
-    const slug = getGitHubSlug(repo.url) ?? repo.url;
-    return `${repo.displayName} ${slug} ${repo.description} ${repo.categories.join(" ")}`
-      .toLowerCase()
-      .includes(normalizedSearch);
+          return (
+            <div className="flex flex-wrap items-center justify-end gap-1 whitespace-nowrap @min-[34rem]:flex-nowrap">
+              {installedRepo ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="text-destructive underline"
+                    onClick={() =>
+                      uninstall(installedRepo.slug, {
+                        onSuccess: () => toast.success(`Uninstalled ${repo.displayName}.`),
+                      })
+                    }
+                    disabled={isPending}
+                  >
+                    {isUninstalling ? "Uninstalling..." : "Uninstall"}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => onConfigure(repo.packageName)}
+                    disabled={isUninstalling}
+                  >
+                    Configure
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() =>
+                    install(repo.url, {
+                      onSuccess: () => toast.success(`Installed ${repo.displayName}.`),
+                    })
+                  }
+                  disabled={isPending}
+                >
+                  <Download />
+                  {isInstalling ? "Installing..." : "Install"}
+                </Button>
+              )}
+              <OpenRepoButton repo={repo} />
+            </div>
+          );
+        },
+      },
+    ],
+    [install, installing, installingUrl, isPending, onConfigure, uninstall, uninstalling, uninstallingSlug],
+  );
+  const table = useTable({
+    features: browseFeatures,
+    data,
+    columns,
+    getRowId: (repo) => repo.url,
+    getColumnCanGlobalFilter: (column) => column.id === "repository",
+    globalFilterFn: (row, columnId, value: string) =>
+      row.getValue<string>(columnId).includes(value.trim().toLowerCase()),
   });
-
-  async function installAll() {
-    let installedCount = 0;
-    for (const repo of missingRepos) {
-      try {
-        await addGitRepoMutation.mutateAsync(repo.url);
-        installedCount += 1;
-      } catch {
-        // The mutation cache reports the error.
-        break;
-      }
-    }
-
-    if (installedCount > 0) {
-      toast.success(`Installed ${installedCount} repo${installedCount === 1 ? "" : "s"}.`);
-    }
-  }
+  const rows = table.getRowModel().rows;
+  const categoryColumn = table.getColumn("category");
+  const actionsColumn = table.getColumn("actions");
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h2 className="text-base font-semibold">Browse</h2>
-          <p className="text-sm text-muted-foreground">Official chord repos for popular apps.</p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            void installAll();
-          }}
-          disabled={isPending || missingRepos.length === 0}
-        >
-          <Download />
-          Install All
-        </Button>
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold">Browse</h2>
+        <p className="text-sm text-muted-foreground">Official chord repos for popular apps.</p>
       </div>
 
       <PackageUpdates
@@ -163,10 +227,8 @@ export function SettingsBrowsePageContent({
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Search chord repos"
-              value={searchInput}
-              onChange={(event) => {
-                setSearchInput(event.target.value);
-              }}
+              value={String(table.state.globalFilter ?? "")}
+              onChange={(event) => table.setGlobalFilter(event.target.value)}
               placeholder="Search chord repos..."
               className="pl-9"
             />
@@ -177,10 +239,10 @@ export function SettingsBrowsePageContent({
             variant="outline"
             spacing={1}
             aria-label="Install status"
-            value={installFilter}
+            value={String(actionsColumn?.getFilterValue() ?? "all")}
             onValueChange={(value) => {
               if (value) {
-                setInstallFilter(value as InstallFilter);
+                actionsColumn?.setFilterValue(value === "all" ? undefined : value);
               }
             }}
           >
@@ -190,29 +252,14 @@ export function SettingsBrowsePageContent({
           </ToggleGroup>
         </div>
 
-        <ToggleGroup
-          type="single"
-          size="sm"
-          spacing={1}
-          aria-label="Category"
-          className="flex-wrap"
-          value={category}
-          onValueChange={(value) => {
-            if (value) {
-              setCategory(value);
-            }
-          }}
-        >
-          <ToggleGroupItem value="all">All</ToggleGroupItem>
-          {categories.map((name) => (
-            <ToggleGroupItem key={name} value={name}>
-              {name}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <CategoryFilter
+          options={categoryOptions}
+          value={String(categoryColumn?.getFilterValue() ?? "all")}
+          onChange={(value) => categoryColumn?.setFilterValue(value === "all" ? undefined : value)}
+        />
       </div>
 
-      {filteredRepos.length === 0 ? (
+      {rows.length === 0 ? (
         <Empty className="rounded-lg border bg-default/20 py-10">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -223,102 +270,64 @@ export function SettingsBrowsePageContent({
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="space-y-3">
-          {filteredRepos.map((repo) => {
-            const slug = getGitHubSlug(repo.url) ?? repo.url;
-            const installedRepo = getInstalledRepo(repo);
-            const isInstalling =
-              addGitRepoMutation.isPending && addGitRepoMutation.variables === repo.url;
-            const isRemoving =
-              removeGitRepoMutation.isPending &&
-              removeGitRepoMutation.variables === installedRepo?.slug;
-
-            return (
-              <article key={repo.url} className="rounded-lg border bg-default/30 px-4 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    <h3 className="font-medium">{repo.displayName}</h3>
-                    {installedRepo?.headShortSha && !installedRepo.linkedLocalPath ? (
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {installedRepo.headShortSha}
-                      </span>
-                    ) : null}
-                    {repo.categories.map((name) => (
-                      <Badge key={name} variant="outline">
-                        {name}
-                      </Badge>
-                    ))}
-                  </div>
-
-                  {!installedRepo ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        addGitRepoMutation.mutate(repo.url, {
-                          onSuccess: () => {
-                            toast.success(`Installed ${repo.displayName}.`);
-                          },
-                        });
-                      }}
-                      disabled={isPending}
+        <div className="@container overflow-x-auto rounded-lg border">
+          <table className="w-full border-collapse text-left text-sm">
+            <caption className="sr-only">Official chord repositories</caption>
+            <thead className="border-b bg-default/40 text-xs text-muted-foreground">
+              {table.getHeaderGroups().map((group) => (
+                <tr key={group.id}>
+                  {group.headers.map((header) => (
+                    <th
+                      key={header.id}
+                      scope="col"
+                      className="px-3 py-2 font-medium last:text-right"
                     >
-                      <Download />
-                      {isInstalling ? "Installing..." : "Install"}
-                    </Button>
-                  ) : (
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="text-destructive underline"
-                        onClick={() => {
-                          removeGitRepoMutation.mutate(installedRepo.slug, {
-                            onSuccess: () => {
-                              toast.success(`Uninstalled ${repo.displayName}.`);
-                            },
-                          });
-                        }}
-                        disabled={isPending}
-                      >
-                        {isRemoving ? "Uninstalling..." : "Uninstall"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => onConfigure(repo.packageName)}
-                        disabled={isRemoving}
-                      >
-                        Configure
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-1 flex items-start justify-between gap-3">
-                  <p className="text-sm text-muted-foreground">{repo.description}</p>
-                  {installedRepo?.linkedLocalPath ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">Linked locally</span>
-                  ) : installedRepo?.pinnedRev ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">Pinned</span>
-                  ) : null}
-                </div>
-
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                    <FolderGit2 className="size-3.5 shrink-0" />
-                    <span className="truncate">{slug}</span>
-                  </p>
-                  <OpenRepoButton repo={{ url: repo.url, slug }} />
-                </div>
-              </article>
-            );
-          })}
+                      <table.FlexRender header={header} />
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-b last:border-b-0 hover:bg-default/30">
+                  {row.getAllCells().map((cell) => (
+                    <td key={cell.id} className="px-3 py-2.5 first:w-full first:min-w-44">
+                      <table.FlexRender cell={cell} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       <CommunityChordPackages />
+    </div>
+  );
+}
+
+function RepositoryDetails({ repo }: { repo: BrowseRepo }) {
+  const { installedRepo } = repo;
+  return (
+    <div className="space-y-1">
+      <h3 className="font-medium">{repo.displayName}</h3>
+      <p className="text-muted-foreground">{repo.description}</p>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <FolderGit2 className="size-3.5 shrink-0" />
+          <span className="break-all">{repo.slug}</span>
+        </span>
+        {installedRepo?.headShortSha && !installedRepo.linkedLocalPath && (
+          <span className="font-mono">{installedRepo.headShortSha}</span>
+        )}
+        {installedRepo?.linkedLocalPath ? (
+          <span>Linked locally</span>
+        ) : (
+          installedRepo?.pinnedRev && <span>Pinned</span>
+        )}
+      </div>
     </div>
   );
 }

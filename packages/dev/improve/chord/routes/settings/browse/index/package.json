@@ -3,6 +3,7 @@
 	"type": "module",
 	"private": true,
 	"imports": {
+		"#category-filter": "./category-filter.tsx",
 		"#package-updates": "./package-updates.tsx",
 		"#settings-browse-page": "./settings-browse-page.tsx"
 	},
@@ -11,10 +12,12 @@
 	},
 	"dependencies": {
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
+		"@chord/com.npmjs.tanstack__react-table": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.empty": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
