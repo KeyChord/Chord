@@ -349,7 +349,7 @@ jobs:
       - name: Resolve Bun pin
         id: tools
         run: |
-          bun_version="$(sed -n 's/^bun[[:space:]]*=[[:space:]]*"\(.*\)"$//p' .prototools)"
+          bun_version="$(sed -n 's/^bun[[:space:]]*=[[:space:]]*"\(.*\)"$/\1/p' .prototools)"
           test -n "$bun_version"
           echo "bun=$bun_version" >> "$GITHUB_OUTPUT"
       - uses: oven-sh/setup-bun@v2
