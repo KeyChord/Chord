@@ -1,1 +1,29 @@
-[packages]
+# Starter packages with global or app bindings for both Linux and Windows.
+
+[packages."@keychord/chords-click"]
+git = "https://github.com/KeyChord/chords-click"
+rev = "e709f48ad908820b401d99bbe55a474c06d79e2e"
+
+[packages."@keychord/chords-com.apple.finder"]
+git = "https://github.com/KeyChord/chords-com.apple.finder"
+rev = "ef798796f64b94b7fe82e847b4f3f98e226aed3b"
+
+[packages."@keychord/chords-com.apple.systempreferences"]
+git = "https://github.com/KeyChord/chords-com.apple.systempreferences"
+rev = "bcbf52afc7a45bdee748d0ca374b47528ae6815e"
+
+[packages."@keychord/chords-menu"]
+git = "https://github.com/KeyChord/chords-menu"
+rev = "26bc364a311c006b207d48b46cde52a3d92e3a9c"
+
+[packages."@keychord/chords-modifiers"]
+git = "https://github.com/KeyChord/chords-modifiers"
+rev = "743260bdfca3ce3d9cb0d94f0d4f4806d73cf0ae"
+
+[packages."@keychord/chords-navigation"]
+git = "https://github.com/KeyChord/chords-navigation"
+rev = "4a29b47bad3f5eb568195ba50ee2770915ff5f7e"
+
+[packages."@keychord/chords-windows"]
+git = "https://github.com/KeyChord/chords-windows"
+rev = "b79acea0d45dd8cfd2a9969fa70a1492cfe7f898"

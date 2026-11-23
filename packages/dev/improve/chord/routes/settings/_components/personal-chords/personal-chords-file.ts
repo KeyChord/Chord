@@ -1,4 +1,4 @@
-import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
+import { desktopPlatform } from "@chord/dev.improve.chord.lib.state/desktop-platform";
 
 /** Chords in this file work in every app (when they start with a symbol). */
 const filename = `${desktopPlatform}.toml`;

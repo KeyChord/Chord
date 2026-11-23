@@ -379,6 +379,7 @@ jobs:
         run: |
           cargo test --locked --lib --target ${{ matrix.target }} bun_js::protocol::tests
           cargo test --locked --lib --target ${{ matrix.target }} caps_lock_guard::tests
+          cargo test --locked --lib --target ${{ matrix.target }} default_packages::tests
       - name: Build desktop installers
         working-directory: Chord/apps/chord-tauri
         env:
@@ -391,6 +392,25 @@ jobs:
             args+=(--config src-tauri/tauri.beta.conf.json)
           fi
           bun tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} "${args[@]}"
+      - name: Smoke-test the bundled Bun runtime
+        env:
+          CHORD_BUILD_TARGET: ${{ matrix.target }}
+        run: |
+          bun -e '
+            import { resolve } from "node:path";
+            const suffix = process.platform === "win32" ? ".exe" : "";
+            const directory = resolve("apps/chord-tauri/src-tauri/target", process.env.CHORD_BUILD_TARGET, "release");
+            const binary = resolve(directory, "chord" + suffix);
+            const runtime = resolve(directory, "chord-bun" + suffix);
+            if (!(await Bun.file(runtime).exists())) throw new Error("missing Bun sidecar");
+            const fixture = resolve(process.env.RUNNER_TEMP, "chord worker fixture.ts");
+            const marker = resolve(process.env.RUNNER_TEMP, "chord worker result.txt");
+            await Bun.write(fixture, "export const write = (path: string) => Bun.write(path, \"chord-bun\");");
+            const run = Bun.spawn([binary, "run", fixture, "write", marker], { stdout: "inherit", stderr: "inherit" });
+            if ((await run.exited) || (await Bun.file(marker).text()) !== "chord-bun") {
+              throw new Error("bundled Bun runtime smoke test failed");
+            }
+          '
       - name: Stage desktop assets
         run: |
           set -euo pipefail

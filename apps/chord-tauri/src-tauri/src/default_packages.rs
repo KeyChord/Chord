@@ -179,6 +179,7 @@ fn install_generation<'a, 'b>(
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn bundled_default_packages_parse() {
         let packages = load_default_packages().unwrap();
@@ -188,6 +189,19 @@ mod tests {
                 .any(|package| package.repo_ref.slug() == "KeyChord/chords-chord")
         );
         assert!(!default_packages_file().unwrap().previous.is_empty());
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn bundled_default_packages_parse() {
+        let plan = plan_default_packages(&[], Some(&[])).unwrap();
+        assert!(
+            plan.install
+                .iter()
+                .any(|package| package.repo_ref.slug() == "KeyChord/chords-navigation")
+        );
+        assert!(plan.install.iter().all(|package| package.rev.len() == 40));
+        assert_eq!(plan.offered.len(), plan.install.len());
     }
 
     fn spec(name: &str, rev: &str) -> PinnedGitRepoSpec {

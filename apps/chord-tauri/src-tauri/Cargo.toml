@@ -1,6 +1,6 @@
 [package]
 name = "chords"
-version = "0.3.4"
+version = "0.3.5"
 description = "shortcuts reimagined"
 edition = "2024"
 autobins = false

@@ -9,7 +9,8 @@
 		"#state-queries": "./state-queries.tsx"
 	},
 	"exports": {
-		".": "./+.ts"
+		".": "./+.ts",
+		"./desktop-platform": "./+desktop-platform.ts"
 	},
 	"dependencies": {
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",

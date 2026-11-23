@@ -112,6 +112,14 @@ function unsupported(feature) {
   throw new Error(`${feature} is unavailable on ${process.platform}`);
 }
 
+function localPath(path) {
+  if (process.platform !== "win32") return path;
+  const extended = "\\\\?\\";
+  const unc = extended + "UNC\\";
+  if (path.startsWith(unc)) return "\\\\" + path.slice(unc.length);
+  return path.startsWith(extended) ? path.slice(extended.length) : path;
+}
+
 function chordModule(root, host, launches, terminations) {
   function hostCall(request) {
     if (!host) throw new Error("Chord host APIs are unavailable in CLI mode");
@@ -126,7 +134,7 @@ function chordModule(root, host, launches, terminations) {
   }
 
   function resolvePackageFile(meta, value) {
-    const modulePath = meta.path ?? Bun.fileURLToPath(meta.url);
+    const modulePath = localPath(meta.path ?? Bun.fileURLToPath(meta.url));
     let packageRoot = root;
     if (!packageRoot || relative(packageRoot, modulePath).startsWith("..")) {
       packageRoot = dirname(modulePath);
@@ -222,18 +230,18 @@ async function serve(address, token) {
   control.onClose(() => process.exit(0));
   const host = connectHost(address, token);
   const config = await control.read();
-  process.chdir(config.cwd);
+  process.chdir(localPath(config.cwd));
   const handlers = new Map();
   const sequences = new Map();
   const launches = new Set();
   const terminations = new Set();
-  chordModule(config.root, host, launches, terminations);
+  chordModule(localPath(config.root), host, launches, terminations);
 
   async function handle(request) {
     if (request === "Ping") return null;
     if ("Register" in request) {
       const { module, raw, pathslug, app_id, args } = request.Register;
-      const build = await (await import(Bun.pathToFileURL(module).href)).default;
+      const build = await (await import(Bun.pathToFileURL(localPath(module)).href)).default;
       if (typeof build !== "function") throw new TypeError("JS default export did not resolve to a function");
       const handler = await build.apply({ chordsFile: raw, chordsFilePath: pathslug, chordsFileAppId: app_id }, decode(args));
       if (typeof handler !== "function") throw new TypeError("The default export function must return a function");
@@ -304,7 +312,7 @@ const [bun, mode, path, ...args] = process.argv;
 if (mode === "worker") {
   await serve(path, args[0]);
 } else {
-  const absolutePath = resolve(path);
+  const absolutePath = resolve(localPath(path));
   process.argv = [bun, absolutePath, ...(mode === "export" ? args.slice(1) : args)];
   chordModule(null, null, new Set(), new Set());
   const module = await import(Bun.pathToFileURL(absolutePath).href);

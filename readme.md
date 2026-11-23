@@ -1,6 +1,6 @@
 # Chord
 
-**Multi-letter shortcuts for macOS.**
+**Multi-letter shortcuts for macOS, Linux, and Windows.**
 
 **Chord** lets you bind actions to key sequences while _keeping your existing shortcuts untouched_.
 
@@ -30,6 +30,8 @@ sudo udevadm trigger --subsystem-match=misc --sysname-match=uinput
 ```
 
 Sign out and back in after changing group membership. Membership in `input` lets processes under your account read input devices. Run Chord as your normal user.
+
+On Linux and Windows, Chord installs starter packages for navigation, mouse clicks, menus, modifiers, window controls, the file manager, and system settings on first launch.
 
 Chord opens guided setup on first launch. Open **Settings → General → Getting Started** to revisit it.
 
