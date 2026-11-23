@@ -8,7 +8,7 @@
 
 use super::caps_remap::REMAPPED_KEYCODE;
 use super::caps_space_gap::event_time_ns;
-use super::health::InputHealth;
+use super::health::{InputHealth, STALL_THRESHOLD};
 use super::thread_priority::{InputThreadPriority, raise_current_thread};
 use crate::models::{Key, KeyEvent, KeyEventAction};
 use anyhow::{Context, Result, anyhow};
@@ -44,6 +44,8 @@ pub(super) const SYNTHETIC_EVENT_USER_DATA: [i64; 2] = [0xDEAD_BEEF, 0xDEAD_DEAD
 /// How often the tap thread wakes up to verify the tap is still enabled.
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_millis(250);
 const START_TIMEOUT: Duration = Duration::from_secs(5);
+/// No key waits this long for the tap: macOS gives up on it far sooner.
+const IMPLAUSIBLE_WAIT: Duration = Duration::from_secs(60);
 
 // Device-dependent modifier bits carried in `CGEventFlags` (`IOLLEvent.h`).
 const NX_DEVICELCTLKEYMASK: u64 = 0x0000_0001;
@@ -196,6 +198,7 @@ impl TapContext {
             self.timebase.1,
         );
         let action = (self.sink)(decoded, event_ns);
+        self.note_if_stalled(event_ns, now_ticks);
         // The hotkey fallback fires for every Caps event that is not swallowed here,
         // and for Space while it has that registered. Counting the ones let through
         // tells it those apart from the ones this tap never received.
@@ -220,6 +223,42 @@ impl TapContext {
                 );
                 KeyEventAction::Forward
             }
+        }
+    }
+}
+
+impl TapContext {
+    fn ticks_to_ns(&self, ticks: u64) -> u64 {
+        u64::try_from(
+            u128::from(ticks) * u128::from(self.timebase.0) / u128::from(self.timebase.1),
+        )
+        .unwrap_or(u64::MAX)
+    }
+
+    /// macOS holds every key until this callback answers, and disables the tap when
+    /// the answer takes too long. Says in the log which side was slow: the key reaching
+    /// this thread (the machine, or this thread not being scheduled), or Chord's own
+    /// handling of it. Costs two clock reads unless a key stalled.
+    fn note_if_stalled(&self, event_ns: u64, entered_ticks: u64) {
+        // SAFETY: reads the clock.
+        #[allow(deprecated)]
+        let left_ns = self.ticks_to_ns(unsafe { libc::mach_absolute_time() });
+        let entered_ns = self.ticks_to_ns(entered_ticks);
+        let waited = Duration::from_nanos(entered_ns.saturating_sub(event_ns));
+        // Keys other apps post can carry any timestamp; only a real one is a moment old.
+        let waited = if waited > IMPLAUSIBLE_WAIT {
+            Duration::ZERO
+        } else {
+            waited
+        };
+        let handled = Duration::from_nanos(left_ns.saturating_sub(entered_ns));
+        if waited < STALL_THRESHOLD && handled < STALL_THRESHOLD {
+            return;
+        }
+        if let Some(unreported) = self.health.note_stall(left_ns) {
+            log::warn!(
+                "A key stalled at the keyboard event tap: it took {waited:?} to reach Chord and {handled:?} to handle ({unreported} more since the last report). macOS disables the tap when this takes too long"
+            );
         }
     }
 }

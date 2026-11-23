@@ -28,6 +28,7 @@ use objc2_foundation::MainThreadMarker;
 use std::ffi::c_void;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 use tauri::AppHandle;
 
 type OSStatus = i32;
@@ -72,6 +73,9 @@ unsafe extern "C" {
     ) -> OSStatus;
     fn UnregisterEventHotKey(hot_key: EventHotKeyRef) -> OSStatus;
     fn GetEventKind(event: EventRef) -> u32;
+    /// Seconds since startup at which the event was made, on the clock below.
+    fn GetEventTime(event: EventRef) -> f64;
+    fn GetCurrentEventTime() -> f64;
     fn GetEventParameter(
         event: EventRef,
         name: u32,
@@ -153,9 +157,14 @@ extern "C" fn handle_hotkey(_: EventHandlerCallRef, event: EventRef, _: *mut c_v
         K_EVENT_HOT_KEY_RELEASED => false,
         _ => return EVENT_NOT_HANDLED_ERR,
     };
+    // How long the key took to get here. Hotkeys wait for the main thread, so on a
+    // stalled machine the keys that follow may already have gone to the focused app.
+    // SAFETY: as above; the second call only reads the clock.
+    let late = unsafe { GetCurrentEventTime() - GetEventTime(event) };
+    let late = Duration::try_from_secs_f64(late).unwrap_or_default();
     let variants = MODIFIER_VARIANTS.len() as u32;
     if (CAPS_ID..CAPS_ID + variants).contains(&id.id) {
-        handle_caps(handle, pressed);
+        handle_caps(handle, pressed, late);
     } else if (SPACE_ID..SPACE_ID + variants).contains(&id.id) {
         handle_space(handle, pressed);
     } else {
@@ -164,7 +173,7 @@ extern "C" fn handle_hotkey(_: EventHandlerCallRef, event: EventRef, _: *mut c_v
     0
 }
 
-fn handle_caps(handle: &AppHandle, pressed: bool) {
+fn handle_caps(handle: &AppHandle, pressed: bool, late: Duration) {
     let keyboard = handle.app_state().keyboard();
     // The tap runs before hotkeys are matched. It swallows the key while Chord owns
     // input, so this event either was let through by it (during an ownership handoff),
@@ -181,7 +190,7 @@ fn handle_caps(handle: &AppHandle, pressed: bool) {
     } else {
         KeyEvent::Release(key)
     };
-    keyboard.handle_unseen_caps_event(event, tap_received);
+    keyboard.handle_unseen_caps_event(event, tap_received, late);
     sync_space(handle);
 }
 

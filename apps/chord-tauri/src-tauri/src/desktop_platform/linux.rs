@@ -324,15 +324,27 @@ pub fn focused_window() -> Option<u32> {
 }
 
 fn client_windows(connection: &RustConnection, screen: usize) -> Result<Vec<u32>> {
-    let atom = connection
-        .intern_atom(true, b"_NET_CLIENT_LIST")?
-        .reply()?
-        .atom;
     let root = connection.setup().roots[screen].root;
-    let reply = connection
-        .get_property(false, root, atom, AtomEnum::WINDOW, 0, 4096)?
-        .reply()?;
-    Ok(reply.value32().into_iter().flatten().collect())
+    for (name, reverse) in [
+        (b"_NET_CLIENT_LIST_STACKING".as_slice(), true),
+        (b"_NET_CLIENT_LIST".as_slice(), false),
+    ] {
+        let atom = connection.intern_atom(true, name)?.reply()?.atom;
+        if atom == 0 {
+            continue;
+        }
+        let reply = connection
+            .get_property(false, root, atom, AtomEnum::WINDOW, 0, 4096)?
+            .reply()?;
+        if let Some(values) = reply.value32() {
+            let mut windows: Vec<_> = values.collect();
+            if reverse {
+                windows.reverse();
+            }
+            return Ok(windows);
+        }
+    }
+    Ok(Vec::new())
 }
 
 pub fn processes() -> Vec<DesktopProcess> {

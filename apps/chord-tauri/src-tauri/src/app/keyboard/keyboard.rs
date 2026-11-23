@@ -1,5 +1,7 @@
 use super::caps_lock_guard::CapsLockGuard;
-use super::caps_remap::{ProcessIdentity, RemapStore, SystemMappingTable};
+use super::caps_remap::{
+    self, CHORD_MAPPING, MappingTable, ProcessIdentity, RemapStore, SystemMappingTable,
+};
 use super::caps_space_gap::{CapsSpaceGaps, KeyTime, milliseconds};
 use super::health::{Backoff, InputHealth};
 use super::secure_input::SecureInputState;
@@ -7,6 +9,8 @@ use super::tap::{TapAction, TapEvent, TapHandle};
 use super::thread_priority::{InputThreadPriority, raise_current_thread};
 use super::{caps_guardian, caps_hotkey, key_catcher};
 use crate::app::AppHandleExt;
+use crate::app::controller::AppController;
+use crate::app::dev_lockfile_detector::DevLockfileDetector;
 use crate::app::permissions::InputPermissions;
 use crate::models::{AppKeyboardState, CapturedKeyEvent, Key, KeyEvent, KeyEventAction};
 use anyhow::Result;
@@ -16,7 +20,7 @@ use nject::injectable;
 use objc2_core_graphics::{CGEventFlags, CGEventSource, CGEventSourceStateID};
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::mpsc::{SyncSender, TrySendError, sync_channel};
-use std::sync::{Arc, Mutex, MutexGuard, Once, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, Once, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
@@ -37,6 +41,65 @@ bitflags! {
       const RIGHT_COMMAND   = 1 << 7;
       const FUNCTION        = 1 << 8;
   }
+}
+
+/// The singletons the event tap consults for every key, looked up once. Tauri finds
+/// managed state under a process-wide mutex that every thread of the app shares, and
+/// on macOS a std mutex does not lend its waiter's priority to its holder: a
+/// background thread preempted inside it on a busy machine would hold up the tap
+/// thread, and with it every key, until macOS gave up on the tap.
+struct InputSingletons {
+    keyboard: &'static AppKeyboard,
+    detector: &'static DevLockfileDetector,
+    controller: &'static AppController,
+}
+
+fn input_singletons(handle: &AppHandle) -> &'static InputSingletons {
+    // The handle is kept for good, so the state it manages lives as long.
+    static HANDLE: OnceLock<AppHandle> = OnceLock::new();
+    static SINGLETONS: OnceLock<InputSingletons> = OnceLock::new();
+    SINGLETONS.get_or_init(|| {
+        let state = HANDLE.get_or_init(|| handle.clone()).app_state();
+        InputSingletons {
+            keyboard: state.keyboard(),
+            detector: state.dev_lockfile_detector(),
+            controller: state.app_controller(),
+        }
+    })
+}
+
+/// How many times Chord puts its Caps mapping back within `RESTORE_WINDOW` before it
+/// stops: another tool that re-applies its own mapping on every change would otherwise
+/// trade writes with Chord forever.
+const RESTORE_LIMIT: usize = 5;
+const RESTORE_WINDOW: Duration = Duration::from_secs(10);
+
+/// Recent restorations of the Caps mapping (see `RESTORE_LIMIT`).
+#[derive(Default)]
+struct RestoreBudget {
+    recent: Vec<Instant>,
+    exhausted_reported: bool,
+}
+
+#[derive(Debug, PartialEq)]
+enum RestoreDecision {
+    Restore,
+    /// Over the limit; `report` is true the first time.
+    GiveUp { report: bool },
+}
+
+impl RestoreBudget {
+    fn spend(&mut self, now: Instant) -> RestoreDecision {
+        self.recent
+            .retain(|at| now.duration_since(*at) < RESTORE_WINDOW);
+        if self.recent.len() >= RESTORE_LIMIT {
+            let report = !std::mem::replace(&mut self.exhausted_reported, true);
+            return RestoreDecision::GiveUp { report };
+        }
+        self.recent.push(now);
+        self.exhausted_reported = false;
+        RestoreDecision::Restore
+    }
 }
 
 /// What the listeners hand to the thread that runs the controller.
@@ -101,6 +164,9 @@ pub struct AppKeyboard {
     /// too. A press that arrived as a hotkey has its release left to the hotkey.
     #[inject(AtomicBool::new(false))]
     tap_has_caps_press: AtomicBool,
+
+    #[inject(Mutex::new(RestoreBudget::default()))]
+    restore_budget: Mutex<RestoreBudget>,
 
     handle: AppHandle,
 }
@@ -181,6 +247,19 @@ impl AppKeyboard {
                     "Failed to register the Caps guardian; a crash would leave Caps Lock remapped: {error:#}"
                 );
             }
+            // Before the first install, so no change to the table goes unseen.
+            static HANDLE: OnceLock<AppHandle> = OnceLock::new();
+            let _ = HANDLE.set(self.handle.clone());
+            let watching = caps_remap::watch_system_table(|| {
+                if let Some(handle) = HANDLE.get() {
+                    handle.app_state().keyboard().on_mapping_table_changed();
+                }
+            });
+            if let Err(error) = watching {
+                log::error!(
+                    "Failed to watch the Caps key mapping; one removed by another app is only noticed at the next Caps press: {error:#}"
+                );
+            }
         });
         store.install(&SystemMappingTable, ProcessIdentity::current()?)?;
         if !self.holds_caps_remap.swap(true, Ordering::SeqCst) {
@@ -202,23 +281,60 @@ impl AppKeyboard {
         }
     }
 
-    /// macOS toggled Caps Lock itself, so something removed Chord's mapping (UTM's
-    /// "Caps Lock as key" cleanup does). Put it back; the toggle stands, like any tap.
+    /// macOS toggled Caps Lock itself, so something removed Chord's mapping and the
+    /// change notification has not put it back yet. The toggle stands, like any tap.
     fn on_native_caps_toggle(&self) {
+        self.restore_caps_remap("macOS toggled Caps Lock itself");
+    }
+
+    /// Some process wrote the key mapping table (UTM's "Caps Lock as key" cleanup
+    /// clears it, for one). Called on the main thread, for Chord's own writes too.
+    fn on_mapping_table_changed(&self) {
+        self.restore_caps_remap("another app changed the key mapping table");
+    }
+
+    /// Puts Chord's Caps mapping back if this instance holds it and it is gone. Reads
+    /// the table and takes the state lock, so the work happens on its own thread.
+    fn restore_caps_remap(&self, noticed: &'static str) {
         if !self.holds_caps_remap.load(Ordering::SeqCst) {
             return;
         }
-        log::warn!(
-            "macOS toggled Caps Lock itself; the Caps key mapping was removed by another app. Restoring it"
-        );
         let handle = self.handle.clone();
         let spawned = std::thread::Builder::new()
             .name("chord-caps-remap".into())
             .spawn(move || {
                 let keyboard = handle.app_state().keyboard();
-                if keyboard.holds_caps_remap.load(Ordering::SeqCst)
-                    && let Err(error) = keyboard.install_caps_remap()
-                {
+                if !keyboard.holds_caps_remap.load(Ordering::SeqCst) {
+                    return;
+                }
+                match SystemMappingTable.read() {
+                    Ok(entries) if caps_mapping_is_chords(&entries) => return,
+                    Ok(_) => {}
+                    Err(error) => {
+                        log::error!("Failed to read the Caps key mapping: {error:#}");
+                        return;
+                    }
+                }
+                let decision = keyboard
+                    .restore_budget
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .spend(Instant::now());
+                match decision {
+                    RestoreDecision::Restore => {}
+                    RestoreDecision::GiveUp { report } => {
+                        if report {
+                            log::error!(
+                                "Another app keeps replacing Chord's Caps key mapping ({RESTORE_LIMIT} times in {RESTORE_WINDOW:?}); leaving it until that stops. Caps+Space cannot start Chord meanwhile"
+                            );
+                        }
+                        return;
+                    }
+                }
+                log::warn!(
+                    "The Caps key mapping was removed by another app ({noticed}). Restoring it"
+                );
+                if let Err(error) = keyboard.install_caps_remap() {
                     log::error!("Failed to restore the Caps key mapping: {error:#}");
                 }
             });
@@ -538,12 +654,12 @@ impl AppKeyboard {
     /// Creates the tap, which feeds the controller queue.
     fn spawn_tap(&self) -> Result<TapHandle> {
         let queue = self.input_queue()?;
-        let handle = self.handle.clone();
+        // Nothing in here may wait on a lock another thread can be preempted in.
+        let InputSingletons {
+            keyboard, detector, ..
+        } = input_singletons(&self.handle);
         let sink = move |event: TapEvent, event_ns: u64| -> TapAction {
-            let keyboard = handle.app_state().keyboard();
-            handle
-                .app_state()
-                .dev_lockfile_detector()
+            detector
                 .with_input_owner(|generation| {
                     let (event, caps_lock_on) = match event {
                         // A key that went down as a hotkey must come up as one: macOS
@@ -612,7 +728,7 @@ impl AppKeyboard {
         self.keyboard_state.handle_key_event(event);
         self.update_modifier_flags(event);
 
-        let app_mode = self.handle.app_state().app_controller().app_mode();
+        let app_mode = input_singletons(&self.handle).controller.app_mode();
 
         // Space while Caps is held enters Chord mode and is never typed. The Caps
         // key itself is Chord's alone: it arrives remapped and never reaches apps.
@@ -666,8 +782,14 @@ impl AppKeyboard {
     /// A Caps press or release that got past the tap, delivered by the hotkey
     /// fallback instead. The tap swallows the key whenever it receives it, so the
     /// hotkey doubles as a witness: `tap_received` is false when the tap never got
-    /// this event. Called on the main thread.
-    pub(super) fn handle_unseen_caps_event(&self, event: KeyEvent, tap_received: bool) {
+    /// this event. `late` is how long the key took to get here. Called on the main
+    /// thread.
+    pub(super) fn handle_unseen_caps_event(
+        &self,
+        event: KeyEvent,
+        tap_received: bool,
+        late: Duration,
+    ) {
         let pressed = matches!(event, KeyEvent::Press(_));
         if pressed {
             // This press is the hotkey's, and so is its release.
@@ -676,9 +798,40 @@ impl AppKeyboard {
         // The lock state before the press, as on the event the tap would have seen.
         let caps_lock_on = pressed.then(Self::caps_lock_flag);
         self.ingest_as_owner(event, caps_lock_on);
-        if !tap_received {
-            self.on_caps_event_missed_by_tap();
+        // Under Secure Input macOS hides every key from the tap, and the hotkey
+        // fallback takes over; that is no fault of the tap.
+        if tap_received || SecureInputState::current() != SecureInputState::Disabled {
+            return;
         }
+        self.on_caps_event_missed_by_tap(late);
+        if pressed {
+            self.start_chord_if_space_got_ahead();
+        }
+    }
+
+    /// A Caps press the tap missed reached Chord late, with Secure Input off: the tap
+    /// was disabled or the process stalled. Nothing held back the keys behind it, so a
+    /// Space that followed went to the focused app instead of starting Chord. If Space
+    /// is still down, start Chord now: the stray space stays typed, but the chord the
+    /// person is about to type runs instead of being typed as well.
+    ///
+    /// The keyboard's own key state stands in for the event Chord never received.
+    /// It cannot tell a Space pressed before Caps from one pressed after; the first
+    /// starts Chord here and not through the tap, which only matters during an outage.
+    fn start_chord_if_space_got_ahead(&self) {
+        if !self.keyboard_state.is_caps_armed()
+            || input_singletons(&self.handle).controller.app_mode().is_chord()
+            || !CGEventSource::key_state(
+                CGEventSourceStateID::HIDSystemState,
+                super::tap::SPACE_KEYCODE as u16,
+            )
+        {
+            return;
+        }
+        log::warn!(
+            "Space was already down when the missed Caps press reached Chord; starting Chord from the keys held"
+        );
+        self.ingest_as_owner(KeyEvent::Press(Key(KeyMappingCode::Space)), None);
     }
 
     /// The modifier keys held right now, by the keyboard's own flags. They include
@@ -696,19 +849,20 @@ impl AppKeyboard {
             .contains(CGEventFlags::MaskAlphaShift)
     }
 
-    /// The tap is registered but did not receive the Caps key. Under Secure Input
-    /// macOS hides every key from it, and the hotkey fallback takes over; otherwise the
-    /// tap is dead in a way macOS does not report (it still reads as enabled), so
-    /// replace it.
-    fn on_caps_event_missed_by_tap(&self) {
-        if SecureInputState::current() != SecureInputState::Disabled {
-            return;
-        }
+    /// The tap is registered but did not receive the Caps key, with Secure Input off.
+    /// Either macOS disabled it, or it is dead in a way macOS does not report (it
+    /// still reads as enabled). Replace it either way.
+    fn on_caps_event_missed_by_tap(&self, late: Duration) {
         if self.tap_restart_pending.swap(true, Ordering::SeqCst) {
             return;
         }
         log::error!(
-            "The keyboard event tap did not receive the Caps key although Secure Input is off; replacing the tap"
+            "The keyboard event tap did not receive the Caps key although Secure Input is off (macOS reports the tap {}; the key reached Chord {late:?} after it was pressed); replacing the tap",
+            if self.health.tap_enabled() {
+                "enabled"
+            } else {
+                "disabled"
+            }
         );
         let handle = self.handle.clone();
         let spawned = std::thread::Builder::new()
@@ -864,6 +1018,11 @@ impl AppKeyboard {
     }
 }
 
+/// Whether the table maps the Caps key to Chord's key and to nothing else.
+fn caps_mapping_is_chords(entries: &[caps_remap::Mapping]) -> bool {
+    caps_remap::with_chord_mapping(entries).0 == entries && entries.contains(&CHORD_MAPPING)
+}
+
 /// Whether a Space press that reached the hotkey fallback belongs to Chord: it follows
 /// an armed Caps press, or a chord is being read and Space is one of its keys.
 fn space_press_is_chords(caps_armed: bool, in_chord: bool) -> bool {
@@ -881,5 +1040,47 @@ mod tests {
         assert!(space_press_is_chords(true, true));
         // A stale registration: the press is handed back to the focused app.
         assert!(!space_press_is_chords(false, false));
+    }
+
+    #[test]
+    fn only_a_table_with_chords_caps_entry_alone_needs_no_restoring() {
+        let other = (0x7_0000_0004, 0x7_0000_0005);
+        assert!(caps_mapping_is_chords(&[CHORD_MAPPING]));
+        assert!(caps_mapping_is_chords(&[other, CHORD_MAPPING]));
+        // Cleared by another tool, or never set.
+        assert!(!caps_mapping_is_chords(&[]));
+        assert!(!caps_mapping_is_chords(&[other]));
+        // Caps mapped elsewhere, with or without Chord's entry.
+        let caps_elsewhere = (caps_remap::CAPS_USAGE, 0x7_0000_00E0);
+        assert!(!caps_mapping_is_chords(&[caps_elsewhere]));
+        assert!(!caps_mapping_is_chords(&[caps_elsewhere, CHORD_MAPPING]));
+    }
+
+    #[test]
+    fn restoring_stops_when_another_app_keeps_undoing_it() {
+        let mut budget = RestoreBudget::default();
+        let start = Instant::now();
+        for _ in 0..RESTORE_LIMIT {
+            assert_eq!(budget.spend(start), RestoreDecision::Restore);
+        }
+        // Reported once, however long the other app keeps at it.
+        assert_eq!(
+            budget.spend(start),
+            RestoreDecision::GiveUp { report: true }
+        );
+        assert_eq!(
+            budget.spend(start + Duration::from_secs(1)),
+            RestoreDecision::GiveUp { report: false }
+        );
+        // Once the window has passed, Chord tries again.
+        let later = start + RESTORE_WINDOW;
+        assert_eq!(budget.spend(later), RestoreDecision::Restore);
+        for _ in 1..RESTORE_LIMIT {
+            assert_eq!(budget.spend(later), RestoreDecision::Restore);
+        }
+        assert_eq!(
+            budget.spend(later),
+            RestoreDecision::GiveUp { report: true }
+        );
     }
 }

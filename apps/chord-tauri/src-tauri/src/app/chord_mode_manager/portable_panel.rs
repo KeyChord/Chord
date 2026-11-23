@@ -48,6 +48,7 @@ impl ChordModePanel {
                 .skip_taskbar(true)
                 .shadow(false)
                 .build()?;
+        #[cfg(windows)]
         window.set_ignore_cursor_events(true)?;
         Ok(window)
     }
@@ -104,7 +105,11 @@ impl ChordModePanel {
     }
 
     pub fn reveal(&self) -> Result<()> {
-        self.get_or_create_window()?.show()?;
+        let window = self.get_or_create_window()?;
+        window.show()?;
+        // Tao needs the GTK window to be realized before shaping its input region.
+        #[cfg(target_os = "linux")]
+        window.set_ignore_cursor_events(true)?;
         Ok(())
     }
 

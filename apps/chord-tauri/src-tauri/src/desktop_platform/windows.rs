@@ -201,16 +201,23 @@ fn foreground() -> HWND {
     unsafe { GetForegroundWindow() }
 }
 
+fn window_class(window: HWND) -> Option<String> {
+    let mut name = [0u16; 256];
+    let length = unsafe { GetClassNameW(window, name.as_mut_ptr(), name.len() as i32) };
+    (length > 0).then(|| String::from_utf16_lossy(&name[..length as usize]))
+}
+
 pub fn foreground_app() -> Option<DesktopProcess> {
+    let window = foreground();
     let mut pid = 0;
     unsafe {
-        GetWindowThreadProcessId(foreground(), &mut pid);
+        GetWindowThreadProcessId(window, &mut pid);
     }
     let executable = process_executable(pid)?;
     Some(DesktopProcess {
         pid,
         executable,
-        window_class: None,
+        window_class: window_class(window),
     })
 }
 

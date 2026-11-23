@@ -259,6 +259,75 @@ impl MappingTable for SystemMappingTable {
     }
 }
 
+type TableChanged = unsafe extern "C-unwind" fn(
+    target: *mut std::ffi::c_void,
+    context: *mut std::ffi::c_void,
+    property: *const CFString,
+    value: *const CFType,
+);
+
+#[link(name = "IOKit", kind = "framework")]
+unsafe extern "C-unwind" {
+    fn IOHIDEventSystemClientRegisterPropertyChangedCallback(
+        client: *const IOHIDEventSystemClient,
+        property: *const CFString,
+        callback: TableChanged,
+        target: *mut std::ffi::c_void,
+        context: *mut std::ffi::c_void,
+    );
+    fn IOHIDEventSystemClientScheduleWithRunLoop(
+        client: *const IOHIDEventSystemClient,
+        run_loop: *const objc2_core_foundation::CFRunLoop,
+        mode: *const CFString,
+    );
+}
+
+static TABLE_CHANGED: std::sync::OnceLock<fn()> = std::sync::OnceLock::new();
+
+unsafe extern "C-unwind" fn table_changed(
+    _target: *mut std::ffi::c_void,
+    _context: *mut std::ffi::c_void,
+    _property: *const CFString,
+    _value: *const CFType,
+) {
+    if let Some(changed) = TABLE_CHANGED.get() {
+        // A panic must never unwind into IOKit.
+        let _ = std::panic::catch_unwind(changed);
+    }
+}
+
+/// Calls `changed` on the main thread each time any process writes `UserKeyMapping`,
+/// Chord included. macOS reports the write within milliseconds (measured: 6 ms), so a
+/// mapping another tool removed is put back before the next Caps press instead of
+/// being discovered by losing one. Only the first call registers.
+pub fn watch_system_table(changed: fn()) -> Result<()> {
+    if TABLE_CHANGED.set(changed).is_err() {
+        return Ok(());
+    }
+    let run_loop =
+        objc2_core_foundation::CFRunLoop::main().context("the main run loop is unavailable")?;
+    let client = IOHIDEventSystemClient::new_simple_client(None);
+    // SAFETY: a live client, static strings and a static callback; the client is
+    // leaked below, so it outlives every notification.
+    unsafe {
+        IOHIDEventSystemClientRegisterPropertyChangedCallback(
+            &*client,
+            &*CFString::from_static_str(USER_KEY_MAPPING),
+            table_changed,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        );
+        IOHIDEventSystemClientScheduleWithRunLoop(
+            &*client,
+            &*run_loop,
+            objc2_core_foundation::kCFRunLoopCommonModes
+                .map_or(std::ptr::null(), |mode| mode as *const CFString),
+        );
+    }
+    std::mem::forget(client);
+    Ok(())
+}
+
 /// A process, identified by PID and start time so a recycled PID never matches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcessIdentity {

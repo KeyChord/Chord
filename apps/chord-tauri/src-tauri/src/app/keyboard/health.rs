@@ -13,7 +13,18 @@ pub struct InputHealth {
     caps_events_forwarded: AtomicU64,
     /// The same for Space.
     space_events_forwarded: AtomicU64,
+    /// When a stalled key was last written to the log, in nanoseconds of the tap
+    /// thread's clock; zero before the first.
+    stall_reported_at: AtomicU64,
+    /// Stalled keys since that log line.
+    stalls_unreported: AtomicU64,
 }
+
+/// A key that waited at least this long for the tap is a stall worth a log line: it
+/// is long enough to feel, and a fraction of what makes macOS disable the tap.
+pub(super) const STALL_THRESHOLD: Duration = Duration::from_millis(100);
+/// Stalls come in bursts on a struggling machine; the log keeps one line per burst.
+const STALL_REPORT_INTERVAL: Duration = Duration::from_secs(30);
 
 impl InputHealth {
     /// The tap exists, or is being replaced right now.
@@ -41,6 +52,20 @@ impl InputHealth {
 
     pub(super) fn space_events_forwarded(&self) -> u64 {
         self.space_events_forwarded.load(Ordering::Acquire)
+    }
+
+    /// A key waited too long at the tap. Returns how many stalls went unreported
+    /// before this one when it is time for a log line, and `None` otherwise. Called
+    /// on the tap thread; only atomics.
+    pub(super) fn note_stall(&self, now_ns: u64) -> Option<u64> {
+        let last = self.stall_reported_at.load(Ordering::Acquire);
+        let interval = STALL_REPORT_INTERVAL.as_nanos() as u64;
+        if last != 0 && now_ns.saturating_sub(last) < interval {
+            self.stalls_unreported.fetch_add(1, Ordering::AcqRel);
+            return None;
+        }
+        self.stall_reported_at.store(now_ns.max(1), Ordering::Release);
+        Some(self.stalls_unreported.swap(0, Ordering::AcqRel))
     }
 
     pub fn tap_enabled(&self) -> bool {
@@ -100,6 +125,18 @@ impl Backoff {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stalls_are_reported_once_per_burst() {
+        let health = InputHealth::default();
+        let second = 1_000_000_000;
+        assert_eq!(health.note_stall(5 * second), Some(0));
+        assert_eq!(health.note_stall(6 * second), None);
+        assert_eq!(health.note_stall(20 * second), None);
+        // The next burst says how many the last one hid.
+        assert_eq!(health.note_stall(36 * second), Some(2));
+        assert_eq!(health.note_stall(37 * second), None);
+    }
 
     #[test]
     fn backoff_grows_then_resets() {

@@ -69,6 +69,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: KeyChord/rbun
+          # Pin the source to the ABI of the prebuilt macOS libraries used by Chord.
+          ref: 4d61e15430e303287aac5d33b26b094627783127
           path: rbun
 
       - name: Setup node
@@ -342,6 +344,8 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: KeyChord/rbun
+          # Pin the source to the ABI of the prebuilt macOS libraries used by Chord.
+          ref: 4d61e15430e303287aac5d33b26b094627783127
           path: rbun
       - uses: actions/setup-node@v6
         with:
