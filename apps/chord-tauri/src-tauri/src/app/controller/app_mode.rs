@@ -93,8 +93,12 @@ impl AppController {
     pub fn set_chord_mode(&self) -> Result<()> {
         self.mode.store(AppMode::Chord, Ordering::SeqCst);
         self.observable.set_state(|_| AppModeState::Chord)?;
-        let chord_mode_manager = self.handle.app_state().chord_mode_manager();
-        chord_mode_manager.ensure_active()?;
+        let state = self.handle.app_state();
+        // Package workers exit while unused; this starts them while the chord is typed.
+        state
+            .chord_package_manager()
+            .start_workers_for_frontmost_app();
+        state.chord_mode_manager().ensure_active()?;
         Ok(())
     }
 }

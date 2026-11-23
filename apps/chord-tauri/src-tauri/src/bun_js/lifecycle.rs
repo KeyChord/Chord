@@ -42,6 +42,15 @@ struct AppLifecycleCallbackEntry {
     callback: Persistent<Function<'static>>,
 }
 
+/// Whether the package in this worker listens for apps launching or quitting.
+#[cfg(target_os = "macos")]
+pub fn has_callbacks() -> bool {
+    APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
+        let callbacks = callbacks.borrow();
+        !callbacks.launch.is_empty() || !callbacks.terminate.is_empty()
+    })
+}
+
 pub fn init_app_lifecycle(handle: AppHandle) {
     // The macOS workspace observers are installed by the desktop-app manager
     // for whichever engine is active.

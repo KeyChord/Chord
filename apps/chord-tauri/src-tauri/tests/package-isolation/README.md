@@ -6,7 +6,13 @@
 Package imports, handler factories, actions, timers, and lifecycle callbacks run in
 one supervised child process per installed package. A package's worker starts when
 it registers its first JS handler, so a package whose chords run no JS has none, and
-it stops once none of its handlers is in use. Workers have separate process
+it stops once none of its handlers is in use. A worker also exits after two minutes
+unused, unless its last reply said the package has work of its own (app lifecycle
+callbacks, a referenced timer, socket or subprocess, or an on-screen window). It
+starts again, restoring its handlers like recovery does, when Chord Mode starts in an
+app whose chords or global chords use it, or when one of its handlers runs. An
+exited package loses its JS state; app lifecycle events don't wake it. The Linux and
+Windows sidecar doesn't report its work, so its workers stay. Workers have separate process
 groups, so a package job-control signal cannot target the GUI's process group. Native add-ons run in that same
 child, whose Cocoa main loop services Swift's MainActor. The GUI does not execute
 package JavaScript or load package native add-ons.

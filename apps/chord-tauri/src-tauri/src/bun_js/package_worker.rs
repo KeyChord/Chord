@@ -71,6 +71,7 @@ impl LoadedPackage {
                     self.config.clone(),
                     self.handle.clone(),
                     ACTION_TIMEOUT,
+                    supervisor::IDLE_EXIT,
                 )
                 .await
                 .map_err(|error| format!("{error:#}"))
@@ -477,6 +478,31 @@ pub fn abort(handler_id: &str) {
     }
 }
 
+/// Starts the workers that run these handlers again if they exited while unused, so the
+/// chord being typed doesn't wait for them. Chord Mode passes the handlers that can run in
+/// the frontmost app.
+pub fn warm(handler_ids: HashSet<String>) {
+    let worker_ids: HashSet<_> = handler_ids
+        .iter()
+        .filter_map(|id| id.split_once(':').map(|(worker, _)| worker.to_string()))
+        .collect();
+    let needed: Vec<_> = workers()
+        .into_iter()
+        .map(|(_, worker)| worker)
+        .filter(|worker| worker_ids.contains(&worker.id))
+        .collect();
+    if needed.is_empty() {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        let mut jobs = tokio::task::JoinSet::new();
+        for worker in needed {
+            jobs.spawn(async move { worker.warm().await });
+        }
+        while jobs.join_next().await.is_some() {}
+    });
+}
+
 pub async fn release_sequences(ids: Vec<String>) {
     // A dead package must not prevent healthy packages from dropping their sequence values.
     let mut jobs = tokio::task::JoinSet::new();
@@ -620,9 +646,13 @@ pub async fn serve(address: String, token: String) -> Result<()> {
     // native add-on callbacks between requests, and sleeps when none is due.
     super::with_package_js(config, host, move |ctx| {
         Box::pin(async move {
-            let _keep_alive = ctx.keep_event_loop_alive()?;
+            let mut keep_alive = Some(ctx.keep_event_loop_alive()?);
             while let Some(request) = incoming.recv().await {
-                let result = super::execute_package_request(ctx.clone(), request).await;
+                let result = if matches!(request, Request::HasOwnWork) {
+                    has_work_of_its_own(&ctx, &mut keep_alive).map(serde_json::Value::Bool)
+                } else {
+                    super::execute_package_request(ctx.clone(), request).await
+                };
                 write_async(
                     &mut control,
                     &Response {
@@ -635,6 +665,29 @@ pub async fn serve(address: String, token: String) -> Result<()> {
         })
     })
     .await
+}
+
+/// Whether the package does anything between requests that exiting this worker while
+/// it is unused would lose: it listens for apps launching or quitting, has a timer,
+/// socket or subprocess that holds Bun's event loop open, or shows a window.
+#[cfg(target_os = "macos")]
+fn has_work_of_its_own<'js>(
+    ctx: &rbun::Ctx<'js>,
+    keep_alive: &mut Option<rbun::EventLoopKeepAlive<'js>>,
+) -> Result<bool> {
+    if super::lifecycle::has_callbacks() {
+        return Ok(true);
+    }
+    // The worker's own timer holds the loop open; without it, is anything else?
+    drop(keep_alive.take());
+    let busy = ctx.is_event_loop_alive();
+    *keep_alive = Some(ctx.keep_event_loop_alive()?);
+    if busy {
+        return Ok(true);
+    }
+    // Unsure counts as busy: a window closed under the person using it is worse than
+    // a worker kept.
+    Ok(crate::native_input::process_has_windows(std::process::id() as i32).unwrap_or(true))
 }
 
 #[cfg(test)]

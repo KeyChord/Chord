@@ -311,6 +311,43 @@ fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
         .collect()
 }
 
+/// The handlers that chords can run in these apps: those of the apps' own chords files,
+/// found as `ChordPackage::matching_app_chords_for_id` finds them, and of every file
+/// with global chords. A file's handlers include those of the files it imports.
+fn handler_ids_for_apps(
+    packages: &OrderMap<String, ChordPackage>,
+    app_ids: &[String],
+) -> HashSet<String> {
+    let app_files: HashSet<PathBuf> = app_ids
+        .iter()
+        .map(|app_id| {
+            PathBuf::from(format!(
+                "chords/{}/{}",
+                app_id.replace('.', "/"),
+                crate::models::CHORDS_FILENAME
+            ))
+        })
+        .collect();
+    let mut handler_ids = HashSet::new();
+    for package in packages.values() {
+        let global_files: HashSet<&PathBuf> = package
+            .global_chords
+            .iter()
+            .map(|reference| &reference.chords_file_pathslug)
+            .collect();
+        for (pathslug, file) in &package.compiled_chords_files {
+            if app_files.contains(pathslug) || global_files.contains(pathslug) {
+                handler_ids.extend(
+                    file.handlers
+                        .iter()
+                        .map(|handler| handler.handler_id.clone()),
+                );
+            }
+        }
+    }
+    handler_ids
+}
+
 /// `assigned` holds the user's placeholder values for this file, by placeholder name.
 fn parse_package_chords_file(
     path: &Path,
@@ -964,6 +1001,20 @@ impl ChordPackageManager {
             .filter(|(_, root)| super::package_module_relative_path(root, path).is_some())
             .max_by_key(|(_, root)| root.as_os_str().len())
             .map(|(name, root)| (name.clone(), root.clone()))
+    }
+
+    /// Starts the package workers that chords in the frontmost app can run in: those of
+    /// its own chords files (the Finder's too while a file picker is open) and of every
+    /// file with global chords. Workers exit while unused, so Chord Mode starts these
+    /// while the chord is typed; any other handler starts its worker when it runs.
+    pub fn start_workers_for_frontmost_app(&self) {
+        let frontmost = self.handle.app_state().frontmost();
+        let mut app_ids: Vec<String> = frontmost.frontmost().ok().flatten().into_iter().collect();
+        if frontmost.file_picker_active() {
+            app_ids.push("com.apple.finder".to_string());
+        }
+        let handler_ids = handler_ids_for_apps(&self.packages.read(), &app_ids);
+        crate::bun_js::package_worker::warm(handler_ids);
     }
 
     async fn load_package(
@@ -1873,5 +1924,86 @@ mod bun_handlers {
             },
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod worker_scope_tests {
+    use super::*;
+
+    fn file(path: &str, handlers: &[&str]) -> (PathBuf, CompiledChordsFile) {
+        let parsed: ParsedChordsFile = "name = 'fixture'\n[chords]\n".parse().unwrap();
+        let path = PathBuf::from(path);
+        let file = CompiledChordsFile {
+            name: parsed.name,
+            pathslug: path.clone(),
+            meta: parsed.meta,
+            handlers: handlers
+                .iter()
+                .map(|id| CompiledChordsFileHandler {
+                    event: "run".into(),
+                    handler_id: (*id).into(),
+                })
+                .collect(),
+            executables: parsed.executables,
+            chords: parsed.chords,
+            chord_hints: parsed.chord_hints,
+            placeholders: parsed.placeholders,
+        };
+        (path, file)
+    }
+
+    #[test]
+    fn chord_mode_starts_the_workers_of_the_frontmost_apps_and_global_chords() {
+        let platform = crate::models::CHORDS_FILENAME;
+        let global_chord: ParsedChordsFile =
+            "name = 'g'\n[chords]\n'/x' = { name = 'X', shell = 'true' }"
+                .parse()
+                .unwrap();
+        let root = format!("chords/{platform}");
+        let package = ChordPackage {
+            name: "fixture".into(),
+            js_package: None,
+            raw_chords_files: HashMap::new(),
+            compiled_chords_files: HashMap::from([
+                file(&root, &["global"]),
+                file(
+                    &format!("chords/com/apple/Safari/{platform}"),
+                    &["safari", "menu-in-safari"],
+                ),
+                file(&format!("chords/com/apple/finder/{platform}"), &["finder"]),
+                // Only reachable through the files that import it.
+                file(
+                    &format!("chords/@keychord/chords-menu/{platform}"),
+                    &["menu"],
+                ),
+            ]),
+            global_chords: global_chord
+                .chords
+                .into_iter()
+                .map(|chord| ChordReference {
+                    package_name: "fixture".into(),
+                    chords_file_pathslug: PathBuf::from(&root),
+                    chord,
+                })
+                .collect(),
+        };
+        let packages = OrderMap::from([("fixture".to_string(), package)]);
+        let ids = |apps: &[&str]| {
+            let apps: Vec<String> = apps.iter().map(|app| app.to_string()).collect();
+            let mut ids: Vec<String> = handler_ids_for_apps(&packages, &apps).into_iter().collect();
+            ids.sort();
+            ids
+        };
+        assert_eq!(
+            ids(&["com.apple.Safari"]),
+            ["global", "menu-in-safari", "safari"]
+        );
+        assert_eq!(
+            ids(&["com.apple.Safari", "com.apple.finder"]),
+            ["finder", "global", "menu-in-safari", "safari"]
+        );
+        assert_eq!(ids(&["dev.elsewhere"]), ["global"]);
+        assert_eq!(ids(&[]), ["global"]);
     }
 }

@@ -438,6 +438,8 @@ async fn execute_package_request(
             // Answering shows the VM's thread is free; the worker's event loop runs
             // on its own (see `package_worker::serve`).
             Request::Ping => {}
+            // The worker loop answers this itself, since it owns the event loop's guard.
+            Request::HasOwnWork => anyhow::bail!("HasOwnWork is answered by the worker loop"),
         }
         Ok::<_, anyhow::Error>(serde_json::Value::Null)
     }

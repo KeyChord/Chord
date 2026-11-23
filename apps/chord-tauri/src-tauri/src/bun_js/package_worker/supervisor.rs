@@ -1,4 +1,8 @@
 //! Stable package/handler identities survive disposable worker processes.
+//!
+//! A worker also exits once its package has gone unused for a while, unless the package
+//! has work of its own between requests. The next request, or Chord Mode starting
+//! (`warm`), starts a new one and restores its handlers, as after a crash.
 
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -6,6 +10,11 @@ use tokio::sync::{Mutex as AsyncMutex, Notify, Semaphore};
 use tokio::time::Instant;
 
 const HEALTHY_WINDOW: Duration = Duration::from_secs(60);
+
+/// How long a worker may go unused before it exits. Each is a whole Bun process, about
+/// 13 MB. A pause between chords keeps it; starting it again takes 0.2–0.6 s, which
+/// Chord Mode hides by starting it while the chord is typed.
+pub(super) const IDLE_EXIT: Duration = Duration::from_secs(120);
 
 struct Registration {
     request: Request,
@@ -20,6 +29,9 @@ struct State {
     failed_worker: Option<String>,
     failures: u32,
     restart_at: Instant,
+    /// The worker exited because it went unused, not because it failed: it starts again
+    /// on the next request, without backoff, and the failure restarter leaves it.
+    retired: bool,
 }
 
 impl State {
@@ -58,6 +70,10 @@ pub(super) struct PackageSupervisor {
     stop_notice: Notify,
     /// Told by a worker that failed or was stopped, and when the package is unloaded.
     worker_ended: Arc<Notify>,
+    idle_exit: Duration,
+    last_used: Mutex<Instant>,
+    /// Told when the package is used, so the idle exit counts from then, and on unload.
+    used: Arc<Notify>,
 }
 
 impl PackageSupervisor {
@@ -67,6 +83,7 @@ impl PackageSupervisor {
         config: WorkerConfig,
         handle: Option<AppHandle>,
         action_timeout: Duration,
+        idle_exit: Duration,
     ) -> Result<Arc<Self>> {
         let worker_ended = Arc::new(Notify::new());
         let worker = PackageWorker::spawn(
@@ -94,11 +111,15 @@ impl PackageSupervisor {
                 failed_worker: None,
                 failures: 0,
                 restart_at: Instant::now(),
+                retired: false,
             }),
             slots: Semaphore::new(QUEUE_CAPACITY),
             stopped: AtomicBool::new(false),
             stop_notice: Notify::new(),
             worker_ended: worker_ended.clone(),
+            idle_exit,
+            last_used: Mutex::new(Instant::now()),
+            used: Arc::new(Notify::new()),
         });
         let weak = Arc::downgrade(&supervisor);
         tokio::spawn(async move {
@@ -114,13 +135,94 @@ impl PackageSupervisor {
                         return;
                     }
                     let mut state = supervisor.state.lock().await;
-                    if supervisor.ensure_ready(&mut state).await.is_ok() {
+                    if state.retired || supervisor.ensure_ready(&mut state).await.is_ok() {
                         break;
                     }
                 }
             }
         });
+        let weak = Arc::downgrade(&supervisor);
+        let used = supervisor.used.clone();
+        tokio::spawn(async move {
+            // Waits on a timer to the idle deadline, which each use moves, and on the next
+            // use while the worker is gone or busy with work of its own. Nothing polls it.
+            loop {
+                let due = {
+                    let Some(supervisor) = weak.upgrade() else {
+                        return;
+                    };
+                    if supervisor.stopped.load(Ordering::Acquire) {
+                        return;
+                    }
+                    *supervisor.last_used.lock() + supervisor.idle_exit
+                };
+                tokio::select! {
+                    _ = tokio::time::sleep_until(due) => {}
+                    _ = used.notified() => continue,
+                }
+                let Some(supervisor) = weak.upgrade() else {
+                    return;
+                };
+                let next = supervisor.retire_if_unused().await;
+                drop(supervisor);
+                if next == IdleCheck::WaitForUse {
+                    used.notified().await;
+                }
+            }
+        });
         Ok(supervisor)
+    }
+
+    /// Notes a use of the package, from which the idle exit counts again.
+    fn touch(&self) {
+        *self.last_used.lock() = Instant::now();
+        self.used.notify_one();
+    }
+
+    /// Stops the worker if the package has gone unused for `idle_exit` and has no work
+    /// of its own.
+    async fn retire_if_unused(&self) -> IdleCheck {
+        // A request holds the state for as long as it runs, and touches when it ends.
+        let Ok(mut state) = self.state.try_lock() else {
+            return IdleCheck::WaitForUse;
+        };
+        if self.stopped.load(Ordering::Acquire)
+            || state.retired
+            || state.worker.failure.lock().is_some()
+        {
+            // Gone already, or failed and left to the restarter, which touches.
+            return IdleCheck::WaitForUse;
+        }
+        if self.last_used.lock().elapsed() < self.idle_exit {
+            return IdleCheck::Recheck;
+        }
+        // Asked of the worker itself, not through `request`, which would count as a use.
+        let own_work = state.worker.request(Request::HasOwnWork).await;
+        if !matches!(own_work, Ok(serde_json::Value::Bool(false))) {
+            // It has, or can't say. The next use moves the deadline and asks again.
+            return IdleCheck::WaitForUse;
+        }
+        log::info!(
+            "package {} worker exited after {} s unused; it starts again when needed",
+            self.name,
+            self.idle_exit.as_secs()
+        );
+        state.retired = true;
+        state.worker.stop();
+        IdleCheck::WaitForUse
+    }
+
+    /// Starts the worker again if it exited while unused, and counts this as a use.
+    pub(super) async fn warm(&self) {
+        {
+            let mut state = self.state.lock().await;
+            if state.retired
+                && let Err(error) = self.ensure_ready(&mut state).await
+            {
+                log::warn!("package {} worker did not start: {error:#}", self.name);
+            }
+        }
+        self.touch();
     }
 
     async fn ensure_ready(&self, state: &mut State) -> Result<()> {
@@ -132,8 +234,12 @@ impl PackageSupervisor {
         if state.worker.failure.lock().is_none() {
             return Ok(());
         }
-        state.observe_failure();
-        if Instant::now() < state.restart_at {
+        // A worker that exited while unused starts again at once.
+        let retired = std::mem::take(&mut state.retired);
+        if !retired {
+            state.observe_failure();
+        }
+        if !retired && Instant::now() < state.restart_at {
             tokio::select! {
                 _ = tokio::time::sleep_until(state.restart_at) => {},
                 _ = self.stop_notice.notified() => {},
@@ -186,10 +292,17 @@ impl PackageSupervisor {
                 state.worker = worker;
                 state.started = Instant::now();
                 state.failed_worker = None;
-                log::info!("package {} worker restarted; handlers restored", self.name);
+                if retired {
+                    log::info!("package {} worker started again", self.name);
+                } else {
+                    log::info!("package {} worker restarted; handlers restored", self.name);
+                }
+                // The idle exit counts from the new worker, also when no request started it.
+                self.touch();
                 Ok(())
             }
             Err(error) => {
+                // From here on it is a failure, which the restarter retries with backoff.
                 self.active.lock().stop();
                 state.postpone_restart();
                 log::warn!(
@@ -204,7 +317,7 @@ impl PackageSupervisor {
         }
     }
 
-    pub(super) async fn request(&self, mut request: Request) -> Result<serde_json::Value> {
+    pub(super) async fn request(&self, request: Request) -> Result<serde_json::Value> {
         let _slot = self
             .slots
             .try_acquire()
@@ -233,7 +346,21 @@ impl PackageSupervisor {
             // are already reflected in the next background restoration.
             return Ok(serde_json::Value::Null);
         }
-        self.ensure_ready(&mut state).await?;
+        if matches!(request, Request::Lifecycle { .. }) && state.retired {
+            // Only a package without lifecycle callbacks is let go while unused.
+            return Ok(serde_json::Value::Null);
+        }
+        let result = self.request_ready(&mut state, request).await;
+        self.touch();
+        result
+    }
+
+    async fn request_ready(
+        &self,
+        state: &mut State,
+        mut request: Request,
+    ) -> Result<serde_json::Value> {
+        self.ensure_ready(state).await?;
         let registration = matches!(request, Request::Register { .. }).then(|| request.clone());
         match &mut request {
             Request::Invoke { action, .. } => {
@@ -291,8 +418,17 @@ impl PackageSupervisor {
         self.stopped.store(true, Ordering::Release);
         self.stop_notice.notify_waiters();
         self.worker_ended.notify_one();
+        self.used.notify_one();
         self.abort();
     }
+}
+
+#[derive(PartialEq)]
+enum IdleCheck {
+    /// The deadline moved; wait for the new one.
+    Recheck,
+    /// Nothing to do until the package is used again.
+    WaitForUse,
 }
 
 impl Drop for PackageSupervisor {
@@ -318,6 +454,20 @@ mod tests {
         }
 
         async fn supervisor(&self) -> Arc<PackageSupervisor> {
+            self.spawn_supervisor(Duration::from_millis(500), IDLE_EXIT)
+                .await
+        }
+
+        async fn supervisor_exiting_after(&self, idle_exit: Duration) -> Arc<PackageSupervisor> {
+            self.spawn_supervisor(Duration::from_secs(10), idle_exit)
+                .await
+        }
+
+        async fn spawn_supervisor(
+            &self,
+            action_timeout: Duration,
+            idle_exit: Duration,
+        ) -> Arc<PackageSupervisor> {
             let executable = PathBuf::from(
                 std::env::var_os("CHORD_PACKAGE_TEST_HOST")
                     .expect("set CHORD_PACKAGE_TEST_HOST to the freshly built chord executable"),
@@ -330,10 +480,35 @@ mod tests {
                     cwd: self.0.clone(),
                 },
                 None,
-                Duration::from_millis(500),
+                action_timeout,
+                idle_exit,
             )
             .await
             .unwrap()
+        }
+
+        /// Registers the default export of a module with this source.
+        async fn register_source(
+            &self,
+            supervisor: &PackageSupervisor,
+            name: &str,
+            source: &str,
+        ) -> String {
+            let module = self.0.join("js").join(format!("{name}.js"));
+            std::fs::write(&module, source).unwrap();
+            supervisor
+                .request(Request::Register {
+                    module: module.to_string_lossy().into_owned(),
+                    raw: serde_json::json!({"name":"fixture"}),
+                    pathslug: "fixture.toml".into(),
+                    app_id: None,
+                    args: vec![],
+                })
+                .await
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string()
         }
 
         async fn register(&self, supervisor: &PackageSupervisor, label: &str) -> String {
@@ -532,5 +707,128 @@ export default function(label) {{
         queued.unwrap();
         assert_eq!(fixture.actions(), ["first:hang", "first:queued"]);
         supervisor.stop();
+    }
+
+    fn pid(supervisor: &PackageSupervisor) -> u32 {
+        supervisor.active.lock().process.child.lock().id()
+    }
+
+    fn has_exited(supervisor: &PackageSupervisor) -> bool {
+        supervisor
+            .active
+            .lock()
+            .process
+            .child
+            .lock()
+            .try_wait()
+            .unwrap()
+            .is_some()
+    }
+
+    /// Waits for the worker to exit on its own, or fails after `limit`.
+    async fn exited_within(supervisor: &PackageSupervisor, limit: Duration) -> bool {
+        tokio::time::timeout(limit, async {
+            while !has_exited(supervisor) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .is_ok()
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn an_unused_worker_exits_and_starts_again_with_its_handlers() {
+        let fixture = Fixture::new();
+        let supervisor = fixture
+            .supervisor_exiting_after(Duration::from_millis(300))
+            .await;
+        let first = fixture.register(&supervisor, "first").await;
+        let second = fixture.register(&supervisor, "second").await;
+        supervisor.request(invoke(&first, "used")).await.unwrap();
+        let original = pid(&supervisor);
+        assert!(
+            exited_within(&supervisor, Duration::from_secs(5)).await,
+            "an unused worker kept running"
+        );
+        assert!(supervisor.state.lock().await.retired);
+        // Exiting while unused is not a failure: no backoff, and the restarter left it.
+        assert_eq!(supervisor.state.lock().await.failures, 0);
+        assert!(supervisor.is_running());
+
+        // The next action starts a new worker with both factories, in order, and runs once.
+        supervisor.request(invoke(&second, "order")).await.unwrap();
+        assert_ne!(pid(&supervisor), original);
+        assert!(!supervisor.state.lock().await.retired);
+        supervisor.request(invoke(&first, "again")).await.unwrap();
+        assert_eq!(
+            fixture.actions(),
+            ["first:used", "second:order", "first:again"]
+        );
+        // Each use moves the deadline, and the new worker exits again once unused.
+        assert!(exited_within(&supervisor, Duration::from_secs(5)).await);
+        supervisor.stop();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn a_worker_with_work_of_its_own_stays_and_others_wake_only_when_used() {
+        let idle = Duration::from_millis(300);
+        let mut cases = Vec::new();
+        for (name, source, stays) in [
+            (
+                "lifecycle",
+                r#"import { onAppLaunch } from "chord"; export default () => { onAppLaunch("dev.fixture", () => {}); return () => {}; };"#,
+                true,
+            ),
+            (
+                "interval",
+                "export default () => { setInterval(() => {}, 50); return () => {}; };",
+                true,
+            ),
+            (
+                "unref-interval",
+                "export default () => { setInterval(() => {}, 50).unref(); return () => {}; };",
+                false,
+            ),
+            ("quiet", "export default () => () => {};", false),
+        ] {
+            let fixture = Fixture::new();
+            let supervisor = fixture.supervisor_exiting_after(idle).await;
+            fixture.register_source(&supervisor, name, source).await;
+            cases.push((name, fixture, supervisor, stays));
+        }
+        tokio::time::sleep(idle * 6).await;
+        for (name, _, supervisor, stays) in &cases {
+            assert_eq!(!has_exited(supervisor), *stays, "{name}");
+        }
+        for (name, _, supervisor, stays) in &cases {
+            if *stays {
+                continue;
+            }
+            // An app launching doesn't wake a worker without lifecycle callbacks.
+            supervisor
+                .request(Request::Lifecycle {
+                    app: crate::app::desktop_app::ObservedApp {
+                        pid: 123,
+                        bundle_id: "dev.fixture".into(),
+                    },
+                    launch: true,
+                })
+                .await
+                .unwrap();
+            supervisor
+                .request(Request::ReleaseSequences(vec![]))
+                .await
+                .unwrap();
+            assert!(has_exited(supervisor), "{name} was woken");
+            // Chord Mode does.
+            supervisor.warm().await;
+            assert!(!has_exited(supervisor), "{name} was not started again");
+            supervisor.request(Request::Ping).await.unwrap();
+        }
+        for (_, _, supervisor, _) in &cases {
+            supervisor.stop();
+        }
     }
 }

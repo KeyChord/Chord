@@ -335,6 +335,12 @@ pub fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {
     crate::desktop_platform::windows(pids)
 }
 
+/// Whether the process has a window on screen, at any window level.
+#[cfg(target_os = "macos")]
+pub fn process_has_windows(pid: i32) -> Result<bool> {
+    macos::process_has_windows(pid)
+}
+
 /// Send one or two button down/up pairs to one window, off the UI/JS thread.
 pub fn click(options: &ClickOptions) -> Result<()> {
     options.validate()?;
@@ -389,6 +395,23 @@ mod macos {
         dictionary_value(dict, key)?
             .downcast_ref::<CFNumber>()?
             .as_i64()
+    }
+
+    pub(super) fn process_has_windows(pid: i32) -> Result<bool> {
+        autoreleasepool(|_| {
+            let list =
+                CGWindowListCopyWindowInfo(CGWindowListOption::OptionOnScreenOnly, kCGNullWindowID)
+                    .context("could not enumerate on-screen windows")?;
+            Ok((0..list.count()).any(|index| {
+                // SAFETY: CGWindowListCopyWindowInfo returns an immutable array of CF dictionaries.
+                let entry = unsafe { &*list.value_at_index(index).cast::<CFType>() };
+                entry.downcast_ref::<CFDictionary>().is_some_and(|dict| {
+                    // SAFETY: Core Graphics' exported immutable CFString constant.
+                    let owner = unsafe { number(dict, kCGWindowOwnerPID) };
+                    owner == Some(i64::from(pid))
+                })
+            }))
+        })
     }
 
     fn windows() -> Result<Vec<NativeWindow>> {
