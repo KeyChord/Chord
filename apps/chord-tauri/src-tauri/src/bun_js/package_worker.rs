@@ -8,7 +8,9 @@ use parking_lot::Mutex;
 use std::collections::{HashMap, HashSet};
 use std::net::{Shutdown, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+#[cfg(target_os = "macos")]
+use std::process::Command;
+use std::process::{Child, Stdio};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
@@ -96,11 +98,16 @@ impl PackageWorker {
     ) -> Result<Arc<Self>> {
         let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0)).await?;
         let token = uuid::Uuid::new_v4().to_string();
-        let mut command = Command::new(executable);
+        let address = listener.local_addr()?.to_string();
+        #[cfg(target_os = "macos")]
+        let mut command = {
+            let mut command = Command::new(executable);
+            command.args(["__package-worker", &address, &token]);
+            command
+        };
+        #[cfg(not(target_os = "macos"))]
+        let mut command = super::worker_command(executable, &address, &token)?;
         command
-            .arg("__package-worker")
-            .arg(listener.local_addr()?.to_string())
-            .arg(&token)
             .stdin(Stdio::null())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
@@ -163,12 +170,7 @@ impl PackageWorker {
                     .as_ref()
                     .context("Chord host APIs are unavailable")
                     .and_then(|handle| {
-                        super::chord_module::handle_host_request(
-                            handle,
-                            request,
-                            &mut pressed,
-                            &mut mouse,
-                        )
+                        super::host::handle_host_request(handle, request, &mut pressed, &mut mouse)
                     });
                 let response = Response {
                     result: result.map_err(|error| format!("{error:#}")),
@@ -181,7 +183,7 @@ impl PackageWorker {
             mouse.release();
             if let Some(handle) = handle {
                 for key in pressed {
-                    let _ = super::chord_module::handle_host_request(
+                    let _ = super::host::handle_host_request(
                         &handle,
                         HostRequest::Release(key),
                         &mut HashSet::new(),
@@ -438,7 +440,10 @@ pub async fn dispatch_lifecycle(app: crate::app::desktop_app::ObservedApp, launc
 
 /// Whether this package has a worker that hasn't been stopped, so its registered handlers run.
 pub fn is_running(name: &str) -> bool {
-    workers().lock().get(name).is_some_and(|worker| worker.is_running())
+    workers()
+        .lock()
+        .get(name)
+        .is_some_and(|worker| worker.is_running())
 }
 
 pub fn shutdown_all() {
@@ -447,8 +452,10 @@ pub fn shutdown_all() {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub struct HostClient(Mutex<TcpStream>);
 
+#[cfg(target_os = "macos")]
 impl HostClient {
     pub fn call(&self, request: HostRequest) -> Result<serde_json::Value> {
         let mut stream = self.0.lock();
@@ -459,6 +466,7 @@ impl HostClient {
 }
 
 /// Entry point of the hidden CLI worker. The binary pumps the Cocoa main loop for Swift UI.
+#[cfg(target_os = "macos")]
 pub async fn serve(address: String, token: String) -> Result<()> {
     let mut control = tokio::net::TcpStream::connect(&address).await?;
     control.set_nodelay(true)?;
@@ -890,7 +898,10 @@ export default () => {{
             .expect("the package's timer never ran")
             .parse()
             .unwrap();
-        assert!(count >= 5, "the package's timer ran {count} times in 600 ms");
+        assert!(
+            count >= 5,
+            "the package's timer ran {count} times in 600 ms"
+        );
         quiet.stop();
         timers.stop();
     }
@@ -937,7 +948,10 @@ export default () => {{
         tokio::time::sleep(Duration::from_millis(300)).await;
         let started = std::time::Instant::now();
         let error = worker.request(invoke(&id, "any")).await.unwrap_err();
-        assert!(error.to_string().contains("timed out after 15 seconds"), "{error:#}");
+        assert!(
+            error.to_string().contains("timed out after 15 seconds"),
+            "{error:#}"
+        );
         assert!(started.elapsed() < SETUP_TIMEOUT + Duration::from_secs(5));
         assert!(worker.request(Request::Ping).await.is_err());
         worker.stop();
@@ -959,9 +973,15 @@ export default function() { return () => {}; }
         // A reload imports the same module again.
         for attempt in 1..=2 {
             let error = register(&worker, missing.clone()).await.unwrap_err();
-            assert!(error.to_string().contains("has no addon for"), "attempt {attempt}: {error:#}");
+            assert!(
+                error.to_string().contains("has no addon for"),
+                "attempt {attempt}: {error:#}"
+            );
         }
-        let healthy = fixture.module("healthy-after", "export default function() { return () => {}; }");
+        let healthy = fixture.module(
+            "healthy-after",
+            "export default function() { return () => {}; }",
+        );
         register(&worker, healthy).await.unwrap();
     }
 

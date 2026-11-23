@@ -2,29 +2,39 @@
 
 use crate::app::desktop_app::ObservedApp;
 use crate::bun_js::package_worker;
+#[cfg(target_os = "macos")]
 use anyhow::Result;
+#[cfg(target_os = "macos")]
 use rbun::Persistent;
+#[cfg(target_os = "macos")]
 use rbun::prelude::*;
+#[cfg(target_os = "macos")]
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(target_os = "macos")]
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::AppHandle;
 use tokio::sync::Semaphore;
 
+#[cfg(target_os = "macos")]
 static NEXT_CALLBACK_ID: AtomicU64 = AtomicU64::new(1);
 static LIFECYCLE_DISPATCH_SLOTS: Semaphore = Semaphore::const_new(64);
 static LIFECYCLE_DROPPED_WARNING_EMITTED: AtomicBool = AtomicBool::new(false);
 
+#[cfg(target_os = "macos")]
 thread_local! {
     static APP_LIFECYCLE_CALLBACKS: RefCell<AppLifecycleCallbacks> =
         RefCell::new(AppLifecycleCallbacks::default());
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Default)]
 struct AppLifecycleCallbacks {
     launch: Vec<AppLifecycleCallbackEntry>,
     terminate: Vec<AppLifecycleCallbackEntry>,
 }
 
+#[cfg(target_os = "macos")]
 #[derive(Clone)]
 struct AppLifecycleCallbackEntry {
     id: u64,
@@ -38,6 +48,7 @@ pub fn init_app_lifecycle(handle: AppHandle) {
     crate::app::desktop_app::init_app_lifecycle(handle);
 }
 
+#[cfg(target_os = "macos")]
 pub fn register_app_launch_handler<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
@@ -59,6 +70,7 @@ pub fn register_app_launch_handler<'js>(
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 pub fn register_app_terminate_handler<'js>(
     ctx: Ctx<'js>,
     bundle_id: String,
@@ -84,6 +96,7 @@ pub fn register_app_terminate_handler<'js>(
     .with_name("off")
 }
 
+#[cfg(target_os = "macos")]
 fn unregister_app_terminate_handler(id: u64) {
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
         let mut callbacks = callbacks.borrow_mut();
@@ -91,6 +104,7 @@ fn unregister_app_terminate_handler(id: u64) {
     });
 }
 
+#[cfg(target_os = "macos")]
 #[allow(dead_code)]
 pub fn clear_callbacks() {
     APP_LIFECYCLE_CALLBACKS.with(|callbacks| {
@@ -125,6 +139,7 @@ fn warn_lifecycle_event_dropped() {
     }
 }
 
+#[cfg(target_os = "macos")]
 pub async fn invoke_launch_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Result<()> {
     let callbacks = APP_LIFECYCLE_CALLBACKS.with(|callbacks| callbacks.borrow().launch.clone());
 
@@ -145,6 +160,7 @@ pub async fn invoke_launch_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Re
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 pub async fn invoke_terminate_callbacks<'js>(ctx: Ctx<'js>, app: ObservedApp) -> Result<()> {
     let callbacks = APP_LIFECYCLE_CALLBACKS.with(|callbacks| callbacks.borrow().terminate.clone());
 

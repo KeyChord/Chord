@@ -3,8 +3,10 @@ use crate::app::desktop_app::AppIdentity;
 use crate::app::state::AppSingleton;
 use crate::state::{FrontmostObservable, FrontmostState, Observable};
 use anyhow::Result;
+#[cfg(target_os = "macos")]
 use frontmost::{Detector, start_nsrunloop};
 use nject::injectable;
+#[cfg(target_os = "macos")]
 use objc2_app_kit::NSWorkspace;
 use observable_property::ObservableProperty;
 use parking_lot::Mutex;
@@ -58,6 +60,7 @@ pub struct AppFrontmost {
 }
 
 impl AppFrontmost {
+    #[cfg(target_os = "macos")]
     pub(super) fn init(&self) -> Result<()> {
         let workspace = NSWorkspace::sharedWorkspace();
         if let Some(application) = workspace.frontmostApplication() {
@@ -76,6 +79,42 @@ impl AppFrontmost {
         super::file_picker::init(self.handle.clone())?;
 
         Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub(super) fn init(&self) -> Result<()> {
+        let handle = self.handle.clone();
+        thread::Builder::new()
+            .name("chord-frontmost".into())
+            .spawn(move || {
+                let mut previous = None;
+                loop {
+                    let active = crate::desktop_platform::foreground_app();
+                    if let Some(app) = active.as_ref().filter(|app| app.pid != std::process::id()) {
+                        if previous.as_ref() != Some(app) {
+                            let identity = AppIdentity::from_process(app);
+                            if let Err(error) =
+                                handle.app_state().frontmost().set_frontmost(identity)
+                            {
+                                log::warn!("Could not publish focused app: {error:#}");
+                            }
+                            previous = active;
+                        }
+                    }
+                    thread::sleep(std::time::Duration::from_millis(80));
+                }
+            })?;
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn capture_current(&self) {
+        if let Some(app) = crate::desktop_platform::foreground_app()
+            && app.pid != std::process::id()
+            && let Err(error) = self.set_frontmost(AppIdentity::from_process(&app))
+        {
+            log::warn!("Could not resolve the foreground app: {error:#}");
+        }
     }
 
     pub fn frontmost(&self) -> Result<Option<String>> {

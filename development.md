@@ -151,6 +151,15 @@ invoke the same `_*.ts` files with Bun, so CI does not require a global Vite+ in
 Start the desktop app with `vpx _dev`, after building rbun's Bun once as shown in
 [Building from source](#building-from-source).
 
+On Linux and Windows, install the native [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). Check out `KeyChord/rbun` beside this repository so Cargo can resolve the macOS dependency. Stage the installed Bun executable before starting Tauri:
+
+```sh
+bun apps/chord-tauri/_stage-bun.ts
+vpx _dev
+```
+
+The Linux desktop backend needs an X11 session and keyboard device access. Follow the [Linux setup instructions](readme.md#linux-and-windows). Windows uses the Microsoft Rust target and WebView2.
+
 On macOS, the development runner builds with Tauri and uses Cargo's runner hook
 to launch a signed, immutable `.app` snapshot through Launch Services. The executable
 and embedded Bun dylib are copied out of the build directories; the copy's Bun
@@ -650,8 +659,7 @@ in under `packages/dev/improve/chord/configs/release/macos/@assets/dmg`; change 
 `dmg-background.swift` and running `vpx _gen-dmg-background`.
 
 Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
-which builds the app for Apple Silicon and Intel and creates a new GitHub release for that version.
-Both architectures must succeed and all assets must upload before the draft is published.
+which builds the app for Apple Silicon, Intel Macs, Linux x86-64, and Windows x86-64. All builds must succeed and upload assets before the draft is published. Windows uses an NSIS installer. Linux ships an AppImage for self-updates and a Debian package for system package management.
 Production releases are tagged `v<version>` and titled `Chord <version>`; beta prereleases are
 tagged `v<version>-beta` and titled `Chord <version> Beta`. Each gets its own publication date and
 retains its downloads. Production is marked as the repository's latest release, so

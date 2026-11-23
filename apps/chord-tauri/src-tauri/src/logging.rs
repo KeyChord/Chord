@@ -272,6 +272,7 @@ mod tests {
     /// stderr as broken file descriptors. Writing a log line then had to stay
     /// non-fatal, because a panic here reached the panic hook, which logs again
     /// and aborted the process (SIGABRT) on the resulting double panic.
+    #[cfg(unix)]
     #[test]
     fn stdout_target_survives_a_closed_stdout() {
         // Replace fd 1 with a closed pipe so every write fails with EPIPE.

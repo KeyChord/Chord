@@ -1,3 +1,4 @@
+import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
@@ -63,8 +64,8 @@ function CommandLineCardContent({
         </div>
         <div className="preference-note">
           <p>
-            Installs <code>/usr/local/bin/{cliCommand}</code>. macOS may ask for your administrator
-            password.
+            {desktopPlatform === "macos" ? <>Installs <code>/usr/local/bin/{cliCommand}</code>. macOS may ask for your administrator
+            password.</> : desktopPlatform === "linux" ? <>Installs <code>~/.local/bin/{cliCommand}</code>.</> : <>Installs <code>{cliCommand}.cmd</code> in your WindowsApps folder.</>}
           </p>
           {isCliInstalled && (
             <p role="status" className="mt-1">

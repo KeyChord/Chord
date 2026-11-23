@@ -16,6 +16,7 @@ import {
 } from "@chord/dev.improve.chord.components.ui.popover";
 import {
   StateQueries,
+  desktopPlatform,
   usePermissionsState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
@@ -76,14 +77,15 @@ function LaunchOnLoginCardContent({
           />
           <SettingSwitchRow
             id="menu-bar-show-icon"
-            label="Show menu bar icon"
-            description="Access settings and reload chords from the menu bar."
+            label={desktopPlatform === "macos" ? "Show menu bar icon" : "Show tray icon"}
+            description="Access settings and reload chords from the Chord icon."
             checked={settings.showMenuBarIcon}
             disabled={toggleMenuBarIconMutation.isPending}
             onCheckedChange={() => {
               toggleMenuBarIconMutation.mutate();
             }}
           />
+          {desktopPlatform === "macos" && (
           <SettingSwitchRow
             id="show-dock-icon"
             label="Show Dock icon"
@@ -94,6 +96,7 @@ function LaunchOnLoginCardContent({
               toggleDockIconMutation.mutate();
             }}
           />
+          )}
           <SettingSwitchRow
             id="hide-hint-panel-by-default"
             label="Hide Hint Panel by default"

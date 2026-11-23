@@ -71,6 +71,12 @@ pub enum HostRequest {
         needs_relaunch: bool,
     },
     /// Chord resolves app IDs, including those of bare executables that chords files claim.
+    #[cfg(not(target_os = "macos"))]
+    AppWindows {
+        app_id: String,
+    },
+    #[cfg(not(target_os = "macos"))]
+    ScreenBounds,
     AppProcessIds {
         app_id: String,
     },

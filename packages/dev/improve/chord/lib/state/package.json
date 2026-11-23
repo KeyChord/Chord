@@ -3,6 +3,7 @@
 	"type": "module",
 	"private": true,
 	"imports": {
+		"#desktop-platform": "./desktop-platform.ts",
 		"#state": "./state.ts",
 		"#state-query": "./state-query.ts",
 		"#state-queries": "./state-queries.tsx"

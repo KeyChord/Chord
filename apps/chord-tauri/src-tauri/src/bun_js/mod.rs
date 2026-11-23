@@ -18,6 +18,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::{mpsc, oneshot};
 
 mod chord_module;
+mod host;
 pub mod lifecycle;
 pub(crate) mod package_worker;
 pub(crate) mod protocol;

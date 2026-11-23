@@ -16,12 +16,17 @@ pub async fn add_app_chord(
     if !is_bundle_id {
         return Err(AppError::Message(format!("{bundle_id} is not a bundle ID")));
     }
+    #[cfg(target_os = "macos")]
+    let command = format!("open -b {bundle_id}");
+    #[cfg(not(target_os = "macos"))]
+    let command =
+        crate::desktop_platform::launch_command(&bundle_id).map_err(AppError::detailed)?;
     let handle = api.handle()?;
     let chord_pm = handle.app_state().chord_package_manager();
     chord_pm
         .registry
         .personal
-        .add_global_chord(&sequence, &name, &format!("open -b {bundle_id}"))
+        .add_global_chord(&sequence, &name, &command)
         .map_err(AppError::detailed)?;
     chord_pm.reload_all().await?;
     Ok(())

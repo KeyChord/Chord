@@ -1,3 +1,4 @@
+#![cfg(target_os = "macos")]
 //! The apps someone could open with their first chord, those in their Dock first.
 use crate::api::InstalledApp;
 use base64::Engine;

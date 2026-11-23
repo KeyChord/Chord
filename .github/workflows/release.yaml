@@ -312,10 +312,104 @@ jobs:
           path: ${{ steps.stage.outputs.dir }}/*
           if-no-files-found: error
 
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+            bundle-dir: appimage
+            extension: AppImage
+            asset: Chord-linux-x86_64.AppImage
+          - runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            bundle-dir: nsis
+            extension: exe
+            asset: Chord-windows-x86_64-setup.exe
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: Chord
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          path: Chord
+      # Cargo reads the sibling manifest even when rbun is excluded from this target.
+      - uses: actions/checkout@v6
+        with:
+          repository: KeyChord/rbun
+          path: rbun
+      - uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+      - name: Resolve Bun pin
+        id: tools
+        run: |
+          bun_version="$(sed -n 's/^bun[[:space:]]*=[[:space:]]*"\(.*\)"$//p' .prototools)"
+          test -n "$bun_version"
+          echo "bun=$bun_version" >> "$GITHUB_OUTPUT"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ steps.tools.outputs.bun }}
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev xdg-utils patchelf
+      - name: Setup Rust
+        run: rustup target add ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: Chord/apps/chord-tauri/src-tauri -> target
+          key: ${{ matrix.target }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Stage Bun sidecar
+        run: bun apps/chord-tauri/_stage-bun.ts ${{ matrix.target }}
+      - name: Check desktop backend
+        working-directory: Chord/apps/chord-tauri/src-tauri
+        run: |
+          cargo test --locked --lib --target ${{ matrix.target }} bun_js::protocol::tests
+          cargo test --locked --lib --target ${{ matrix.target }} caps_lock_guard::tests
+      - name: Build desktop installers
+        working-directory: Chord/apps/chord-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          args=()
+          if [ "$RELEASE_CHANNEL" = beta ]; then
+            args+=(--config src-tauri/tauri.beta.conf.json)
+          fi
+          bun tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} "${args[@]}"
+      - name: Stage desktop assets
+        run: |
+          set -euo pipefail
+          bundle="apps/chord-tauri/src-tauri/target/${{ matrix.target }}/release/bundle"
+          mkdir -p "$RUNNER_TEMP/desktop-assets"
+          destination="$RUNNER_TEMP/desktop-assets/${{ matrix.asset }}"
+          installers=("$bundle"/${{ matrix.bundle-dir }}/*.${{ matrix.extension }})
+          test "${#installers[@]}" = 1
+          cp "${installers[0]}" "$destination"
+          cp "${installers[0]}.sig" "$destination.sig"
+          if [ "${{ runner.os }}" = Linux ]; then
+            cp "$bundle"/deb/*.deb "$RUNNER_TEMP/desktop-assets/Chord-linux-x86_64.deb"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chord-${{ matrix.target }}
+          path: ${{ runner.temp }}/desktop-assets/*
+          if-no-files-found: error
+
   publish:
     # Manual runs from other branches only produce build artifacts.
     if: ${{ github.ref_name == 'beta' || github.ref_name == 'prod' }}
-    needs: build
+    needs: [build, build-desktop]
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -359,7 +453,7 @@ jobs:
             endpoint="https://github.com/KeyChord/Chord/releases/download/beta/latest.json"
             flags=(--prerelease --latest=false)
           fi
-          download="Download the \`.dmg\` for your Mac: \`aarch64\` for Apple Silicon, \`x86_64\` for Intel."
+          download="macOS: choose the DMG for Apple Silicon (aarch64) or Intel (x86_64). Linux x86_64: choose the AppImage or Debian package and follow the X11 input setup in the README. Windows x86_64: choose the setup.exe installer."
           notes="Automatic $channel build from \`$RELEASE_CHANNEL\` @ ${short}. $download $gatekeeper"
 
           # What installed copies of Chord read to update themselves. The updater only installs a
@@ -404,6 +498,9 @@ jobs:
             rm "assets/Chord-$arch.app.tar.gz.sig"
             url[$arch]="$base/$name"
           done
+          for installer in Chord-linux-x86_64.AppImage Chord-windows-x86_64-setup.exe; do
+            test -s "assets/$installer" && test -s "assets/$installer.sig"
+          done
           jq -n \
             --arg version "$version" \
             --arg notes "Chord $version from \`$RELEASE_CHANNEL\` @ ${short}." \
@@ -412,10 +509,17 @@ jobs:
             --arg arm_url "${url[aarch64]}" \
             --arg intel "${signature[x86_64]}" \
             --arg intel_url "${url[x86_64]}" \
+            --rawfile linux assets/Chord-linux-x86_64.AppImage.sig \
+            --arg linux_url "$base/Chord-linux-x86_64.AppImage" \
+            --rawfile windows assets/Chord-windows-x86_64-setup.exe.sig \
+            --arg windows_url "$base/Chord-windows-x86_64-setup.exe" \
             '{version: $version, notes: $notes, pub_date: $date, platforms: {
               "darwin-aarch64": {signature: $arm, url: $arm_url},
-              "darwin-x86_64": {signature: $intel, url: $intel_url}
+              "darwin-x86_64": {signature: $intel, url: $intel_url},
+              "linux-x86_64": {signature: ($linux | rtrimstr("\n") | rtrimstr("\r")), url: $linux_url},
+              "windows-x86_64": {signature: ($windows | rtrimstr("\n") | rtrimstr("\r")), url: $windows_url}
             }}' > manifest/latest.json
+          rm assets/Chord-linux-x86_64.AppImage.sig assets/Chord-windows-x86_64-setup.exe.sig
           jq '{version, pub_date, platforms: (.platforms | keys)}' manifest/latest.json
 
           if [ -z "$existing" ]; then

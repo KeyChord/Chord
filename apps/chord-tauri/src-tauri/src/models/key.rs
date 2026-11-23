@@ -938,6 +938,7 @@ impl FromStr for Key {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl TryFrom<Key> for mac_keycode::Key {
     type Error = anyhow::Error;
 
@@ -1065,6 +1066,7 @@ impl TryFrom<Key> for mac_keycode::Key {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl TryFrom<mac_keycode::Key> for Key {
     type Error = anyhow::Error;
 
@@ -1205,6 +1207,7 @@ impl TryFrom<mac_keycode::Key> for Key {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl TryFrom<Key> for rdev::Key {
     type Error = anyhow::Error;
 
@@ -1345,6 +1348,7 @@ impl TryFrom<Key> for rdev::Key {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl TryFrom<rdev::Key> for Key {
     type Error = anyhow::Error;
 
@@ -1484,6 +1488,7 @@ impl TryFrom<rdev::Key> for Key {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl From<device_query::Keycode> for Key {
     fn from(key: device_query::Keycode) -> Self {
         use device_query::Keycode as K;

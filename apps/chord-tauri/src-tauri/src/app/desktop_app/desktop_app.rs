@@ -1,11 +1,15 @@
 use anyhow::Result;
+#[cfg(target_os = "macos")]
 use base64::Engine;
+#[cfg(target_os = "macos")]
 use objc2::__framework_prelude::AnyObject;
 #[allow(unused_imports)]
+#[cfg(target_os = "macos")]
 use objc2_app_kit::{
     NSBitmapImageFileType, NSBitmapImageRep, NSRunningApplication, NSWorkspace,
     NSWorkspaceLaunchOptions,
 };
+#[cfg(target_os = "macos")]
 use objc2_foundation::{NSDictionary, NSSize, NSString};
 #[allow(unused_imports)]
 use std::time::{Duration, Instant};
@@ -39,6 +43,19 @@ impl DesktopApp {
         })
     }
 
+    #[cfg(not(target_os = "macos"))]
+    pub fn resolve_display_name(&self) -> Option<String> {
+        crate::desktop_platform::installed_apps()
+            .into_iter()
+            .find(|app| app.bundle_id == self.bundle_id)
+            .map(|app| app.name)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn resolve_icon_data_url(&self) -> Option<String> {
+        None
+    }
+
     #[allow(dead_code)]
     pub fn get_metadata(&self) -> Result<DesktopAppMetadata> {
         Ok(DesktopAppMetadata {
@@ -49,6 +66,7 @@ impl DesktopApp {
     }
 
     #[allow(dead_code)]
+    #[cfg(target_os = "macos")]
     pub fn resolve_display_name(&self) -> Option<String> {
         let bundle_id = NSString::from_str(&self.bundle_id);
         let running_apps =
@@ -73,6 +91,7 @@ impl DesktopApp {
     }
 
     #[allow(dead_code)]
+    #[cfg(target_os = "macos")]
     pub fn resolve_path(&self) -> Option<String> {
         let bundle_id = NSString::from_str(&self.bundle_id);
         let workspace = NSWorkspace::sharedWorkspace();
@@ -82,6 +101,7 @@ impl DesktopApp {
     }
 
     #[allow(dead_code)]
+    #[cfg(target_os = "macos")]
     pub fn resolve_icon_data_url(&self) -> Option<String> {
         let app_path = self.resolve_path()?;
         let workspace = NSWorkspace::sharedWorkspace();

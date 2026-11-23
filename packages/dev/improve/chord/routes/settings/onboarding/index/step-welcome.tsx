@@ -1,3 +1,4 @@
+import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
 import { Button } from '@chord/dev.improve.chord.components.ui.button';
 import { ArrowRight } from 'lucide-react';
 import { Key } from '#keyboard-map';
@@ -7,7 +8,7 @@ export function WelcomeStep({ onContinue, onSkip }: { onContinue: () => void; on
 	return (
 		<StepLayout
 			title="Welcome to Chord"
-			description="Type a couple of letters to open an app or press a shortcut, from anywhere on your Mac."
+			description="Type a couple of letters to open an app or press a shortcut, from anywhere on your desktop."
 			actions={(
 				<Button type="button" size="lg" onClick={onContinue}>
 					Get Started
@@ -30,13 +31,13 @@ export function WelcomeStep({ onContinue, onSkip }: { onContinue: () => void; on
 						Let go of caps lock but <Click>keep holding space</Click>.
 					</Instruction>
 					<Instruction number={3} state="current">
-						Type <Key>/</Key> <Key>s</Key>
+						Type {desktopPlatform === 'macos' ? <><Key>/</Key> <Key>s</Key></> : <><Key>0</Key> <Key>,</Key></>}
 					</Instruction>
 					<Instruction number={4} state="current">
 						Let go of <Key>space</Key>.
 					</Instruction>
 				</ol>
-				<p className="mt-2 text-muted-foreground">Safari opens. That's it.</p>
+				<p className="mt-2 text-muted-foreground">{desktopPlatform === 'macos' ? 'Safari opens.' : 'Chord Settings opens.'}</p>
 			</div>
 			<p className="text-[13.5px] leading-[21px] text-muted-foreground">
 				Setup takes about two minutes. We'll tell you what to click at every step, and by the end

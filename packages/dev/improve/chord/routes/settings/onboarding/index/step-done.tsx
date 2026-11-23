@@ -1,3 +1,4 @@
+import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
 import { useMutation } from '@chord/com.npmjs.tanstack__react-query';
 import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
 import { Button } from '@chord/dev.improve.chord.components.ui.button';
@@ -51,13 +52,13 @@ export function DoneStep({
 					Press <Key>caps lock</Key> and <Key>space</Key> together, keep holding space, and look at the list on your screen. It shows the chords for whichever app you're using.
 				</Tip>
 				<Tip title="Open Chord's settings">
-					Use the chord <Key>0</Key> <Key>,</Key> or click the Chord icon at the top of your screen, in the menu bar.
+					Use the chord <Key>0</Key> <Key>,</Key> or click the Chord icon in {desktopPlatform === 'macos' ? 'the menu bar' : 'your system tray'}.
 				</Tip>
 			</div>
 			<label className="flex items-center justify-between gap-4 rounded-[12px] border border-black/[0.08] px-4 py-3 dark:border-white/10">
 				<span>
 					<span className="block text-[13.5px] font-medium leading-[20px] text-foreground">Start Chord when you log in</span>
-					<span className="block text-[12.5px] leading-[18px] text-muted-foreground">So your chords are always ready. macOS may show a notice that Chord runs in the background. That's expected.</span>
+					<span className="block text-[12.5px] leading-[18px] text-muted-foreground">So your chords are always ready. {desktopPlatform === 'macos' ? "macOS may show a notice that Chord runs in the background." : ""}</span>
 				</span>
 				<Switch aria-label="Start Chord when you log in" checked={startAtLogin} onCheckedChange={setStartAtLogin} />
 			</label>

@@ -36,7 +36,7 @@ fn core_bindings(store: &PackageStore) -> Result<(PathBuf, String)> {
         std::fs::write(manifest, manifest_contents)?;
     }
     let mut linked = false;
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, unix))]
     {
         let source = Path::new(env!("CHORD_CORE_SOURCE"));
         if source.is_file() {

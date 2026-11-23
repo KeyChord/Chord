@@ -213,3 +213,21 @@ mod tests {
         assert!(error.to_string().contains("timed out"));
     }
 }
+
+/// Execute the platform's standard command language, with the source passed intact.
+pub(crate) fn shell_command(source: &str) -> tokio::process::Command {
+    #[cfg(windows)]
+    {
+        let mut command = tokio::process::Command::new("cmd.exe");
+        command.args(["/d", "/s", "/c"]);
+        command.raw_arg(format!("\"{source}\""));
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        command
+    }
+    #[cfg(not(windows))]
+    {
+        let mut command = tokio::process::Command::new("sh");
+        command.arg("-c").arg(source);
+        command
+    }
+}

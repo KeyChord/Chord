@@ -29,7 +29,7 @@ import { Search, ShieldAlert, X } from "lucide-react";
 import { useMemo } from "react";
 
 export const PACKAGE_CODE_WARNING =
-  "Chord scripts and native add-ons can run arbitrary code with your macOS permissions. Only approve packages from people you trust or after auditing their code.";
+  "Chord scripts and native add-ons can run arbitrary code with your account permissions. Only approve packages from people you trust or after auditing their code.";
 
 const approvalFeatures = tableFeatures({
   rowSelectionFeature,

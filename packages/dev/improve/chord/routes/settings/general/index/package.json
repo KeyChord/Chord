@@ -10,6 +10,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
+		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",

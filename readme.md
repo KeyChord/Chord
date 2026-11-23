@@ -6,16 +6,38 @@
 
 ## Installation
 
-1. Download `Chord-aarch64.dmg` (Apple silicon) or `Chord-x86_64.dmg` (Intel) from the [latest release](https://github.com/KeyChord/Chord/releases/latest). Both are signed and notarized.
-2. Open the DMG, drag **Chord** into `Applications`, and open it.
+### macOS
 
-Chord then starts a short guided setup: it asks for the permission it needs, helps you make your first chord, and has you practice using it. The rest of this readme is reference for what you learn there. To see the guide again, open **Settings → General → Getting Started**.
+Download `Chord-aarch64.dmg` for Apple silicon or `Chord-x86_64.dmg` for Intel from the [latest release](https://github.com/KeyChord/Chord/releases/latest). Open the signed disk image, drag **Chord** into **Applications**, and launch it.
+
+### Linux and Windows
+
+Download the installer from the [latest release](https://github.com/KeyChord/Chord/releases/latest).
+
+- On Windows 10 or 11 (x64), run `Chord-windows-x86_64-setup.exe` and launch Chord from the Start menu. Chord sends keys to apps running at the same privilege level. Elevated windows and the secure desktop are outside that session.
+- On Linux (x86-64), install `Chord-linux-x86_64.deb` with your package manager or make `Chord-linux-x86_64.AppImage` executable and run it. Choose an **X11** desktop session at your login screen.
+
+For Linux keyboard capture, Chord needs read access to the physical keyboard's `/dev/input/event*` device and write access to `/dev/uinput`. On Debian and Ubuntu, a local administrator can configure those permissions as follows:
+
+```sh
+sudo modprobe uinput
+echo uinput | sudo tee /etc/modules-load.d/chord.conf
+sudo groupadd -f input
+sudo usermod -aG input "$USER"
+echo 'KERNEL=="uinput", GROUP="input", MODE="0660", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/70-chord-uinput.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=misc --sysname-match=uinput
+```
+
+Sign out and back in after changing group membership. Membership in `input` lets processes under your account read input devices. Run Chord as your normal user.
+
+Chord opens guided setup on first launch. Open **Settings → General → Getting Started** to revisit it.
 
 # Setup
 
 ## Permissions
 
-Chord requires macOS _Accessibility Permissions_ (called _Device Control and Data Access_ on macOS 27) so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
+On macOS, Chord requires _Accessibility Permissions_ (called _Device Control and Data Access_ on macOS 27) so it can detect when you press <kbd>⇪</kbd> (Caps Lock) + <kbd>␣</kbd> (Space) to activate _Chord Mode_.
 
 ## Chord Mode
 
@@ -51,6 +73,8 @@ For example, instead of pressing <kbd>⇪</kbd>, you can also type <kbd>0</kbd><
 # Configuration
 
 ## Chord Files
+
+Use `chords/macos.toml`, `chords/linux.toml`, or `chords/windows.toml` for global chords. An app-specific file goes in `chords/<app ID with dots replaced by slashes>/<platform>.toml`. Linux and Windows packages can declare `executables = ["program-name"]` in app files to associate those bindings with a focused application. Use the full executable filename on Windows, such as `Code.exe`. Linux also checks X11 `WM_CLASS`. A shared TOML file can be imported by platform files.
 
 All chords are defined in configuration files called _chord files._
 

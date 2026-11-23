@@ -8,7 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
-import {
+import { desktopPlatform,
   useAppUpdateState,
   useGitRepoStoreState,
   useSettingsState,
@@ -263,7 +263,7 @@ export function SettingsPage() {
       <SettingsShell>
         <Outlet />
       </SettingsShell>
-      {!permissionDialogDismissed ? (
+      {desktopPlatform === "macos" && !permissionDialogDismissed ? (
         <PermissionsDialog
           onDismiss={() => {
             setPermissionDialogDismissed(true);

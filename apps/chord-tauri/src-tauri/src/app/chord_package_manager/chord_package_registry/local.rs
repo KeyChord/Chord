@@ -436,12 +436,3 @@ pub(super) fn read_package(root: &Path) -> anyhow::Result<RawChordPackage> {
         bin_files_contents,
     })
 }
-
-#[allow(dead_code)]
-fn is_supported_macos_chord_filename(path: &Path) -> bool {
-    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
-        return false;
-    };
-
-    file_name == "macos.toml" || file_name.ends_with(".macos.toml")
-}

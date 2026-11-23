@@ -66,6 +66,7 @@
 		"vite-plus": "^1.2.0"
 	},
 	"bin": {
+		"_stage-bun": "./_stage-bun.ts",
 		"_build": "./_build.ts",
 		"_vite-dev": "./_vite-dev.ts",
 		"_preview": "./_preview.ts",

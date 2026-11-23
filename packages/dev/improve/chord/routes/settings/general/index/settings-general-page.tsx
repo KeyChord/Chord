@@ -1,3 +1,4 @@
+import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
 import { GettingStartedCard } from "#getting-started-card";
 import { ActivationTriggerCard } from "@chord/dev.improve.chord.routes.settings._components.activation-trigger-card";
 import { LaunchOnLoginCard } from "@chord/dev.improve.chord.routes.settings._components.launch-on-login-card";
@@ -10,7 +11,12 @@ export function SettingsGeneralPage() {
       <GettingStartedCard />
       <ActivationTriggerCard />
       <LaunchOnLoginCard />
-      <PermissionsCard />
+      {desktopPlatform === "macos" && <PermissionsCard />}
+      {desktopPlatform === "linux" && (
+        <a className="text-sm underline" href="https://github.com/KeyChord/Chord#linux-and-windows" target="_blank" rel="noreferrer">
+          Linux keyboard setup
+        </a>
+      )}
       <QuitChordCard />
     </div>
   );

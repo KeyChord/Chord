@@ -24,8 +24,10 @@ impl PackageStore {
     }
 
     pub fn is_official_root(&self, path: &Path) -> bool {
-        self.contains(path) && path.strip_prefix(self.root.join("@keychord"))
-            .is_ok_and(|relative| relative.components().next().is_some())
+        self.contains(path)
+            && path
+                .strip_prefix(self.root.join("@keychord"))
+                .is_ok_and(|relative| relative.components().next().is_some())
     }
 
     /// Only the official repository loader calls this. A manifest claiming an official
@@ -34,7 +36,11 @@ impl PackageStore {
     pub(super) fn mount_official(&self, source: &Path) -> Result<PathBuf> {
         let source = fs::canonicalize(source)?;
         let name = source.file_name().context("Package has no folder name")?;
-        let link = self.root.join("@keychord/.managed").join(source_id(&source)).join(name);
+        let link = self
+            .root
+            .join("@keychord/.managed")
+            .join(source_id(&source))
+            .join(name);
         ensure_link(&source, &link)?;
         Ok(link)
     }
@@ -122,14 +128,9 @@ fn source_id(source: &Path) -> String {
 /// or silently redirect a link whose source identity conflicts with the requested source.
 pub(super) fn ensure_link(source: &Path, link: &Path) -> Result<()> {
     match fs::symlink_metadata(link) {
-        Ok(metadata) => {
+        Ok(_) => {
             ensure!(
-                metadata.file_type().is_symlink(),
-                "{} is not a symlink",
-                link.display()
-            );
-            ensure!(
-                fs::read_link(link)? == source,
+                linked_target(link)? == source,
                 "Conflicting package link at {}",
                 link.display()
             );
@@ -143,7 +144,7 @@ pub(super) fn ensure_link(source: &Path, link: &Path) -> Result<()> {
     let result = std::os::unix::fs::symlink(source, link);
     #[cfg(windows)]
     let result = if source.is_dir() {
-        std::os::windows::fs::symlink_dir(source, link)
+        junction::create(source, link)
     } else {
         std::os::windows::fs::symlink_file(source, link)
     };
@@ -152,7 +153,7 @@ pub(super) fn ensure_link(source: &Path, link: &Path) -> Result<()> {
         // Another reload may have mounted the same source while this one was preparing it.
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
             ensure!(
-                fs::read_link(link)? == source,
+                linked_target(link)? == source,
                 "Conflicting package link at {}",
                 link.display()
             );
@@ -162,10 +163,20 @@ pub(super) fn ensure_link(source: &Path, link: &Path) -> Result<()> {
     }
 }
 
+fn linked_target(link: &Path) -> Result<PathBuf> {
+    #[cfg(windows)]
+    if junction::exists(link)? {
+        return Ok(fs::canonicalize(junction::get_target(link)?)?);
+    }
+    Ok(fs::read_link(link)?)
+}
+
 /// Keep an existing destination intact. Cross-volume migrations stage a complete copy before
 /// publishing it; a failed copy leaves the original checkout and its stored path untouched.
 pub(super) fn migrate_directory(source: &Path, destination: &Path) -> Result<()> {
-    if fs::symlink_metadata(source)?.file_type().is_symlink() {
+    if fs::symlink_metadata(source)?.file_type().is_symlink()
+        || cfg!(windows) && linked_target(source).is_ok()
+    {
         // A relative root link must keep pointing to the same checkout after changing parent.
         let target = fs::canonicalize(source)?;
         ensure_link(&target, destination)?;
@@ -198,7 +209,9 @@ pub(super) fn migrate_directory(source: &Path, destination: &Path) -> Result<()>
     }
     let temporary = parent.join(format!(".migrate-{}", uuid::Uuid::new_v4()));
     let result = (|| {
-        if fs::symlink_metadata(source)?.file_type().is_symlink() {
+        if fs::symlink_metadata(source)?.file_type().is_symlink()
+            || cfg!(windows) && linked_target(source).is_ok()
+        {
             ensure_link(&fs::read_link(source)?, &temporary)?;
         } else {
             copy_directory(source, &temporary)?;

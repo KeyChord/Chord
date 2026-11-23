@@ -8,10 +8,9 @@ use crate::app::chord_package_manager::{
 use crate::app::placeholder_chord_store::FilePlaceholderAssignments;
 use crate::app::state::AppSingleton;
 use crate::models::{
-    Chord, ChordAction, ChordEventTrigger, ChordInput, ChordInputEvent, ChordsFileImportOverride,
-    CompiledChordsFile,
-    CompiledChordsFileHandler, FilePathslug, ParsedChordsFile, RawChordPackage, RawChordsFile,
-    CORE_CHORD_PACKAGE, is_core_chords_file,
+    CORE_CHORD_PACKAGE, Chord, ChordAction, ChordEventTrigger, ChordInput, ChordInputEvent,
+    ChordsFileImportOverride, CompiledChordsFile, CompiledChordsFileHandler, FilePathslug,
+    ParsedChordsFile, RawChordPackage, RawChordsFile, is_core_chords_file,
 };
 use crate::state::{
     ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable, Observable,
@@ -108,13 +107,25 @@ mod keep_loaded_package_tests {
         assert!(keep(link, Some(link), &pinned, true));
         assert!(!keep(link, Some(link), &pinned, false), "stopped worker");
         let other = Path::new("/u/.chord/packages/@keychord/.managed/4c5b6a/chords-menu");
-        assert!(!keep(link, Some(other), &pinned, true), "another revision's link");
+        assert!(
+            !keep(link, Some(other), &pinned, true),
+            "another revision's link"
+        );
         assert!(!keep(link, None, &pinned, true), "not loaded before");
         let checkout = Path::new("/u/code/chords/@keychord/chords-menu");
-        assert!(!keep(link, Some(link), checkout, true), "linked to a checkout");
+        assert!(
+            !keep(link, Some(link), checkout, true),
+            "linked to a checkout"
+        );
         let personal = Path::new("/u/.chord/packages/default");
-        assert!(!keep(personal, Some(personal), personal, true), "editable package");
-        assert!(!can_keep_loaded_package(link, Some(link), None, Some(sources), true), "source missing");
+        assert!(
+            !keep(personal, Some(personal), personal, true),
+            "editable package"
+        );
+        assert!(
+            !can_keep_loaded_package(link, Some(link), None, Some(sources), true),
+            "source missing"
+        );
     }
 }
 
@@ -140,7 +151,10 @@ fn resolve_handler_args(
 /// Takes out the actions that emit to a handler that failed to load, and the chords left with
 /// none, so one handler that can't load (such as a native add-on built for another architecture)
 /// doesn't take the rest of its file with it. Returns how many chords were dropped.
-fn without_failed_handlers(chords: Vec<Chord>, failed_events: &HashSet<String>) -> (Vec<Chord>, usize) {
+fn without_failed_handlers(
+    chords: Vec<Chord>,
+    failed_events: &HashSet<String>,
+) -> (Vec<Chord>, usize) {
     if failed_events.is_empty() {
         return (chords, 0);
     }
@@ -182,12 +196,18 @@ file = "tray.js"
         .unwrap();
         let failed = HashSet::from(["menu".to_string()]);
         let (chords, dropped) = without_failed_handlers(file.chords.clone(), &failed);
-        let mut names = chords.iter().map(|chord| chord.name.as_str()).collect::<Vec<_>>();
+        let mut names = chords
+            .iter()
+            .map(|chord| chord.name.as_str())
+            .collect::<Vec<_>>();
         names.sort();
         assert_eq!(names, ["Control Center", "Either", "Volume Up"]);
         assert_eq!(dropped, 1);
         let either = chords.iter().find(|chord| chord.name == "Either").unwrap();
-        assert!(matches!(either.actions.as_slice(), [ChordAction::Shortcut(_)]));
+        assert!(matches!(
+            either.actions.as_slice(),
+            [ChordAction::Shortcut(_)]
+        ));
 
         let (all, dropped) = without_failed_handlers(file.chords.clone(), &HashSet::new());
         assert_eq!((all.len(), dropped), (file.chords.len(), 0));
@@ -236,6 +256,14 @@ file = "base.toml"
     }
 }
 
+fn executable_key(executable: &str) -> std::borrow::Cow<'_, str> {
+    if cfg!(windows) {
+        executable.to_ascii_lowercase().into()
+    } else {
+        executable.into()
+    }
+}
+
 /// Claims follow package priority; a later package cannot take over an executable.
 fn executable_app_ids<'a>(
     packages: impl IntoIterator<Item = &'a ChordPackage>,
@@ -257,14 +285,15 @@ fn executable_app_ids<'a>(
                 continue;
             };
             for executable in &file.executables {
-                match app_ids.get(executable) {
+                let executable = executable_key(executable);
+                match app_ids.get(executable.as_ref()) {
                     Some(existing) if existing != &app_id => log::warn!(
                         "executable {executable:?} is claimed by {existing} and {app_id} ({}); using {existing}",
                         package.name
                     ),
                     Some(_) => {}
                     None => {
-                        app_ids.insert(executable.clone(), app_id.clone());
+                        app_ids.insert(executable.into_owned(), app_id.clone());
                     }
                 }
             }
@@ -534,14 +563,20 @@ impl ChordPackageManager {
         let package = super::chord_package_registry::core::load_core_package(
             &self.registry.local.package_store()?,
         )?;
-        let (hints, halt_template) = super::chord_package_registry::core::meta_configuration(&package)?;
-        self.packages.write().insert(package.name.clone(), package.clone());
+        let (hints, halt_template) =
+            super::chord_package_registry::core::meta_configuration(&package)?;
+        self.packages
+            .write()
+            .insert(package.name.clone(), package.clone());
         self.update_executable_app_ids();
         self.observable.set_state(|_| ChordPackageManagerState {
             packages: vec![package],
             ..Default::default()
         })?;
-        self.handle.app_state().chord_mode_manager().configure_meta_commands(hints, halt_template)
+        self.handle
+            .app_state()
+            .chord_mode_manager()
+            .configure_meta_commands(hints, halt_template)
     }
 
     pub async fn set_monorepo_packages(&self, source: &str, names: Vec<String>) -> Result<()> {
@@ -700,7 +735,12 @@ impl ChordPackageManager {
         );
         if order != saved_order {
             // Remember where newly seen packages went, so a later install lands above them.
-            if let Err(error) = self.handle.app_state().chord_package_store().set_order(order) {
+            if let Err(error) = self
+                .handle
+                .app_state()
+                .chord_package_store()
+                .set_order(order)
+            {
                 log::warn!("Failed to save the package order: {error:#}");
             }
         }
@@ -751,14 +791,19 @@ impl ChordPackageManager {
                     && can_keep_loaded_package(
                         &raw_chord_package.root,
                         previous_roots.get(&package_name).map(PathBuf::as_path),
-                        std::fs::canonicalize(&raw_chord_package.root).ok().as_deref(),
+                        std::fs::canonicalize(&raw_chord_package.root)
+                            .ok()
+                            .as_deref(),
                         pinned_sources.as_deref(),
                         crate::bun_js::package_worker::is_running(&package_name),
                     )
             });
             if let Some(package) = kept {
                 log::debug!("keeping package {package_name}: same pinned revision, worker running");
-                let errors = previous_errors.get(&package_name).cloned().unwrap_or_default();
+                let errors = previous_errors
+                    .get(&package_name)
+                    .cloned()
+                    .unwrap_or_default();
                 next_placeholder_settings.insert(package_name.clone(), placeholder_settings);
                 package_errors.insert(package_name, errors);
                 chord_packages.insert(package.name.clone(), package.clone());
@@ -799,7 +844,9 @@ impl ChordPackageManager {
             .cloned()
             .collect::<Vec<_>>();
         ensure_selected_packages_loaded(&required, &package_errors)?;
-        let core = chord_packages.get(CORE_CHORD_PACKAGE).context("Chord's core package must remain loaded")?;
+        let core = chord_packages
+            .get(CORE_CHORD_PACKAGE)
+            .context("Chord's core package must remain loaded")?;
         let (hints, halt_template) = super::chord_package_registry::core::meta_configuration(core)?;
 
         let next_handler_ids = handler_ids(&chord_packages);
@@ -809,7 +856,10 @@ impl ChordPackageManager {
         *self.package_roots.write() = next_roots;
         *self.loaded_placeholder_settings.lock() = next_placeholder_settings;
         self.update_executable_app_ids();
-        self.handle.app_state().chord_mode_manager().configure_meta_commands(hints, halt_template)?;
+        self.handle
+            .app_state()
+            .chord_mode_manager()
+            .configure_meta_commands(hints, halt_template)?;
         package_errors.retain(|_, errors| !errors.is_empty());
         let observable_result = self.observable.set_state(|_| ChordPackageManagerState {
             packages: observable_packages,
@@ -884,7 +934,10 @@ impl ChordPackageManager {
 
     /// The app ID a loaded chords file claims for a bare executable with this file name.
     pub fn app_id_for_executable(&self, executable_name: &str) -> Option<String> {
-        self.executable_app_ids.read().get(executable_name).cloned()
+        self.executable_app_ids
+            .read()
+            .get(executable_key(executable_name).as_ref())
+            .cloned()
     }
 
     /// Rebuilds the executable claims, then re-resolves the frontmost app, which may be a bare
@@ -934,6 +987,11 @@ impl ChordPackageManager {
         let no_assigned_placeholders = HashMap::new();
 
         for (path, contents) in raw_chord_package.chords_files_contents {
+            if !is_core_chords_file(&name, &path)
+                && crate::models::is_other_platform_chords_file(&path)
+            {
+                continue;
+            }
             let Ok(raw) = toml::from_str::<RawChordsFile>(&contents)
                 .with_context(|| format!("Failed to parse {}", path.display()))
                 .inspect_err(|error| {
@@ -945,8 +1003,9 @@ impl ChordPackageManager {
             };
             raw_chords_files.insert(path.clone(), raw);
             let parsed = if is_core_chords_file(&name, &path) {
-                ParsedChordsFile::parse_core(&contents)
-                    .with_context(|| format!("Failed to parse protected core file {}", path.display()))
+                ParsedChordsFile::parse_core(&contents).with_context(|| {
+                    format!("Failed to parse protected core file {}", path.display())
+                })
             } else {
                 let assigned = placeholder_settings
                     .assigned
@@ -976,6 +1035,12 @@ impl ChordPackageManager {
 
         // Compile sequentially inside this package's bounded worker queue.
         for (pathslug, parsed_chord_file) in &parsed_chords_files {
+            if !cfg!(target_os = "macos")
+                && !crate::models::is_platform_chords_file(pathslug)
+                && !is_core_chords_file(&name, pathslug)
+            {
+                continue;
+            }
             let mut handler_errors = Vec::new();
             let compile_result = Self::compile_chords_file(
                 self.handle.clone(),
@@ -1289,8 +1354,18 @@ fn rank_packages(
         .get(CORE_CHORD_PACKAGE)
         .into_iter()
         .chain(personal.iter().filter(|name| names.contains(*name)))
-        .chain(order.iter().filter(loaded).filter(|name| !builtins.contains(*name)))
-        .chain(order.iter().filter(loaded).filter(|name| builtins.contains(*name)))
+        .chain(
+            order
+                .iter()
+                .filter(loaded)
+                .filter(|name| !builtins.contains(*name)),
+        )
+        .chain(
+            order
+                .iter()
+                .filter(loaded)
+                .filter(|name| builtins.contains(*name)),
+        )
         .cloned()
         .collect();
     (ranked, order)
@@ -1306,7 +1381,10 @@ fn merge_package_order(saved: &[String], order: Vec<String>) -> Vec<String> {
         if given.contains(name) {
             previous = Some(name.clone());
         } else {
-            following.entry(previous.clone()).or_default().push(name.clone());
+            following
+                .entry(previous.clone())
+                .or_default()
+                .push(name.clone());
         }
     }
     let mut merged = following.remove(&None).unwrap_or_default();
@@ -1466,7 +1544,12 @@ mod package_rank_tests {
         saved: &[&str],
         builtins: &[&str],
     ) -> (Vec<String>, Vec<String>) {
-        let owned = |names: &[&str]| names.iter().map(|name| name.to_string()).collect::<Vec<_>>();
+        let owned = |names: &[&str]| {
+            names
+                .iter()
+                .map(|name| name.to_string())
+                .collect::<Vec<_>>()
+        };
         rank_packages(
             owned(names),
             &owned(personal),
@@ -1478,7 +1561,14 @@ mod package_rank_tests {
     #[test]
     fn installed_packages_override_built_ins_and_follow_the_saved_order() {
         let (ranked, order) = rank(
-            &["finder", "raycast", CORE_CHORD_PACKAGE, "mine", "warp", "spotlight"],
+            &[
+                "finder",
+                "raycast",
+                CORE_CHORD_PACKAGE,
+                "mine",
+                "warp",
+                "spotlight",
+            ],
             &["mine"],
             &["spotlight", "warp", "finder", "raycast"],
             &["finder", "spotlight"],
@@ -1486,7 +1576,14 @@ mod package_rank_tests {
         // A built-in ranked above an installed package by the user still comes after it.
         assert_eq!(
             ranked,
-            [CORE_CHORD_PACKAGE, "mine", "warp", "raycast", "spotlight", "finder"]
+            [
+                CORE_CHORD_PACKAGE,
+                "mine",
+                "warp",
+                "raycast",
+                "spotlight",
+                "finder"
+            ]
         );
         assert_eq!(order, ["spotlight", "warp", "finder", "raycast"]);
     }
@@ -1501,7 +1598,10 @@ mod package_rank_tests {
         );
         assert_eq!(ranked, ["raycast", "rift", "warp", "finder", "spotlight"]);
         // A package that isn't loaded right now keeps its place for when it returns.
-        assert_eq!(order, ["raycast", "rift", "warp", "finder", "gone", "spotlight"]);
+        assert_eq!(
+            order,
+            ["raycast", "rift", "warp", "finder", "gone", "spotlight"]
+        );
 
         let (ranked, again) = rank(
             &["warp", "raycast", "rift", "finder", "spotlight"],
@@ -1522,15 +1622,22 @@ mod package_rank_tests {
             &[],
         );
         assert_eq!(ranked, [CORE_CHORD_PACKAGE, "mine", "warp"]);
-        assert_eq!(order, ["warp", "mine", CORE_CHORD_PACKAGE], "duplicates are dropped");
+        assert_eq!(
+            order,
+            ["warp", "mine", CORE_CHORD_PACKAGE],
+            "duplicates are dropped"
+        );
     }
 
     #[test]
     fn reordering_loaded_packages_keeps_offline_ones_beside_their_neighbors() {
-        let saved = ["offline-first", "warp", "offline-a", "raycast", "offline-b"]
-            .map(String::from);
+        let saved =
+            ["offline-first", "warp", "offline-a", "raycast", "offline-b"].map(String::from);
         let merged = merge_package_order(&saved, vec!["raycast".into(), "warp".into()]);
-        assert_eq!(merged, ["offline-first", "raycast", "offline-b", "warp", "offline-a"]);
+        assert_eq!(
+            merged,
+            ["offline-first", "raycast", "offline-b", "warp", "offline-a"]
+        );
     }
 }
 
@@ -1677,7 +1784,10 @@ mod file_picker_tests {
     }
 
     fn names(matches: &[(ChordPackage, ChordReference)]) -> Vec<&str> {
-        matches.iter().map(|(_, reference)| reference.chord.name.as_str()).collect()
+        matches
+            .iter()
+            .map(|(_, reference)| reference.chord.name.as_str())
+            .collect()
     }
 
     #[test]
@@ -1699,7 +1809,10 @@ mod file_picker_tests {
         let order = [&host, &raycast, &spotlight, &finder];
 
         let matches = collect_matching_chord_contexts(order, &event("/f", "dev.fixture"), false);
-        assert_eq!(names(&matches), ["Finder", "Host launcher", "Raycast", "Spotlight"]);
+        assert_eq!(
+            names(&matches),
+            ["Finder", "Host launcher", "Raycast", "Spotlight"]
+        );
 
         // Fallbacks keep scope and package order: the app's own launcher, then the higher rank.
         let matches = collect_matching_chord_contexts(order, &event("/calc", "dev.fixture"), false);

@@ -2,11 +2,9 @@
 
 use crate::app::AppHandleExt;
 use crate::app::chord_package_manager::resolve_logical_package_path;
-use crate::app::global_hotkey_store::GlobalHotkeyStoreEntry;
 use crate::bun_js::AppUserData;
 use crate::bun_js::lifecycle::{register_app_launch_handler, register_app_terminate_handler};
 use crate::bun_js::protocol::HostRequest;
-use crate::constants::GLOBAL_HOTKEYS_POOL;
 use crate::models::{ShortcutChordAction, SimulatedShortcut, native_module_relpath};
 #[cfg(target_os = "macos")]
 use osakit::{Language as OsaLanguage, Script as OsaScript};
@@ -192,119 +190,6 @@ fn host_call(ctx: &Ctx<'_>, request: HostRequest) -> rbun::Result<serde_json::Va
     remote
         .call(request)
         .or_throw_msg(ctx, "Chord host request failed")
-}
-
-/// The parent's narrow state/input bridge; no package function or native module executes here.
-pub(crate) fn handle_host_request(
-    handle: &tauri::AppHandle,
-    request: HostRequest,
-    pressed: &mut HashSet<String>,
-    mouse: &mut crate::native_input::MouseSession,
-) -> anyhow::Result<serde_json::Value> {
-    use serde_json::Value as Json;
-    // Workers can now call these APIs concurrently; allocation and storage must stay atomic.
-    static HOST_REQUEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
-    let _host_guard = HOST_REQUEST_LOCK.lock();
-    let input = match &request {
-        HostRequest::Press(key) => Some((key, true, false)),
-        HostRequest::Release(key) => Some((key, false, true)),
-        HostRequest::Tap(key) => Some((key, true, true)),
-        _ => None,
-    };
-    if let Some((key, down, up)) = input {
-        let shortcut = key.parse::<SimulatedShortcut>()?;
-        let state = handle.app_state();
-        let runner = state.chord_action_task_runner();
-        let action = ShortcutChordAction {
-            simulated_shortcut: shortcut,
-        };
-        if down {
-            pressed.insert(key.clone());
-            runner.shortcut.simulate_shortcut_actions(
-                runner
-                    .shortcut
-                    .get_start_simulated_shortcut_actions(&action, 1),
-            )?;
-        }
-        if up {
-            runner.shortcut.simulate_shortcut_actions(
-                runner.shortcut.get_end_simulated_shortcut_actions(&action),
-            )?;
-            pressed.remove(key);
-        }
-        return Ok(Json::Null);
-    }
-    match request {
-        HostRequest::Mouse(options) => {
-            mouse.apply(&options)?;
-            Ok(Json::Null)
-        }
-        HostRequest::Press(key) | HostRequest::Tap(key) | HostRequest::Release(key) => {
-            anyhow::bail!("unhandled input operation: {key}")
-        }
-        HostRequest::GetGlobalHotkey {
-            bundle_id,
-            hotkey_id,
-        } => {
-            let shortcut = handle
-                .app_state()
-                .global_hotkey_store()
-                .entries()?
-                .into_iter()
-                .find_map(|(shortcut, entry)| {
-                    (entry.bundle_id == bundle_id && entry.hotkey_id == hotkey_id)
-                        .then_some(shortcut)
-                });
-            Ok(serde_json::to_value(shortcut)?)
-        }
-        HostRequest::RegisterGlobalHotkey {
-            bundle_id,
-            hotkey_id,
-        } => {
-            let state = handle.app_state();
-            let store = state.global_hotkey_store();
-            let all = store.entries()?;
-            if let Some(shortcut) = all.iter().find_map(|(shortcut, entry)| {
-                (entry.bundle_id == bundle_id && entry.hotkey_id == hotkey_id)
-                    .then_some(shortcut.clone())
-            }) {
-                return Ok(Json::String(shortcut));
-            }
-            let used: HashSet<_> = all.into_keys().collect();
-            let Some(shortcut) = GLOBAL_HOTKEYS_POOL
-                .iter()
-                .map(|shortcut| shortcut.serialize())
-                .find(|shortcut| !used.contains(shortcut))
-            else {
-                return Ok(Json::Null);
-            };
-            store.set(
-                &shortcut,
-                GlobalHotkeyStoreEntry {
-                    bundle_id,
-                    hotkey_id,
-                },
-            )?;
-            Ok(Json::String(shortcut))
-        }
-        HostRequest::SetAppNeedsRelaunch {
-            bundle_id,
-            needs_relaunch,
-        } => {
-            handle
-                .app_state()
-                .desktop_app_manager()
-                .set_app_needs_relaunch(&bundle_id, needs_relaunch)?;
-            Ok(Json::Null)
-        }
-        HostRequest::AppProcessIds { app_id } => {
-            let pids: Vec<i32> = crate::app::desktop_app::running_apps_with_id(handle, &app_id)
-                .iter()
-                .map(|app| app.processIdentifier())
-                .collect();
-            Ok(serde_json::to_value(pids)?)
-        }
-    }
 }
 
 fn on_app_launch<'js>(
@@ -534,10 +419,9 @@ fn locate_module_path<'js>(ctx: &Ctx<'js>, module_path: &Path) -> rbun::Result<(
             .as_ref()
             .map(|package| package.config.root.clone())
     }) {
-        if let Some(relative) = crate::app::chord_package_manager::package_module_relative_path(
-            &root,
-            &module_path,
-        ) {
+        if let Some(relative) =
+            crate::app::chord_package_manager::package_module_relative_path(&root, &module_path)
+        {
             return Ok((root, relative));
         }
     }

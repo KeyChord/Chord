@@ -13,7 +13,7 @@ pub fn focused_window_id(handle: &AppHandle, app_id: Option<&str>) -> Option<u32
 
 #[cfg(not(target_os = "macos"))]
 pub fn focused_window_id(_handle: &AppHandle, _app_id: Option<&str>) -> Option<u32> {
-    None
+    crate::desktop_platform::focused_window()
 }
 
 #[cfg(target_os = "macos")]

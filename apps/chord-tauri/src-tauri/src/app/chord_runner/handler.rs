@@ -1,9 +1,13 @@
 use crate::app::chord_runner::ChordActionTask;
-use crate::bun_js::{format_js_error, package_worker};
+#[cfg(all(test, target_os = "macos"))]
+use crate::bun_js::format_js_error;
+use crate::bun_js::package_worker;
 use crate::models::HandlerChordAction;
 use anyhow::Result;
 use nject::injectable;
+#[cfg(target_os = "macos")]
 use rbun::prelude::{Args, Object, OptionExt, ResultExt, Value};
+#[cfg(target_os = "macos")]
 use rbun::{Array, Ctx, Function};
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
@@ -58,8 +62,10 @@ impl HandlerChordActionTaskRunner {
     }
 }
 
+#[cfg(target_os = "macos")]
 const SEQUENCE_VALUES: &str = "__RUST_CHORD_SEQUENCE_VALUES";
 
+#[cfg(target_os = "macos")]
 fn sequence_registry<'js>(ctx: Ctx<'js>) -> rbun::Result<Object<'js>> {
     if let Some(registry) = ctx.globals().get::<_, Option<Object>>(SEQUENCE_VALUES)? {
         return Ok(registry);
@@ -70,6 +76,7 @@ fn sequence_registry<'js>(ctx: Ctx<'js>) -> rbun::Result<Object<'js>> {
     Ok(registry)
 }
 
+#[cfg(target_os = "macos")]
 fn sequence_values<'js>(ctx: Ctx<'js>, id: &str) -> rbun::Result<Object<'js>> {
     let registry = sequence_registry(ctx.clone())?;
     if let Some(values) = registry.get::<_, Option<Object>>(id)? {
@@ -90,6 +97,7 @@ pub async fn release_chord_sequences(handle: AppHandle, ids: Vec<String>) -> Res
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 pub(crate) fn release_sequence_values(ctx: Ctx<'_>, ids: Vec<String>) -> rbun::Result<()> {
     if let Some(registry) = ctx.globals().get::<_, Option<Object>>(SEQUENCE_VALUES)? {
         for id in ids {
@@ -99,6 +107,7 @@ pub(crate) fn release_sequence_values(ctx: Ctx<'_>, ids: Vec<String>) -> rbun::R
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 fn resolve_event_argument<'js>(
     ctx: Ctx<'js>,
     value: &toml::Value,
@@ -145,6 +154,7 @@ fn resolve_event_argument<'js>(
     }
 }
 
+#[cfg(target_os = "macos")]
 pub(crate) async fn invoke_js_handler<'js>(
     ctx: Ctx<'js>,
     action: &HandlerChordAction,
@@ -214,7 +224,7 @@ pub(crate) async fn invoke_js_handler<'js>(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use crate::models::{ChordKeyboardEvent, Key, KeyEvent};

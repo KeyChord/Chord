@@ -3,12 +3,11 @@ use crate::models::{CapturedKeyEvent, Key, KeyEvent};
 use crate::state::{AppModeObservable, AppModeState, Observable};
 use anyhow::Result;
 use atomic_enum::atomic_enum;
-use device_query::{DeviceQuery, DeviceState};
+use derive_more::Display;
 use keycode::KeyMappingCode;
 use nject::{inject, injectable};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager};
-use derive_more::Display;
 
 #[atomic_enum(AtomicAppModeState)]
 #[derive(PartialEq, Display)]
@@ -40,7 +39,6 @@ impl AppController {
     pub fn app_mode(&self) -> AppMode {
         self.mode.load(Ordering::SeqCst)
     }
-
 
     pub fn handle_key_event(&self, input: &CapturedKeyEvent) -> Result<()> {
         let key_event = &input.event;

@@ -1,5 +1,5 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 use clap::{Parser, Subcommand, ValueHint};
 use std::path::PathBuf;
@@ -60,6 +60,7 @@ enum Commands {
     },
     /// Internal crash-isolated package runtime.
     #[command(name = "__package-worker", hide = true)]
+    #[cfg(target_os = "macos")]
     PackageWorker { address: String, token: String },
     /// Internal detached app launch used for chord execution.
     #[command(name = "__app-chord", hide = true)]
@@ -99,6 +100,10 @@ fn main() {
         eprintln!("Failed to connect development log streams: {error:#}");
         std::process::exit(1);
     }
+    #[cfg(windows)]
+    if std::env::args_os().len() > 1 {
+        chords_lib::attach_console();
+    }
     let cli = Cli::parse();
 
     #[cfg(target_os = "macos")]
@@ -118,11 +123,13 @@ fn main() {
     // and `-i` sources the user's interactive rc file — commonly hundreds of milliseconds.
     // A CLI invocation already has the right PATH: it was started from that very shell. So pay
     // the cost only when launching the app.
+    #[cfg(target_os = "macos")]
     if cli.command.is_none() {
         let _ = fix_path_env::fix();
     }
 
     match cli.command {
+        #[cfg(target_os = "macos")]
         Some(Commands::PackageWorker { address, token }) => {
             exit_on_error(cli_worker::run_package(move || async move {
                 chords_lib::run_package_worker(address, token).await
@@ -200,10 +207,7 @@ fn exit_on_error(result: anyhow::Result<()>) {
 }
 
 fn run_shell_cli(command: String) -> anyhow::Result<()> {
-    let status = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&command)
-        .status()?;
+    let status = chords_lib::shell_cli(&command)?;
     if !status.success() {
         anyhow::bail!("shell command exited with status {status}");
     }

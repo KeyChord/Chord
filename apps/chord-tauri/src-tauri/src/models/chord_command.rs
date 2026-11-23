@@ -5,7 +5,39 @@ use std::time::Duration;
 
 pub const CORE_CHORD_PACKAGE: &str = "@keychord/chords-chord";
 pub const CORE_CHORD_REPO: &str = "KeyChord/chords-chord";
+// Core controls use the historical path so saved bindings and CLI documentation
+// identify the same protected file on every platform.
 pub const CORE_CHORD_FILE: &str = "chords/com/leonsilicon/chord/macos.toml";
+#[cfg(target_os = "linux")]
+pub const CHORDS_FILENAME: &str = "linux.toml";
+#[cfg(windows)]
+pub const CHORDS_FILENAME: &str = "windows.toml";
+#[cfg(target_os = "macos")]
+pub const CHORDS_FILENAME: &str = "macos.toml";
+
+pub fn matches_chord_filename(filename: &str, platform_file: &str) -> bool {
+    filename == platform_file
+        || filename
+            .strip_suffix(platform_file)
+            .is_some_and(|prefix| prefix.ends_with('.'))
+}
+
+pub fn is_platform_chords_file(path: &std::path::Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| matches_chord_filename(name, CHORDS_FILENAME))
+}
+
+pub fn is_other_platform_chords_file(path: &std::path::Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            ["macos.toml", "linux.toml", "windows.toml"]
+                .into_iter()
+                .any(|file| file != CHORDS_FILENAME && matches_chord_filename(name, file))
+                || (cfg!(target_os = "macos") && name.ends_with(".desktop.toml"))
+        })
+}
 
 pub fn is_core_chords_file(package: &str, path: &std::path::Path) -> bool {
     package == CORE_CHORD_PACKAGE && path == std::path::Path::new(CORE_CHORD_FILE)

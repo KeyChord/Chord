@@ -4,9 +4,12 @@ use anyhow::Result;
 #[cfg(target_os = "macos")]
 use macos::init_macos_observers;
 use nject::injectable;
+#[cfg(target_os = "macos")]
 use objc2_app_kit::{NSRunningApplication, NSWorkspace, NSWorkspaceLaunchOptions};
+#[cfg(target_os = "macos")]
 use objc2_foundation::NSString;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "macos")]
 use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
@@ -33,6 +36,7 @@ impl DesktopAppManager {
         Ok(())
     }
 
+    #[cfg(target_os = "macos")]
     pub fn relaunch_app(&self, bundle_id: &str) -> Result<()> {
         let _app = DesktopApp::new(bundle_id)?;
 
@@ -74,6 +78,11 @@ impl DesktopAppManager {
         Ok(())
     }
 
+    #[cfg(not(target_os = "macos"))]
+    pub fn relaunch_app(&self, app_id: &str) -> Result<()> {
+        crate::desktop_platform::relaunch_app(app_id)
+    }
+
     pub fn set_app_needs_relaunch(&self, bundle_id: &str, needs_relaunch: bool) -> Result<()> {
         self.observable.set_state(|prev| {
             let bundle_id = bundle_id.to_string();
@@ -112,6 +121,55 @@ pub fn init_app_lifecycle(handle: AppHandle) {
         {
             log::error!("Failed to initialize app lifecycle observers: {error}");
         }
+    }
+    #[cfg(not(target_os = "macos"))]
+    portable_lifecycle(handle);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn portable_lifecycle(handle: AppHandle) {
+    use crate::app::desktop_app::AppIdentity;
+    use std::collections::HashMap;
+    if let Err(error) = std::thread::Builder::new()
+        .name("chord-lifecycle".into())
+        .spawn(move || {
+            let mut previous = HashMap::<u32, String>::new();
+            let mut initialized = false;
+            loop {
+                let mut current = HashMap::new();
+                for process in crate::desktop_platform::processes() {
+                    if process.pid == std::process::id() {
+                        continue;
+                    }
+                    if let Some(id) = AppIdentity::from_process(&process).resolve(&handle) {
+                        current.insert(process.pid, id);
+                    }
+                }
+                for (pid, app_id) in &previous {
+                    if !current.contains_key(pid) {
+                        dispatch_app_terminate(ObservedApp {
+                            pid: *pid as i32,
+                            bundle_id: app_id.clone(),
+                        });
+                    }
+                }
+                if initialized {
+                    for (pid, app_id) in &current {
+                        if !previous.contains_key(pid) {
+                            dispatch_app_launch(ObservedApp {
+                                pid: *pid as i32,
+                                bundle_id: app_id.clone(),
+                            });
+                        }
+                    }
+                }
+                previous = current;
+                initialized = true;
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        })
+    {
+        log::warn!("Could not start desktop application tracking: {error}");
     }
 }
 

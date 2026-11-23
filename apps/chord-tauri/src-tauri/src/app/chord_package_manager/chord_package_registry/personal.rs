@@ -14,10 +14,15 @@ use walkdir::WalkDir;
 
 /// Chord creates this package when it is missing, so there is always a place for new chords.
 pub const DEFAULT_PERSONAL_PACKAGE: &str = "default";
+#[cfg(target_os = "macos")]
 const GLOBAL_CHORDS_FILE: &str = "chords/macos.toml";
+#[cfg(target_os = "linux")]
+const GLOBAL_CHORDS_FILE: &str = "chords/linux.toml";
+#[cfg(windows)]
+const GLOBAL_CHORDS_FILE: &str = "chords/windows.toml";
 
 /// The file every new personal package starts with.
-const STARTER_PATHSLUG: &str = "chords/macos.toml";
+const STARTER_PATHSLUG: &str = GLOBAL_CHORDS_FILE;
 
 fn starter_contents(dirname: &str) -> String {
     format!(
@@ -28,8 +33,8 @@ fn starter_contents(dirname: &str) -> String {
 #   "/n" = {{ name = "Notes", shell = "open -a Notes" }}
 #   "/t" = {{ name = "Terminal", shell = "open -a Terminal" }}
 #
-# Chords for a single app go in chords/<bundle ID, with / for .>/macos.toml,
-# such as chords/com/apple/finder/macos.toml for Finder.
+# Chords for a single app go in chords/<application ID, with / for .>/<platform>.toml,
+# using the same filename as this file.
 name = "{dirname}"
 
 [chords]
@@ -182,7 +187,9 @@ fn package_dirnames(dir: &Path) -> anyhow::Result<Vec<String>> {
                                 dirnames.push(format!("{dirname}/{name}"));
                             }
                         }
-                    } else { dirnames.push(dirname); }
+                    } else {
+                        dirnames.push(dirname);
+                    }
                 }
             }
         }
@@ -233,7 +240,11 @@ fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<Persona
         }
         // Scoped packages are installed libraries, not folders managed by My Chords.
         if !dirname.starts_with('@') {
-            states.push(PersonalPackageState { dirname, name, error });
+            states.push(PersonalPackageState {
+                dirname,
+                name,
+                error,
+            });
         }
     }
     (packages, states)
@@ -242,7 +253,9 @@ fn import_packages(dir: &Path) -> (HashMap<String, RawChordPackage>, Vec<Persona
 fn list(dir: &Path) -> anyhow::Result<PersonalPackages> {
     let mut packages = Vec::new();
     for dirname in package_dirnames(dir)? {
-        if dirname.starts_with('@') { continue; }
+        if dirname.starts_with('@') {
+            continue;
+        }
         let root = dir.join(&dirname);
         packages.push(PersonalPackageFiles {
             files: chords_files(&root)?,
@@ -354,13 +367,10 @@ pub fn chords_file_problem(contents: &str) -> Option<ChordsFileProblem> {
 /// editor started from, or `None` to create a new file; a file that changed on disk since then
 /// is not overwritten.
 /// `contents` with a shell chord added to its `[chords]` table.
-fn insert_chord(
-    contents: &str,
-    sequence: &str,
-    name: &str,
-    shell: &str,
-) -> anyhow::Result<String> {
-    let parsed: toml::Table = contents.parse().context("Your chords file has a mistake in it")?;
+fn insert_chord(contents: &str, sequence: &str, name: &str, shell: &str) -> anyhow::Result<String> {
+    let parsed: toml::Table = contents
+        .parse()
+        .context("Your chords file has a mistake in it")?;
     let taken = parsed
         .get("chords")
         .and_then(toml::Value::as_table)
@@ -586,9 +596,16 @@ mod tests {
     fn scoped_packages_are_discovered_but_are_not_personal_editor_folders() {
         let dir = temporary_dir();
         create_package(&dir, "default").unwrap();
-        for (path, name) in [("@keychord/chords-test", "@keychord/test"), ("@thirdparty/test", "@thirdparty/test")] {
+        for (path, name) in [
+            ("@keychord/chords-test", "@keychord/test"),
+            ("@thirdparty/test", "@thirdparty/test"),
+        ] {
             fs::create_dir_all(dir.join(path)).unwrap();
-            fs::write(dir.join(path).join("package.json"), serde_json::json!({"name": name}).to_string()).unwrap();
+            fs::write(
+                dir.join(path).join("package.json"),
+                serde_json::json!({"name": name}).to_string(),
+            )
+            .unwrap();
         }
         fs::create_dir_all(dir.join("@keychord/.managed/stale")).unwrap();
         let (packages, states) = import_packages(&dir);
@@ -738,6 +755,7 @@ mod tests {
         assert!(error.to_string().contains("already have a chord"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn saving_keeps_symlinks_and_permissions_and_deleting_prunes_empty_folders() {
         use std::os::unix::fs::{PermissionsExt, symlink};

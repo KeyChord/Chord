@@ -2,6 +2,11 @@ use anyhow::{Context, Result, bail};
 use std::{fs, io::ErrorKind, path::Path};
 
 pub fn is_installed(destination: &Path, executable: &Path) -> Result<bool> {
+    #[cfg(windows)]
+    return Ok(
+        fs::read_to_string(destination).is_ok_and(|value| value == command_script(executable))
+    );
+    #[cfg(unix)]
     match fs::read_link(destination) {
         Ok(target) => Ok(target == executable),
         Err(error) if matches!(error.kind(), ErrorKind::NotFound | ErrorKind::InvalidInput) => {
@@ -27,6 +32,7 @@ pub fn install(executable: &Path, destination: &Path) -> Result<()> {
     let parent = destination
         .parent()
         .context("Missing installation directory")?;
+    #[cfg(unix)]
     match fs::create_dir_all(parent)
         .and_then(|()| std::os::unix::fs::symlink(executable, destination))
     {
@@ -35,6 +41,36 @@ pub fn install(executable: &Path, destination: &Path) -> Result<()> {
         Err(error) => return Err(error).context("Could not install the command line tool"),
     }
 
+    #[cfg(windows)]
+    {
+        fs::create_dir_all(parent)?;
+        use std::io::Write;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(destination)?;
+        return file
+            .write_all(command_script(executable).as_bytes())
+            .context("Could not install the command line tool");
+    }
+    #[cfg(target_os = "linux")]
+    bail!("Permission denied installing {}", destination.display());
+    #[cfg(target_os = "macos")]
+    install_with_administrator_access(executable, destination, parent)
+}
+
+#[cfg(windows)]
+fn command_script(executable: &Path) -> String {
+    let path = executable.to_string_lossy().replace('%', "%%");
+    format!("@echo off\r\n\"{path}\" %*\r\n")
+}
+
+#[cfg(target_os = "macos")]
+fn install_with_administrator_access(
+    executable: &Path,
+    destination: &Path,
+    parent: &Path,
+) -> Result<()> {
     // AppleScript receives the shell command as an argument, with every path shell-quoted.
     let quote = |path: &Path| -> Result<String> {
         Ok(shlex::try_quote(
@@ -66,7 +102,7 @@ pub fn install(executable: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

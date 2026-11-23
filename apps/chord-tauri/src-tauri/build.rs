@@ -17,13 +17,14 @@ fn main() {
     // /Users/runner/work/_temp/bun-embed, would load whatever someone puts there.
     // XProtect refuses to open such an app ("Apple could not verify Chord is free of
     // malware"), notarized or not.
-    if tauri_build::is_dev() {
+    let macos = std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos");
+    if macos && tauri_build::is_dev() {
         if let Ok(lib_dir) = std::env::var("DEP_BUN_EMBED_LIB_DIR") {
             // Not `-bins`: the test harness links the library too.
             println!("cargo:rustc-link-arg=-Wl,-rpath,{lib_dir}");
         }
     }
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+    if macos {
         println!("cargo:rustc-link-arg-bins=-Wl,-rpath,@executable_path/../Frameworks");
     }
 

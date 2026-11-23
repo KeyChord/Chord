@@ -37,15 +37,17 @@ pub struct ChordReference {
 /// The app a chords file applies to: `chords/com/spotify/client/macos.toml` applies to
 /// `com.spotify.client`. Root and bundled (`chords/@scope/…`) files apply to no app.
 pub fn chords_file_app_id(pathslug: &Path) -> Option<String> {
-    if pathslug.file_name()? != "macos.toml" {
+    if pathslug.file_name()? != crate::models::CHORDS_FILENAME {
         return None;
     }
     let app_id = pathslug
         .parent()?
         .strip_prefix("chords")
         .ok()?
-        .to_str()?
-        .replace('/', ".");
+        .iter()
+        .map(|part| part.to_str())
+        .collect::<Option<Vec<_>>>()?
+        .join(".");
     (!app_id.is_empty() && !app_id.starts_with('@')).then_some(app_id)
 }
 
@@ -64,13 +66,21 @@ impl ChordPackage {
         event: &ChordInputEvent,
         app_id: &str,
     ) -> Vec<ChordReference> {
-        let pathslug = PathBuf::from(format!("chords/{}/macos.toml", app_id.replace(".", "/")));
+        let pathslug = PathBuf::from(format!(
+            "chords/{}/{}",
+            app_id.replace('.', "/"),
+            crate::models::CHORDS_FILENAME
+        ));
         let Some(file) = self.compiled_chords_files.get(&pathslug) else {
             return Vec::new();
         };
         file.chords
             .iter()
-            .filter(|chord| chord.trigger.matches_in_namespace(&event.input, is_core_chords_file(&self.name, &pathslug)))
+            .filter(|chord| {
+                chord
+                    .trigger
+                    .matches_in_namespace(&event.input, is_core_chords_file(&self.name, &pathslug))
+            })
             .map(|chord| ChordReference {
                 package_name: self.name.clone(),
                 chords_file_pathslug: pathslug.clone(),
@@ -82,8 +92,12 @@ impl ChordPackage {
     pub fn matching_global_chords(&self, event: &ChordInputEvent) -> Vec<ChordReference> {
         self.global_chords
             .iter()
-            .filter(|reference| reference.chord.trigger.matches_in_namespace(&event.input,
-                is_core_chords_file(&reference.package_name, &reference.chords_file_pathslug)))
+            .filter(|reference| {
+                reference.chord.trigger.matches_in_namespace(
+                    &event.input,
+                    is_core_chords_file(&reference.package_name, &reference.chords_file_pathslug),
+                )
+            })
             .cloned()
             .collect()
     }

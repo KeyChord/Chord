@@ -97,7 +97,10 @@ impl AppPermissions {
 
     pub fn check_now() -> InputPermissions {
         InputPermissions {
+            #[cfg(target_os = "macos")]
             accessibility: macos_accessibility_client::accessibility::application_is_trusted(),
+            #[cfg(not(target_os = "macos"))]
+            accessibility: crate::desktop_platform::input_available(),
         }
     }
 
@@ -156,9 +159,10 @@ impl AppPermissions {
     }
 }
 
-pub fn open_system_settings(url: &str, permission_name: &str) {
-    if let Err(error) = std::process::Command::new("open").arg(url).spawn() {
-        log::error!("Failed to open {permission_name} settings: {error}");
+pub fn open_system_settings(_url: &str, _permission_name: &str) {
+    #[cfg(target_os = "macos")]
+    if let Err(error) = std::process::Command::new("open").arg(_url).spawn() {
+        log::error!("Failed to open {_permission_name} settings: {error}");
     }
 }
 

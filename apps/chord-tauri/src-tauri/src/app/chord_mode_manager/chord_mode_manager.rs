@@ -1,5 +1,7 @@
+#[cfg(target_os = "macos")]
+use super::NativeSurfaceRect;
 use crate::app::AppHandleExt;
-use crate::app::chord_mode_manager::{ChordInputManager, ChordModePanel, NativeSurfaceRect};
+use crate::app::chord_mode_manager::{ChordInputManager, ChordModePanel};
 use crate::models::{Key, KeyEvent};
 use crate::state::{
     ChordInputObservable, ChordInputState, ChordPanelObservable, ChordPanelState, Observable,
@@ -25,27 +27,30 @@ impl ChordModeManager {
         self.input_manager.load_macros()?;
         self.panel.init()?;
 
-        let surface_window = self.panel.get_or_create_window()?;
-        let surface_handle = self.handle.clone();
-        let listener_window = surface_window.clone();
-        let listener_window2 = surface_window.clone();
-        listener_window.listen(
-            "chorder-surface-rect",
-            move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
-                Ok(rect) => {
-                    if let Err(error) = ChordModePanel::configure_window_surface(
-                        &listener_window2,
-                        surface_handle.clone(),
-                        rect,
-                    ) {
-                        log::error!("Failed to configure native chorder surface: {error}");
+        #[cfg(target_os = "macos")]
+        {
+            let surface_window = self.panel.get_or_create_window()?;
+            let surface_handle = self.handle.clone();
+            let listener_window = surface_window.clone();
+            let listener_window2 = surface_window.clone();
+            listener_window.listen(
+                "chorder-surface-rect",
+                move |event| match serde_json::from_str::<NativeSurfaceRect>(event.payload()) {
+                    Ok(rect) => {
+                        if let Err(error) = ChordModePanel::configure_window_surface(
+                            &listener_window2,
+                            surface_handle.clone(),
+                            rect,
+                        ) {
+                            log::error!("Failed to configure native chorder surface: {error}");
+                        }
                     }
-                }
-                Err(error) => {
-                    log::error!("Failed to parse chorder surface rect: {error}");
-                }
-            },
-        );
+                    Err(error) => {
+                        log::error!("Failed to parse chorder surface rect: {error}");
+                    }
+                },
+            );
+        }
         Ok(())
     }
 

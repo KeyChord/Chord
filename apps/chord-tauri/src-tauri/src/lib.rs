@@ -6,6 +6,7 @@ use parking_lot::deadlock;
 use std::thread;
 use std::time::Duration;
 use tauri::{Manager, RunEvent};
+#[cfg(target_os = "macos")]
 use tauri_nspanel::tauri_panel;
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_log::{Target, TargetKind};
@@ -15,9 +16,12 @@ pub mod dev_runtime;
 
 mod api;
 mod app;
+#[cfg_attr(not(target_os = "macos"), path = "bun_js/portable.rs")]
 mod bun_js;
 mod constants;
 mod default_packages;
+#[cfg(not(target_os = "macos"))]
+mod desktop_platform;
 pub mod git;
 mod logging;
 mod mode;
@@ -30,6 +34,7 @@ mod tauri_app;
 
 pub use tauri_app::*;
 
+#[cfg(target_os = "macos")]
 tauri_panel! {
     panel!(IndicatorPanel {
         config: {
@@ -179,7 +184,12 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
     };
 
     let has_startup_command = startup_command.is_some();
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .plugin(tauri_nspanel::init())
+        .plugin(tauri_plugin_user_input::init());
+    let app = builder
         .invoke_handler(taurpc::create_ipc_handler(api_handler))
         .menu(|handle| tauri_app::menu::build_app_menu(handle))
         .on_menu_event(|handle, event| {
@@ -201,7 +211,6 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
                 log::error!("Failed to show settings window for existing instance: {error}");
             }
         }))
-        .plugin(tauri_nspanel::init())
         .plugin({
             #[cfg(target_os = "macos")]
             {
@@ -221,7 +230,6 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_user_input::init())
         .setup(move |app| {
             api.set_handle(app.handle().clone());
             if let Err(error) = logging::initialize(app.handle()) {
@@ -313,7 +321,7 @@ fn run_app_with_cli_command(startup_command: Option<tauri_app::scripting::CliApp
 }
 
 pub async fn run_script(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
-    bun_js::run_standalone_module(path.as_ref()).await
+    bun_js::run_standalone_module_with_args(path.as_ref(), Vec::new()).await
 }
 
 pub async fn run_script_with_args(
@@ -338,6 +346,20 @@ pub fn run_caps_guardian(state: &std::path::Path) -> anyhow::Result<()> {
 }
 
 /// Internal package subprocess entry; callers must provide the parent's private IPC endpoint.
+#[cfg(target_os = "macos")]
 pub async fn run_package_worker(address: String, token: String) -> anyhow::Result<()> {
     bun_js::package_worker::serve(address, token).await
+}
+
+pub fn shell_cli(source: &str) -> anyhow::Result<std::process::ExitStatus> {
+    Ok(process::shell_command(source).into_std().status()?)
+}
+
+#[cfg(windows)]
+pub fn attach_console() {
+    unsafe {
+        windows_sys::Win32::System::Console::AttachConsole(
+            windows_sys::Win32::System::Console::ATTACH_PARENT_PROCESS,
+        );
+    }
 }

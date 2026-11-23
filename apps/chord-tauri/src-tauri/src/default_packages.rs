@@ -32,6 +32,12 @@ pub struct DefaultPackagePlan {
     pub offered: Vec<String>,
 }
 
+#[cfg(not(target_os = "macos"))]
+fn default_packages_file() -> anyhow::Result<DefaultPackagesFile> {
+    parse_file(include_str!("../../data/default-packages-desktop.toml"))
+}
+
+#[cfg(target_os = "macos")]
 fn default_packages_file() -> anyhow::Result<DefaultPackagesFile> {
     #[cfg(debug_assertions)]
     {

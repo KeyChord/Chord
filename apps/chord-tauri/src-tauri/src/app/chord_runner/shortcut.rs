@@ -14,6 +14,7 @@ pub struct ShortcutChordActionTaskRunner {
 impl ShortcutChordActionTaskRunner {
     // We use `rdev` for simulate instead of Enigo because rdev sends actual keypresses
     // instead of enigo's input injection (this works better in some apps, e.g. cmd+1 in IntelliJ)
+    #[cfg(target_os = "macos")]
     pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
         let events: Vec<(rdev::EventType, bool)> = actions
             .into_iter()
@@ -46,6 +47,11 @@ impl ShortcutChordActionTaskRunner {
         result_rx
             .recv()
             .context("main thread stopped before simulating shortcut")?
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
+        crate::desktop_platform::simulate_keys(&actions)
     }
 
     pub fn get_start_simulated_shortcut_actions(

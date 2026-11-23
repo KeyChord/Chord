@@ -3,6 +3,9 @@
 > [!NOTE]
 > This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
 
+
+On Linux and Windows, Chord launches its bundled Bun executable in a separate package-worker process. Ordinary module imports, Bun APIs, the `chord` input bridge, package-relative resolver functions, and native Node-API modules for the current platform are available. Use `resolvePackageFile(import.meta, path)` and `resolveNativeModulePath(import.meta, path)` for packages that target these platforms. The embedded `import.meta.chord` extension, AppleScript, and the macOS privilege prompt belong to the macOS runtime. Select handlers using platform-specific TOML manifests.
+
 ## Recommended Setup
 
 A chord package is a folder with chord files in `chords/` and, optionally, JavaScript handlers. To start one, follow the quick start in [create-chord-package](https://github.com/KeyChord/create-chord-package). Packages build their handlers with [`@keychord/config`](https://github.com/KeyChord/config) and get typings for the `chord` module from [`@keychord/types`](https://github.com/KeyChord/types-monorepo). The packages in [KeyChord/chords](https://github.com/KeyChord/chords) are working examples.

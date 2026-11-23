@@ -3,3 +3,5 @@
 target/
 # Sidecars produced by @chord/dev.improve.chord.native
 binaries/
+
+/binaries/

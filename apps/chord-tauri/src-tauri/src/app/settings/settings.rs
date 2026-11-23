@@ -16,20 +16,36 @@ pub struct AppSettings {
 }
 
 impl AppSettings {
+    fn cli_destination(&self, command: &str) -> anyhow::Result<std::path::PathBuf> {
+        #[cfg(target_os = "macos")]
+        let directory = std::path::PathBuf::from("/usr/local/bin");
+        #[cfg(target_os = "linux")]
+        let directory = tauri::Manager::path(&self.handle)
+            .home_dir()?
+            .join(".local/bin");
+        #[cfg(windows)]
+        let directory = tauri::Manager::path(&self.handle)
+            .local_data_dir()?
+            .join("Microsoft/WindowsApps");
+        Ok(directory.join(if cfg!(windows) {
+            format!("{command}.cmd")
+        } else {
+            command.to_owned()
+        }))
+    }
+
     pub fn refresh_cli_installation(&self) -> anyhow::Result<()> {
         let executable = cli_executable()?;
         self.observable.try_set_state(|mut state| {
-            state.is_cli_installed = super::cli::is_installed(
-                &std::path::Path::new("/usr/local/bin").join(&state.cli_command),
-                &executable,
-            )?;
+            state.is_cli_installed =
+                super::cli::is_installed(&self.cli_destination(&state.cli_command)?, &executable)?;
             Ok(state)
         })
     }
 
     pub fn install_cli(&self) -> anyhow::Result<()> {
         let state = self.observable.get_state()?;
-        let destination = std::path::Path::new("/usr/local/bin").join(&state.cli_command);
+        let destination = self.cli_destination(&state.cli_command)?;
         super::cli::install(&cli_executable()?, &destination)?;
         self.refresh_cli_installation()
     }

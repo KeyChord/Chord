@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@chord/com.npmjs.tanstack__react-query';
 import { useNavigate } from '@chord/com.npmjs.tanstack__react-router';
 import { taurpc } from '@chord/dev.improve.chord.api.taurpc';
-import { usePermissionsState } from '@chord/dev.improve.chord.lib.state';
+import { desktopPlatform, usePermissionsState } from '@chord/dev.improve.chord.lib.state';
 import { useEffect, useState } from 'react';
 import { DoneStep, useFinishOnboarding } from '#step-done';
 import { type CreatedChord, FirstChordStep } from '#step-first-chord';
@@ -60,6 +60,16 @@ export function OnboardingPage() {
 				/>
 			);
 		case 'permission':
+			if (desktopPlatform === 'linux') {
+				return (
+					<div className="settings-content-surface m-auto max-w-lg space-y-4 p-8">
+						<h1 className="text-xl font-semibold">Enable Chord keyboard input</h1>
+						<p>Use an X11 session and give your account access to the keyboard devices and /dev/uinput.</p>
+						<p><a className="underline" href="https://github.com/KeyChord/Chord#linux-and-windows" target="_blank" rel="noreferrer">Linux setup instructions</a></p>
+						<button type="button" className="underline" onClick={skipSetup}>Skip setup</button>
+					</div>
+				);
+			}
 			return (
 				<PermissionStep
 					{...numbers('permission')}

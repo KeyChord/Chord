@@ -129,6 +129,8 @@ impl MouseOptions {
 pub struct MouseSession {
     #[cfg(target_os = "macos")]
     held: Option<macos::HeldMouse>,
+    #[cfg(not(target_os = "macos"))]
+    held: Option<MouseButton>,
 }
 
 impl MouseSession {
@@ -137,7 +139,7 @@ impl MouseSession {
             #[cfg(target_os = "macos")]
             return macos::mouse(self, options);
             #[cfg(not(target_os = "macos"))]
-            anyhow::bail!("mouse input is only supported on macOS");
+            return self.apply_desktop(options);
         });
         if result.is_err() {
             self.release();
@@ -145,10 +147,65 @@ impl MouseSession {
         result
     }
 
+    #[cfg(not(target_os = "macos"))]
+    fn apply_desktop(&mut self, options: &MouseOptions) -> Result<()> {
+        use crate::desktop_platform as platform;
+        match options.action {
+            MouseAction::Up => {
+                if let Some(button) = self.held {
+                    platform::mouse_button(button, false)?;
+                    self.held = None;
+                }
+                return Ok(());
+            }
+            MouseAction::Down | MouseAction::Click => {
+                ensure!(self.held.is_none(), "a mouse button is already held")
+            }
+            MouseAction::Move => {}
+        }
+        let (x, y) = if let Some(id) = options.window_id {
+            let window = platform::window(id)?;
+            options.click_options().validate_window(&window)?;
+            (window.bounds.x + options.x, window.bounds.y + options.y)
+        } else {
+            (options.x, options.y)
+        };
+        platform::move_mouse(x, y)?;
+        if let Some(id) = options.window_id {
+            ensure!(
+                platform::pointer_targets_window(id)?,
+                "another window covers the target point"
+            );
+        }
+        match options.action {
+            MouseAction::Click => {
+                for _ in 0..options.click_count {
+                    platform::mouse_button(options.button, true)?;
+                    self.held = Some(options.button);
+                    std::thread::sleep(std::time::Duration::from_millis(options.press_duration_ms));
+                    platform::mouse_button(options.button, false)?;
+                    self.held = None;
+                }
+            }
+            MouseAction::Down => {
+                platform::mouse_button(options.button, true)?;
+                self.held = Some(options.button);
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn release(&mut self) {
         #[cfg(target_os = "macos")]
         if let Some(held) = self.held.take() {
             held.release();
+        }
+        #[cfg(not(target_os = "macos"))]
+        if let Some(button) = self.held.take() {
+            if let Err(error) = crate::desktop_platform::mouse_button(button, false) {
+                log::warn!("Could not release mouse button: {error:#}");
+            }
         }
     }
 }
@@ -164,7 +221,7 @@ pub fn get_screen_bounds() -> Result<WindowBounds> {
     #[cfg(target_os = "macos")]
     return macos::get_screen_bounds();
     #[cfg(not(target_os = "macos"))]
-    anyhow::bail!("screen bounds are only supported on macOS");
+    crate::desktop_platform::screen_bounds()
 }
 
 /// Standalone CLI scripts share a session across asynchronous native calls.
@@ -275,7 +332,7 @@ pub fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {
     #[cfg(target_os = "macos")]
     return macos::get_process_windows(pids);
     #[cfg(not(target_os = "macos"))]
-    anyhow::bail!("window-targeted mouse input is only supported on macOS");
+    crate::desktop_platform::windows(pids)
 }
 
 /// Send one or two button down/up pairs to one window, off the UI/JS thread.

@@ -6,7 +6,6 @@ use nject::injectable;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
-use tokio::process::Command;
 use tokio::sync::Semaphore;
 
 const MAX_CONCURRENT_SHELL_COMMANDS: usize = 16;
@@ -56,8 +55,7 @@ pub(crate) async fn run_shell_command(shell: &str, current_dir: Option<PathBuf>)
     let _permit = SHELL_COMMAND_SLOTS
         .try_acquire()
         .context("too many shell commands are already running")?;
-    let mut command = Command::new("sh");
-    command.arg("-c").arg(shell);
+    let mut command = crate::process::shell_command(shell);
     if let Some(current_dir) = current_dir {
         command.current_dir(current_dir);
     }
