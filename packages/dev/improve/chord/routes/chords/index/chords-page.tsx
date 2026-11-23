@@ -1,16 +1,23 @@
-import type { Chord, ChordHint, ChordReference } from '@chord/dev.improve.chord.lib.typeshare';
+import type { Chord, ChordExecutionState, ChordHint, ChordInputState, ChordMacrosState, ChordPanelState, ChordReference, FrontmostState, HintPanelState } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
-import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState } from '@chord/dev.improve.chord.lib.state';
+import { useHintPanelState } from '@chord/dev.improve.chord.lib.state/hint-panel';
 import { emit, listen } from '@tauri-apps/api/event';
 import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 	String.fromCharCode('A'.charCodeAt(0) + index));
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
+/** The widest the sidebar card gets, as `INDICATOR_WIDTH` in `chord_mode_panel.rs`. */
+const SIDEBAR_MAX_WIDTH = 640;
+// How far each card's box-shadow reaches past its edge: offset plus radius. Chord sizes
+// the panel's window to the card and that reach, since WebKit keeps pixels for the
+// whole window, transparent or not. (Tailwind reads comments, so no class names here.)
+const SIDEBAR_SHADOW_REACH = 18 + 60; // the sidebar card's x offset plus radius, to the right
+const FLOATING_SHADOW_REACH = 12 - 4; // the floating card's radius less y offset, above
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
@@ -128,33 +135,66 @@ function ChordKeyRow({
 
 export function ChordsPage() {
 	return (
-		<StateQueries queries={[useChordInputState(), useChordPanelState(), useFrontmostState(), useChordPackageManagerState(), useChordExecutionState(), useChordMacrosState()]} quiet>
-			{(chordInputData, chordPanelData, frontmostData, chordPackageManagerData, chordExecutionData, chordMacrosData) => (
-				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
+		<HintPanelStates>
+			{(chordInputData, chordPanelData, frontmostData, hintPanelData, chordExecutionData, chordMacrosData) => (
+				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} hintPanelData={hintPanelData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
 			)}
-		</StateQueries>
+		</HintPanelStates>
 	);
+}
+
+/**
+ * Renders once every state the panel draws from has loaded. The panel takes no clicks, so
+ * unlike `StateQueries` it offers no retry; leaving it out also keeps HeroUI's button, and
+ * the libraries it brings, out of the panel's page.
+ */
+function HintPanelStates({ children }: {
+	children: (
+		chordInput: ChordInputState,
+		chordPanel: ChordPanelState,
+		frontmost: FrontmostState,
+		hintPanel: HintPanelState,
+		chordExecution: ChordExecutionState,
+		chordMacros: ChordMacrosState,
+	) => ReactNode
+}) {
+	const queries = [
+		useHintPanelState('chord-input'),
+		useHintPanelState('chord-panel'),
+		useHintPanelState('frontmost'),
+		useHintPanelState('hint-panel'),
+		useHintPanelState('chord-execution'),
+		useHintPanelState('chord-macros'),
+	] as const;
+	if (queries.some(query => query.isError && query.data === undefined)) {
+		return <div role="alert" className="p-4 text-sm text-muted-foreground">Could not load app state.</div>;
+	}
+	const [chordInput, chordPanel, frontmost, hintPanel, chordExecution, chordMacros] = queries;
+	if (!chordInput.data || !chordPanel.data || !frontmost.data || !hintPanel.data || !chordExecution.data || !chordMacros.data) {
+		return null;
+	}
+	return children(chordInput.data, chordPanel.data, frontmost.data, hintPanel.data, chordExecution.data, chordMacros.data);
 }
 
 export function ChordsPageContent({
 	chordInputData,
 	chordPanelData,
 	frontmostData,
-	chordPackageManagerData,
+	hintPanelData,
 	chordExecutionData,
 	chordMacrosData,
 }: {
-	chordInputData: NonNullable<ReturnType<typeof useChordInputState>['data']>
-	chordPanelData: NonNullable<ReturnType<typeof useChordPanelState>['data']>
-	frontmostData: NonNullable<ReturnType<typeof useFrontmostState>['data']>
-	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
-	chordExecutionData: NonNullable<ReturnType<typeof useChordExecutionState>['data']>
-	chordMacrosData: NonNullable<ReturnType<typeof useChordMacrosState>['data']>
+	chordInputData: ChordInputState
+	chordPanelData: ChordPanelState
+	frontmostData: FrontmostState
+	hintPanelData: HintPanelState
+	chordExecutionData: ChordExecutionState
+	chordMacrosData: ChordMacrosState
 }) {
 	const chordInputState = chordInputData;
 	const chordPanelState = chordPanelData;
 	const { frontmostAppBundleId, filePickerActive } = frontmostData;
-	const { packages } = chordPackageManagerData;
+	const { packages } = hintPanelData;
 	const { loops, metaCommands, haltLoopTemplate } = chordExecutionData;
 	const isFloating = chordPanelState.layout === 'floating-bottom';
 
@@ -165,11 +205,27 @@ export function ChordsPageContent({
 	const floatingKeysRef = useRef<HTMLDivElement>(null);
 	/** The widest the floating bar has been while the current buffer was typed. */
 	const floatingWidthFloorRef = useRef<{ tokens: string[], width: number } | null>(null);
+	const reportedExtentRef = useRef('');
 
 	const emitSurfaceRect = useCallback(() => {
 		const surface = surfaceRef.current;
-		if (!surface) {
+		const bar = floatingBarRef.current;
+		if (!surface || !bar) {
 			return;
+		}
+
+		// The window the card needs: the sidebar card's width from the left edge, and the
+		// floating card's height from the bottom, each with its box-shadow's reach. Layout
+		// boxes ignore the transforms that slide the card out of view, so a hidden card
+		// keeps its room.
+		const extent = JSON.stringify({
+			layout: chordPanelState.layout,
+			width: Math.ceil(bar.offsetLeft + bar.offsetWidth + SIDEBAR_SHADOW_REACH),
+			height: Math.ceil(window.innerHeight - bar.offsetTop + FLOATING_SHADOW_REACH),
+		});
+		if (extent !== reportedExtentRef.current) {
+			reportedExtentRef.current = extent;
+			void emit('chorder-panel-extent', JSON.parse(extent));
 		}
 
 		const rect = surface.getBoundingClientRect();
@@ -181,7 +237,7 @@ export function ChordsPageContent({
 			radius: isFloating ? 16 : NATIVE_SURFACE_RADIUS,
 			flushLeft: !isFloating,
 		});
-	}, [isFloating]);
+	}, [isFloating, chordPanelState.layout]);
 
 	useEffect(() => {
 		const handleResize = () => {
@@ -243,7 +299,7 @@ export function ChordsPageContent({
 	for (const chordPackage of packages) {
 		globalChords.push(...chordPackage.globalChords);
 
-		for (const [relpath, file] of Object.entries(chordPackage.compiledChordsFiles)) {
+		for (const [relpath, file] of Object.entries(chordPackage.chordsFiles)) {
 			const bundleId = relpath.split('/').slice(1, -1).join('.');
 			for (const hint of file.chordHints) {
 				if (chordPackage.name === '@keychord/chords-chord'
@@ -497,7 +553,7 @@ export function ChordsPageContent({
 
 	return (
 		<div className="relative size-full bg-transparent">
-			<div ref={floatingBarRef} className={isFloating ? 'absolute bottom-3 left-1/2 w-max min-w-40 max-w-[calc(100%_-_1.5rem)] -translate-x-1/2' : 'absolute left-0 top-1/2 -translate-y-1/2'}>
+			<div ref={floatingBarRef} className={isFloating ? 'absolute bottom-3 left-1/2 w-max min-w-40 max-w-[calc(100%_-_1.5rem)] -translate-x-1/2' : 'absolute left-0 top-1/2 w-max -translate-y-1/2'} style={isFloating ? undefined : { maxWidth: SIDEBAR_MAX_WIDTH }}>
 				<div
 					key={surfaceVersion}
 					ref={surfaceRef}

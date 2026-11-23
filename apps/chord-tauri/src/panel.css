@@ -2,7 +2,6 @@
 @import "tailwindcss" source(none);
 @import "@heroui/styles/base" layer(base);
 @import "@heroui/styles/themes/default";
-@import "@heroui/styles/components/button.css" layer(components);
 @import "@heroui/styles/components/kbd.css" layer(components);
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
@@ -13,5 +12,4 @@
 @source './panel.tsx';
 @source '../../../packages/dev/improve/chord/routes/chords/index';
 @source '../../../packages/dev/improve/chord/components/ui/kbd';
-@source '../../../packages/dev/improve/chord/components/ui/button';
 @source '../../../packages/dev/improve/chord/lib/state';

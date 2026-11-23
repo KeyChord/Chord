@@ -1,13 +1,14 @@
 import type { QueryClient } from '@chord/com.npmjs.tanstack__react-query';
 
-const queryKey = ['tauri-observable-states'] as const;
-
 /** Keep a shared snapshot subscribed for as long as it remains in the query cache. */
-export function createStateQuery<T extends object>({ stateIds, read, subscribe }: {
+export function createStateQuery<T extends object>({ key = 'tauri-observable-states', stateIds, read, subscribe }: {
+	/** Distinguishes snapshots of different sets of states in one query client. */
+	key?: string
 	stateIds: readonly (keyof T & string)[]
 	read: () => Promise<T>
 	subscribe: (id: keyof T & string, onChange: (value: unknown) => void) => Promise<() => void>
 }) {
+	const queryKey = [key] as const;
 	const sources = new WeakMap<QueryClient, {
 		ready: Promise<void>
 		updates: Map<keyof T, unknown>

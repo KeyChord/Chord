@@ -1,16 +1,20 @@
 import { cn } from "@chord/com.npmjs.utils-cn";
-import { Kbd as HeroKbd } from "@heroui/react/kbd";
 import type { ComponentProps } from "react";
 
+/**
+ * HeroUI's keycap as plain markup: its `Kbd` only adds the `kbd` class that
+ * `@heroui/styles` styles, and importing it brings HeroUI's component runtime into the
+ * Hint Panel's page.
+ */
 function Kbd({ children, className, ...props }: ComponentProps<"kbd">) {
   return (
-    <HeroKbd
+    <kbd
       {...props}
       data-slot="kbd"
-      className={cn("h-5 min-w-5 justify-center rounded-sm px-1 font-mono text-xs", className)}
+      className={cn("kbd", "h-5 min-w-5 justify-center rounded-sm px-1 font-mono text-xs", className)}
     >
       {children}
-    </HeroKbd>
+    </kbd>
   );
 }
 function KbdGroup({ className, ...props }: ComponentProps<"span">) {

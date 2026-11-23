@@ -400,7 +400,6 @@
       "name": "@chord/dev.improve.chord.components.ui.kbd",
       "dependencies": {
         "@chord/com.npmjs.utils-cn": "workspace:*",
-        "@heroui/react": "^3.2.7",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },

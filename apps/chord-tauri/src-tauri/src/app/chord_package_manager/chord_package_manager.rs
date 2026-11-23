@@ -13,7 +13,8 @@ use crate::models::{
     ParsedChordsFile, RawChordPackage, RawChordsFile, is_core_chords_file,
 };
 use crate::state::{
-    ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable, Observable,
+    ChordPackageManagerObservable, ChordPackageManagerState, GitReposObservable,
+    HintPanelChordsFile, HintPanelPackage, Observable,
 };
 use anyhow::{Context, Result};
 use nject::{inject, injectable};
@@ -309,6 +310,57 @@ fn handler_ids(packages: &OrderMap<String, ChordPackage>) -> HashSet<String> {
         .flat_map(|file| file.handlers.iter())
         .map(|handler| handler.handler_id.clone())
         .collect()
+}
+
+/// Every package's hints and global chords, and the chords of the files the Hint Panel's
+/// page shows for this app: the frontmost app's, and the Finder's while a file picker is
+/// open. The page reads a file's app from its folder, as `chords_folder_app_id` does.
+fn hint_panel_packages(
+    packages: &OrderMap<String, ChordPackage>,
+    app_id: Option<&str>,
+    file_picker_active: bool,
+) -> Vec<HintPanelPackage> {
+    let shown = |pathslug: &Path| {
+        chords_folder_app_id(pathslug).is_some_and(|folder_app| {
+            Some(folder_app.as_str()) == app_id
+                || (file_picker_active && folder_app == "com.apple.finder")
+        })
+    };
+    packages
+        .values()
+        .map(|package| HintPanelPackage {
+            name: package.name.clone(),
+            chords_files: package
+                .compiled_chords_files
+                .iter()
+                .map(|(pathslug, file)| {
+                    let chords = if shown(pathslug) {
+                        file.chords.clone()
+                    } else {
+                        Vec::new()
+                    };
+                    let file = HintPanelChordsFile {
+                        chords,
+                        chord_hints: file.chord_hints.clone(),
+                    };
+                    (pathslug.clone(), file)
+                })
+                .collect(),
+            global_chords: package.global_chords.clone(),
+        })
+        .collect()
+}
+
+/// The app of a chords file's folder, whatever the file is called, as the Hint Panel's
+/// page reads it: `chords/com/apple/Safari/macos.toml` is `com.apple.Safari`, and a root
+/// file is the empty string.
+fn chords_folder_app_id(pathslug: &Path) -> Option<String> {
+    let folder = pathslug.parent()?.strip_prefix("chords").ok()?;
+    let parts = folder
+        .iter()
+        .map(|part| part.to_str())
+        .collect::<Option<Vec<_>>>()?;
+    Some(parts.join("."))
 }
 
 /// The handlers that chords can run in these apps: those of the apps' own chords files,
@@ -1001,6 +1053,15 @@ impl ChordPackageManager {
             .filter(|(_, root)| super::package_module_relative_path(root, path).is_some())
             .max_by_key(|(_, root)| root.as_os_str().len())
             .map(|(name, root)| (name.clone(), root.clone()))
+    }
+
+    /// What the Hint Panel draws from while this app is frontmost (see `HintPanelState`).
+    pub fn hint_panel_packages(
+        &self,
+        app_id: Option<&str>,
+        file_picker_active: bool,
+    ) -> Vec<HintPanelPackage> {
+        hint_panel_packages(&self.packages.read(), app_id, file_picker_active)
     }
 
     /// Starts the package workers that chords in the frontmost app can run in: those of
@@ -2005,5 +2066,78 @@ mod worker_scope_tests {
         );
         assert_eq!(ids(&["dev.elsewhere"]), ["global"]);
         assert_eq!(ids(&[]), ["global"]);
+    }
+
+    #[test]
+    fn the_hint_panel_gets_the_frontmost_apps_chords_and_every_files_hints() {
+        let chords_file = |path: &str| {
+            let parsed: ParsedChordsFile =
+                "name = 'f'\n[chords]\nab = { name = 'AB', shell = 'true' }\n'?a' = { name = 'A' }"
+                    .parse()
+                    .unwrap();
+            let path = PathBuf::from(path);
+            let file = CompiledChordsFile {
+                name: parsed.name,
+                pathslug: path.clone(),
+                meta: parsed.meta,
+                handlers: vec![],
+                executables: parsed.executables,
+                chords: parsed.chords,
+                chord_hints: parsed.chord_hints,
+                placeholders: parsed.placeholders,
+            };
+            (path, file)
+        };
+        let package = ChordPackage {
+            name: "fixture".into(),
+            js_package: None,
+            raw_chords_files: HashMap::new(),
+            compiled_chords_files: HashMap::from([
+                chords_file("chords/macos.toml"),
+                chords_file("chords/com/apple/Safari/macos.toml"),
+                // The page reads a file's app from its folder, whatever the file's name.
+                chords_file("chords/com/apple/Safari/linux.toml"),
+                chords_file("chords/com/apple/finder/macos.toml"),
+                chords_file("chords/@keychord/chords-menu/macos.toml"),
+            ]),
+            global_chords: vec![],
+        };
+        assert!(
+            !package
+                .compiled_chords_files
+                .values()
+                .any(|file| file.chord_hints.is_empty())
+        );
+        let packages = OrderMap::from([("fixture".to_string(), package)]);
+        let with_chords = |app: Option<&str>, picker: bool| {
+            let packages = hint_panel_packages(&packages, app, picker);
+            let files = &packages[0].chords_files;
+            assert_eq!(files.len(), 5);
+            assert!(files.values().all(|file| file.chord_hints.len() == 1));
+            let mut paths: Vec<_> = files
+                .iter()
+                .filter(|(_, file)| !file.chords.is_empty())
+                .map(|(path, _)| path.to_string_lossy().into_owned())
+                .collect();
+            paths.sort();
+            paths
+        };
+        assert_eq!(
+            with_chords(Some("com.apple.Safari"), false),
+            [
+                "chords/com/apple/Safari/linux.toml",
+                "chords/com/apple/Safari/macos.toml"
+            ]
+        );
+        assert_eq!(
+            with_chords(Some("com.apple.Safari"), true),
+            [
+                "chords/com/apple/Safari/linux.toml",
+                "chords/com/apple/Safari/macos.toml",
+                "chords/com/apple/finder/macos.toml"
+            ]
+        );
+        assert!(with_chords(None, false).is_empty());
+        assert!(with_chords(Some("dev.elsewhere"), false).is_empty());
     }
 }

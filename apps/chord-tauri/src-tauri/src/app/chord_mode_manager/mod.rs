@@ -10,3 +10,5 @@ mod chord_sequence;
 pub use chord_mode_panel::*;
 mod chord_mode_manager;
 pub use chord_mode_manager::*;
+mod hint_panel_state;
+pub use hint_panel_state::*;
