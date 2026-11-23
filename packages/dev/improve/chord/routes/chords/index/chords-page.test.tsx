@@ -5,7 +5,7 @@ import { ChordLayout, type ChordPackage } from "@chord/dev.improve.chord.lib.typ
 // The passive overlay only uses the viewport during server rendering. Effects
 // that talk to Tauri do not run, and TauRPC needs the browser's Proxy constructor.
 const previousWindow = globalThis.window;
-globalThis.window = { innerHeight: 720, Proxy, screen: {} } as unknown as Window & typeof globalThis;
+globalThis.window = { innerHeight: 720, Proxy, screen: {}, navigator: { userAgent: "Macintosh" } } as unknown as Window & typeof globalThis;
 const { ChordsPageContent } = await import("#chords-page");
 afterAll(() => {
   globalThis.window = previousWindow;
@@ -121,6 +121,42 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
       expect(html).toContain("Repeat 3 times · `d2,i13` · Step 2");
       // The next column offers the rest of the chord being typed.
       expect(html).toContain("Close tab");
+    }
+  });
+
+  test(`${layout} groups unmatched letters while keeping launcher chords available`, () => {
+    const path = "chords/dev/fixture/macos.toml";
+    const render = (input: string[]) => renderToString(<ChordsPageContent
+      chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
+      chordPanelData={{ isVisible: true, layout }}
+      frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
+      chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], builtinPackages: [], packages: [{
+        name: "@fixture/test",
+        rawChordsFiles: {},
+        globalChords: [],
+        compiledChordsFiles: {
+          [path]: {
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
+            chords: [{ rawTrigger: "/f", trigger: { keys: ["Slash", "KeyF"] }, name: "Open Finder", index: 0, actions: [], fallback: false }],
+            chordHints: [{ rawPattern: "/", pattern: { keys: ["Slash"] }, description: "Launch" }],
+          },
+        },
+      }] }}
+      chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+      chordMacrosData={{ entries: [] }}
+    />);
+
+    const notion = render(["Slash", "KeyN", "KeyO", "KeyT", "KeyI", "KeyO", "KeyN"]);
+    expect(notion).toContain(">/</kbd>");
+    expect(notion).toContain(">NOTION</kbd>");
+    expect(notion).not.toContain(">N</kbd>");
+    expect(render(["Slash", "KeyN", "KeyO"])).toContain(">NO</kbd>");
+
+    const finder = render(["Slash", "KeyF"]);
+    expect(finder).toContain(">/</kbd>");
+    expect(finder).toContain(">F</kbd>");
+    if (layout === ChordLayout.SidebarLeft) {
+      expect(render(["Slash"])).toContain("Open Finder");
     }
   });
 

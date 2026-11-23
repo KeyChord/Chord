@@ -326,8 +326,6 @@ export function ChordsPageContent({
 		? normalizedBufferTokens
 		: normalizedActiveChordTokens;
 	const floatingQuotes = showsBuffer ? chordInputState.quotes : chordInputState.selectedInputEvent?.quotes ?? [];
-	// Typed quotes keep their text beside the keys; show it in place.
-	const floatingDisplayTokens = withQuoteTexts(floatingTokens, floatingQuotes, showsBuffer && chordInputState.inserting);
 	const floatingBlockEnds = startsWithBlocks(floatingTokens)
 		? blockDisplayEnds(floatingTokens, floatingQuotes, chordInputState.blocks)
 		: [];
@@ -376,86 +374,96 @@ export function ChordsPageContent({
 	);
 	const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
 
-	const keyColumns = Array.from(
-		{
-			length: shouldHighlightActiveChord
-				? Math.max(1, currentPrefixLength)
-				: Math.max(1, currentPrefixLength + 1),
-		},
-		(_, columnIndex) => {
-			const prefixTokens = selectedTokens.slice(0, columnIndex);
-			const selectedToken = selectedTokens[columnIndex];
-			const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? [...commandPrefixTokens, ...normalizeChordTokens(chord.trigger.keys)] : [];
+	const columnCount = Math.max(1, currentPrefixLength + (shouldHighlightActiveChord ? 0 : 1));
+	const typedChordStart = Math.max(blockLength, commandPrefixTokens.length);
+	const keyColumns = [];
+	for (let columnIndex = 0; columnIndex < columnCount;) {
+		const prefixTokens = selectedTokens.slice(0, columnIndex);
+		const selectedToken = selectedTokens[columnIndex];
+		const getChordKeys = (chord: Chord) => 'keys' in chord.trigger ? [...commandPrefixTokens, ...normalizeChordTokens(chord.trigger.keys)] : [];
 
-			const matchingChords = activeChords.filter(chord =>
-				prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
-			);
-			const activeTokens = new Set(
-				matchingChords
-					.map(chord => getChordKeys(chord)[columnIndex])
-					.filter((token): token is string => Boolean(token)),
-			);
-			if (selectedToken) {
-				activeTokens.add(selectedToken);
+		const matchingChords = activeChords.filter(chord =>
+			prefixTokens.every((token, tokenIndex) => getChordKeys(chord)[tokenIndex] === token),
+		);
+		const activeTokens = new Set(
+			matchingChords
+				.map(chord => getChordKeys(chord)[columnIndex])
+				.filter((token): token is string => Boolean(token)),
+		);
+		// Explicit hints are options even when their handler uses a regex trigger.
+		const matchingHints = hintSequences.filter(hint =>
+			prefixTokens.every((token, tokenIndex) => hint.tokens[tokenIndex] === token),
+		);
+		for (const hint of matchingHints) {
+			const token = hint.tokens[columnIndex];
+			if (token) {
+				activeTokens.add(token);
 			}
-			// Explicit hints are options even when their handler uses a regex trigger.
-			const matchingHints = hintSequences.filter(hint =>
-				prefixTokens.every((token, tokenIndex) => hint.tokens[tokenIndex] === token),
+		}
+
+		const matchingRanges = rangeHints.filter(
+			hint =>
+				hint.prefix.length === columnIndex &&
+				prefixTokens.every((token, index) => hint.prefix[index] === token),
+		);
+		let nextColumnIndex = columnIndex + 1;
+		// Once a letter has no matching continuation, the rest of its letter run is free text.
+		if (isTyping && columnIndex >= typedChordStart && selectedToken && SINGLE_LETTER_TOKEN_REGEX.test(selectedToken)
+			&& !activeTokens.has(selectedToken) && !matchingRanges.some(range => range.keys.includes(selectedToken))) {
+			while (SINGLE_LETTER_TOKEN_REGEX.test(selectedTokens[nextColumnIndex] ?? '')) nextColumnIndex++;
+		}
+		const selectedLabel = nextColumnIndex === columnIndex + 1
+			? selectedToken
+			: selectedTokens.slice(columnIndex, nextColumnIndex).join('');
+		if (selectedToken) {
+			activeTokens.add(selectedToken);
+		}
+		for (const range of matchingRanges) {
+			for (const token of range.keys) activeTokens.delete(token);
+		}
+
+		const rows = sortTokens(activeTokens).map(token => {
+			const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
+			const exactHint = matchingHints.findLast(
+				hint => hint.tokens[columnIndex] === token && hint.tokens.length === columnIndex + 1,
 			);
-			for (const hint of matchingHints) {
-				const token = hint.tokens[columnIndex];
-				if (token) {
-					activeTokens.add(token);
-				}
-			}
-
-			const matchingRanges = rangeHints.filter(
-				hint =>
-					hint.prefix.length === columnIndex &&
-					prefixTokens.every((token, index) => hint.prefix[index] === token),
+			const exactChord = matchingChords.find(
+				chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 			);
-			for (const range of matchingRanges) {
-				for (const token of range.keys) activeTokens.delete(token);
-			}
-
-			const rows = sortTokens(activeTokens).map(token => {
-				const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
-				const exactHint = matchingHints.findLast(
-					hint => hint.tokens[columnIndex] === token && hint.tokens.length === columnIndex + 1,
-				);
-				const exactChord = matchingChords.find(
-					chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
-				);
-
-				return {
-					token,
-					keys: [token],
-					description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
-				};
-			});
-
-			for (const range of matchingRanges) {
-				const token = range.label;
-				// Later range hints take precedence when they use the same label.
-				const existingIndex = rows.findIndex(row => row.token === token);
-				if (existingIndex !== -1) rows.splice(existingIndex, 1);
-				rows.push({
-					token,
-					keys: range.keys,
-					description: range.description,
-				});
-			}
-			const tokenOrder = sortTokens(rows.map(row => row.token));
-			rows.sort((left, right) => tokenOrder.indexOf(left.token) - tokenOrder.indexOf(right.token));
 
 			return {
-				id: `column-${columnIndex}`,
-				rows,
-				selectedToken,
-				hasSelection: Boolean(selectedToken),
+				token,
+				keys: [token],
+				description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
 			};
-		},
-	);
+		});
+
+		for (const range of matchingRanges) {
+			const token = range.label;
+			// Later range hints take precedence when they use the same label.
+			const existingIndex = rows.findIndex(row => row.token === token);
+			if (existingIndex !== -1) rows.splice(existingIndex, 1);
+			rows.push({
+				token,
+				keys: range.keys,
+				description: range.description,
+			});
+		}
+		const tokenOrder = sortTokens(rows.map(row => row.token));
+		rows.sort((left, right) => tokenOrder.indexOf(left.token) - tokenOrder.indexOf(right.token));
+
+		keyColumns.push({
+			index: columnIndex,
+			rows,
+			selectedToken,
+			selectedLabel,
+		});
+		columnIndex = nextColumnIndex;
+	}
+
+	// Typed quotes keep their text beside the keys; show it in place.
+	const floatingKeycaps = isTyping ? keyColumns.flatMap(column => column.selectedLabel ? [column.selectedLabel] : []) : floatingTokens;
+	const floatingDisplayTokens = withQuoteTexts(floatingKeycaps, floatingQuotes, showsBuffer && chordInputState.inserting);
 
 	// Typing never narrows the floating bar, even when the description shortens;
 	// it may shrink again after Backspace or once the buffer clears.
@@ -466,7 +474,9 @@ export function ChordsPageContent({
 			return;
 		}
 
-		const typedTokens = isFloating && showsBuffer && normalizedBufferTokens.length > 0 ? floatingDisplayTokens : null;
+		const typedTokens = isFloating && showsBuffer && normalizedBufferTokens.length > 0
+			? withQuoteTexts(normalizedBufferTokens, floatingQuotes, chordInputState.inserting)
+			: null;
 		const floor = floatingWidthFloorRef.current;
 		bar.style.minWidth = typedTokens && floor && !isDeletionOf(typedTokens, floor.tokens)
 			? `min(${floor.width}px, 100% - 1.5rem)`
@@ -567,11 +577,11 @@ export function ChordsPageContent({
 						<div className="flex items-start gap-6">
 							{keyColumns.map((column, columnIndex) => (
 								<div
-									key={column.id}
-									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', columnIndex > 0 && selectedBlockEnds.includes(columnIndex) && 'ml-3')}
+									key={column.index}
+									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', column.index > 0 && selectedBlockEnds.includes(column.index) && 'ml-3')}
 									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px` }}
 								>
-									{SHOW_DEVELOPMENT_LABEL && column.id === 'column-0'
+									{SHOW_DEVELOPMENT_LABEL && column.index === 0
 										? (
 												<div className="-mb-1 text-[10px] font-semibold tracking-[0.28em] text-foreground/55">
 													DEVELOPMENT
@@ -580,14 +590,14 @@ export function ChordsPageContent({
 										: null}
 									{column.rows.map(row => (
 										<ChordKeyRow
-											key={`${column.id}-${row.token}`}
-											token={row.token}
+											key={row.token}
+											token={row.token === column.selectedToken ? column.selectedLabel : row.token}
 											description={row.description}
 											error={columnIndex === keyColumns.length - 1 && row.keys.includes(column.selectedToken) ? executionError : undefined}
 											isSelected={row.keys.includes(column.selectedToken)}
 											isFailed={executionError !== undefined}
-											isDimmed={column.hasSelection && !row.keys.includes(column.selectedToken)}
-											block={getColumnBlock(columnIndex)}
+											isDimmed={Boolean(column.selectedToken) && !row.keys.includes(column.selectedToken)}
+											block={getColumnBlock(column.index)}
 											keySize={keySize}
 											descriptionFontSize={descriptionFontSize}
 										/>
