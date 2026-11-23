@@ -342,3 +342,10 @@ journey.step("a menu bar chord from the default packages works", async () => {
   vnc.key(Keysym.Escape, true);
   vnc.key(Keysym.Escape, false);
 });
+
+journey.step("the default /, chord opens System Settings", async () => {
+  await guest.run("open /Applications");
+  await waitForFront("com.apple.finder");
+  await screen.chord("/,");
+  await waitForFront("com.apple.systempreferences");
+});

@@ -37,6 +37,10 @@ rev = "f247a89a5c5ee04f88ef643e558e16c05f42e275"
 git = "https://github.com/KeyChord/chords-com.apple.AccessibilityInspector"
 rev = "649819aa07e97e9d5c1dfef5280a4cfd87e419e1"
 
+[packages."@keychord/chords-com.apple.systempreferences"]
+git = "https://github.com/KeyChord/chords-com.apple.systempreferences"
+rev = "8ae0c94dcdb2dc7720db3363e060d84aab2a7378"
+
 # The built-in `/` launcher, which opens Spotlight's top result for a query. It is a fallback
 # chord, so other `/` chords win, and an installed launcher such as chords-raycast replaces it.
 [packages."@keychord/chords-com.apple.Spotlight"]
@@ -47,6 +51,16 @@ rev = "06af4b44924e53bf5c5f23c664172a96aef030d4"
 # dropped is removed while it's still at a revision listed here. Chord also uses these to find the
 # set that an install from before it recorded which defaults it had was set up with: that install
 # gets the packages the defaults gained after its set, and not the ones the user removed.
+
+[[previous]] # 2026-11-21, 38a02ac6 (Chord 0.3.2)
+"KeyChord/chords-chord" = "0fdb58e52044f75f6f89fce8243e8c8bd4ad3206"
+"KeyChord/chords-menu" = "2cca8b753e62193e7abb9ff609bfb36f3dd3b627"
+"KeyChord/chords-com.apple" = "4fe5b6328d5aeb4b18f4faeb51040e2eb05143a5"
+"KeyChord/chords-com.apple.finder" = "d2d31c8566584c151a615a60c639d0c8cd32efc7"
+"KeyChord/chords-com.apple.Safari" = "3b858d47100440807a9fc296beb76ed339d8fce9"
+"KeyChord/chords-com.apple.ActivityMonitor" = "f247a89a5c5ee04f88ef643e558e16c05f42e275"
+"KeyChord/chords-com.apple.AccessibilityInspector" = "649819aa07e97e9d5c1dfef5280a4cfd87e419e1"
+"KeyChord/chords-com.apple.Spotlight" = "06af4b44924e53bf5c5f23c664172a96aef030d4"
 
 [[previous]] # 2026-11-18, 819e45bf (Chord 0.2.11)
 "KeyChord/chords-chord" = "1b9d92ab1cec81ea3b61cfa78f367957e8b69214"
