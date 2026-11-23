@@ -1,0 +1,17 @@
+/* The Hint Panel's styles: only what its page uses, so its web content process parses none of Settings'. */
+@import "tailwindcss" source(none);
+@import "@heroui/styles/base" layer(base);
+@import "@heroui/styles/themes/default";
+@import "@heroui/styles/components/button.css" layer(components);
+@import "@heroui/styles/components/kbd.css" layer(components);
+@import "@heroui/styles/utilities";
+@import "@heroui/styles/variants";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+@import "./theme.css";
+
+@source './panel.tsx';
+@source '../../../packages/dev/improve/chord/routes/chords/index';
+@source '../../../packages/dev/improve/chord/components/ui/kbd';
+@source '../../../packages/dev/improve/chord/components/ui/button';
+@source '../../../packages/dev/improve/chord/lib/state';

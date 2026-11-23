@@ -27,9 +27,88 @@ use supervisor::PackageSupervisor;
 #[path = "benchmarks.rs"]
 mod benchmarks;
 
-fn workers() -> &'static Mutex<HashMap<String, Arc<PackageSupervisor>>> {
-    static WORKERS: OnceLock<Mutex<HashMap<String, Arc<PackageSupervisor>>>> = OnceLock::new();
-    WORKERS.get_or_init(Mutex::default)
+/// A loaded package. Its worker starts with the first JS handler it registers: most
+/// packages declare their chords without running any JS, and each worker is a whole
+/// Bun process, about 13 MB before the package's own code.
+struct LoadedPackage {
+    executable: PathBuf,
+    config: WorkerConfig,
+    handle: Option<AppHandle>,
+    /// Set by the first start. A failed start is kept, so the package's other handlers
+    /// fail at once instead of each waiting out the startup timeout; reloading retries.
+    supervisor: tokio::sync::OnceCell<Result<Arc<PackageSupervisor>, String>>,
+}
+
+impl LoadedPackage {
+    fn new(executable: PathBuf, config: WorkerConfig, handle: Option<AppHandle>) -> Arc<Self> {
+        Arc::new(Self {
+            executable,
+            config,
+            handle,
+            supervisor: tokio::sync::OnceCell::new(),
+        })
+    }
+
+    /// The same package, with no worker.
+    fn idle(&self) -> Arc<Self> {
+        Self::new(
+            self.executable.clone(),
+            self.config.clone(),
+            self.handle.clone(),
+        )
+    }
+
+    fn supervisor(&self) -> Option<Arc<PackageSupervisor>> {
+        self.supervisor.get()?.as_ref().ok().cloned()
+    }
+
+    async fn start(&self, name: &str) -> Result<Arc<PackageSupervisor>> {
+        self.supervisor
+            .get_or_init(|| async {
+                PackageSupervisor::spawn(
+                    &self.executable,
+                    name.to_string(),
+                    self.config.clone(),
+                    self.handle.clone(),
+                    ACTION_TIMEOUT,
+                )
+                .await
+                .map_err(|error| format!("{error:#}"))
+            })
+            .await
+            .clone()
+            .map_err(anyhow::Error::msg)
+    }
+}
+
+fn packages() -> &'static Mutex<HashMap<String, Arc<LoadedPackage>>> {
+    static PACKAGES: OnceLock<Mutex<HashMap<String, Arc<LoadedPackage>>>> = OnceLock::new();
+    PACKAGES.get_or_init(Mutex::default)
+}
+
+/// The packages whose workers have started.
+fn workers() -> Vec<(String, Arc<PackageSupervisor>)> {
+    packages()
+        .lock()
+        .iter()
+        .filter_map(|(name, package)| Some((name.clone(), package.supervisor()?)))
+        .collect()
+}
+
+/// Replaces `name`'s entry with `next` (or removes it) only if it is still `current`,
+/// so a package reloaded in the meantime keeps its new entry.
+fn replace_package(name: &str, current: &Arc<LoadedPackage>, next: Option<Arc<LoadedPackage>>) {
+    let mut packages = packages().lock();
+    if !packages
+        .get(name)
+        .is_some_and(|package| Arc::ptr_eq(package, current))
+    {
+        return;
+    }
+    match next {
+        Some(next) => packages.insert(name.to_string(), next),
+        None => packages.remove(name),
+    };
 }
 
 struct Process {
@@ -313,11 +392,9 @@ impl PackageWorker {
     }
 }
 
+/// Forgets the package's previous load and stops its worker. The next worker starts
+/// when the package registers a handler.
 pub async fn reset_package(handle: AppHandle, name: String, root: PathBuf) -> Result<()> {
-    let old = workers().lock().remove(&name);
-    if let Some(old) = old {
-        old.stop();
-    }
     super::lifecycle::init_app_lifecycle(handle.clone());
     let cwd = handle
         .path()
@@ -326,16 +403,22 @@ pub async fn reset_package(handle: AppHandle, name: String, root: PathBuf) -> Re
         .filter(|path| path.is_dir())
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| root.clone());
-    let worker = PackageSupervisor::spawn(
-        &std::env::current_exe()?,
-        name.clone(),
-        WorkerConfig { root, cwd },
-        Some(handle),
-        ACTION_TIMEOUT,
-    )
-    .await?;
-    workers().lock().insert(name, worker);
+    load_package(
+        name,
+        LoadedPackage::new(
+            std::env::current_exe().context("failed to locate Chord")?,
+            WorkerConfig { root, cwd },
+            Some(handle),
+        ),
+    );
     Ok(())
+}
+
+fn load_package(name: String, package: Arc<LoadedPackage>) {
+    let old = packages().lock().insert(name, package);
+    if let Some(old) = old.and_then(|old| old.supervisor()) {
+        old.stop();
+    }
 }
 
 pub async fn register(handle: AppHandle, module: String, request: Request) -> Result<String> {
@@ -344,11 +427,16 @@ pub async fn register(handle: AppHandle, module: String, request: Request) -> Re
         .chord_package_manager()
         .package_for_path(Path::new(&module))
         .context("handler package is unavailable")?;
-    let worker = workers()
+    register_in(&name, request).await
+}
+
+async fn register_in(name: &str, request: Request) -> Result<String> {
+    let package = packages()
         .lock()
-        .get(&name)
+        .get(name)
         .cloned()
-        .context("package worker is unavailable")?;
+        .context("package is not loaded")?;
+    let worker = package.start(name).await?;
     let id = worker.request(request).await?;
     let id = id
         .as_str()
@@ -359,10 +447,9 @@ pub async fn register(handle: AppHandle, module: String, request: Request) -> Re
 fn worker_for_handler(id: &str) -> Result<(Arc<PackageSupervisor>, String)> {
     let (worker_id, handler_id) = id.split_once(':').context("invalid package handler ID")?;
     let worker = workers()
-        .lock()
-        .values()
+        .into_iter()
+        .map(|(_, worker)| worker)
         .find(|worker| worker.id == worker_id)
-        .cloned()
         .context("package handler belongs to an unloaded configuration")?;
     Ok((worker, handler_id.to_string()))
 }
@@ -391,10 +478,9 @@ pub fn abort(handler_id: &str) {
 }
 
 pub async fn release_sequences(ids: Vec<String>) {
-    let snapshot: Vec<_> = workers().lock().values().cloned().collect();
     // A dead package must not prevent healthy packages from dropping their sequence values.
     let mut jobs = tokio::task::JoinSet::new();
-    for worker in snapshot {
+    for (_, worker) in workers() {
         let ids = ids.clone();
         jobs.spawn(async move {
             let _ = worker.request(Request::ReleaseSequences(ids)).await;
@@ -404,30 +490,41 @@ pub async fn release_sequences(ids: Vec<String>) {
 }
 
 pub async fn retain_handlers(ids: HashSet<String>, roots: HashMap<String, PathBuf>) {
-    let snapshot: Vec<_> = workers()
+    let snapshot: Vec<_> = packages()
         .lock()
         .iter()
-        .map(|(name, worker)| (name.clone(), worker.clone()))
+        .map(|(name, package)| (name.clone(), package.clone()))
         .collect();
-    for (name, worker) in snapshot {
+    for (name, package) in snapshot {
         if !roots.contains_key(&name) {
-            worker.stop();
-            workers().lock().remove(&name);
+            replace_package(&name, &package, None);
+            if let Some(worker) = package.supervisor() {
+                worker.stop();
+            }
             continue;
         }
+        let Some(worker) = package.supervisor() else {
+            continue;
+        };
         let prefix = format!("{}:", worker.id);
-        let ids = ids
+        let ids: Vec<_> = ids
             .iter()
             .filter_map(|id| id.strip_prefix(&prefix).map(str::to_string))
             .collect();
+        if ids.is_empty() {
+            // No chord runs this package's JS any more (its handlers failed to load,
+            // say), so its process goes. Registering a handler starts a new one.
+            replace_package(&name, &package, Some(package.idle()));
+            worker.stop();
+            continue;
+        }
         let _ = worker.request(Request::RetainHandlers(ids)).await;
     }
 }
 
 pub async fn dispatch_lifecycle(app: crate::app::desktop_app::ObservedApp, launch: bool) {
-    let snapshot: Vec<_> = workers().lock().values().cloned().collect();
     let mut jobs = tokio::task::JoinSet::new();
-    for worker in snapshot {
+    for (_, worker) in workers() {
         let app = app.clone();
         jobs.spawn(async move {
             if let Err(error) = worker.request(Request::Lifecycle { app, launch }).await {
@@ -438,16 +535,24 @@ pub async fn dispatch_lifecycle(app: crate::app::desktop_app::ObservedApp, launc
     while jobs.join_next().await.is_some() {}
 }
 
-/// Whether this package has a worker that hasn't been stopped, so its registered handlers run.
+/// Whether this package is loaded and its worker, if it needed one, started and hasn't
+/// been stopped, so its registered handlers run.
 pub fn is_running(name: &str) -> bool {
-    workers()
-        .lock()
-        .get(name)
-        .is_some_and(|worker| worker.is_running())
+    packages().lock().get(name).is_some_and(|package| {
+        package
+            .supervisor
+            .get()
+            .is_none_or(|started| started.as_ref().is_ok_and(|worker| worker.is_running()))
+    })
 }
 
 pub fn shutdown_all() {
-    for worker in workers().lock().drain().map(|(_, worker)| worker) {
+    let packages: Vec<_> = packages()
+        .lock()
+        .drain()
+        .map(|(_, package)| package)
+        .collect();
+    for worker in packages.iter().filter_map(|package| package.supervisor()) {
         worker.stop();
     }
 }
@@ -983,6 +1088,101 @@ export default function() { return () => {}; }
             "export default function() { return () => {}; }",
         );
         register(&worker, healthy).await.unwrap();
+    }
+
+    /// Each worker is a whole Bun process, so a package has one only while a chord runs
+    /// its JS. This is the only test that uses the package registry, which is global.
+    #[tokio::test]
+    #[ignore = "requires a freshly built chord executable; see tests/package-isolation/README.md"]
+    async fn a_package_has_a_worker_only_while_its_handlers_are_in_use() {
+        let fixture = Fixture::new();
+        let executable = PathBuf::from(
+            std::env::var_os("CHORD_PACKAGE_TEST_HOST")
+                .expect("set CHORD_PACKAGE_TEST_HOST to the freshly built chord executable"),
+        );
+        let config = WorkerConfig {
+            root: fixture.0.clone(),
+            cwd: fixture.0.clone(),
+        };
+        let name = format!("lazy-fixture-{}", uuid::Uuid::new_v4());
+        let roots = HashMap::from([(name.clone(), fixture.0.clone())]);
+        let module = fixture.module("lazy", "export default () => () => {};");
+        let registration = || Request::Register {
+            module: module.clone(),
+            raw: serde_json::json!({"name":"fixture"}),
+            pathslug: "fixture.toml".into(),
+            app_id: None,
+            args: vec![],
+        };
+        let worker_of = |name: &str| {
+            workers()
+                .into_iter()
+                .find(|(worker, _)| worker == name)
+                .map(|(_, worker)| worker)
+        };
+
+        // Loading a package starts nothing.
+        load_package(
+            name.clone(),
+            LoadedPackage::new(executable.clone(), config.clone(), None),
+        );
+        assert!(worker_of(&name).is_none());
+        assert!(is_running(&name));
+
+        // Its first handler starts the worker, which its other handlers share.
+        let first = register_in(&name, registration()).await.unwrap();
+        let second = register_in(&name, registration()).await.unwrap();
+        let worker = worker_of(&name).expect("registering a handler started no worker");
+        for id in [&first, &second] {
+            assert!(id.starts_with(&format!("{}:", worker.id)), "{id}");
+            let (owner, handler) = worker_for_handler(id).unwrap();
+            owner.request(invoke(&handler, "run")).await.unwrap();
+        }
+        assert!(is_running(&name));
+
+        // Keeping one handler keeps the worker; keeping none stops it, and the package
+        // stays loaded for the next handler to start a new one.
+        retain_handlers(HashSet::from([first.clone()]), roots.clone()).await;
+        assert!(Arc::ptr_eq(&worker_of(&name).unwrap(), &worker));
+        retain_handlers(HashSet::new(), roots.clone()).await;
+        assert!(worker_of(&name).is_none());
+        assert!(is_running(&name));
+        let error = worker.request(Request::Ping).await.unwrap_err();
+        assert!(error.to_string().contains("was unloaded"), "{error:#}");
+        let third = register_in(&name, registration()).await.unwrap();
+        let replacement = worker_of(&name).unwrap();
+        assert!(!Arc::ptr_eq(&replacement, &worker));
+        assert!(third.starts_with(&format!("{}:", replacement.id)));
+
+        // A worker that cannot start fails the package's handlers, and the package does
+        // not count as running, so the next reload loads it again.
+        let broken = format!("broken-fixture-{}", uuid::Uuid::new_v4());
+        load_package(
+            broken.clone(),
+            LoadedPackage::new(fixture.0.join("no-such-chord"), config, None),
+        );
+        for _ in 0..2 {
+            let error = register_in(&broken, registration()).await.unwrap_err();
+            assert!(
+                error.to_string().contains("failed to start package worker"),
+                "{error:#}"
+            );
+        }
+        assert!(!is_running(&broken));
+
+        // Unloading forgets the packages and stops their workers.
+        retain_handlers(HashSet::new(), HashMap::new()).await;
+        assert!(!is_running(&name) && !is_running(&broken));
+        assert!(
+            replacement
+                .request(Request::Ping)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("was unloaded")
+        );
+        let error = register_in(&name, registration()).await.unwrap_err();
+        assert!(error.to_string().contains("not loaded"), "{error:#}");
     }
 
     #[tokio::test]

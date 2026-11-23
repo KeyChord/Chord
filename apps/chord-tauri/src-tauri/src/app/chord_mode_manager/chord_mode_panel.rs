@@ -243,7 +243,7 @@ impl ChordModePanel {
         // Guard that short creation phase so even the intermediate window cannot
         // activate Chord or replace the user's frontmost application.
         let panel = PanelBuilder::<Wry, IndicatorPanel>::new(&self.handle, "chords")
-            .url(WebviewUrl::App("index.html".into()))
+            .url(WebviewUrl::App("panel.html".into()))
             .title("Chords")
             .no_activate(true)
             .ignores_mouse_events(true)

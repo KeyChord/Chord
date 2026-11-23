@@ -4,7 +4,9 @@
 > This document is largely AI-written, so parts of it may not be fully accurate. It will be replaced with a hand-written version when I get the time.
 
 Package imports, handler factories, actions, timers, and lifecycle callbacks run in
-one supervised child process per installed package. Workers have separate process
+one supervised child process per installed package. A package's worker starts when
+it registers its first JS handler, so a package whose chords run no JS has none, and
+it stops once none of its handlers is in use. Workers have separate process
 groups, so a package job-control signal cannot target the GUI's process group. Native add-ons run in that same
 child, whose Cocoa main loop services Swift's MainActor. The GUI does not execute
 package JavaScript or load package native add-ons.

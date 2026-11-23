@@ -1,4 +1,5 @@
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { tanstackRouter } from '@chord/com.npmjs.tanstack__router-plugin/vite';
 import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
@@ -20,6 +21,16 @@ export default defineConfig({
 			target: 'react',
 		}),
 	],
+
+	build: {
+		rollupOptions: {
+			// The Hint Panel loads its own page, without Settings.
+			input: {
+				index: fileURLToPath(new URL('index.html', import.meta.url)),
+				panel: fileURLToPath(new URL('panel.html', import.meta.url)),
+			},
+		},
+	},
 
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
 	//

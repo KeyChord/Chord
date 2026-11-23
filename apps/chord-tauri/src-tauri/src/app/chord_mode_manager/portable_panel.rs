@@ -37,7 +37,7 @@ impl ChordModePanel {
             return Ok(window);
         }
         let window =
-            WebviewWindowBuilder::new(&self.handle, "chords", WebviewUrl::App("index.html".into()))
+            WebviewWindowBuilder::new(&self.handle, "chords", WebviewUrl::App("panel.html".into()))
                 .title("Chords")
                 .visible(false)
                 .focused(false)
