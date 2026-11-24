@@ -120,7 +120,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     }
   });
 
-  test(`${layout} groups unmatched letters while keeping launcher chords available`, () => {
+  test(`${layout} displays unmatched keys while keeping launcher chords available`, () => {
     const path = "chords/dev/fixture/macos.toml";
     const render = (input: string[]) => renderToString(<ChordsPageContent
       chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
@@ -131,7 +131,10 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
         globalChords: [],
         chordsFiles: {
           [path]: {
-            chords: [{ rawTrigger: "/f", trigger: { keys: ["Slash", "KeyF"] }, name: "Open Finder", index: 0, actions: [], fallback: false }],
+            chords: [
+              { rawTrigger: "/f", trigger: { keys: ["Slash", "KeyF"] }, name: "Open Finder", index: 0, actions: [], fallback: false },
+              { rawTrigger: "/b", trigger: { keys: ["Slash", "KeyB"] }, name: "Open Browser", index: 1, actions: [], fallback: false },
+            ],
             chordHints: [{ rawPattern: "/", pattern: { keys: ["Slash"] }, description: "Launch" }],
           },
         },
@@ -151,6 +154,10 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(finder).toContain(">F</kbd>");
     if (layout === ChordLayout.SidebarLeft) {
       expect(render(["Slash"])).toContain("Open Finder");
+      expect(notion.match(/>(?:NOTION|B|F)<\/kbd>/g)).toEqual([">NOTION</kbd>", ">B</kbd>", ">F</kbd>"]);
+      expect(render(["Slash", "KeyZ"]).match(/>(?:Z|B|F)<\/kbd>/g)).toEqual([">Z</kbd>", ">B</kbd>", ">F</kbd>"]);
+      expect(render(["Slash", "Period"]).match(/>(?:\.|B|F)<\/kbd>/g)).toEqual([">.</kbd>", ">B</kbd>", ">F</kbd>"]);
+      expect(finder.match(/>(?:B|F)<\/kbd>/g)).toEqual([">B</kbd>", ">F</kbd>"]);
     }
   });
 
