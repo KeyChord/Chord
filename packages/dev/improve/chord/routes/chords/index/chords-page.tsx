@@ -413,10 +413,13 @@ export function ChordsPageContent({
 				hint.prefix.length === columnIndex &&
 				prefixTokens.every((token, index) => hint.prefix[index] === token),
 		);
+		const unmatchedToken = selectedToken && !activeTokens.has(selectedToken)
+			&& !matchingRanges.some(range => range.keys.includes(selectedToken))
+			? selectedToken
+			: undefined;
 		let nextColumnIndex = columnIndex + 1;
 		// Once a letter has no matching continuation, the rest of its letter run is free text.
-		if (isTyping && columnIndex >= typedChordStart && selectedToken && SINGLE_LETTER_TOKEN_REGEX.test(selectedToken)
-			&& !activeTokens.has(selectedToken) && !matchingRanges.some(range => range.keys.includes(selectedToken))) {
+		if (isTyping && columnIndex >= typedChordStart && unmatchedToken && SINGLE_LETTER_TOKEN_REGEX.test(unmatchedToken)) {
 			while (SINGLE_LETTER_TOKEN_REGEX.test(selectedTokens[nextColumnIndex] ?? '')) nextColumnIndex++;
 		}
 		const selectedLabel = nextColumnIndex === columnIndex + 1
@@ -429,7 +432,7 @@ export function ChordsPageContent({
 			for (const token of range.keys) activeTokens.delete(token);
 		}
 
-		const rows = sortTokens(activeTokens).map(token => {
+		const rows = [...activeTokens].map(token => {
 			const sequenceKey = [...prefixTokens, token].join('').toLowerCase();
 			const exactHint = matchingHints.findLast(
 				hint => hint.tokens[columnIndex] === token && hint.tokens.length === columnIndex + 1,
@@ -458,7 +461,8 @@ export function ChordsPageContent({
 				description: range.description,
 			});
 		}
-		const tokenOrder = sortTokens(rows.map(row => row.token));
+		const tokenOrder = sortTokens(rows.map(row => row.token).filter(token => token !== unmatchedToken));
+		if (unmatchedToken) tokenOrder.unshift(unmatchedToken);
 		rows.sort((left, right) => tokenOrder.indexOf(left.token) - tokenOrder.indexOf(right.token));
 
 		keyColumns.push({
