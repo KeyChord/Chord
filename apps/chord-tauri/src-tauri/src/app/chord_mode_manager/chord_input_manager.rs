@@ -292,9 +292,12 @@ impl ChordInputManager {
         triggers: &[ChordEventTrigger],
         keyboard_event: Option<&ChordKeyboardEvent>,
     ) -> Result<ChordSequenceDispatch> {
+        let state = self.handle.app_state();
+        let frontmost = state.frontmost();
+        frontmost.refresh_chord_context()?;
         let raw_event = ChordInputEvent {
             input: keys.to_vec(),
-            application_id: self.handle.app_state().frontmost().frontmost()?,
+            application_id: frontmost.chord_application()?,
             quotes: quotes.to_vec(),
         };
         self.sequence

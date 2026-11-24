@@ -91,10 +91,11 @@ impl AppController {
     }
 
     pub fn set_chord_mode(&self) -> Result<()> {
+        let state = self.handle.app_state();
+        state.frontmost().refresh_chord_context()?;
         self.mode.store(AppMode::Chord, Ordering::SeqCst);
         self.observable.set_state(|_| AppModeState::Chord)?;
-        let chord_mode_manager = self.handle.app_state().chord_mode_manager();
-        chord_mode_manager.ensure_active()?;
+        state.chord_mode_manager().ensure_active()?;
         Ok(())
     }
 }

@@ -1296,7 +1296,7 @@ impl ChordPackageManager {
         collect_matching_chord_contexts(
             packages.values(),
             event,
-            self.handle.app_state().frontmost().file_picker_active(),
+            self.handle.app_state().frontmost().chord_file_picker_active(),
         )
     }
 }

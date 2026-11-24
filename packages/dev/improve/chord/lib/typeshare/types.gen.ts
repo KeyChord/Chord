@@ -351,6 +351,7 @@ export interface EmitChordAction {
 
 export interface FrontmostState {
 	frontmostAppBundleId?: string;
+	overlayAppBundleId?: string;
 	filePickerActive: boolean;
 }
 

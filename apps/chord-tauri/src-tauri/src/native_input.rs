@@ -335,6 +335,9 @@ pub fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {
     crate::desktop_platform::windows(pids)
 }
 
+#[cfg(target_os = "macos")]
+pub(crate) use macos::screenshot_markup_visible;
+
 /// Send one or two button down/up pairs to one window, off the UI/JS thread.
 pub fn click(options: &ClickOptions) -> Result<()> {
     options.validate()?;
@@ -356,8 +359,9 @@ mod macos {
     use objc2_core_graphics::{
         CGDisplayBounds, CGError, CGEvent, CGEventField, CGEventTapLocation, CGEventType,
         CGGetDisplaysWithPoint, CGMainDisplayID, CGMouseButton, CGPreflightPostEventAccess,
-        CGWarpMouseCursorPosition, CGWindowListCopyWindowInfo, CGWindowListOption, kCGNullWindowID,
-        kCGWindowBounds, kCGWindowLayer, kCGWindowName, kCGWindowNumber, kCGWindowOwnerPID,
+        CGWarpMouseCursorPosition, CGWindowLevelForKey, CGWindowLevelKey, CGWindowListCopyWindowInfo,
+        CGWindowListOption, kCGNullWindowID, kCGWindowBounds, kCGWindowLayer, kCGWindowName,
+        kCGWindowNumber, kCGWindowOwnerPID,
     };
     use objc2_foundation::{NSPoint, NSProcessInfo, NSString};
     use std::ffi::c_void;
@@ -392,6 +396,10 @@ mod macos {
     }
 
     fn windows() -> Result<Vec<NativeWindow>> {
+        windows_at_layer(0)
+    }
+
+    fn windows_at_layer(window_layer: i64) -> Result<Vec<NativeWindow>> {
         let list =
             CGWindowListCopyWindowInfo(CGWindowListOption::OptionOnScreenOnly, kCGNullWindowID)
                 .context("could not enumerate on-screen windows")?;
@@ -412,7 +420,7 @@ mod macos {
                     dictionary_value(dict, kCGWindowName),
                 )
             };
-            if layer != Some(0) {
+            if layer != Some(window_layer) {
                 continue;
             }
             let (Some(id), Some(pid), Some(raw_bounds)) = (id, pid, raw_bounds) else {
@@ -451,16 +459,35 @@ mod macos {
         Ok(windows)
     }
 
-    pub(super) fn get_app_windows(bundle_id: &str) -> Result<Vec<NativeWindow>> {
-        let pids: Vec<_> = autoreleasepool(|_| {
+    fn running_process_ids(bundle_id: &str) -> Vec<i32> {
+        autoreleasepool(|_| {
             NSRunningApplication::runningApplicationsWithBundleIdentifier(&NSString::from_str(
                 bundle_id,
             ))
             .iter()
             .map(|app| app.processIdentifier())
             .collect()
-        });
-        get_process_windows(&pids)
+        })
+    }
+
+    pub(crate) fn screenshot_markup_visible() -> bool {
+        let pids = running_process_ids("com.apple.screencaptureui");
+        if pids.is_empty() {
+            return false;
+        }
+        // Markup floats without activating the Screenshot agent. The thumbnail
+        // uses a different window level.
+        let layer = i64::from(CGWindowLevelForKey(
+            CGWindowLevelKey::FloatingWindowLevelKey,
+        ));
+        autoreleasepool(|_| {
+            windows_at_layer(layer)
+                .is_ok_and(|windows| windows.iter().any(|window| pids.contains(&window.process_id)))
+        })
+    }
+
+    pub(super) fn get_app_windows(bundle_id: &str) -> Result<Vec<NativeWindow>> {
+        get_process_windows(&running_process_ids(bundle_id))
     }
 
     pub(super) fn get_process_windows(pids: &[i32]) -> Result<Vec<NativeWindow>> {

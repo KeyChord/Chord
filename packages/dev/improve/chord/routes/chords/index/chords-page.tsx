@@ -155,7 +155,9 @@ export function ChordsPageContent({
 }) {
 	const chordInputState = chordInputData;
 	const chordPanelState = chordPanelData;
-	const { frontmostAppBundleId, filePickerActive } = frontmostData;
+	const { overlayAppBundleId } = frontmostData;
+	const frontmostAppBundleId = overlayAppBundleId ?? frontmostData.frontmostAppBundleId;
+	const filePickerActive = !overlayAppBundleId && frontmostData.filePickerActive;
 	const { packages } = chordPackageManagerData;
 	const { loops, metaCommands, haltLoopTemplate } = chordExecutionData;
 	const isFloating = chordPanelState.layout === 'floating-bottom';

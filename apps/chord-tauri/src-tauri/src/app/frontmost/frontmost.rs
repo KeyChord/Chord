@@ -121,6 +121,35 @@ impl AppFrontmost {
         Ok(self.observable.get_state()?.frontmost_app_bundle_id)
     }
 
+    pub fn refresh_chord_context(&self) -> Result<()> {
+        #[cfg(target_os = "macos")]
+        {
+            let overlay = crate::native_input::screenshot_markup_visible()
+                .then(|| "com.apple.screencaptureui".to_owned());
+            if self.observable.get_state()?.overlay_app_bundle_id != overlay {
+                self.observable.set_state(|state| FrontmostState {
+                    overlay_app_bundle_id: overlay,
+                    ..state
+                })?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn chord_application(&self) -> Result<Option<String>> {
+        Ok(self
+            .observable
+            .get_state()?
+            .chord_application()
+            .map(str::to_owned))
+    }
+
+    pub fn chord_file_picker_active(&self) -> bool {
+        self.observable
+            .get_state()
+            .is_ok_and(|state| state.chord_file_picker_active())
+    }
+
     pub(super) fn set_frontmost(&self, identity: AppIdentity) -> Result<()> {
         // Resolve and publish under the lock so a package reload cannot publish a stale app.
         let mut current = self.identity.lock();
@@ -147,6 +176,7 @@ impl AppFrontmost {
             file_picker_active: previous.file_picker_active
                 && previous.frontmost_app_bundle_id == app_id,
             frontmost_app_bundle_id: app_id,
+            ..previous
         })
     }
 
