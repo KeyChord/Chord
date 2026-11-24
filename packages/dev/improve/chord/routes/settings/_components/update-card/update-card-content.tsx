@@ -62,7 +62,7 @@ export function UpdateCardContent({
           isIndeterminate={percent === undefined}
         >
           <ProgressBar.Track>
-            <ProgressBar.Fill />
+            <ProgressBar.Fill className="transition-none" />
           </ProgressBar.Track>
         </ProgressBar>
       ) : null}
