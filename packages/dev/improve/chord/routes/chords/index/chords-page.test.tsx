@@ -173,6 +173,39 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(html).toContain("Caps+Space closes the quote");
   });
 
+  test(`${layout} uses More for an unlabeled default placeholder prefix`, () => {
+    const path = "chords/macos.toml";
+    const render = (prefix: string, key: string, label?: string) => renderToString(<ChordsPageContent
+      chordInputData={{ input: layout === ChordLayout.FloatingBottom ? [key] : [], quotes: [], inserting: false, blocks: [], openBlock: false }}
+      chordPanelData={{ isVisible: true, layout }}
+      frontmostData={{ filePickerActive: false }}
+      chordPackageManagerData={{ errors: {}, personalPackages: [], thirdPartyPackages: [], builtinPackages: [], packages: [{
+        name: "@fixture/test",
+        rawChordsFiles: {},
+        globalChords: [],
+        compiledChordsFiles: {
+          [path]: {
+            name: "fixture", pathslug: path, meta: {}, handlers: [], executables: [], placeholders: [],
+            chords: [],
+            chordHints: [
+              { rawPattern: `${prefix}m`, pattern: { keys: [key, "KeyM"] }, description: "Menu" },
+              ...(label ? [{ rawPattern: prefix, pattern: { keys: [key] }, description: label }] : []),
+            ],
+          },
+        },
+      }] }}
+      chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+      chordMacrosData={{ entries: [] }}
+      defaultGlobalPrefixForPlaceholders={prefix}
+    />);
+
+    expect(render(";", "Semicolon")).toContain(">More</div>");
+    expect(render("=", "Equal")).toContain(">More</div>");
+    const overridden = render("=", "Equal", "Utilities");
+    expect(overridden).toContain(">Utilities</div>");
+    expect(overridden).not.toContain(">More</div>");
+  });
+
   test(`${layout} describes a key that also prefixes a range hint`, () => {
     const path = "chords/macos.toml";
     const html = renderToString(<ChordsPageContent

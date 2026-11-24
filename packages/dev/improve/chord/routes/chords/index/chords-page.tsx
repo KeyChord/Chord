@@ -1,7 +1,7 @@
 import type { Chord, ChordHint, ChordReference } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
-import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState } from '@chord/dev.improve.chord.lib.state';
+import { StateQueries, useChordExecutionState, useChordInputState, useChordMacrosState, useChordPackageManagerState, useChordPanelState, useFrontmostState, useSettingsState } from '@chord/dev.improve.chord.lib.state';
 import { emit, listen } from '@tauri-apps/api/event';
 import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
@@ -128,9 +128,9 @@ function ChordKeyRow({
 
 export function ChordsPage() {
 	return (
-		<StateQueries queries={[useChordInputState(), useChordPanelState(), useFrontmostState(), useChordPackageManagerState(), useChordExecutionState(), useChordMacrosState()]} quiet>
-			{(chordInputData, chordPanelData, frontmostData, chordPackageManagerData, chordExecutionData, chordMacrosData) => (
-				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
+		<StateQueries queries={[useChordInputState(), useChordPanelState(), useFrontmostState(), useChordPackageManagerState(), useChordExecutionState(), useChordMacrosState(), useSettingsState()]} quiet>
+			{(chordInputData, chordPanelData, frontmostData, chordPackageManagerData, chordExecutionData, chordMacrosData, settings) => (
+				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} chordPackageManagerData={chordPackageManagerData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} defaultGlobalPrefixForPlaceholders={settings.defaultGlobalPrefixForPlaceholders} />
 			)}
 		</StateQueries>
 	);
@@ -143,6 +143,7 @@ export function ChordsPageContent({
 	chordPackageManagerData,
 	chordExecutionData,
 	chordMacrosData,
+	defaultGlobalPrefixForPlaceholders,
 }: {
 	chordInputData: NonNullable<ReturnType<typeof useChordInputState>['data']>
 	chordPanelData: NonNullable<ReturnType<typeof useChordPanelState>['data']>
@@ -150,6 +151,7 @@ export function ChordsPageContent({
 	chordPackageManagerData: NonNullable<ReturnType<typeof useChordPackageManagerState>['data']>
 	chordExecutionData: NonNullable<ReturnType<typeof useChordExecutionState>['data']>
 	chordMacrosData: NonNullable<ReturnType<typeof useChordMacrosState>['data']>
+	defaultGlobalPrefixForPlaceholders?: string
 }) {
 	const chordInputState = chordInputData;
 	const chordPanelState = chordPanelData;
@@ -347,6 +349,9 @@ export function ChordsPageContent({
 	const commandPrefix = getCommandPrefix(selectedTokens);
 	const commandPrefixTokens = commandPrefix.tokens;
 	const commandLabel = getCommandLabel(commandPrefix);
+	const defaultPlaceholderToken = defaultGlobalPrefixForPlaceholders
+		? normalizeToken(defaultGlobalPrefixForPlaceholders)
+		: undefined;
 	const builtinHints = [
 		...metaCommands,
 		...loops.map(loop => ({ sequence: haltLoopTemplate.replace('{id}', String(loop.id)), name: `Halt loop ${loop.id}: ${loop.input}` })),
@@ -359,8 +364,10 @@ export function ChordsPageContent({
 	const floatingHint = hintSequences.findLast(hint =>
 		hint.tokens.length === floatingTokens.length
 		&& hint.tokens.every((token, index) => floatingTokens[index] === token));
+	const isFloatingPlaceholderPrefix = floatingTokens.length === commandPrefixTokens.length + 1
+		&& floatingTokens.at(-1) === defaultPlaceholderToken;
 	const floatingDescription = chordInputState.description
-		?? floatingHint?.description
+		?? (isFloatingPlaceholderPrefix ? floatingHint?.description || 'More' : floatingHint?.description)
 		?? (floatingTokens.length > 0 ? '...' : 'Ready for a chord');
 
 	const maxVisibleRows = 20;
@@ -430,11 +437,13 @@ export function ChordsPageContent({
 			const exactChord = matchingChords.find(
 				chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 			);
+			const isDefaultPlaceholderPrefix = columnIndex === commandPrefixTokens.length && token === defaultPlaceholderToken;
+			const description = exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name;
 
 			return {
 				token,
 				keys: [token],
-				description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
+				description: description || (isDefaultPlaceholderPrefix ? exactChord?.name || 'More' : ''),
 			};
 		});
 
