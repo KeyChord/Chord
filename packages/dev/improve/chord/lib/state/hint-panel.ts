@@ -1,4 +1,5 @@
 import type {
+  AppSettingsState,
   ChordExecutionState,
   ChordInputState,
   ChordMacrosState,
@@ -19,6 +20,7 @@ export interface HintPanelStates {
   "hint-panel": HintPanelState;
   "chord-execution": ChordExecutionState;
   "chord-macros": ChordMacrosState;
+  settings: AppSettingsState;
 }
 
 const stateIds = [
@@ -28,6 +30,7 @@ const stateIds = [
   "hint-panel",
   "chord-execution",
   "chord-macros",
+  "settings",
 ] as const satisfies readonly (keyof HintPanelStates)[];
 
 const stateQuery = createStateQuery<HintPanelStates>({

@@ -136,8 +136,8 @@ function ChordKeyRow({
 export function ChordsPage() {
 	return (
 		<HintPanelStates>
-			{(chordInputData, chordPanelData, frontmostData, hintPanelData, chordExecutionData, chordMacrosData) => (
-				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} hintPanelData={hintPanelData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} />
+			{(chordInputData, chordPanelData, frontmostData, hintPanelData, chordExecutionData, chordMacrosData, defaultGlobalPrefixForPlaceholders) => (
+				<ChordsPageContent chordInputData={chordInputData} chordPanelData={chordPanelData} frontmostData={frontmostData} hintPanelData={hintPanelData} chordExecutionData={chordExecutionData} chordMacrosData={chordMacrosData} defaultGlobalPrefixForPlaceholders={defaultGlobalPrefixForPlaceholders} />
 			)}
 		</HintPanelStates>
 	);
@@ -156,6 +156,7 @@ function HintPanelStates({ children }: {
 		hintPanel: HintPanelState,
 		chordExecution: ChordExecutionState,
 		chordMacros: ChordMacrosState,
+		defaultGlobalPrefixForPlaceholders: string,
 	) => ReactNode
 }) {
 	const queries = [
@@ -165,15 +166,16 @@ function HintPanelStates({ children }: {
 		useHintPanelState('hint-panel'),
 		useHintPanelState('chord-execution'),
 		useHintPanelState('chord-macros'),
+		useHintPanelState('settings'),
 	] as const;
 	if (queries.some(query => query.isError && query.data === undefined)) {
 		return <div role="alert" className="p-4 text-sm text-muted-foreground">Could not load app state.</div>;
 	}
-	const [chordInput, chordPanel, frontmost, hintPanel, chordExecution, chordMacros] = queries;
-	if (!chordInput.data || !chordPanel.data || !frontmost.data || !hintPanel.data || !chordExecution.data || !chordMacros.data) {
+	const [chordInput, chordPanel, frontmost, hintPanel, chordExecution, chordMacros, settings] = queries;
+	if (!chordInput.data || !chordPanel.data || !frontmost.data || !hintPanel.data || !chordExecution.data || !chordMacros.data || !settings.data) {
 		return null;
 	}
-	return children(chordInput.data, chordPanel.data, frontmost.data, hintPanel.data, chordExecution.data, chordMacros.data);
+	return children(chordInput.data, chordPanel.data, frontmost.data, hintPanel.data, chordExecution.data, chordMacros.data, settings.data.defaultGlobalPrefixForPlaceholders);
 }
 
 export function ChordsPageContent({
@@ -183,6 +185,7 @@ export function ChordsPageContent({
 	hintPanelData,
 	chordExecutionData,
 	chordMacrosData,
+	defaultGlobalPrefixForPlaceholders,
 }: {
 	chordInputData: ChordInputState
 	chordPanelData: ChordPanelState
@@ -190,6 +193,7 @@ export function ChordsPageContent({
 	hintPanelData: HintPanelState
 	chordExecutionData: ChordExecutionState
 	chordMacrosData: ChordMacrosState
+	defaultGlobalPrefixForPlaceholders?: string
 }) {
 	const chordInputState = chordInputData;
 	const chordPanelState = chordPanelData;
@@ -403,6 +407,9 @@ export function ChordsPageContent({
 	const commandPrefix = getCommandPrefix(selectedTokens);
 	const commandPrefixTokens = commandPrefix.tokens;
 	const commandLabel = getCommandLabel(commandPrefix);
+	const defaultPlaceholderToken = defaultGlobalPrefixForPlaceholders
+		? normalizeToken(defaultGlobalPrefixForPlaceholders)
+		: undefined;
 	const builtinHints = [
 		...metaCommands,
 		...loops.map(loop => ({ sequence: haltLoopTemplate.replace('{id}', String(loop.id)), name: `Halt loop ${loop.id}: ${loop.input}` })),
@@ -415,8 +422,10 @@ export function ChordsPageContent({
 	const floatingHint = hintSequences.findLast(hint =>
 		hint.tokens.length === floatingTokens.length
 		&& hint.tokens.every((token, index) => floatingTokens[index] === token));
+	const isFloatingPlaceholderPrefix = floatingTokens.length === commandPrefixTokens.length + 1
+		&& floatingTokens.at(-1) === defaultPlaceholderToken;
 	const floatingDescription = chordInputState.description
-		?? floatingHint?.description
+		?? (isFloatingPlaceholderPrefix ? floatingHint?.description || 'More' : floatingHint?.description)
 		?? (floatingTokens.length > 0 ? '...' : 'Ready for a chord');
 
 	const maxVisibleRows = 20;
@@ -486,11 +495,13 @@ export function ChordsPageContent({
 			const exactChord = matchingChords.find(
 				chord => getChordKeys(chord)[columnIndex] === token && getChordKeys(chord).length === columnIndex + 1,
 			);
+			const isDefaultPlaceholderPrefix = columnIndex === commandPrefixTokens.length && token === defaultPlaceholderToken;
+			const description = exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name;
 
 			return {
 				token,
 				keys: [token],
-				description: exactHint?.description ?? hintsByRawPattern[sequenceKey]?.description ?? exactChord?.name ?? '',
+				description: description || (isDefaultPlaceholderPrefix ? exactChord?.name || 'More' : ''),
 			};
 		});
 
