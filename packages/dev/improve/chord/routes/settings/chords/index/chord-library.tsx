@@ -193,6 +193,10 @@ export function applyPackageOrder(packages: LibraryPackage[], order: string[]): 
 }
 
 const rankGroups: Partial<Record<PackageRank, { label: string; description: string }>> = {
+  core: {
+    label: "Core",
+    description: "Chord's own chords. They override every other package.",
+  },
   installed: {
     label: "Installed",
     description: "When two packages define the same chord, the higher one runs.",

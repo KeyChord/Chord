@@ -1,7 +1,5 @@
 use super::caps_lock_guard::CapsLockGuard;
-use super::caps_remap::{
-    self, CHORD_MAPPING, MappingTable, ProcessIdentity, RemapStore, SystemMappingTable,
-};
+use super::caps_remap::{self, ProcessIdentity, RemapStore, SystemMappingTable};
 use super::caps_space_gap::{CapsSpaceGaps, KeyTime, milliseconds};
 use super::health::{Backoff, InputHealth};
 use super::secure_input::SecureInputState;
@@ -262,7 +260,17 @@ impl AppKeyboard {
             }
         });
         store.install(&SystemMappingTable, ProcessIdentity::current()?)?;
-        if !self.holds_caps_remap.swap(true, Ordering::SeqCst) {
+        // Held from the write on, so that it is released on exit whatever follows.
+        let newly_held = !self.holds_caps_remap.swap(true, Ordering::SeqCst);
+        // Read back from the keyboards themselves: what was written is only worth
+        // what they report.
+        let missing = caps_remap::tables_without_chord_mapping(&SystemMappingTable)?;
+        anyhow::ensure!(
+            missing.is_empty(),
+            "macOS accepted the Caps key mapping but it is not in effect on {}",
+            missing.join(", ")
+        );
+        if newly_held {
             log::info!("Took over the Caps key (mapped to F20 while Chord owns input)");
         }
         Ok(())
@@ -293,8 +301,9 @@ impl AppKeyboard {
         self.restore_caps_remap("another app changed the key mapping table");
     }
 
-    /// Puts Chord's Caps mapping back if this instance holds it and it is gone. Reads
-    /// the table and takes the state lock, so the work happens on its own thread.
+    /// Puts Chord's Caps mapping back if this instance holds it and any keyboard has
+    /// lost it. Reads the tables and takes the state lock, so the work happens on its
+    /// own thread.
     fn restore_caps_remap(&self, noticed: &'static str) {
         if !self.holds_caps_remap.load(Ordering::SeqCst) {
             return;
@@ -307,14 +316,15 @@ impl AppKeyboard {
                 if !keyboard.holds_caps_remap.load(Ordering::SeqCst) {
                     return;
                 }
-                match SystemMappingTable.read() {
-                    Ok(entries) if caps_mapping_is_chords(&entries) => return,
-                    Ok(_) => {}
+                let missing = match caps_remap::tables_without_chord_mapping(&SystemMappingTable)
+                {
+                    Ok(missing) if missing.is_empty() => return,
+                    Ok(missing) => missing.join(", "),
                     Err(error) => {
                         log::error!("Failed to read the Caps key mapping: {error:#}");
                         return;
                     }
-                }
+                };
                 let decision = keyboard
                     .restore_budget
                     .lock()
@@ -332,7 +342,7 @@ impl AppKeyboard {
                     }
                 }
                 log::warn!(
-                    "The Caps key mapping was removed by another app ({noticed}). Restoring it"
+                    "The Caps key mapping was removed from {missing} by another app ({noticed}). Restoring it"
                 );
                 if let Err(error) = keyboard.install_caps_remap() {
                     log::error!("Failed to restore the Caps key mapping: {error:#}");
@@ -1018,11 +1028,6 @@ impl AppKeyboard {
     }
 }
 
-/// Whether the table maps the Caps key to Chord's key and to nothing else.
-fn caps_mapping_is_chords(entries: &[caps_remap::Mapping]) -> bool {
-    caps_remap::with_chord_mapping(entries).0 == entries && entries.contains(&CHORD_MAPPING)
-}
-
 /// Whether a Space press that reached the hotkey fallback belongs to Chord: it follows
 /// an armed Caps press, or a chord is being read and Space is one of its keys.
 fn space_press_is_chords(caps_armed: bool, in_chord: bool) -> bool {
@@ -1040,20 +1045,6 @@ mod tests {
         assert!(space_press_is_chords(true, true));
         // A stale registration: the press is handed back to the focused app.
         assert!(!space_press_is_chords(false, false));
-    }
-
-    #[test]
-    fn only_a_table_with_chords_caps_entry_alone_needs_no_restoring() {
-        let other = (0x7_0000_0004, 0x7_0000_0005);
-        assert!(caps_mapping_is_chords(&[CHORD_MAPPING]));
-        assert!(caps_mapping_is_chords(&[other, CHORD_MAPPING]));
-        // Cleared by another tool, or never set.
-        assert!(!caps_mapping_is_chords(&[]));
-        assert!(!caps_mapping_is_chords(&[other]));
-        // Caps mapped elsewhere, with or without Chord's entry.
-        let caps_elsewhere = (caps_remap::CAPS_USAGE, 0x7_0000_00E0);
-        assert!(!caps_mapping_is_chords(&[caps_elsewhere]));
-        assert!(!caps_mapping_is_chords(&[caps_elsewhere, CHORD_MAPPING]));
     }
 
     #[test]

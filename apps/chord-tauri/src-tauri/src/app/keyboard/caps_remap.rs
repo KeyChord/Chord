@@ -4,13 +4,20 @@
 //! mapped away from Caps (usage 0x39) never changes the lock state and Chord becomes its
 //! only writer. The key reaches Chord's event tap as F20, ordered with every other key.
 //!
-//! The mapping is one system-wide table that outlives the process that set it. Chord
-//! edits only its own entry, and records the owner and any Caps entries it displaced in
-//! a state file. The crash guardian reads that file to undo the mapping if Chord dies.
+//! macOS keeps one table per keyboard, plus a default that a keyboard starts from when
+//! it connects. A key does what its own keyboard's table says, and any process may
+//! write either kind (UTM clears each keyboard's table and leaves the default alone).
+//! So "Chord owns Caps" means one thing only: every connected keyboard's table has
+//! Chord's entry. Chord reads and writes all of them (`MappingTables`) and never takes
+//! the default as proof of what a keyboard does.
+//!
+//! The tables outlive the process that set them. Chord edits only its own entry, and
+//! records the owner and any Caps entries it displaced in a state file. The crash
+//! guardian reads that file to undo the mapping if Chord dies.
 
 use anyhow::{Context, Result, ensure};
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
-use objc2_io_kit::IOHIDEventSystemClient;
+use objc2_io_kit::{IOHIDEventSystemClient, IOHIDServiceClient};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -58,6 +65,40 @@ pub fn without_chord_mapping(entries: &[Mapping], displaced: &[Mapping]) -> Vec<
         kept.extend_from_slice(displaced);
     }
     kept
+}
+
+/// Whether a table maps the Caps key to Chord's key and to nothing else.
+pub fn is_chords(entries: &[Mapping]) -> bool {
+    with_chord_mapping(entries).0 == entries
+}
+
+/// Which of the tables that decide what a key does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TableId {
+    /// What a keyboard starts from when it connects.
+    Default,
+    /// A connected keyboard, by its IORegistry entry ID.
+    Keyboard(u64),
+}
+
+/// One table as it is right now.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Table {
+    pub id: TableId,
+    /// For the log: "the default table" or the keyboard's product name.
+    pub name: String,
+    pub entries: Vec<Mapping>,
+}
+
+/// The names of the tables in which the Caps key is not Chord's alone. Empty exactly
+/// when Caps reaches Chord from every keyboard.
+pub fn tables_without_chord_mapping(tables: &impl MappingTables) -> Result<Vec<String>> {
+    Ok(tables
+        .read()?
+        .into_iter()
+        .filter(|table| !is_chords(&table.entries))
+        .map(|table| table.name)
+        .collect())
 }
 
 /// Who holds Chord's mapping, and what to restore when it is removed.
@@ -140,14 +181,20 @@ impl RemapStore {
         }
     }
 
-    /// Installs Chord's mapping for `owner`. A state left by a dead owner keeps its
-    /// displaced entries, which belong to the user, not to Chord. Idempotent: nothing
-    /// is written when the mapping and state are already in place.
-    pub fn install(&self, table: &impl MappingTable, owner: ProcessIdentity) -> Result<()> {
+    /// Installs Chord's mapping for `owner` in every table. A state left by a dead
+    /// owner keeps its displaced entries, which belong to the user, not to Chord.
+    /// Idempotent: a table or state that is already right is not written.
+    pub fn install(&self, tables: &impl MappingTables, owner: ProcessIdentity) -> Result<()> {
         self.locked(|store| {
             let previous = store.read()?;
-            let current = table.read()?;
-            let (entries, displaced) = with_chord_mapping(&current);
+            let current = tables.read()?;
+            // What to put back comes from the default table: each keyboard's table is
+            // a copy of it unless someone wrote that keyboard alone.
+            let displaced = current
+                .iter()
+                .find(|table| table.id == TableId::Default)
+                .map(|table| with_chord_mapping(&table.entries).1)
+                .unwrap_or_default();
             let displaced = match &previous {
                 Some(previous) if displaced.is_empty() => previous.displaced.clone(),
                 _ => displaced,
@@ -161,18 +208,23 @@ impl RemapStore {
             if previous.as_ref() != Some(&state) {
                 store.write(&state)?;
             }
-            if entries != current {
-                table.write(&entries)?;
+            for table in &current {
+                let (entries, _) = with_chord_mapping(&table.entries);
+                if entries != table.entries {
+                    tables
+                        .write(table.id, &entries)
+                        .with_context(|| format!("failed to map Caps on {}", table.name))?;
+                }
             }
             Ok(())
         })
     }
 
-    /// Removes Chord's mapping when `owner` holds it or its holder has died. With no
-    /// owner (the guardian), only a dead holder's mapping is removed.
+    /// Removes Chord's mapping from every table when `owner` holds it or its holder
+    /// has died. With no owner (the guardian), only a dead holder's mapping is removed.
     pub fn uninstall(
         &self,
-        table: &impl MappingTable,
+        tables: &impl MappingTables,
         owner: Option<ProcessIdentity>,
     ) -> Result<bool> {
         self.locked(|store| {
@@ -183,76 +235,152 @@ impl RemapStore {
             if Some(holder) != owner && holder.is_alive() {
                 return Ok(false);
             }
-            table.write(&without_chord_mapping(&table.read()?, &state.displaced))?;
+            for table in tables.read()? {
+                let entries = without_chord_mapping(&table.entries, &state.displaced);
+                if entries != table.entries {
+                    tables
+                        .write(table.id, &entries)
+                        .with_context(|| format!("failed to unmap Caps on {}", table.name))?;
+                }
+            }
             store.remove()?;
             Ok(true)
         })
     }
 }
 
-/// The system-wide `UserKeyMapping`, abstracted so the logic above is testable.
-pub trait MappingTable {
-    fn read(&self) -> Result<Vec<Mapping>>;
-    fn write(&self, entries: &[Mapping]) -> Result<()>;
+/// Every `UserKeyMapping` table, abstracted so the logic above is testable.
+pub trait MappingTables {
+    /// The default table and the table of each connected keyboard, as they are now.
+    fn read(&self) -> Result<Vec<Table>>;
+    fn write(&self, id: TableId, entries: &[Mapping]) -> Result<()>;
 }
 
-/// macOS's table. Set without a service, it applies to every keyboard, including ones
-/// connected later.
+/// macOS's tables. The default is the property set on the HID event system itself;
+/// writing it also replaces every keyboard's table. A keyboard's table is the same
+/// property on its service.
 pub struct SystemMappingTable;
 
-impl MappingTable for SystemMappingTable {
-    fn read(&self) -> Result<Vec<Mapping>> {
-        let client = IOHIDEventSystemClient::new_simple_client(None);
-        let Some(value) = client.property(&CFString::from_static_str(USER_KEY_MAPPING)) else {
-            return Ok(vec![]);
+// HID usage page and usage of a keyboard (`kHIDPage_GenericDesktop`, `kHIDUsage_GD_Keyboard`).
+const KEYBOARD_USAGE: (u32, u32) = (0x01, 0x06);
+
+impl SystemMappingTable {
+    fn keyboards(client: &IOHIDEventSystemClient) -> Vec<CFRetained<IOHIDServiceClient>> {
+        let Some(services) = client.services() else {
+            return vec![];
         };
-        let array = value
-            .downcast::<CFArray>()
-            .map_err(|_| anyhow::anyhow!("UserKeyMapping is not an array"))?;
-        // SAFETY: UserKeyMapping is documented as an array of dictionaries.
-        let array = unsafe { CFRetained::cast_unchecked::<CFArray<CFType>>(array) };
-        let src_key = CFString::from_static_str(MAPPING_SRC);
-        let dst_key = CFString::from_static_str(MAPPING_DST);
-        let mut entries = Vec::new();
-        for item in array.iter() {
-            let Ok(dictionary) = item.downcast::<CFDictionary>() else {
-                continue;
-            };
-            // SAFETY: mapping entries are dictionaries keyed by strings.
-            let dictionary =
-                unsafe { CFRetained::cast_unchecked::<CFDictionary<CFString, CFType>>(dictionary) };
-            let number = |key: &CFString| {
-                dictionary
-                    .get(key)
-                    .and_then(|value| value.downcast_ref::<CFNumber>().and_then(CFNumber::as_i64))
-            };
-            if let (Some(src), Some(dst)) = (number(&src_key), number(&dst_key)) {
-                entries.push((src as u64, dst as u64));
-            }
-        }
-        Ok(entries)
+        // SAFETY: documented as an array of IOHIDServiceClient.
+        let services = unsafe { CFRetained::cast_unchecked::<CFArray<CFType>>(services) };
+        services
+            .iter()
+            .filter_map(|service| service.downcast::<IOHIDServiceClient>().ok())
+            .filter(|service| service.conforms_to(KEYBOARD_USAGE.0, KEYBOARD_USAGE.1))
+            .collect()
     }
 
-    fn write(&self, entries: &[Mapping]) -> Result<()> {
-        let src_key = CFString::from_static_str(MAPPING_SRC);
-        let dst_key = CFString::from_static_str(MAPPING_DST);
-        let dictionaries: Vec<CFRetained<CFDictionary<CFString, CFNumber>>> = entries
-            .iter()
-            .map(|(src, dst)| {
-                CFDictionary::from_slices(
-                    &[&*src_key, &*dst_key],
-                    &[
-                        &*CFNumber::new_i64(*src as i64),
-                        &*CFNumber::new_i64(*dst as i64),
-                    ],
-                )
-            })
-            .collect();
-        let array = CFArray::from_retained_objects(&dictionaries);
+    fn keyboard_id(service: &IOHIDServiceClient) -> Option<u64> {
+        let id = service.registry_id();
+        id.downcast_ref::<CFNumber>()
+            .and_then(CFNumber::as_i64)
+            .map(|id| id as u64)
+    }
+}
+
+/// Decodes a `UserKeyMapping` value; an unset one is an empty table.
+fn entries_from(value: Option<CFRetained<CFType>>) -> Result<Vec<Mapping>> {
+    let Some(value) = value else {
+        return Ok(vec![]);
+    };
+    let array = value
+        .downcast::<CFArray>()
+        .map_err(|_| anyhow::anyhow!("UserKeyMapping is not an array"))?;
+    // SAFETY: UserKeyMapping is documented as an array of dictionaries.
+    let array = unsafe { CFRetained::cast_unchecked::<CFArray<CFType>>(array) };
+    let src_key = CFString::from_static_str(MAPPING_SRC);
+    let dst_key = CFString::from_static_str(MAPPING_DST);
+    let mut entries = Vec::new();
+    for item in array.iter() {
+        let Ok(dictionary) = item.downcast::<CFDictionary>() else {
+            continue;
+        };
+        // SAFETY: mapping entries are dictionaries keyed by strings.
+        let dictionary =
+            unsafe { CFRetained::cast_unchecked::<CFDictionary<CFString, CFType>>(dictionary) };
+        let number = |key: &CFString| {
+            dictionary
+                .get(key)
+                .and_then(|value| value.downcast_ref::<CFNumber>().and_then(CFNumber::as_i64))
+        };
+        if let (Some(src), Some(dst)) = (number(&src_key), number(&dst_key)) {
+            entries.push((src as u64, dst as u64));
+        }
+    }
+    Ok(entries)
+}
+
+/// Encodes a table as a `UserKeyMapping` value.
+fn entries_value(entries: &[Mapping]) -> CFRetained<CFArray<CFDictionary<CFString, CFNumber>>> {
+    let src_key = CFString::from_static_str(MAPPING_SRC);
+    let dst_key = CFString::from_static_str(MAPPING_DST);
+    let dictionaries: Vec<CFRetained<CFDictionary<CFString, CFNumber>>> = entries
+        .iter()
+        .map(|(src, dst)| {
+            CFDictionary::from_slices(
+                &[&*src_key, &*dst_key],
+                &[
+                    &*CFNumber::new_i64(*src as i64),
+                    &*CFNumber::new_i64(*dst as i64),
+                ],
+            )
+        })
+        .collect();
+    CFArray::from_retained_objects(&dictionaries)
+}
+
+impl MappingTables for SystemMappingTable {
+    fn read(&self) -> Result<Vec<Table>> {
+        let key = CFString::from_static_str(USER_KEY_MAPPING);
         let client = IOHIDEventSystemClient::new_simple_client(None);
-        // SAFETY: a property list value of the documented shape.
-        let applied = unsafe {
-            client.set_property(&CFString::from_static_str(USER_KEY_MAPPING), array.as_ref())
+        let mut tables = vec![Table {
+            id: TableId::Default,
+            name: "the default table".into(),
+            entries: entries_from(client.property(&key))?,
+        }];
+        for service in Self::keyboards(&client) {
+            let Some(id) = Self::keyboard_id(&service) else {
+                continue;
+            };
+            let product = service
+                .property(&CFString::from_static_str("Product"))
+                .and_then(|name| name.downcast_ref::<CFString>().map(ToString::to_string))
+                .unwrap_or_else(|| "an unnamed keyboard".into());
+            tables.push(Table {
+                id: TableId::Keyboard(id),
+                name: format!("{product} ({id:#x})"),
+                entries: entries_from(service.property(&key))?,
+            });
+        }
+        Ok(tables)
+    }
+
+    fn write(&self, id: TableId, entries: &[Mapping]) -> Result<()> {
+        let key = CFString::from_static_str(USER_KEY_MAPPING);
+        let value = entries_value(entries);
+        let client = IOHIDEventSystemClient::new_simple_client(None);
+        let applied = match id {
+            // SAFETY: a property list value of the documented shape.
+            TableId::Default => unsafe { client.set_property(&key, value.as_ref()) },
+            TableId::Keyboard(id) => {
+                let Some(service) = Self::keyboards(&client)
+                    .into_iter()
+                    .find(|service| Self::keyboard_id(service) == Some(id))
+                else {
+                    // Unplugged since it was read: nothing left to map.
+                    return Ok(());
+                };
+                // SAFETY: a property list value of the documented shape.
+                unsafe { service.set_property(&key, value.as_ref()) }
+            }
         };
         ensure!(applied, "macOS rejected the Caps Lock key mapping");
         Ok(())
@@ -296,10 +424,13 @@ unsafe extern "C-unwind" fn table_changed(
     }
 }
 
-/// Calls `changed` on the main thread each time any process writes `UserKeyMapping`,
-/// Chord included. macOS reports the write within milliseconds (measured: 6 ms), so a
-/// mapping another tool removed is put back before the next Caps press instead of
-/// being discovered by losing one. Only the first call registers.
+/// Calls `changed` on the main thread each time any process writes the default
+/// `UserKeyMapping` table, Chord included. macOS reports the write within milliseconds
+/// (measured: 6 ms), so a mapping another tool removed is put back before the next Caps
+/// press instead of being discovered by losing one. Only the first call registers.
+///
+/// A write to one keyboard's table is not reported here (seen 2026-11-26, UTM); that
+/// one is found by the Caps press it lets through (`TapEvent::NativeCapsToggle`).
 pub fn watch_system_table(changed: fn()) -> Result<()> {
     if TABLE_CHANGED.set(changed).is_err() {
         return Ok(());
@@ -374,19 +505,52 @@ mod tests {
 
     const F18: Mapping = (0x7_0000_0039, 0x7_0000_006D);
     const OTHER: Mapping = (0x7_0000_0004, 0x7_0000_0005);
+    const BUILT_IN: TableId = TableId::Keyboard(1);
+    const EXTERNAL: TableId = TableId::Keyboard(2);
 
-    #[derive(Default)]
-    struct Table {
-        entries: RefCell<Vec<Mapping>>,
+    /// Behaves like macOS: writing the default replaces every keyboard's table.
+    struct Tables {
+        tables: RefCell<Vec<Table>>,
         writes: std::cell::Cell<usize>,
     }
 
-    impl MappingTable for Table {
-        fn read(&self) -> Result<Vec<Mapping>> {
-            Ok(self.entries.borrow().clone())
+    impl Tables {
+        fn new(keyboards: &[TableId]) -> Self {
+            let ids = std::iter::once(TableId::Default).chain(keyboards.iter().copied());
+            Self {
+                tables: RefCell::new(
+                    ids.map(|id| Table {
+                        id,
+                        name: format!("{id:?}"),
+                        entries: vec![],
+                    })
+                    .collect(),
+                ),
+                writes: std::cell::Cell::new(0),
+            }
         }
-        fn write(&self, entries: &[Mapping]) -> Result<()> {
-            *self.entries.borrow_mut() = entries.to_vec();
+
+        fn entries(&self, id: TableId) -> Vec<Mapping> {
+            let tables = self.tables.borrow();
+            tables
+                .iter()
+                .find(|table| table.id == id)
+                .unwrap()
+                .entries
+                .clone()
+        }
+    }
+
+    impl MappingTables for Tables {
+        fn read(&self) -> Result<Vec<Table>> {
+            Ok(self.tables.borrow().clone())
+        }
+        fn write(&self, id: TableId, entries: &[Mapping]) -> Result<()> {
+            for table in self.tables.borrow_mut().iter_mut() {
+                if table.id == id || id == TableId::Default {
+                    table.entries = entries.to_vec();
+                }
+            }
             self.writes.set(self.writes.get() + 1);
             Ok(())
         }
@@ -426,32 +590,88 @@ mod tests {
     }
 
     #[test]
+    fn only_a_table_with_chords_caps_entry_alone_is_chords() {
+        assert!(is_chords(&[CHORD_MAPPING]));
+        assert!(is_chords(&[OTHER, CHORD_MAPPING]));
+        // Cleared by another tool, or never set.
+        assert!(!is_chords(&[]));
+        assert!(!is_chords(&[OTHER]));
+        // Caps mapped elsewhere, with or without Chord's entry.
+        let caps_elsewhere = (CAPS_USAGE, 0x7_0000_00E0);
+        assert!(!is_chords(&[caps_elsewhere]));
+        assert!(!is_chords(&[caps_elsewhere, CHORD_MAPPING]));
+    }
+
+    #[test]
     fn install_records_the_owner_before_mapping_and_uninstall_restores() {
-        let table = Table::default();
-        table.write(&[OTHER, F18]).unwrap();
+        let tables = Tables::new(&[BUILT_IN]);
+        tables.write(TableId::Default, &[OTHER, F18]).unwrap();
         let store = store();
         let me = ProcessIdentity::current().unwrap();
-        store.install(&table, me).unwrap();
-        assert_eq!(table.read().unwrap(), [OTHER, CHORD_MAPPING]);
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables.entries(TableId::Default), [OTHER, CHORD_MAPPING]);
+        assert_eq!(tables.entries(BUILT_IN), [OTHER, CHORD_MAPPING]);
         let state = store.read().unwrap().unwrap();
         assert_eq!(
             (state.owner_pid, state.displaced.clone()),
             (me.pid, vec![F18])
         );
         // Re-installing keeps what was originally displaced and rewrites nothing.
-        let writes = table.writes.get();
-        store.install(&table, me).unwrap();
+        let writes = tables.writes.get();
+        store.install(&tables, me).unwrap();
         assert_eq!(store.read().unwrap().unwrap().displaced, [F18]);
-        assert_eq!(table.writes.get(), writes);
-        assert!(store.uninstall(&table, Some(me)).unwrap());
-        assert_eq!(table.read().unwrap(), [OTHER, F18]);
+        assert_eq!(tables.writes.get(), writes);
+        assert!(store.uninstall(&tables, Some(me)).unwrap());
+        assert_eq!(tables.entries(TableId::Default), [OTHER, F18]);
+        assert_eq!(tables.entries(BUILT_IN), [OTHER, F18]);
         assert_eq!(store.read().unwrap(), None);
-        assert!(!store.uninstall(&table, Some(me)).unwrap());
+        assert!(!store.uninstall(&tables, Some(me)).unwrap());
+    }
+
+    /// The outage of 2026-11-26: UTM cleared each keyboard's table and left the
+    /// default alone, so the default still read as Chord's while Caps was plain Caps
+    /// Lock on every keyboard.
+    #[test]
+    fn a_keyboard_cleared_behind_an_intact_default_is_seen_and_mapped_again() {
+        let tables = Tables::new(&[BUILT_IN, EXTERNAL]);
+        let store = store();
+        let me = ProcessIdentity::current().unwrap();
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables_without_chord_mapping(&tables).unwrap(), [""; 0]);
+
+        tables.write(BUILT_IN, &[]).unwrap();
+        assert_eq!(tables.entries(TableId::Default), [CHORD_MAPPING]);
+        assert_eq!(
+            tables_without_chord_mapping(&tables).unwrap(),
+            [format!("{BUILT_IN:?}")]
+        );
+
+        // Only the keyboard that lost it is written.
+        let writes = tables.writes.get();
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables.writes.get(), writes + 1);
+        assert_eq!(tables.entries(BUILT_IN), [CHORD_MAPPING]);
+        assert_eq!(tables_without_chord_mapping(&tables).unwrap(), [""; 0]);
+    }
+
+    #[test]
+    fn a_keyboard_keeps_its_own_entries_and_loses_only_chords_on_uninstall() {
+        let tables = Tables::new(&[BUILT_IN, EXTERNAL]);
+        tables.write(EXTERNAL, &[OTHER]).unwrap();
+        let store = store();
+        let me = ProcessIdentity::current().unwrap();
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables.entries(BUILT_IN), [CHORD_MAPPING]);
+        assert_eq!(tables.entries(EXTERNAL), [OTHER, CHORD_MAPPING]);
+        assert!(store.uninstall(&tables, Some(me)).unwrap());
+        assert_eq!(tables.entries(BUILT_IN), []);
+        assert_eq!(tables.entries(EXTERNAL), [OTHER]);
+        assert_eq!(tables.entries(TableId::Default), []);
     }
 
     #[test]
     fn a_live_owner_keeps_the_mapping_while_a_dead_one_releases_it() {
-        let table = Table::default();
+        let tables = Tables::new(&[BUILT_IN]);
         let store = store();
         let me = ProcessIdentity::current().unwrap();
         // The test runner's parent stands in for another live instance; spawning one
@@ -464,22 +684,37 @@ mod tests {
         };
         // A live instance cannot take the mapping this process holds, and neither
         // can the guardian.
-        store.install(&table, me).unwrap();
-        assert!(!store.uninstall(&table, Some(other)).unwrap());
-        assert!(!store.uninstall(&table, None).unwrap());
-        assert_eq!(table.read().unwrap(), [CHORD_MAPPING]);
-        store.install(&table, other).unwrap();
-        assert!(!store.uninstall(&table, Some(me)).unwrap());
+        store.install(&tables, me).unwrap();
+        assert!(!store.uninstall(&tables, Some(other)).unwrap());
+        assert!(!store.uninstall(&tables, None).unwrap());
+        assert_eq!(tables.entries(BUILT_IN), [CHORD_MAPPING]);
+        store.install(&tables, other).unwrap();
+        assert!(!store.uninstall(&tables, Some(me)).unwrap());
         // Once its holder is gone, anyone releases it.
         let gone = ProcessIdentity {
             pid: u32::MAX >> 1,
             started: 0,
         };
         assert!(!gone.is_alive());
-        store.install(&table, gone).unwrap();
-        assert!(store.uninstall(&table, None).unwrap());
-        assert_eq!(table.read().unwrap(), []);
+        store.install(&tables, gone).unwrap();
+        assert!(store.uninstall(&tables, None).unwrap());
+        assert_eq!(tables.entries(TableId::Default), []);
+        assert_eq!(tables.entries(BUILT_IN), []);
         assert_eq!(store.read().unwrap(), None);
+    }
+
+    #[test]
+    #[ignore = "reads this Mac's key mapping tables"]
+    fn reads_the_default_table_and_each_keyboard() {
+        let tables = SystemMappingTable.read().unwrap();
+        for table in &tables {
+            println!("{}: {:x?}", table.name, table.entries);
+        }
+        assert_eq!(tables[0].id, TableId::Default);
+        println!(
+            "without Chord's mapping: {:?}",
+            tables_without_chord_mapping(&SystemMappingTable).unwrap()
+        );
     }
 
     #[test]

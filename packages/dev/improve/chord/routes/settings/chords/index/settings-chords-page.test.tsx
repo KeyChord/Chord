@@ -322,12 +322,15 @@ test("moves among many packages land exactly where they are dropped", () => {
   expect(movePackage(rows, "a", "e", "after")).toEqual(["b", "c", "d", "e", "a"]);
 });
 
-test("the library groups installed and built-in packages with drag handles", () => {
+test("the library groups core, installed and built-in packages with drag handles", () => {
   const html = render(
     ["@keychord/chords-chord", "@keychord/raycast", "@keychord/warp", "@keychord/finder"].map(pkg),
     [],
     ["@keychord/finder"],
   );
+  const core = html.indexOf(">Core<");
+  expect(core).toBeGreaterThan(-1);
+  expect(core).toBeLessThan(html.indexOf('aria-label="Show chords in @keychord/chords-chord"'));
   const installed = html.indexOf(">Installed<");
   const builtin = html.indexOf(">Built-in<");
   expect(installed).toBeGreaterThan(
