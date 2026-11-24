@@ -87,21 +87,29 @@ export function SettingsChordsPageContent({
   const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
   const needsApproval = thirdPartyPackages.some((pkg) => !pkg.approved);
   const approvals = (
-    <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
+    <PackageApprovals
+      key="approvals"
+      packages={thirdPartyPackages}
+      errors={chordPackageManagerData.errors}
+    />
+  );
+  const library = (
+    <ChordLibrary
+      key="library"
+      packages={shownPackages}
+      apps={apps}
+      personalDirnames={{}}
+      configurePackage={configurePackage}
+      onReorder={setPackageOrder}
+    />
   );
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-7">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-4">
       <TabsList aria-label="Chords views">
-        <TabsTrigger
-          value="packages"
-          className="min-w-28 px-4 text-[13px]"
-        >
+        <TabsTrigger value="packages" className="min-w-max whitespace-nowrap px-3 text-[13px]">
           Packages
         </TabsTrigger>
-        <TabsTrigger
-          value="personal"
-          className="min-w-28 px-4 text-[13px]"
-        >
+        <TabsTrigger value="personal" className="min-w-max whitespace-nowrap px-3 text-[13px]">
           Local Chords
         </TabsTrigger>
       </TabsList>
@@ -109,31 +117,25 @@ export function SettingsChordsPageContent({
         value="packages"
         forceMount
         hidden={activeTab !== "packages"}
-        className="space-y-7"
+        className="space-y-4 p-0"
       >
-        {needsApproval ? approvals : null}
+        {needsApproval ? [approvals, library] : [library, approvals]}
         <DefaultGlobalPrefixSetting />
-        <ChordLibrary
-          packages={shownPackages}
-          apps={apps}
-          personalDirnames={{}}
-          configurePackage={configurePackage}
-          onReorder={setPackageOrder}
-        />
-        {needsApproval ? null : approvals}
         <Collapsible className="group/sources preference-disclosure">
-          <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-5 py-4 text-sm font-normal">
+          <CollapsibleTrigger className="flex h-auto w-full items-center justify-start gap-3 px-4 py-3 text-[13px] font-medium">
             <Settings2 className="size-4 text-muted-foreground" /> Manage sources
             <ChevronRight className="ml-auto size-4 text-muted-foreground transition-transform group-data-[expanded=true]/sources:rotate-90" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-5 px-5 pb-5">
-            <LocalFoldersCard />
-            <ChordReposCard />
-            <ChordMonoreposCard />
+          <CollapsibleContent>
+            <div className="space-y-5 px-4 pb-4">
+              <LocalFoldersCard />
+              <ChordReposCard />
+              <ChordMonoreposCard />
+            </div>
           </CollapsibleContent>
         </Collapsible>
       </TabsContent>
-      <TabsContent value="personal" forceMount hidden={activeTab !== "personal"}>
+      <TabsContent value="personal" forceMount hidden={activeTab !== "personal"} className="p-0">
         <div className="preference-disclosure p-5">
           <PersonalChords />
         </div>
@@ -155,38 +157,39 @@ function DefaultGlobalPrefixSetting() {
 
   return (
     <form
-      className="preference-disclosure flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4"
+      className="preference-disclosure flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3"
       onSubmit={(event) => {
         event.preventDefault();
         if (canSave) save.mutate(draft);
       }}
     >
-      <div className="min-w-56 flex-1">
-        <label htmlFor={inputId} className="text-sm font-medium">
-          Default Global Prefix for Placeholders
+      <div className="min-w-44 flex-1">
+        <label htmlFor={inputId} className="text-[13px] font-medium">
+          Default global prefix for placeholders
         </label>
-        <p id={`${inputId}-help`} className="mt-1 text-xs text-muted-foreground">
-          Chord adds this symbol before a package&apos;s prefix letter. You can still set a prefix
-          for each package.
+        <p id={`${inputId}-help`} className="text-xs text-(--settings-description)">
+          Added before a package&apos;s prefix letter, unless the package has a custom prefix.
         </p>
       </div>
-      <Input
-        id={inputId}
-        aria-describedby={`${inputId}-help`}
-        value={draft ?? current}
-        onChange={(event) => {
-          save.reset();
-          setDraft(event.target.value);
-        }}
-        className="w-14 text-center font-mono"
-        autoComplete="off"
-        spellCheck={false}
-        maxLength={1}
-        disabled={save.isPending}
-      />
-      <Button type="submit" size="sm" disabled={!canSave}>
-        {save.isPending ? "Saving..." : "Save"}
-      </Button>
+      <div className="flex shrink-0 items-center gap-2">
+        <Input
+          id={inputId}
+          aria-describedby={`${inputId}-help`}
+          value={draft ?? current}
+          onChange={(event) => {
+            save.reset();
+            setDraft(event.target.value);
+          }}
+          className="h-7 w-10 px-0 text-center font-mono"
+          autoComplete="off"
+          spellCheck={false}
+          maxLength={1}
+          disabled={save.isPending}
+        />
+        <Button type="submit" variant="outline" size="sm" disabled={!canSave}>
+          {save.isPending ? "Saving..." : "Save"}
+        </Button>
+      </div>
       {save.isError && (
         <p role="alert" className="w-full text-xs text-destructive">
           {typeof save.error === "object" && "Message" in save.error

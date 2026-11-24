@@ -127,13 +127,14 @@ export function listLibraryPackages(
       return {
         name: pkg.name,
         personal,
-        rank: (pkg.name === CORE_PACKAGE
-          ? "core"
-          : personal
-            ? "personal"
-            : builtinNames.has(pkg.name)
-              ? "builtin"
-              : "installed"),
+        rank:
+          pkg.name === CORE_PACKAGE
+            ? "core"
+            : personal
+              ? "personal"
+              : builtinNames.has(pkg.name)
+                ? "builtin"
+                : "installed",
         chords,
         placeholders: listPlaceholders([pkg]),
         fileCount: new Set([
@@ -281,7 +282,10 @@ function ChordName({
   const file = dirname ? { dirname, pathslug: entry.pathslug } : undefined;
   return (
     <div className="flex items-center gap-3">
-      <span className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.015em]" title={entry.chord.name}>
+      <span
+        className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.015em]"
+        title={entry.chord.name}
+      >
         {entry.chord.name}
       </span>
       {entry.personal && file && (
@@ -412,9 +416,7 @@ function AppChords({
       </h3>
       <div className="chord-library-scroll">
         <table className="chord-library-table app-chords-table">
-          <caption className="sr-only">
-            {appLabel} sequences, actions, and action types
-          </caption>
+          <caption className="sr-only">{appLabel} sequences, actions, and action types</caption>
           <thead>
             {table.getHeaderGroups().map((group) => (
               <tr key={group.id}>
@@ -722,8 +724,14 @@ export function ChordLibrary({
   }, [configurePackage, hasConfigurePackage]);
 
   return (
-    <section aria-label="Chord packages">
-      <div className="chord-library-toolbar">
+    <section aria-label="Chord packages" className="preference-disclosure">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-(--settings-separator) px-4 py-3">
+        <div>
+          <h3 className="text-[13px] font-semibold">Package library</h3>
+          <p className="text-xs text-(--settings-description)" role="status">
+            {visibleRows.length} package{visibleRows.length === 1 ? "" : "s"}
+          </p>
+        </div>
         <label className="chord-library-search">
           <Search size={16} aria-hidden="true" />
           <Input
@@ -744,9 +752,6 @@ export function ChordLibrary({
             </Button>
           )}
         </label>
-        <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground" role="status">
-          {visibleRows.length} package{visibleRows.length === 1 ? "" : "s"}
-        </span>
       </div>
       {onReorder && (
         <p id={hintId} className="sr-only">
@@ -764,8 +769,8 @@ export function ChordLibrary({
           data-dragging={isDragging || undefined}
         >
           <caption className="sr-only">
-            Your chord packages, highest rank first; expand a package to view its placeholders
-            and its chords grouped by app
+            Your chord packages, highest rank first; expand a package to view its placeholders and
+            its chords grouped by app
           </caption>
           <thead>
             {table.getHeaderGroups().map((group) => (
@@ -775,7 +780,9 @@ export function ChordLibrary({
                 </th>
                 {group.headers.map((header) => (
                   <th key={header.id} scope="col">
-                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                    <span className="sr-only">
+                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
+                    </span>
                   </th>
                 ))}
               </tr>
@@ -868,7 +875,7 @@ export function ChordLibrary({
         </table>
       </div>
       {visibleRows.length === 0 && (
-        <div className="py-16 text-center">
+        <div className="px-4 py-8 text-center">
           <Package className="mx-auto mb-3 size-7 text-muted-foreground/50" strokeWidth={1.4} />
           <p className="text-sm">
             {packages.length === 0 ? "Your package library is empty" : "No packages found"}

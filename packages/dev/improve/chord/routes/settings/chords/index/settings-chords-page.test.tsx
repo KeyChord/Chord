@@ -8,7 +8,11 @@ import type {
 } from "@chord/dev.improve.chord.lib.typeshare";
 
 const previousWindow = globalThis.window;
-globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
+globalThis.window = {
+  Proxy,
+  navigator: { userAgent: "Macintosh" },
+  screen: {},
+} as unknown as Window & typeof globalThis;
 const { SettingsChordsPageContent } = await import("#settings-chords-page");
 const { applyPackageOrder, ChordLibrary, listLibraryChords, listLibraryPackages, movePackage } =
   await import("#chord-library");
@@ -73,7 +77,10 @@ function render(
   });
   return renderToString(
     <QueryClientProvider client={client}>
-      <SettingsChordsPageContent chordPackageManagerData={state} configurePackage={configurePackage} />
+      <SettingsChordsPageContent
+        chordPackageManagerData={state}
+        configurePackage={configurePackage}
+      />
     </QueryClientProvider>,
   ).replaceAll("<!-- -->", "");
 }
@@ -91,7 +98,7 @@ test("Packages lists installed packages while Local Chords keeps personal editin
   expect(html).toContain('role="tablist"');
   expect(html).toMatch(/role="tab"[^>]*>Packages</);
   expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
-  expect(html).toContain("Default Global Prefix for Placeholders");
+  expect(html).toContain("Default global prefix for placeholders");
   expect(html).toMatch(/<input[^>]+maxLength="1"[^>]+value=";"/i);
   expect(html).toContain("2 packages");
   expect(html).toContain('aria-label="Show chords in @keychord/finder" aria-expanded="false"');
@@ -144,17 +151,17 @@ test("blocked packages are reviewable in the Chords tab without appearing as ena
   );
   expect(html).toContain('aria-label="Third-party packages"');
   expect(html).toContain("1 awaiting approval");
-  expect(html).toMatch(/title="Approval required"[^>]*>(<[^>]*>)*Blocked</);
-  expect(html).toContain('aria-label="Approve @untrusted/test"');
-  expect(html).toContain("/Users/me/.chord/packages/downloaded");
-  expect(html).toContain("arbitrary code");
-  expect(html).toContain("after auditing their code");
-  expect(html).toContain("quit and restart Chord");
+  expect(html).toContain('aria-label="Review @untrusted/test for approval"');
+  expect(html).toContain('title="/Users/me/.chord/packages/downloaded"');
+  expect(html).toContain("~/.chord/packages/downloaded");
+  expect(html).toContain("Install a third-party package");
   expect(html).not.toContain('aria-label="Show chords in @untrusted/test"');
-  expect(html).not.toContain('aria-label="Revoke approval for @untrusted/test"');
+  expect(html).not.toContain('aria-label="Select @untrusted/test"');
+  expect(html).not.toContain('aria-label="Search third-party packages"');
+  expect(html.indexOf("Third-Party Packages")).toBeLessThan(html.indexOf("Package library"));
 });
 
-test("approved packages expose revocation and an empty approval queue is explicit", () => {
+test("approved packages are disclosed below the installed library when nothing is blocked", () => {
   const html = render(
     [],
     [
@@ -166,38 +173,42 @@ test("approved packages expose revocation and an empty approval queue is explici
       },
     ],
   );
-  expect(html).toContain("No packages awaiting approval.");
-  expect(html).toMatch(/title="Can run code"[^>]*>(<[^>]*>)*Approved</);
-  expect(html).toContain('aria-label="Revoke approval for test"');
-  expect(html).not.toContain('aria-label="Approve test"');
+  expect(html).toMatch(/aria-expanded="false"[^>]*>(?:<[^>]*>)*Approved packages \(1\)/);
+  expect(html).not.toContain('aria-label="Revoke approval for test"');
+  expect(html.indexOf("Package library")).toBeLessThan(html.indexOf("Third-Party Packages"));
+  expect(html.indexOf("Package library")).toBeLessThan(html.indexOf("Default global prefix"));
 });
 
-test("third-party packages share one selectable table with blocked packages first", () => {
+test("blocked packages stay alphabetized and longer approval queues expose search and selection", () => {
   const html = render(
     [],
     [
-      { name: "zeta", path: "/p/zeta", identity: "zeta-identity", approved: false },
-      { name: "alpha", path: "/p/alpha", identity: "alpha-identity", approved: true },
-      { name: "beta", path: "/p/beta", identity: "beta-identity", approved: false },
+      { name: "approved", path: "/p/approved", identity: "approved", approved: true },
+      ...["zeta", "gamma", "alpha", "delta", "beta"].map((name) => ({
+        name,
+        path: `/p/${name}`,
+        identity: name,
+        approved: false,
+      })),
     ],
   );
-  expect(html).toContain("2 awaiting approval");
-  expect(html).toContain("3 packages");
+  expect(html).toContain("5 awaiting approval");
   expect(html).toContain('aria-label="Search third-party packages"');
-  expect(html).toContain('aria-label="Select all packages"');
-  const order = ["beta", "zeta", "alpha"].map((name) =>
+  expect(html).toContain('aria-label="Select all visible third-party packages"');
+  const order = ["alpha", "beta", "delta", "gamma", "zeta"].map((name) =>
     html.indexOf(`aria-label="Select ${name}"`),
   );
   expect(order.every((index) => index >= 0)).toBe(true);
   expect(order).toEqual(order.toSorted((a, b) => a - b));
-  // Bulk actions only appear once something is selected.
+  expect(html).not.toContain('aria-label="Select approved"');
   expect(html).not.toContain('aria-label="Bulk actions"');
 });
 
-test("the approval table is omitted when no third-party packages are installed", () => {
+test("empty approval queues keep the installation instructions available", () => {
   const html = render([]);
-  expect(html).toContain("No packages awaiting approval.");
-  expect(html).not.toContain('aria-label="Select all packages"');
+  expect(html).toContain("No third-party packages installed.");
+  expect(html).toContain("Install a third-party package");
+  expect(html).not.toContain('aria-label="Select all visible third-party packages"');
 });
 
 test("each package aggregates its files, chord count, and app scopes", () => {
@@ -247,7 +258,14 @@ test("app-scoped chords use friendly names while global chords remain available 
 });
 
 test("packages keep their native rank, with installed ones above built-ins", () => {
-  const names = ["@keychord/chords-chord", "@keychord/raycast", "@me/work", "@keychord/warp", "@keychord/finder", "@keychord/spotlight"];
+  const names = [
+    "@keychord/chords-chord",
+    "@keychord/raycast",
+    "@me/work",
+    "@keychord/warp",
+    "@keychord/finder",
+    "@keychord/spotlight",
+  ];
   const rows = listLibraryPackages(
     names.map(pkg),
     new Set(["@me/work"]),
@@ -264,12 +282,7 @@ test("packages keep their native rank, with installed ones above built-ins", () 
   ]);
 
   // Moves stay within their group, and the saved order lists only packages the user ranks.
-  const moved = [
-    "@keychord/warp",
-    "@keychord/raycast",
-    "@keychord/finder",
-    "@keychord/spotlight",
-  ];
+  const moved = ["@keychord/warp", "@keychord/raycast", "@keychord/finder", "@keychord/spotlight"];
   expect(movePackage(rows, "@keychord/warp", "@keychord/raycast", "before")).toEqual(moved);
   expect(movePackage(rows, "@keychord/raycast", "@keychord/warp", "after")).toEqual(moved);
   expect(movePackage(rows, "@keychord/spotlight", "@keychord/finder", "before")).toEqual([
@@ -317,7 +330,9 @@ test("the library groups installed and built-in packages with drag handles", () 
   );
   const installed = html.indexOf(">Installed<");
   const builtin = html.indexOf(">Built-in<");
-  expect(installed).toBeGreaterThan(html.indexOf('aria-label="Show chords in @keychord/chords-chord"'));
+  expect(installed).toBeGreaterThan(
+    html.indexOf('aria-label="Show chords in @keychord/chords-chord"'),
+  );
   expect(builtin).toBeGreaterThan(html.indexOf('aria-label="Show chords in @keychord/warp"'));
   expect(builtin).toBeLessThan(html.indexOf('aria-label="Show chords in @keychord/finder"'));
   expect(html).toContain("Installed packages always override them.");
@@ -331,7 +346,12 @@ test("the library groups installed and built-in packages with drag handles", () 
 
 test("placeholders list each token with its keys and default", () => {
   const rift = pkg("@keychord/chords-rift");
-  const placeholder = { name: "<>", label: "Window management prefix", default: ";", assigned: "-" };
+  const placeholder = {
+    name: "<>",
+    label: "Window management prefix",
+    default: ";",
+    assigned: "-",
+  };
   const named = { name: "<mode>" };
   rift.compiledChordsFiles["chords/macos.toml"]!.placeholders = [placeholder, named];
   const entries = listPlaceholders([pkg("@keychord/finder"), rift]);

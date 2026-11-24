@@ -1,14 +1,4 @@
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
-import type { ColumnDef, Row } from "@chord/com.npmjs.tanstack__react-table";
-import {
-  columnFilteringFeature,
-  createFilteredRowModel,
-  globalFilteringFeature,
-  rowSelectionFeature,
-  Subscribe,
-  tableFeatures,
-  useTable,
-} from "@chord/com.npmjs.tanstack__react-table";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
   AlertDialog,
@@ -20,29 +10,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@chord/dev.improve.chord.components.ui.alert-dialog";
-import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import { Checkbox } from "@chord/dev.improve.chord.components.ui.checkbox";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import type { ThirdPartyPackage } from "@chord/dev.improve.chord.lib.typeshare";
-import { Search, ShieldAlert, X } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronRight, Search, Shield, ShieldAlert, X } from "lucide-react";
+import { useId, useState } from "react";
 
-export const PACKAGE_CODE_WARNING =
-  "Chord scripts and native add-ons can run arbitrary code with your account permissions. Only approve packages from people you trust or after auditing their code.";
-
-const approvalFeatures = tableFeatures({
-  rowSelectionFeature,
-  columnFilteringFeature,
-  globalFilteringFeature,
-  filteredRowModel: createFilteredRowModel(),
-});
-
-type ApprovalRow = Row<typeof approvalFeatures, ThirdPartyPackage>;
-
-function countPackages(count: number) {
-  return `${count} Package${count === 1 ? "" : "s"}`;
-}
+const PACKAGE_CODE_WARNING =
+  "Chord scripts and native add-ons can run arbitrary code with your account permissions. Only approve packages you trust or whose code you have reviewed.";
 
 function ApproveDialog({
   packages,
@@ -60,21 +36,21 @@ function ApproveDialog({
   const single = packages.length === 1 ? packages[0] : undefined;
   return (
     <AlertDialog>
-      <Button size="sm" disabled={disabled || packages.length === 0} aria-label={ariaLabel}>
+      <Button size="sm" variant="outline" disabled={disabled} aria-label={ariaLabel}>
         {label}
       </Button>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            Approve {single ? single.name : countPackages(packages.length)}?
+            Approve {single ? single.name : `${packages.length} packages`}?
           </AlertDialogTitle>
           <AlertDialogDescription>{PACKAGE_CODE_WARNING}</AlertDialogDescription>
         </AlertDialogHeader>
         <ul className="my-3 max-h-60 space-y-2 overflow-y-auto">
           {packages.map((pkg) => (
             <li key={pkg.identity}>
-              {!single && <span className="block break-words text-sm">{pkg.name}</span>}
-              <code className="block break-all text-xs text-muted-foreground">{pkg.path}</code>
+              {!single && <span className="block wrap-break-word text-sm">{pkg.name}</span>}
+              <code className="block wrap-anywhere text-xs text-muted-foreground">{pkg.path}</code>
             </li>
           ))}
         </ul>
@@ -93,21 +69,6 @@ function ApproveDialog({
   );
 }
 
-function RowCheckbox({ row }: { row: ApprovalRow }) {
-  // The core row is stable. Subscribe here so the React Compiler sees selection changes.
-  return (
-    <Subscribe source={row.table.atoms.rowSelection} selector={(selection) => !!selection[row.id]}>
-      {(selected) => (
-        <Checkbox
-          aria-label={`Select ${row.original.name}`}
-          checked={selected}
-          onCheckedChange={(checked) => row.toggleSelected(checked)}
-        />
-      )}
-    </Subscribe>
-  );
-}
-
 export function PackageApprovals({
   packages,
   errors,
@@ -115,6 +76,10 @@ export function PackageApprovals({
   packages: ThirdPartyPackage[];
   errors: Record<string, string[]>;
 }) {
+  const approvedId = useId();
+  const [showApproved, setShowApproved] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selection, setSelection] = useState<ReadonlySet<string>>(() => new Set());
   const {
     mutate: setApprovals,
     isPending,
@@ -125,240 +90,259 @@ export function PackageApprovals({
         targets.map((pkg) => pkg.identity),
         approved,
       ),
+    onSuccess: (_, { targets }) => updateSelection(targets, false),
   });
-  const data = useMemo(
-    () =>
-      packages.toSorted(
-        (a, b) => Number(a.approved) - Number(b.approved) || a.name.localeCompare(b.name),
-      ),
-    [packages],
-  );
-  const pendingCount = data.filter((pkg) => !pkg.approved).length;
-  const columns = useMemo<ColumnDef<typeof approvalFeatures, ThirdPartyPackage>[]>(
-    () => [
-      // The header checkbox is rendered with the table so it follows data as well as state.
-      { id: "select", cell: ({ row }) => <RowCheckbox row={row} /> },
-      {
-        accessorKey: "name",
-        header: "Package",
-        cell: ({ row }) => {
-          const pkg = row.original;
-          return (
-            <div className="min-w-0 space-y-1">
-              <span className="block break-words text-sm font-medium">{pkg.name}</span>
-              <code className="block break-all text-xs text-muted-foreground">{pkg.path}</code>
-              {pkg.approved &&
-                errors[pkg.name]?.map((message) => (
-                  <p
-                    key={message}
-                    role="alert"
-                    className="whitespace-pre-wrap break-words text-sm text-destructive"
-                  >
-                    {message}
-                  </p>
-                ))}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: "approved",
-        header: "Status",
-        cell: ({ row }) =>
-          row.original.approved ? (
-            <Badge variant="secondary" title="Can run code">
-              Approved
-            </Badge>
-          ) : (
-            <Badge variant="outline" title="Approval required">
-              Blocked
-            </Badge>
-          ),
-      },
-      {
-        id: "actions",
-        header: () => <span className="sr-only">Actions</span>,
-        cell: ({ row }) => {
-          const pkg = row.original;
-          return pkg.approved ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isPending}
-              aria-label={`Revoke approval for ${pkg.name}`}
-              onClick={() => setApprovals({ targets: [pkg], approved: false })}
-            >
-              Revoke
-            </Button>
-          ) : (
-            <ApproveDialog
-              packages={[pkg]}
-              disabled={isPending}
-              label="Approve…"
-              ariaLabel={`Approve ${pkg.name}`}
-              onApprove={() => setApprovals({ targets: [pkg], approved: true })}
-            />
-          );
-        },
-      },
-    ],
-    [errors, isPending, setApprovals],
-  );
-  const table = useTable({
-    features: approvalFeatures,
-    data,
-    columns,
-    getRowId: (pkg) => pkg.identity,
-    globalFilterFn: (row, _columnId, value: string) =>
-      [row.original.name, row.original.path].some((label) =>
-        label.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
-      ),
-  });
-  const visibleRows = table.getRowModel().rows;
-  const search = String(table.state.globalFilter ?? "");
-  // Hidden rows keep their selection, but bulk actions only apply to what the search shows.
-  const selected = table.getFilteredSelectedRowModel().rows.map((row) => row.original);
+
+  const sorted = packages.toSorted((a, b) => a.name.localeCompare(b.name));
+  const pending = sorted.filter((pkg) => !pkg.approved);
+  const approved = sorted.filter((pkg) => pkg.approved);
+  const failedCount = approved.filter((pkg) => errors[pkg.name]?.length).length;
+  const query = search.trim().toLocaleLowerCase();
+  function matches(pkg: ThirdPartyPackage) {
+    return [pkg.name, pkg.path].some((value) => value.toLocaleLowerCase().includes(query));
+  }
+  const visiblePending = pending.filter(matches);
+  const visibleApproved = showApproved ? approved.filter(matches) : [];
+  const visible = [...visiblePending, ...visibleApproved];
+  // Search and disclosures can hide selected packages. Bulk actions only affect visible selections.
+  const selected = visible.filter((pkg) => selection.has(pkg.identity));
   const selectedPending = selected.filter((pkg) => !pkg.approved);
   const selectedApproved = selected.filter((pkg) => pkg.approved);
-  const allSelected = visibleRows.length > 0 && selected.length === visibleRows.length;
-  const errorMessage = error
-    ? typeof error === "object" && "Message" in error
-      ? String(error.Message)
-      : String(error)
-    : null;
+  const allSelected = visible.length > 0 && selected.length === visible.length;
+  const canSelect = visible.length > 1 || selected.length > 0;
+  const showSearch = search !== "" || pending.length + (showApproved ? approved.length : 0) > 4;
+  const errorMessage =
+    error &&
+    (typeof error === "object" && "Message" in error ? String(error.Message) : String(error));
 
-  function bulkUpdate(targets: ThirdPartyPackage[], approved: boolean) {
-    setApprovals({ targets, approved }, { onSuccess: () => table.resetRowSelection() });
+  function updateSelection(targets: ThirdPartyPackage[], checked: boolean) {
+    setSelection((previous) => {
+      const next = new Set(previous);
+      for (const pkg of targets) {
+        if (checked) next.add(pkg.identity);
+        else next.delete(pkg.identity);
+      }
+      return next;
+    });
+  }
+
+  function renderPackage(pkg: ThirdPartyPackage) {
+    const displayPath = pkg.path.replace(
+      /^.*?[\\/]\.chord[\\/]packages[\\/]/,
+      "~/.chord/packages/",
+    );
+    return (
+      <li
+        key={pkg.identity}
+        className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-(--settings-separator) px-4 py-2.5"
+      >
+        {canSelect && (
+          <Checkbox
+            aria-label={`Select ${pkg.name}`}
+            checked={selection.has(pkg.identity)}
+            onCheckedChange={(checked) => updateSelection([pkg], checked)}
+          />
+        )}
+        <div className="min-w-24 flex-1">
+          <p className="wrap-anywhere text-[13px] font-medium">{pkg.name}</p>
+          <p title={pkg.path} className="truncate text-xs text-(--settings-description)">
+            {displayPath}
+          </p>
+          {pkg.approved &&
+            errors[pkg.name]?.map((message) => (
+              <p
+                key={message}
+                role="alert"
+                className="mt-1 wrap-anywhere whitespace-pre-wrap text-xs text-destructive"
+              >
+                {message}
+              </p>
+            ))}
+        </div>
+        {pkg.approved ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={isPending}
+            aria-label={`Revoke approval for ${pkg.name}`}
+            onClick={() => setApprovals({ targets: [pkg], approved: false })}
+          >
+            Revoke
+          </Button>
+        ) : (
+          <ApproveDialog
+            packages={[pkg]}
+            disabled={isPending}
+            label="Review…"
+            ariaLabel={`Review ${pkg.name} for approval`}
+            onApprove={() => setApprovals({ targets: [pkg], approved: true })}
+          />
+        )}
+      </li>
+    );
   }
 
   return (
-    <section aria-label="Third-party packages" className="preference-disclosure px-5 py-4">
-      <div className="flex items-center gap-2">
-        <ShieldAlert className="size-4 text-muted-foreground" aria-hidden="true" />
-        <h3 className="text-sm font-medium">Third-Party Packages</h3>
-        <span className="ml-auto text-xs text-muted-foreground" role="status">
-          {pendingCount > 0
-            ? `${pendingCount} awaiting approval`
-            : "No packages awaiting approval."}
+    <section aria-label="Third-party packages" className="preference-disclosure">
+      <div className="flex items-start gap-3 px-4 py-3">
+        <span
+          className={
+            pending.length
+              ? "flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"
+              : "flex size-8 shrink-0 items-center justify-center rounded-lg bg-(--settings-key) text-(--settings-key-foreground)"
+          }
+          aria-hidden="true"
+        >
+          {pending.length ? <ShieldAlert size={16} /> : <Shield size={16} />}
         </span>
+        <div className="min-w-0">
+          <h3 className="text-[13px] font-semibold">Third-Party Packages</h3>
+          <p className="text-xs text-(--settings-description)" role="status">
+            {pending.length > 0
+              ? `${pending.length} awaiting approval. Review before allowing code to run.`
+              : approved.length > 0
+                ? "Manage which packages can run code."
+                : "No third-party packages installed."}
+          </p>
+        </div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">{PACKAGE_CODE_WARNING}</p>
-      <p className="mb-4 mt-2 text-xs leading-relaxed text-muted-foreground">
-        Download and extract the package into <code>~/.chord/packages/&lt;name&gt;</code>, then quit
-        and restart Chord. Review and approve it here to enable it. Official packages live in{" "}
-        <code>~/.chord/packages/@keychord/</code>.
-      </p>
+
       {errorMessage && (
-        <p role="alert" className="mb-4 break-words text-sm text-destructive">
+        <p role="alert" className="wrap-anywhere px-4 pb-3 text-xs text-destructive">
           {errorMessage}
         </p>
       )}
-      {data.length > 0 && (
-        <>
-          <div className="chord-library-toolbar">
+
+      {(showSearch || canSelect) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-(--settings-separator) px-4 py-2">
+          {canSelect && (
+            <Checkbox
+              aria-label="Select all visible third-party packages"
+              checked={allSelected}
+              isIndeterminate={selected.length > 0 && !allSelected}
+              onCheckedChange={(checked) => updateSelection(visible, checked)}
+              className="text-xs text-(--settings-description)"
+            >
+              {selected.length === 0 ? "Select all" : null}
+            </Checkbox>
+          )}
+          {selected.length > 0 && (
+            <div
+              role="group"
+              aria-label="Bulk actions"
+              className="flex flex-wrap items-center gap-2"
+            >
+              <span className="text-xs text-(--settings-description)" role="status">
+                {selected.length} selected
+              </span>
+              {selectedPending.length > 0 && (
+                <ApproveDialog
+                  packages={selectedPending}
+                  disabled={isPending}
+                  label={`Review selected (${selectedPending.length})…`}
+                  onApprove={() => setApprovals({ targets: selectedPending, approved: true })}
+                />
+              )}
+              {selectedApproved.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={isPending}
+                  onClick={() => setApprovals({ targets: selectedApproved, approved: false })}
+                >
+                  Revoke selected ({selectedApproved.length})
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Clear package selection"
+                onClick={() => setSelection(new Set())}
+              >
+                <X size={14} />
+              </Button>
+            </div>
+          )}
+          {showSearch && (
             <label className="chord-library-search">
-              <Search size={16} aria-hidden="true" />
+              <Search size={14} aria-hidden="true" />
               <Input
                 aria-label="Search third-party packages"
-                placeholder="Search packages"
+                placeholder="Search third-party packages"
                 value={search}
-                onChange={(event) => table.setGlobalFilter(event.target.value)}
+                onChange={(event) => setSearch(event.target.value)}
               />
               {search && (
                 <Button
                   variant="ghost"
-                  type="button"
                   size="icon-xs"
-                  aria-label="Clear search"
-                  onClick={() => table.setGlobalFilter("")}
+                  aria-label="Clear third-party package search"
+                  onClick={() => setSearch("")}
                 >
                   <X size={14} />
                 </Button>
               )}
             </label>
-            {selected.length > 0 && (
-              <div
-                role="group"
-                aria-label="Bulk actions"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span className="text-xs text-muted-foreground" role="status">
-                  {selected.length} selected
-                </span>
-                <ApproveDialog
-                  packages={selectedPending}
-                  disabled={isPending}
-                  label={`Approve ${countPackages(selectedPending.length)}…`}
-                  onApprove={() => bulkUpdate(selectedPending, true)}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={isPending || selectedApproved.length === 0}
-                  onClick={() => bulkUpdate(selectedApproved, false)}
-                >
-                  Revoke {countPackages(selectedApproved.length)}
-                </Button>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  size="icon-xs"
-                  aria-label="Clear selection"
-                  onClick={() => table.resetRowSelection()}
-                >
-                  <X size={14} />
-                </Button>
-              </div>
-            )}
-            <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground">
-              {countPackages(visibleRows.length).toLowerCase()}
-            </span>
-          </div>
-          <div className="chord-library-scroll">
-            <table className="chord-library-table package-approvals-table">
-              <caption className="sr-only">
-                Third-party packages, their approval status, and approval actions
-              </caption>
-              <thead>
-                {table.getHeaderGroups().map((group) => (
-                  <tr key={group.id}>
-                    {group.headers.map((header) => (
-                      <th key={header.id} scope="col">
-                        {header.column.id === "select" ? (
-                          <Checkbox
-                            aria-label="Select all packages"
-                            checked={allSelected}
-                            isIndeterminate={selected.length > 0 && !allSelected}
-                            onCheckedChange={(checked) => table.toggleAllRowsSelected(checked)}
-                          />
-                        ) : header.isPlaceholder ? null : (
-                          <table.FlexRender header={header} />
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {visibleRows.map((row) => (
-                  <tr key={row.id} data-selected={!!table.state.rowSelection[row.id]}>
-                    {row.getAllCells().map((cell) => (
-                      <td key={cell.id}>
-                        <table.FlexRender cell={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {visibleRows.length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No packages match your search.
-            </p>
           )}
-        </>
+        </div>
       )}
+
+      {visiblePending.length > 0 && (
+        <ul aria-label="Packages awaiting approval">{visiblePending.map(renderPackage)}</ul>
+      )}
+      {query && visible.length === 0 && (
+        <p
+          role="status"
+          className="border-t border-(--settings-separator) px-4 py-3 text-xs text-(--settings-description)"
+        >
+          No third-party packages match your search.
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-start gap-x-4 border-t border-(--settings-separator) px-4 py-2">
+        {approved.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={showApproved}
+            aria-controls={approvedId}
+            onClick={() => setShowApproved(!showApproved)}
+            className="group flex min-h-6 cursor-pointer items-center gap-1.5 rounded-sm text-xs font-medium text-(--settings-description) hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <ChevronRight
+              size={13}
+              className="transition-transform group-aria-expanded:rotate-90"
+              aria-hidden="true"
+            />
+            Approved packages ({approved.length})
+            {failedCount > 0 && (
+              <span className="text-destructive">· {failedCount} with errors</span>
+            )}
+          </button>
+        )}
+        <details className="group open:w-full">
+          <summary className="flex min-h-6 cursor-pointer list-none items-center gap-1.5 rounded-sm text-xs font-medium text-(--settings-description) hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+            <ChevronRight
+              size={13}
+              className="transition-transform group-open:rotate-90"
+              aria-hidden="true"
+            />
+            Install a third-party package
+          </summary>
+          <p className="max-w-[65ch] pt-1.5 pb-1 pl-[19px] text-xs leading-relaxed text-(--settings-description)">
+            Extract the package into <code>~/.chord/packages/&lt;name&gt;</code>, then quit and
+            restart Chord. Review the package here to enable it. Official packages live in{" "}
+            <code>~/.chord/packages/@keychord/</code>.
+          </p>
+        </details>
+      </div>
+      <ul id={approvedId} aria-label="Approved packages" hidden={!showApproved || !approved.length}>
+        {visibleApproved.map(renderPackage)}
+        {query && !visibleApproved.length && visiblePending.length > 0 && (
+          <li className="border-t border-(--settings-separator) px-4 py-3 text-xs text-(--settings-description)">
+            No approved packages match your search.
+          </li>
+        )}
+      </ul>
     </section>
   );
 }
