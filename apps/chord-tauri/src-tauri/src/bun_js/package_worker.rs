@@ -14,11 +14,14 @@ use std::process::{Child, Stdio};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncRead};
 use tokio::sync::{Notify, mpsc, oneshot};
 
 const SETUP_TIMEOUT: Duration = Duration::from_secs(15);
 const ACTION_TIMEOUT: Duration = Duration::from_secs(300);
 const QUEUE_CAPACITY: usize = 64;
+/// Longest line of package output kept in one log entry.
+const MAX_OUTPUT_LINE_BYTES: usize = 8 * 1024;
 
 mod supervisor;
 use supervisor::PackageSupervisor;
@@ -134,6 +137,70 @@ impl Drop for Process {
     }
 }
 
+/// Logs each line a package worker writes to `stream`, after the package's name, until the
+/// worker exits. The stream is always drained, so a chatty package never blocks on a full pipe.
+fn forward_output(
+    package: String,
+    stream: impl AsyncRead + Unpin + Send + 'static,
+    level: log::Level,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(async move {
+        let mut reader = tokio::io::BufReader::new(stream);
+        let mut line = Vec::new();
+        loop {
+            line.clear();
+            match read_line_bounded(&mut reader, &mut line, MAX_OUTPUT_LINE_BYTES).await {
+                Ok(None) => break,
+                Ok(Some(truncated)) => {
+                    let text = String::from_utf8_lossy(&line);
+                    let text = text.trim_end();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let marker = if truncated {
+                        "… [line truncated]"
+                    } else {
+                        ""
+                    };
+                    log::log!(level, "{package}: {text}{marker}");
+                }
+                Err(error) => {
+                    log::debug!("Stopped reading the output of package {package}: {error}");
+                    break;
+                }
+            }
+        }
+    })
+}
+
+/// Reads one line into `line` without its newline, keeping at most `limit` bytes of it.
+/// Returns whether bytes were dropped, or `None` at the end of the stream.
+async fn read_line_bounded(
+    reader: &mut (impl AsyncBufRead + Unpin),
+    line: &mut Vec<u8>,
+    limit: usize,
+) -> std::io::Result<Option<bool>> {
+    let mut read_any = false;
+    let mut truncated = false;
+    loop {
+        let buffer = reader.fill_buf().await?;
+        if buffer.is_empty() {
+            return Ok(read_any.then_some(truncated));
+        }
+        read_any = true;
+        let newline = buffer.iter().position(|&byte| byte == b'\n');
+        let content = &buffer[..newline.unwrap_or(buffer.len())];
+        let keep = limit.saturating_sub(line.len()).min(content.len());
+        line.extend_from_slice(&content[..keep]);
+        truncated |= keep < content.len();
+        let used = newline.map_or(buffer.len(), |index| index + 1);
+        reader.consume(used);
+        if newline.is_some() {
+            return Ok(Some(truncated));
+        }
+    }
+}
+
 /// A worker that did not answer within the time it was given.
 #[derive(Debug)]
 struct Stalled(Duration);
@@ -187,10 +254,12 @@ impl PackageWorker {
         };
         #[cfg(not(target_os = "macos"))]
         let mut command = super::worker_command(executable, &address, &token)?;
+        // A release build's own stdout and stderr go nowhere, so package output
+        // (`console.log`, `console.error`, a crash message) is forwarded to the log.
         command
             .stdin(Stdio::null())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;
@@ -203,6 +272,14 @@ impl PackageWorker {
             child: Mutex::new(child),
             sockets: Vec::new(),
         };
+        if let Some(stdout) = process.child.get_mut().stdout.take() {
+            let stdout = tokio::process::ChildStdout::from_std(stdout)?;
+            forward_output(name.clone(), stdout, log::Level::Info);
+        }
+        if let Some(stderr) = process.child.get_mut().stderr.take() {
+            let stderr = tokio::process::ChildStderr::from_std(stderr)?;
+            forward_output(name.clone(), stderr, log::Level::Warn);
+        }
         let handshake = tokio::time::timeout(SETUP_TIMEOUT, async {
             let (mut control, _) = listener.accept().await?;
             control.set_nodelay(true)?;
@@ -695,6 +772,77 @@ mod tests {
     use super::*;
     use crate::models::{ChordKeyboardEvent, HandlerChordAction, Key, KeyEvent};
     use keycode::KeyMappingCode;
+
+    /// Package output reaches the log, one entry per line after the package's name.
+    #[tokio::test]
+    async fn worker_output_is_forwarded_to_the_log() {
+        struct Capture(Mutex<Vec<(log::Level, String)>>);
+        impl log::Log for Capture {
+            fn enabled(&self, _: &log::Metadata<'_>) -> bool {
+                true
+            }
+            fn log(&self, record: &log::Record<'_>) {
+                self.0
+                    .lock()
+                    .push((record.level(), record.args().to_string()));
+            }
+            fn flush(&self) {}
+        }
+        static CAPTURE: Capture = Capture(Mutex::new(Vec::new()));
+        log::set_logger(&CAPTURE).expect("no other test installs a logger");
+        log::set_max_level(log::LevelFilter::Trace);
+
+        let package = "@keychord/chords-forwarding-test";
+        let (mut writer, reader) = tokio::io::duplex(64);
+        let forwarding = forward_output(package.into(), reader, log::Level::Warn);
+        tokio::io::AsyncWriteExt::write_all(&mut writer, b"Error: boom\n  at run (rift.js:1)\n")
+            .await
+            .unwrap();
+        drop(writer);
+        forwarding.await.unwrap();
+
+        let forwarded: Vec<_> = CAPTURE
+            .0
+            .lock()
+            .iter()
+            .filter(|(_, message)| message.starts_with(package))
+            .cloned()
+            .collect();
+        assert_eq!(
+            forwarded,
+            [
+                (log::Level::Warn, format!("{package}: Error: boom")),
+                (log::Level::Warn, format!("{package}:   at run (rift.js:1)")),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn output_lines_are_split_and_bounded() {
+        // A one-byte buffer makes every line span many reads.
+        let mut reader = tokio::io::BufReader::with_capacity(
+            1,
+            &b"first\r\nlonger than the limit\n\nlast without newline"[..],
+        );
+        let mut lines = Vec::new();
+        let mut line = Vec::new();
+        while let Some(truncated) = read_line_bounded(&mut reader, &mut line, 8).await.unwrap() {
+            lines.push((
+                String::from_utf8(std::mem::take(&mut line)).unwrap(),
+                truncated,
+            ));
+        }
+
+        assert_eq!(
+            lines,
+            [
+                ("first\r".to_string(), false),
+                ("longer t".to_string(), true),
+                (String::new(), false),
+                ("last wit".to_string(), true),
+            ]
+        );
+    }
 
     struct Fixture(PathBuf);
     impl Fixture {

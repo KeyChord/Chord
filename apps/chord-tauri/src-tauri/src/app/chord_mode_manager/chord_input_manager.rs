@@ -1,11 +1,12 @@
 use super::chord_loops::{ChordLoops, run_plan, select_run_window};
 use super::chord_sequence::{ChordSequence, ChordSequenceDispatch, ChordTaskQueue};
 use crate::app::AppHandleExt;
-use crate::app::chord_runner::release_chord_sequences;
+use crate::app::chord_runner::{ChordActionTask, release_chord_sequences};
 use crate::app::state::AppSingleton;
 use crate::models::{
-    ChordEventTrigger, ChordInputEvent, ChordKeyboardEvent, ChordMacroName, ChordMacros, Key,
-    KeyEvent, MetaChordCommand, expand_typed_reference, has_pending_escape, select_escape,
+    ChordEventTrigger, ChordInputEvent, ChordKeyboardEvent, ChordMacroName, ChordMacros,
+    ChordTaskAction, Key, KeyEvent, MetaChordCommand, expand_typed_reference, has_pending_escape,
+    select_escape,
 };
 use crate::state::{
     ChordExecutionObservable, ChordInputObservable, ChordInputState, ChordMacrosObservable,
@@ -141,6 +142,7 @@ impl ChordInputManager {
             self.reset_matching_chords()?;
             bail!("no chord is configured for `{sequence}`");
         };
+        log::info!("{}", describe_run(&input, &dispatch));
         self.set_executed_event(event)?;
         self.run_dispatch(dispatch, false)?;
         self.reset_matching_chords()
@@ -380,6 +382,20 @@ impl ChordInputManager {
         if dispatch.tasks.is_empty() && dispatch.expired.is_empty() && loop_run.is_none() {
             return Ok(());
         }
+        let run_label = {
+            let tasks: Vec<_> = dispatch
+                .tasks
+                .iter()
+                .chain(loop_run.iter().flat_map(|(_, plan, _)| &plan.steps))
+                .collect();
+            run_label(
+                dispatch
+                    .input_event
+                    .as_ref()
+                    .map(|event| event.input.as_slice()),
+                &tasks,
+            )
+        };
         let release = if let Some(input_event) = dispatch
             .input_event
             .clone()
@@ -479,7 +495,7 @@ impl ChordInputManager {
             }
             .await;
             if let Err(error) = result {
-                log::error!("error running chord events: {error:#}");
+                log::error!("{run_label} failed: {error:#}");
                 report_failure(&error);
                 if let Some((id, plan, _)) = loop_run {
                     loops.finish(id, &execution_observable);
@@ -494,7 +510,7 @@ impl ChordInputManager {
                     let result = run_plan(handle, plan, cancelled).await;
                     loops.finish(id, &execution_observable);
                     if let Err(error) = result {
-                        log::error!("chord loop {id} stopped: {error:#}");
+                        log::error!("{run_label} stopped (loop {id}): {error:#}");
                         report_failure(&error);
                     }
                 });
@@ -533,6 +549,7 @@ impl ChordInputManager {
     /// Input that cannot run stays on screen like an executed chord, with the
     /// reason in place of the chord's name. Its blocks stay in the buffer.
     fn fail_input(&self, input: &[Key], quotes: &[String], error: String) -> Result<()> {
+        log::info!("Chord `{}` did not run: {error}", format_keys(input));
         self.end_active_task();
         self.executions.fetch_add(1, Ordering::SeqCst);
         self.observable.set_state(|state| {
@@ -579,6 +596,7 @@ impl ChordInputManager {
         hold_input: bool,
     ) -> Result<()> {
         if let Some(event) = dispatch.input_event.clone() {
+            log::info!("{}", describe_run(keys, &dispatch));
             self.set_executed_event(event)?;
             self.run_dispatch(dispatch, hold_input)?;
             return self.reset_matching_chords();
@@ -878,9 +896,129 @@ fn should_handle_held_key_event(held_keys: &mut HashSet<Key>, key_event: &KeyEve
     }
 }
 
+/// The keys as a chord sequence, such as `r,p`, for the log.
+fn format_keys(keys: &[Key]) -> String {
+    Key::serialize_sequence(keys).unwrap_or_else(|| {
+        let keys: Vec<_> = keys.iter().map(ToString::to_string).collect();
+        keys.join(" ")
+    })
+}
+
+/// The log line for input that runs: the keys, the chord's name, the focused app and every
+/// task. Text typed into quotes never appears, since the description would quote it.
+fn describe_run(keys: &[Key], dispatch: &ChordSequenceDispatch) -> String {
+    let tasks: Vec<_> = dispatch
+        .tasks
+        .iter()
+        .chain(dispatch.plan.iter().flat_map(|plan| &plan.steps))
+        .collect();
+    let typing = tasks
+        .iter()
+        .any(|task| matches!(task.action, ChordTaskAction::Type(_)));
+    let mut line = format!("Running chord `{}`", format_keys(keys));
+    if let Some(description) = dispatch.description.as_ref().filter(|_| !typing) {
+        line.push_str(&format!(" \"{description}\""));
+    }
+    if let Some(app) = dispatch
+        .input_event
+        .as_ref()
+        .and_then(|event| event.application_id.as_deref())
+    {
+        line.push_str(&format!(" in {app}"));
+    }
+    if let Some(command) = &dispatch.meta_command {
+        let command = match command {
+            // The macro's body may hold quoted text.
+            MetaChordCommand::SetMacro { name, .. } => format!("SetMacro {name:?}"),
+            command => format!("{command:?}"),
+        };
+        line.push_str(&format!(" → Chord command {command}"));
+    }
+    if let Some(plan) = &dispatch.plan {
+        line.push_str(&format!(" → plan of {} step(s)", plan.steps.len()));
+    }
+    if !tasks.is_empty() {
+        let tasks: Vec<_> = tasks.iter().map(|task| task.summary()).collect();
+        line.push_str(&format!(" → {}", tasks.join("; ")));
+    }
+    line
+}
+
+/// Names the chord in errors from its run, such as `Chord \`r,p\` (@keychord/chords-rift)`.
+fn run_label(input: Option<&[Key]>, tasks: &[&ChordActionTask]) -> String {
+    let input = input
+        .or_else(|| tasks.first().map(|task| task.event.input.as_slice()))
+        .filter(|input| !input.is_empty());
+    let mut label = match input {
+        Some(input) => format!("Chord `{}`", format_keys(input)),
+        None => "Chord".to_string(),
+    };
+    let mut packages: Vec<&str> = Vec::new();
+    for task in tasks {
+        if !packages.contains(&task.package_name.as_str()) {
+            packages.push(&task.package_name);
+        }
+    }
+    if !packages.is_empty() {
+        label.push_str(&format!(" ({})", packages.join(", ")));
+    }
+    label
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn run_log_names_the_chord_and_its_tasks_but_never_typed_text() {
+        use crate::models::{ShellChordAction, TypeChordAction};
+
+        let keys = Key::parse_sequence("r,p").unwrap();
+        let event = ChordInputEvent {
+            input: keys.clone(),
+            application_id: Some("com.apple.finder".into()),
+            quotes: vec![],
+        };
+        let task = |action| ChordActionTask {
+            package_name: "@keychord/chords-rift".into(),
+            initiator_file_pathslug: "chords/macos.toml".into(),
+            event: event.clone(),
+            action,
+            num_times: 1,
+        };
+        let shell = task(ChordTaskAction::Shell(ShellChordAction {
+            command: "rift service start".into(),
+        }));
+        let dispatch = ChordSequenceDispatch {
+            tasks: vec![shell],
+            input_event: Some(event.clone()),
+            description: Some("Rift: Play (Start)".into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            describe_run(&keys, &dispatch),
+            "Running chord `r,p` \"Rift: Play (Start)\" in com.apple.finder → \
+             @keychord/chords-rift: shell `rift service start`"
+        );
+        assert_eq!(
+            run_label(Some(&keys), &dispatch.tasks.iter().collect::<Vec<_>>()),
+            "Chord `r,p` (@keychord/chords-rift)"
+        );
+
+        let typed = task(ChordTaskAction::Type(TypeChordAction {
+            text: "hunter2".into(),
+            intervals_ms: vec![],
+        }));
+        let dispatch = ChordSequenceDispatch {
+            tasks: vec![typed],
+            input_event: Some(event),
+            description: Some("Type 'hunter2'".into()),
+            ..Default::default()
+        };
+        let line = describe_run(&keys, &dispatch);
+        assert!(!line.contains("hunter2"), "{line}");
+        assert!(line.ends_with("type 7 characters"), "{line}");
+    }
 
     #[test]
     fn insert_mode_types_text_in_event_order_and_ignores_keys_held_from_chord_mode() {

@@ -236,8 +236,12 @@ impl ChordPackage {
                         num_times,
                     })
                 } else {
-                    log::debug!(
-                        "missing handler for event: {}, available handlers: {:?}",
+                    // The chord does nothing, so say why where people look.
+                    log::warn!(
+                        "Chord \"{}\" in {} ({}) emits `{}`, which no handler registers; available handlers: {:?}",
+                        chord_reference.chord.name,
+                        chord_reference.package_name,
+                        chord_reference.chords_file_pathslug.display(),
                         emit.event_key,
                         chords_file
                             .handlers

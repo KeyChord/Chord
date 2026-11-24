@@ -25,6 +25,49 @@ pub struct ChordActionTask {
     pub num_times: u32,
 }
 
+impl ChordActionTask {
+    /// What the task does, for the log. Typed text is left out: only its length is given.
+    pub fn summary(&self) -> String {
+        let action = match &self.action {
+            ChordTaskAction::Shell(action) => format!("shell `{}`", action.command),
+            ChordTaskAction::Handler(action) => {
+                let mut summary =
+                    format!("JS handler from {}", self.initiator_file_pathslug.display());
+                if !action.event_args.is_empty() {
+                    let args: Vec<_> = action
+                        .event_args
+                        .iter()
+                        .map(|arg| arg.to_string())
+                        .collect();
+                    summary.push_str(&format!(" with [{}]", args.join(", ")));
+                }
+                summary
+            }
+            ChordTaskAction::Shortcut(action) => {
+                let chords: Vec<_> = action
+                    .simulated_shortcut
+                    .chords
+                    .iter()
+                    .map(|chord| {
+                        let keys: Vec<_> = chord.keys.iter().map(ToString::to_string).collect();
+                        keys.join("+")
+                    })
+                    .collect();
+                format!("shortcut {}", chords.join(" "))
+            }
+            ChordTaskAction::Type(action) => {
+                format!("type {} characters", action.text.chars().count())
+            }
+        };
+        let times = if self.num_times > 1 {
+            format!(" ×{}", self.num_times)
+        } else {
+            String::new()
+        };
+        format!("{}: {action}{times}", self.package_name)
+    }
+}
+
 #[derive(Debug)]
 pub enum ChordActionTaskRun {
     Shell(ShellChordActionTaskRun),
