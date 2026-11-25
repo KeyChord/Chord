@@ -115,6 +115,13 @@ async function fixture(channel = "prod", overrides: Partial<State> = {}) {
         );
       }
     }
+    for (const [platform, installer] of [
+      ["linux-x86_64", "Chord-linux-x86_64.AppImage"],
+      ["windows-x86_64", "Chord-windows-x86_64-setup.exe"],
+    ]) {
+      await Bun.write(join(dir, "assets", installer), `${version} ${platform} signed archive`);
+      await Bun.write(join(dir, "assets", `${installer}.sig`), `${version} ${platform} signature\n`);
+    }
   }
   await stage("0.2.10");
   return {
@@ -156,6 +163,12 @@ test("successive production versions create distinct releases and keep earlier d
   expect(release.targetCommitish).toBe(SHA);
   const manifest = JSON.parse(release.assets["latest.json"]!);
   expect(manifest.version).toBe("0.2.10");
+  expect(Object.keys(manifest.platforms).sort()).toEqual([
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "linux-x86_64",
+    "windows-x86_64",
+  ]);
   for (const [platform, asset] of Object.entries(manifest.platforms) as [
     string,
     { url: string; signature: string },
