@@ -6,11 +6,13 @@
 		"#desktop-platform": "./desktop-platform.ts",
 		"#state": "./state.ts",
 		"#state-query": "./state-query.ts",
-		"#state-queries": "./state-queries.tsx"
+		"#state-queries": "./state-queries.tsx",
+		"#hint-panel": "./hint-panel.ts"
 	},
 	"exports": {
 		".": "./+.ts",
-		"./desktop-platform": "./+desktop-platform.ts"
+		"./desktop-platform": "./+desktop-platform.ts",
+		"./hint-panel": "./+hint-panel.ts"
 	},
 	"dependencies": {
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",

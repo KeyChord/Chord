@@ -19,7 +19,8 @@ use crate::state::{
     ChordExecutionObservable,
     ChordInputObservable, ChordMacrosObservable, ChordPackageManagerObservable,
     ChordPackageStoreObservable, ChordPanelObservable, DesktopAppManagerObservable,
-    FrontmostObservable, GitRepo, GitReposObservable, KeyboardObservable, Observable,
+    FrontmostObservable, GitRepo, GitReposObservable, HintPanelObservable, KeyboardObservable,
+    Observable,
 };
 use crate::tauri_app;
 use anyhow::Result;
@@ -47,6 +48,12 @@ pub fn setup(app: &mut tauri::App) -> Result<()> {
     let git_repos_observable = GitReposObservable::new(app)?;
     let frontmost_observable = FrontmostObservable::new(app)?;
     let keyboard_observable = KeyboardObservable::new(app)?;
+    crate::app::chord_mode_manager::feed_hint_panel(
+        &handle,
+        HintPanelObservable::new(app)?,
+        &frontmost_observable,
+        &chord_package_manager_observable,
+    )?;
 
     let managed = Managed {
         handle: handle.clone(),

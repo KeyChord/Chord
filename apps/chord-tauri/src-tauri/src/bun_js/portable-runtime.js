@@ -239,6 +239,9 @@ async function serve(address, token) {
 
   async function handle(request) {
     if (request === "Ping") return null;
+    // This sidecar can't tell whether the package has timers, sockets or windows of its
+    // own, so its worker is never let go while unused.
+    if (request === "HasOwnWork") return true;
     if ("Register" in request) {
       const { module, raw, pathslug, app_id, args } = request.Register;
       const build = await (await import(Bun.pathToFileURL(localPath(module)).href)).default;

@@ -419,6 +419,31 @@ export interface HandlerChordAction {
 	focusedWindowId?: number;
 }
 
+export interface HintPanelChordsFile {
+	chords: Chord[];
+	chordHints: ChordHint[];
+}
+
+export interface HintPanelPackage {
+	name: string;
+	/**
+	 * Every chords file with its hints. Only the frontmost app's files, and the Finder's
+	 * while a file picker is open, keep their chords.
+	 */
+	chordsFiles: Record<FilePathslug, HintPanelChordsFile>;
+	globalChords: ChordReference[];
+}
+
+/**
+ * What the Hint Panel draws from, recomputed when the frontmost app or the packages
+ * change. With the whole package state, some 3,000 chords took about 5 MB of the
+ * panel's web content process, and every change to them reached it.
+ */
+export interface HintPanelState {
+	/** Loaded packages in rank order, as in `ChordPackageManagerState::packages`. */
+	packages: HintPanelPackage[];
+}
+
 export interface KeyboardState {
 	isCapsPressed: boolean;
 	isShiftPressed: boolean;

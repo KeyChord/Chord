@@ -1,5 +1,5 @@
 #[cfg(target_os = "macos")]
-use super::NativeSurfaceRect;
+use super::{NativeSurfaceRect, PanelExtent};
 use crate::app::AppHandleExt;
 use crate::app::chord_mode_manager::{ChordInputManager, ChordModePanel};
 use crate::models::{Key, KeyEvent};
@@ -30,6 +30,19 @@ impl ChordModeManager {
         #[cfg(target_os = "macos")]
         {
             let surface_window = self.panel.get_or_create_window()?;
+            let extent_handle = self.handle.clone();
+            surface_window.listen(
+                "chorder-panel-extent",
+                move |event| match serde_json::from_str::<PanelExtent>(event.payload()) {
+                    Ok(extent) => {
+                        let panel = &extent_handle.app_state().chord_mode_manager().panel;
+                        if let Err(error) = panel.fit_to_card(extent) {
+                            log::error!("Failed to fit the Hint Panel to its card: {error:#}");
+                        }
+                    }
+                    Err(error) => log::error!("Failed to parse the Hint Panel's extent: {error}"),
+                },
+            );
             let surface_handle = self.handle.clone();
             let listener_window = surface_window.clone();
             let listener_window2 = surface_window.clone();

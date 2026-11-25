@@ -30,6 +30,18 @@ pub trait Observable: Sized + Send + Sync + 'static {
     ) -> Result<observable_property::ObserverId>;
 }
 
+/// The states with these IDs, as `get_all_observable_states` gives them.
+pub fn get_observable_states(ids: &[String]) -> Result<HashMap<String, serde_json::Value>> {
+    let observables = OBSERVABLES.lock().expect("poisoned");
+
+    observables.iter()
+        .filter(|(id, _)| ids.iter().any(|wanted| wanted == id))
+        .map(|(id, produce_json)| {
+            produce_json().map(|json| (id.to_string(), json))
+        })
+        .collect()
+}
+
 pub fn get_all_observable_states() -> Result<HashMap<String, serde_json::Value>> {
     let observables = OBSERVABLES.lock().expect("poisoned");
 

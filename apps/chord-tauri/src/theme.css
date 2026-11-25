@@ -1,0 +1,123 @@
+/* The palette, theme tokens and base styles shared by Settings and the Hint Panel. */
+
+/* Keep controls and portaled overlays on the same neutral palette. */
+:root,
+.light,
+[data-theme="light"] {
+  --background: #f2f2f2;
+  --foreground: #292929;
+  --surface: #fff;
+  --surface-foreground: var(--foreground);
+  --surface-secondary: #f3f3f3;
+  --surface-tertiary: #ededed;
+  --overlay: #fff;
+  --overlay-foreground: var(--foreground);
+  --muted: #818181;
+  --default: #e8e8e8;
+  --default-foreground: var(--foreground);
+  --field-background: #fff;
+  --field-foreground: var(--foreground);
+  --segment: #fff;
+  --segment-foreground: var(--foreground);
+  --border: #e5e5e5;
+  --separator: #e5e5e5;
+  --accent: #292929;
+  --accent-foreground: #fff;
+  --success: #555;
+  --success-foreground: #fff;
+  --warning: #777;
+  --warning-foreground: #fff;
+  --danger: #333;
+  --danger-foreground: #fff;
+  --focus: var(--accent);
+}
+.dark,
+[data-theme="dark"] {
+  --background: #252525;
+  --foreground: #ededed;
+  --surface: #303030;
+  --surface-foreground: var(--foreground);
+  --surface-secondary: #363636;
+  --surface-tertiary: #3b3b3b;
+  --overlay: #303030;
+  --overlay-foreground: var(--foreground);
+  --muted: #a0a0a0;
+  --default: #3b3b3b;
+  --default-foreground: var(--foreground);
+  --field-background: #303030;
+  --field-foreground: var(--foreground);
+  --segment: #555;
+  --segment-foreground: var(--foreground);
+  --border: #414141;
+  --separator: #414141;
+  --accent: #ededed;
+  --accent-foreground: #252525;
+  --success: #c4c4c4;
+  --success-foreground: #252525;
+  --warning: #aaa;
+  --warning-foreground: #252525;
+  --danger: #ddd;
+  --danger-foreground: #252525;
+  --focus: var(--accent);
+}
+
+/* Aliases used by Chord's feature layouts. */
+:root,
+.light,
+.dark,
+[data-theme="light"],
+[data-theme="dark"] {
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-foreground);
+  --secondary: var(--default);
+  --secondary-foreground: var(--default-foreground);
+  --card: var(--surface);
+  --card-foreground: var(--surface-foreground);
+  --popover: var(--overlay);
+  --popover-foreground: var(--overlay-foreground);
+  --muted-foreground: var(--muted);
+  --destructive: var(--danger);
+  --input: var(--field-border);
+  --ring: var(--focus);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--foreground);
+}
+@theme inline {
+  --font-sans: "Geist Variable", sans-serif;
+  /* Used for keycaps: its slashed zero keeps 0 distinct from O. ui-monospace draws the key symbols it lacks, such as ↩. */
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-transparent text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  #root {
+    @apply bg-transparent;
+  }
+}

@@ -36,10 +36,25 @@ pub struct NativeSurfaceRect {
     pub flush_left: bool,
 }
 
+/// The window the page's card needs in a layout, in points: in the sidebar, the width
+/// from the screen's left edge, and floating, the height from the bottom margin, each
+/// including the card's shadow.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+pub struct PanelExtent {
+    pub layout: ChordLayout,
+    pub width: f64,
+    pub height: f64,
+}
+
 #[injectable]
 pub struct ChordModePanel {
     #[inject(ArcSwap::new(Arc::new(None)))]
     panel: ArcSwap<Option<PanelHandle<Wry>>>,
+
+    /// What the page last said its card needs. The window is sized to it, since WebKit
+    /// keeps pixels for the whole window, including its transparent parts.
+    #[inject(parking_lot::Mutex::new(None))]
+    extent: parking_lot::Mutex<Option<PanelExtent>>,
 
     handle: AppHandle,
     observable: ChordPanelObservable,
@@ -153,9 +168,10 @@ impl ChordModePanel {
         self.observable
             .set_state(|prev| ChordPanelState { layout, ..prev })?;
         let panel = self.panel.load_full();
+        let extent = *self.extent.lock();
         self.run_on_main_thread_sync(move || {
             if let Some(panel) = panel.as_ref() {
-                Self::position_panel(panel, layout);
+                Self::position_panel(panel, layout, extent);
             }
             Ok(())
         })?;
@@ -166,36 +182,65 @@ impl ChordModePanel {
         self.set_layout(self.observable.get_state()?.layout.next())
     }
 
-    fn frame_for_layout(layout: ChordLayout, visible_frame: NSRect) -> NSRect {
+    /// Each layout keeps the card anchored to the window's edge it grows away from: the
+    /// sidebar card to the left, the floating card to the bottom. So the window only
+    /// narrows to the sidebar card, keeping the height the page centers it in, and only
+    /// lowers to the floating card, keeping the width the page centers it in. Without an
+    /// extent for the layout, it spans the most the layout uses.
+    fn frame_for_layout(
+        layout: ChordLayout,
+        visible_frame: NSRect,
+        extent: Option<PanelExtent>,
+    ) -> NSRect {
+        let extent = extent.filter(|extent| extent.layout == layout);
         match layout {
-            ChordLayout::SidebarLeft => NSRect::new(
-                visible_frame.origin,
-                NSSize::new(
-                    INDICATOR_WIDTH.min(visible_frame.size.width),
-                    visible_frame.size.height,
-                ),
-            ),
-            // The transparent panel spans the display above the margin, so the
-            // webview can size and center the floating bar to fit its keys,
-            // description, and suggestions.
+            ChordLayout::SidebarLeft => {
+                let widest = INDICATOR_WIDTH.min(visible_frame.size.width);
+                let width = extent.map_or(widest, |extent| extent.width.min(widest).max(0.0));
+                NSRect::new(
+                    visible_frame.origin,
+                    NSSize::new(width, visible_frame.size.height),
+                )
+            }
             ChordLayout::FloatingBottom => {
                 let margin = FLOATING_BOTTOM_MARGIN.min(visible_frame.size.height);
+                let tallest = visible_frame.size.height - margin;
+                let height = extent.map_or(tallest, |extent| extent.height.min(tallest).max(0.0));
                 NSRect::new(
                     NSPoint::new(visible_frame.origin.x, visible_frame.origin.y + margin),
-                    NSSize::new(visible_frame.size.width, visible_frame.size.height - margin),
+                    NSSize::new(visible_frame.size.width, height),
                 )
             }
         }
     }
 
-    fn position_panel(panel: &PanelHandle<Wry>, layout: ChordLayout) {
+    /// Sizes the window to what the page says its card needs.
+    pub fn fit_to_card(&self, extent: PanelExtent) -> Result<()> {
+        {
+            let mut current = self.extent.lock();
+            if *current == Some(extent) {
+                return Ok(());
+            }
+            *current = Some(extent);
+        }
+        let layout = self.observable.get_state()?.layout;
+        let panel = self.panel.load_full();
+        self.handle.run_on_main_thread(move || {
+            if let Some(panel) = panel.as_ref() {
+                Self::position_panel(panel, layout, Some(extent));
+            }
+        })?;
+        Ok(())
+    }
+
+    fn position_panel(panel: &PanelHandle<Wry>, layout: ChordLayout, extent: Option<PanelExtent>) {
         let native_panel = panel.as_panel();
         // Keep the native window out of mouse hit testing after layout changes
         // and before every show, including its transparent webview and vibrancy.
         native_panel.setIgnoresMouseEvents(true);
         native_panel.setAcceptsMouseMovedEvents(false);
         if let Some(screen) = native_panel.screen() {
-            let frame = Self::frame_for_layout(layout, screen.visibleFrame());
+            let frame = Self::frame_for_layout(layout, screen.visibleFrame(), extent);
             native_panel.setContentSize(frame.size);
             native_panel.setFrameOrigin(frame.origin);
         }
@@ -243,7 +288,7 @@ impl ChordModePanel {
         // Guard that short creation phase so even the intermediate window cannot
         // activate Chord or replace the user's frontmost application.
         let panel = PanelBuilder::<Wry, IndicatorPanel>::new(&self.handle, "chords")
-            .url(WebviewUrl::App("index.html".into()))
+            .url(WebviewUrl::App("panel.html".into()))
             .title("Chords")
             .no_activate(true)
             .ignores_mouse_events(true)
@@ -347,13 +392,14 @@ impl ChordModePanel {
     fn show(&self) -> Result<()> {
         let panel = self.panel.load_full();
         let layout = self.observable.get_state()?.layout;
+        let extent = *self.extent.lock();
 
         self.run_on_main_thread_sync(move || {
             let panel = panel
                 .as_ref()
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("chord-mode panel was not initialized"))?;
-            Self::position_panel(panel, layout);
+            Self::position_panel(panel, layout, extent);
             Self::ensure_nonactivating(panel)?;
 
             panel.set_alpha_value(0.0);
@@ -433,25 +479,73 @@ mod tests {
     fn layouts_follow_the_displays_visible_frame_including_negative_origins() {
         let screen = NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(1440.0, 900.0));
         assert_eq!(
-            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen),
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, None),
             NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(640.0, 900.0))
         );
         assert_eq!(
-            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, screen),
+            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, screen, None),
             NSRect::new(NSPoint::new(-1600.0, 104.0), NSSize::new(1440.0, 876.0))
         );
         let small = NSRect::new(NSPoint::new(0.0, -100.0), NSSize::new(320.0, 100.0));
         assert_eq!(
-            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, small),
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, small, None),
             small
         );
         assert_eq!(
-            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, small),
+            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, small, None),
             NSRect::new(NSPoint::new(0.0, -76.0), NSSize::new(320.0, 76.0))
         );
         let tiny = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(320.0, 10.0));
         assert_eq!(
-            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, tiny),
+            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, tiny, None),
+            NSRect::new(NSPoint::new(0.0, 10.0), NSSize::new(320.0, 0.0))
+        );
+    }
+
+    #[test]
+    fn the_window_fits_the_card_along_the_edge_it_grows_from() {
+        let screen = NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(1440.0, 900.0));
+        let card = |layout, width, height| {
+            Some(PanelExtent {
+                layout,
+                width,
+                height,
+            })
+        };
+        let sidebar = card(ChordLayout::SidebarLeft, 412.0, 900.0);
+        let floating = card(ChordLayout::FloatingBottom, 1440.0, 140.0);
+        // The sidebar narrows, keeping the height the card is centered in.
+        assert_eq!(
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, sidebar),
+            NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(412.0, 900.0))
+        );
+        // The floating panel lowers its top, keeping its bottom and the width it centers in.
+        assert_eq!(
+            ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, screen, floating),
+            NSRect::new(NSPoint::new(-1600.0, 104.0), NSSize::new(1440.0, 140.0))
+        );
+        // A card bigger than the layout allows gets what the layout allows.
+        assert_eq!(
+            ChordModePanel::frame_for_layout(
+                ChordLayout::SidebarLeft,
+                screen,
+                card(ChordLayout::SidebarLeft, 2000.0, 900.0)
+            ),
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, None)
+        );
+        // An extent from the other layout, from before a switch, isn't used.
+        assert_eq!(
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, floating),
+            ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, None)
+        );
+        // A display with no room left gets an empty window, not a panic.
+        let tiny = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(320.0, 10.0));
+        assert_eq!(
+            ChordModePanel::frame_for_layout(
+                ChordLayout::FloatingBottom,
+                tiny,
+                card(ChordLayout::FloatingBottom, 320.0, 140.0)
+            ),
             NSRect::new(NSPoint::new(0.0, 10.0), NSSize::new(320.0, 0.0))
         );
     }

@@ -95,6 +95,10 @@ impl AppController {
         state.frontmost().refresh_chord_context()?;
         self.mode.store(AppMode::Chord, Ordering::SeqCst);
         self.observable.set_state(|_| AppModeState::Chord)?;
+        // Package workers exit while unused; this starts them while the chord is typed.
+        state
+            .chord_package_manager()
+            .start_workers_for_frontmost_app();
         state.chord_mode_manager().ensure_active()?;
         Ok(())
     }

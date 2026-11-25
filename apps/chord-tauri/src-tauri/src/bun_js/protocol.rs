@@ -45,6 +45,10 @@ pub enum Request {
         launch: bool,
     },
     Ping,
+    /// Whether the package has work of its own between requests (app lifecycle
+    /// callbacks, a referenced timer, socket or subprocess, an on-screen window), which
+    /// exiting the worker while it is unused would lose. Anything but `false` keeps it.
+    HasOwnWork,
 }
 
 #[derive(Serialize, Deserialize)]

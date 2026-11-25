@@ -129,6 +129,8 @@ pub trait Api {
     async fn install_update() -> AppResult<()>;
     async fn restart_to_update() -> AppResult<()>;
     async fn get_current_states() -> AppResult<String>;
+    /// Only these states, by observable ID, as JSON.
+    async fn get_states(ids: Vec<String>) -> AppResult<String>;
     async fn get_app_logs() -> AppResult<Vec<AppLogEntry>>;
     async fn run_chord_command(command: String) -> AppResult<ChordCommandOutput>;
 }
