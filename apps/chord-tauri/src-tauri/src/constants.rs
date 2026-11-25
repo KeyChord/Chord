@@ -5,6 +5,8 @@ use std::str::FromStr;
 use std::sync::LazyLock;
 
 pub const UPDATE_MENU_ID: &str = "update";
+pub const CHECK_FOR_UPDATES_MENU_ID: &str = "check-for-updates";
+pub const CHECK_FOR_UPDATES_MENU_LABEL: &str = "Check for Updates…";
 pub const SETTINGS_MENU_ID: &str = "settings";
 pub const SHOW_SETTINGS_WINDOW_MENU_ID: &str = "show-settings-window";
 pub const RELOAD_CONFIGS_MENU_ID: &str = "reload-configs";

@@ -1,4 +1,7 @@
-use crate::constants::{QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID, SETTINGS_MENU_ID, UPDATE_MENU_ID};
+use crate::constants::{
+    CHECK_FOR_UPDATES_MENU_ID, CHECK_FOR_UPDATES_MENU_LABEL, QUIT_MENU_ID, RELOAD_CONFIGS_MENU_ID,
+    SETTINGS_MENU_ID, UPDATE_MENU_ID,
+};
 use crate::state::AppUpdateState;
 use crate::tauri_app::scripting::reload_configs;
 use tauri::{
@@ -53,7 +56,8 @@ fn build_menu(handle: &AppHandle, update: &AppUpdateState) -> tauri::Result<Menu
     }
     menu = menu
         .text(SETTINGS_MENU_ID, "Show Settings")
-        .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs");
+        .text(RELOAD_CONFIGS_MENU_ID, "Reload Configs")
+        .text(CHECK_FOR_UPDATES_MENU_ID, CHECK_FOR_UPDATES_MENU_LABEL);
 
     #[cfg(debug_assertions)]
     {

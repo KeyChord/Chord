@@ -1,6 +1,6 @@
 //! Keeps Chord up to date. Each release publishes `latest.json` beside its signed app archives.
-//! Chord reads it at launch and once a day and offers anything newer in Settings and the tray
-//! menu. Downloading, signature checks and replacing the app are `tauri-plugin-updater`'s job.
+//! Chord reads it at launch, once a day, and on demand. It offers anything newer in Settings and
+//! the tray menu. Downloading, signature checks and replacing the app are `tauri-plugin-updater`'s job.
 
 use crate::app::{AppHandleExt, AppSingleton};
 use crate::state::{AppUpdateObservable, AppUpdateState, Observable};
@@ -14,6 +14,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
+const CHECK_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Points Chord at another `latest.json`, for testing an update. Whatever it lists must still be
 /// signed with the key whose public half is in tauri.conf.json, so it can't install anything else.
@@ -32,6 +33,8 @@ pub struct AppUpdaterProvider {
 pub struct AppUpdater {
     observable: AppUpdateObservable,
     handle: AppHandle,
+    #[inject(tokio::sync::Mutex::new(()))]
+    checking: tokio::sync::Mutex<()>,
     /// The release on offer. Also guards moves between the update states.
     #[inject(Mutex::new(None))]
     found: Mutex<Option<Update>>,
@@ -65,12 +68,64 @@ impl AppUpdater {
         });
     }
 
-    async fn check(&self) -> Result<()> {
-        if self.state()?.is_applying() {
-            return Ok(());
+    async fn check(&self) -> Result<Option<AppUpdateState>> {
+        let Ok(_checking) = self.checking.try_lock() else {
+            return Ok(None);
+        };
+        let state = self.state()?;
+        if state.is_applying() {
+            return Ok(Some(state));
         }
         let update = self.fetch().await?;
-        self.record_check(update)
+        self.record_check(update)?;
+        Ok(Some(self.state()?))
+    }
+
+    pub fn check_from_menu(&self) {
+        let handle = self.handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let (title, message) = match handle.app_state().app_updater().check().await {
+                Ok(Some(AppUpdateState::Idle)) => (
+                    "Chord Is Up to Date",
+                    format!(
+                        "You’re running the latest version of Chord ({}).",
+                        handle.package_info().version
+                    ),
+                ),
+                Ok(Some(AppUpdateState::Available { version })) => (
+                    "Update Available",
+                    format!(
+                        "Chord {version} is available. You can install it from Settings or the Chord tray menu."
+                    ),
+                ),
+                Ok(Some(
+                    AppUpdateState::Downloading { version, .. }
+                    | AppUpdateState::Installing { version },
+                )) => (
+                    "Update in Progress",
+                    format!("Chord is updating to {version}."),
+                ),
+                Ok(Some(AppUpdateState::Ready { version })) => (
+                    "Restart to Finish Updating",
+                    format!("Restart Chord to start using version {version}."),
+                ),
+                Ok(None) => (
+                    "Check in Progress",
+                    "Chord is already checking for updates.".to_string(),
+                ),
+                Err(error) => {
+                    log::warn!("Couldn't check for a Chord update: {error:#}");
+                    handle
+                        .dialog()
+                        .message(format!("Chord couldn’t check for updates: {error:#}"))
+                        .title("Update Check Failed")
+                        .kind(MessageDialogKind::Error)
+                        .show(|_| {});
+                    return;
+                }
+            };
+            handle.dialog().message(message).title(title).show(|_| {});
+        });
     }
 
     /// Reads `latest.json`: the newest release, if it's newer than this build.
@@ -83,7 +138,7 @@ impl AppUpdater {
             log::info!("Checking for updates at {endpoint}");
             builder = builder.endpoints(vec![Url::parse(&endpoint)?])?;
         }
-        Ok(builder.build()?.check().await?)
+        Ok(tokio::time::timeout(CHECK_TIMEOUT, builder.build()?.check()).await??)
     }
 
     fn record_check(&self, update: Option<Update>) -> Result<()> {
