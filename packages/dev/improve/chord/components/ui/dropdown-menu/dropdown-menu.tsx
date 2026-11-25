@@ -1,4 +1,6 @@
 import { Dropdown } from "@heroui/react/dropdown";
+import { Header } from "@heroui/react/header";
+import { Separator } from "@heroui/react/separator";
 import type { ComponentProps } from "react";
 
 const DropdownMenu = Dropdown;
@@ -32,4 +34,13 @@ function DropdownMenuItem({
     />
   );
 }
-export { DropdownMenu, DropdownMenuContent, DropdownMenuItem };
+/** A section's title. Inside a menu it has to be a collection header, not a plain element. */
+const DropdownMenuHeader = Header;
+const DropdownMenuSeparator = Separator;
+export {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuHeader,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+};

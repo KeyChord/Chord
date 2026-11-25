@@ -10,7 +10,6 @@ import {
 } from "@chord/dev.improve.chord.components.ui.collapsible";
 import { desktopPlatform,
   useAppUpdateState,
-  useGitRepoStoreState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
 import { LogStreamProvider } from "@chord/dev.improve.chord.routes.settings._components.log-stream";
@@ -107,14 +106,12 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
   const settings = useSettingsState();
   const appUpdate = useAppUpdateState();
-  const gitRepos = useGitRepoStoreState();
-  // Browse lists these; the count says there's something to look at.
-  const packageUpdateCount = Object.keys(gitRepos.data?.updates ?? {}).filter(
-    (slug) => gitRepos.data?.repos[slug],
-  ).length;
   const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isLogPage = pathname === "/settings/log" || pathname === "/settings/log/";
+  // These pages fill the window and scroll inside themselves.
+  const fillsWindow = ["/settings/log", "/settings/browse"].some(
+    (path) => pathname === path || pathname === `${path}/`,
+  );
   const currentPage = navigationGroups
     .map((group) => group.items.find((item) => pathname === item.to || pathname === `${item.to}/`))
     .find((item) => item !== undefined);
@@ -200,14 +197,6 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
                         >
                           <Icon className="size-4 shrink-0" strokeWidth={1.8} />
                           <span>{item.label}</span>
-                          {item.to === "/settings/browse" && packageUpdateCount > 0 ? (
-                            <span
-                              aria-label={`${packageUpdateCount} package update${packageUpdateCount === 1 ? "" : "s"}`}
-                              className="ml-auto min-w-5 rounded-full bg-foreground/10 px-1.5 text-center text-[11px] font-semibold tabular-nums"
-                            >
-                              {packageUpdateCount}
-                            </span>
-                          ) : null}
                         </Link>
                       </li>
                     );
@@ -232,15 +221,15 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
         <div
           ref={scrollContainerRef}
           className={
-            isLogPage
+            fillsWindow
               ? "settings-page-scroll min-h-0 flex-1 overflow-hidden bg-background"
               : "settings-page-scroll min-h-0 flex-1 overflow-y-auto bg-background"
           }
         >
           <div
             className={
-              isLogPage
-                ? "settings-page-content h-full w-full px-6 pb-6 pt-4"
+              fillsWindow
+                ? `settings-page-content h-full w-full px-6 pt-4 ${isSidebarCollapsed && hasUpdateCard ? "pb-28" : "pb-6"}`
                 : `settings-page-content mx-auto w-full max-w-[960px] px-6 pt-4 ${isSidebarCollapsed && hasUpdateCard ? "pb-28" : "pb-10"}`
             }
           >

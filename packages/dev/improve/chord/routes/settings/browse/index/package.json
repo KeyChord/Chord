@@ -3,8 +3,7 @@
 	"type": "module",
 	"private": true,
 	"imports": {
-		"#category-filter": "./category-filter.tsx",
-		"#package-updates": "./package-updates.tsx",
+		"#filter-menu": "./filter-menu.tsx",
 		"#settings-browse-page": "./settings-browse-page.tsx"
 	},
 	"exports": {
@@ -20,7 +19,6 @@
 		"@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.empty": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
 		"@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
 		"@chord/dev.improve.chord.lib.github": "workspace:*",
 		"@chord/dev.improve.chord.lib.state": "workspace:*",

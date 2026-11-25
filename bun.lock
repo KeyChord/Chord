@@ -1036,7 +1036,6 @@
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",

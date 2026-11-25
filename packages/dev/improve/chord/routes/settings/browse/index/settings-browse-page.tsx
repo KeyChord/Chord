@@ -29,7 +29,6 @@ import {
   EmptyTitle,
 } from "@chord/dev.improve.chord.components.ui.empty";
 import { Input } from "@chord/dev.improve.chord.components.ui.input";
-import { ToggleGroup, ToggleGroupItem } from "@chord/dev.improve.chord.components.ui.toggle-group";
 import { officialChordReposData } from "@chord/dev.improve.chord.data.official-chord-repos";
 import { getGitHubSlug } from "@chord/dev.improve.chord.lib.github";
 import { StateQueries, useGitRepoStoreState } from "@chord/dev.improve.chord.lib.state";
@@ -38,8 +37,7 @@ import type { GitReposState } from "@chord/dev.improve.chord.lib.typeshare";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Download, ExternalLink, FolderGit2, Search } from "lucide-react";
 import { useMemo } from "react";
-import { CategoryFilter } from "#category-filter";
-import { PackageUpdates } from "#package-updates";
+import { FilterMenu, type InstallFilter } from "#filter-menu";
 
 interface OfficialChordRepo {
   packageName: string;
@@ -48,8 +46,6 @@ interface OfficialChordRepo {
   categories: string[];
   url: string;
 }
-
-type InstallFilter = "all" | "installed" | "not-installed";
 
 const officialChordRepos: OfficialChordRepo[] = officialChordReposData;
 const categories = [...new Set(officialChordRepos.flatMap((repo) => repo.categories))].sort(
@@ -68,12 +64,6 @@ type BrowseRepo = OfficialChordRepo & {
   slug: string;
   installedRepo?: GitReposState["repos"][string];
 };
-const displayNames = new Map(
-  officialChordRepos.flatMap((repo) => {
-    const slug = getGitHubSlug(repo.url);
-    return slug ? [[slug.toLowerCase(), repo.displayName] as const] : [];
-  }),
-);
 // Official chord package mirrors and community chord package repos carry the `chordpack` topic.
 const communityChordPackagesUrl = "https://github.com/search?q=topic%3Achordpack&type=repositories";
 
@@ -208,102 +198,84 @@ export function SettingsBrowsePageContent({
   const actionsColumn = table.getColumn("actions");
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold">Browse</h2>
-        <p className="text-sm text-muted-foreground">Official chord repos for popular apps.</p>
-      </div>
-
-      <PackageUpdates
-        repos={repos}
-        updates={state.updates}
-        updateCheck={state.updateCheck}
-        displayNames={displayNames}
-      />
-
-      <div className="space-y-3 border-b pb-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              aria-label="Search chord repos"
-              value={String(table.state.globalFilter ?? "")}
-              onChange={(event) => table.setGlobalFilter(event.target.value)}
-              placeholder="Search chord repos..."
-              className="pl-9"
-            />
-          </div>
-
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            spacing={1}
-            aria-label="Install status"
-            value={String(actionsColumn?.getFilterValue() ?? "all")}
-            onValueChange={(value) => {
-              if (value) {
-                actionsColumn?.setFilterValue(value === "all" ? undefined : value);
-              }
-            }}
-          >
-            <ToggleGroupItem value="all">All</ToggleGroupItem>
-            <ToggleGroupItem value="installed">Installed</ToggleGroupItem>
-            <ToggleGroupItem value="not-installed">Not Installed</ToggleGroupItem>
-          </ToggleGroup>
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex shrink-0 items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label="Search chord repos"
+            value={String(table.state.globalFilter ?? "")}
+            onChange={(event) => table.setGlobalFilter(event.target.value)}
+            placeholder="Search chord repos..."
+            className="pl-9"
+          />
         </div>
-
-        <CategoryFilter
-          options={categoryOptions}
-          value={String(categoryColumn?.getFilterValue() ?? "all")}
-          onChange={(value) => categoryColumn?.setFilterValue(value === "all" ? undefined : value)}
+        <FilterMenu
+          install={(actionsColumn?.getFilterValue() as InstallFilter | undefined) ?? "all"}
+          onInstallChange={(value) => actionsColumn?.setFilterValue(value === "all" ? undefined : value)}
+          categories={categoryOptions}
+          category={String(categoryColumn?.getFilterValue() ?? "all")}
+          onCategoryChange={(value) =>
+            categoryColumn?.setFilterValue(value === "all" ? undefined : value)
+          }
         />
       </div>
 
-      {rows.length === 0 ? (
-        <Empty className="rounded-lg border bg-default/20 py-10">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Search />
-            </EmptyMedia>
-            <EmptyTitle>No matching repos</EmptyTitle>
-            <EmptyDescription>Try a different search or filter.</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <div className="@container overflow-x-auto rounded-lg border">
-          <table className="w-full border-collapse text-left text-sm">
-            <caption className="sr-only">Official chord repositories</caption>
-            <thead className="border-b bg-default/40 text-xs text-muted-foreground">
-              {table.getHeaderGroups().map((group) => (
-                <tr key={group.id}>
-                  {group.headers.map((header) => (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      className="px-3 py-2 font-medium last:text-right"
-                    >
-                      <table.FlexRender header={header} />
-                    </th>
-                  ))}
-                </tr>
-              ))}
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b last:border-b-0 hover:bg-default/30">
+      {/* The table fills the page and scrolls on its own, so the search stays in view. */}
+      <div className="@container min-h-0 flex-1 overflow-auto rounded-lg border bg-card">
+        <table className="w-full border-separate border-spacing-0 text-left text-sm">
+          <caption className="sr-only">Official chord repositories</caption>
+          <thead className="sticky top-0 z-10 bg-card text-xs text-muted-foreground">
+            {table.getHeaderGroups().map((group) => (
+              <tr key={group.id}>
+                {group.headers.map((header) => (
+                  <th
+                    key={header.id}
+                    scope="col"
+                    className="border-b px-3 py-2 font-medium last:text-right"
+                  >
+                    <table.FlexRender header={header} />
+                  </th>
+                ))}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={table.getAllLeafColumns().length} className="border-b">
+                  <Empty className="py-10">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Search />
+                      </EmptyMedia>
+                      <EmptyTitle>No matching repos</EmptyTitle>
+                      <EmptyDescription>Try a different search or filter.</EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr key={row.id} className="hover:bg-default/30">
                   {row.getAllCells().map((cell) => (
-                    <td key={cell.id} className="px-3 py-2.5 first:w-full first:min-w-44">
+                    <td key={cell.id} className="border-b px-3 py-2.5 first:w-full first:min-w-44">
                       <table.FlexRender cell={cell} />
                     </td>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <CommunityChordPackages />
+              ))
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={table.getAllLeafColumns().length} className="px-3 py-3">
+                <CommunityChordPackages />
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }
@@ -338,7 +310,7 @@ function CommunityChordPackages() {
   });
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed px-4 py-3">
+    <div className="flex items-center justify-between gap-3">
       <div className="space-y-1">
         <h3 className="font-medium">Community chord packages</h3>
         <p className="text-sm text-muted-foreground">
