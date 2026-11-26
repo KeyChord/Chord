@@ -98,6 +98,8 @@ impl Catcher {
         panel.setWorksWhenModal(true);
         panel.setLevel(NSFloatingWindowLevel);
         panel.setAnimationBehavior(NSWindowAnimationBehavior::None);
+        // Like the Hint Panel: Chord being hidden must not hide the window keys go to.
+        panel.setCanHide(false);
         // Like the Hint Panel: on whichever Space, including beside a full-screen app.
         panel.setCollectionBehavior(
             NSWindowCollectionBehavior::CanJoinAllSpaces
