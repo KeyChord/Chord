@@ -50,7 +50,30 @@ impl SettingsUi {
 
         let window = window_builder.build()?;
 
+        // Chord keeps running once Settings closes, and the keyboard goes back to the app
+        // that had it, so the next chord acts there and not on Chord with no window.
+        #[cfg(target_os = "macos")]
+        {
+            let handle = self.handle.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    if let Err(error) = handle.hide() {
+                        log::warn!("Failed to hand focus back after closing Settings: {error}");
+                    }
+                }
+            });
+        }
+
         Ok(window)
+    }
+
+    /// Closes the window, and with it the web content behind it, while Chord keeps
+    /// running in the menu bar. Opening Settings again makes a new window.
+    pub fn close(&self) -> Result<()> {
+        if let Some(window) = self.handle.get_webview_window("settings") {
+            window.close()?;
+        }
+        Ok(())
     }
 
     pub fn open(&self) -> Result<()> {
