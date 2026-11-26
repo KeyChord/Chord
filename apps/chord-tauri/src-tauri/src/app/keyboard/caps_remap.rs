@@ -19,6 +19,7 @@ use anyhow::{Context, Result, ensure};
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
 use objc2_io_kit::{IOHIDEventSystemClient, IOHIDServiceClient};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::os::fd::AsRawFd;
@@ -108,6 +109,9 @@ pub struct RemapState {
     /// Start time of the owner, so a recycled PID is never mistaken for Chord.
     pub owner_started: u64,
     pub displaced: Vec<Mapping>,
+    /// Original Caps entries for keyboards already connected when Chord took over.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    keyboard_displaced: BTreeMap<u64, Vec<Mapping>>,
 }
 
 impl RemapState {
@@ -188,8 +192,6 @@ impl RemapStore {
         self.locked(|store| {
             let previous = store.read()?;
             let current = tables.read()?;
-            // What to put back comes from the default table: each keyboard's table is
-            // a copy of it unless someone wrote that keyboard alone.
             let displaced = current
                 .iter()
                 .find(|table| table.id == TableId::Default)
@@ -199,24 +201,31 @@ impl RemapStore {
                 Some(previous) if displaced.is_empty() => previous.displaced.clone(),
                 _ => displaced,
             };
+            let mut keyboard_displaced = previous
+                .as_ref()
+                .map(|previous| previous.keyboard_displaced.clone())
+                .unwrap_or_default();
+            for table in &current {
+                if let TableId::Keyboard(id) = table.id {
+                    let (_, displaced) = with_chord_mapping(&table.entries);
+                    if previous.is_none() || !displaced.is_empty() {
+                        keyboard_displaced.insert(id, displaced);
+                    }
+                }
+            }
             let state = RemapState {
                 owner_pid: owner.pid,
                 owner_started: owner.started,
                 displaced,
+                keyboard_displaced,
             };
             // Record first: if Chord dies right after the write, the guardian can undo it.
             if previous.as_ref() != Some(&state) {
                 store.write(&state)?;
             }
-            for table in &current {
-                let (entries, _) = with_chord_mapping(&table.entries);
-                if entries != table.entries {
-                    tables
-                        .write(table.id, &entries)
-                        .with_context(|| format!("failed to map Caps on {}", table.name))?;
-                }
-            }
-            Ok(())
+            write_tables(tables, &current, "map", |table| {
+                with_chord_mapping(&table.entries).0
+            })
         })
     }
 
@@ -235,14 +244,13 @@ impl RemapStore {
             if Some(holder) != owner && holder.is_alive() {
                 return Ok(false);
             }
-            for table in tables.read()? {
-                let entries = without_chord_mapping(&table.entries, &state.displaced);
-                if entries != table.entries {
-                    tables
-                        .write(table.id, &entries)
-                        .with_context(|| format!("failed to unmap Caps on {}", table.name))?;
-                }
-            }
+            write_tables(tables, &tables.read()?, "unmap", |table| {
+                let displaced = match table.id {
+                    TableId::Keyboard(id) => state.keyboard_displaced.get(&id),
+                    TableId::Default => None,
+                };
+                without_chord_mapping(&table.entries, displaced.unwrap_or(&state.displaced))
+            })?;
             store.remove()?;
             Ok(true)
         })
@@ -251,9 +259,33 @@ impl RemapStore {
 
 /// Every `UserKeyMapping` table, abstracted so the logic above is testable.
 pub trait MappingTables {
-    /// The default table and the table of each connected keyboard, as they are now.
+    /// The default table followed by the table of each connected keyboard.
     fn read(&self) -> Result<Vec<Table>>;
     fn write(&self, id: TableId, entries: &[Mapping]) -> Result<()>;
+}
+
+fn write_tables(
+    tables: &impl MappingTables,
+    current: &[Table],
+    action: &str,
+    desired: impl Fn(&Table) -> Vec<Mapping>,
+) -> Result<()> {
+    let mut default_written: Option<Vec<Mapping>> = None;
+    for table in current {
+        let entries = desired(table);
+        // Writing the default also sets every keyboard to that table. Restore any
+        // differences from the snapshot, even if the keyboard was already correct.
+        let live_entries = default_written.as_deref().unwrap_or(&table.entries);
+        if entries.as_slice() != live_entries {
+            tables
+                .write(table.id, &entries)
+                .with_context(|| format!("failed to {action} Caps on {}", table.name))?;
+            if table.id == TableId::Default {
+                default_written = Some(entries);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// macOS's tables. The default is the property set on the HID event system itself;
@@ -667,6 +699,36 @@ mod tests {
         assert_eq!(tables.entries(BUILT_IN), []);
         assert_eq!(tables.entries(EXTERNAL), [OTHER]);
         assert_eq!(tables.entries(TableId::Default), []);
+    }
+
+    #[test]
+    fn changing_the_default_preserves_each_keyboards_own_mappings() {
+        let tables = Tables::new(&[BUILT_IN, EXTERNAL]);
+        let another_caps_mapping = (CAPS_USAGE, 0x7_0000_0029);
+        tables.write(TableId::Default, &[F18]).unwrap();
+        tables
+            .write(BUILT_IN, &[OTHER, another_caps_mapping])
+            .unwrap();
+        tables.write(EXTERNAL, &[OTHER]).unwrap();
+        let store = store();
+        let me = ProcessIdentity::current().unwrap();
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables.entries(BUILT_IN), [OTHER, CHORD_MAPPING]);
+        assert_eq!(tables.entries(EXTERNAL), [OTHER, CHORD_MAPPING]);
+
+        // Reset the default and restore a keyboard to a valid, custom table. It
+        // still needs to be written after Chord repairs the default.
+        tables.write(TableId::Default, &[]).unwrap();
+        tables.write(BUILT_IN, &[OTHER, CHORD_MAPPING]).unwrap();
+        tables.write(EXTERNAL, &[OTHER, CHORD_MAPPING]).unwrap();
+        store.install(&tables, me).unwrap();
+        assert_eq!(tables.entries(BUILT_IN), [OTHER, CHORD_MAPPING]);
+        assert_eq!(tables.entries(EXTERNAL), [OTHER, CHORD_MAPPING]);
+
+        assert!(store.uninstall(&tables, Some(me)).unwrap());
+        assert_eq!(tables.entries(TableId::Default), [F18]);
+        assert_eq!(tables.entries(BUILT_IN), [OTHER, another_caps_mapping]);
+        assert_eq!(tables.entries(EXTERNAL), [OTHER]);
     }
 
     #[test]
