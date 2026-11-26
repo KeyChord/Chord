@@ -155,7 +155,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
         id="settings-sidebar"
         inert={isSidebarCollapsed}
         data-collapsed={isSidebarCollapsed || undefined}
-        className="settings-window-sidebar flex w-[15.5rem] shrink-0 select-none flex-col overflow-hidden border-r border-black/[0.08] text-sidebar-foreground transition-[width] duration-200 ease-out motion-reduce:transition-none data-collapsed:w-0 data-collapsed:border-r-0"
+        className="settings-window-sidebar flex w-[15.5rem] shrink-0 select-none flex-col overflow-hidden border-r border-black/[0.08] dark:border-white/[0.08] text-sidebar-foreground transition-[width] duration-200 ease-out motion-reduce:transition-none data-collapsed:w-0 data-collapsed:border-r-0"
       >
         <div className="h-[50px] shrink-0" onMouseDown={handleTitleBarMouseDown} />
 
