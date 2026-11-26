@@ -12,7 +12,15 @@ const LETTER_TOKENS = Array.from({ length: 26 }, (_, index) =>
 const MAX_KEY_SIZE = 32;
 const NATIVE_SURFACE_RADIUS = 32;
 /** The widest the sidebar card gets, as `INDICATOR_WIDTH` in `chord_mode_panel.rs`. */
-const SIDEBAR_MAX_WIDTH = 640;
+const SIDEBAR_MAX_WIDTH = 960;
+/** Descriptions past this width end in an ellipsis, so wrapped columns stay even. */
+const DESCRIPTION_MAX_WIDTH = 240;
+/** Columns the sidebar shows in full; earlier keys collapse into the trail above them. */
+const MAX_FULL_COLUMNS = 3;
+/** The most columns one long list of options wraps into before the rest is counted. */
+const MAX_WRAPPED_COLUMNS = 3;
+/** Loops listed above the keys; the rest are counted. */
+const MAX_LISTED_LOOPS = 3;
 // How far each card's box-shadow reaches past its edge: offset plus radius. Chord sizes
 // the panel's window to the card and that reach, since WebKit keeps pixels for the
 // whole window, transparent or not. (Tailwind reads comments, so no class names here.)
@@ -71,7 +79,34 @@ type BlockState = 'solid' | 'open';
 
 /** Class names for a key in a block; an open block is still being typed with Shift held. */
 function blockKeyClassName(block: BlockState) {
-	return cn('border-sky-400/90 bg-sky-100 text-sky-950', block === 'open' && 'border-dashed bg-sky-50');
+	return cn(
+		'border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-400/60 dark:bg-sky-500/25 dark:text-sky-50',
+		block === 'open' && 'border-dashed bg-sky-50 dark:bg-sky-500/10',
+	);
+}
+
+const IDLE_KEY_CLASS_NAME = 'border-border/80 bg-background/95 text-foreground dark:border-white/12 dark:bg-white/10';
+const RAN_KEY_CLASS_NAME = 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/60 dark:bg-emerald-500/25 dark:text-emerald-50';
+const FAILED_KEY_CLASS_NAME = 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/60 dark:bg-red-500/25 dark:text-red-50';
+
+/**
+ * Hides the part of a list that does not fit behind a fade at that edge, the way macOS
+ * lists end, instead of a scroll bar the panel could never be scrolled with.
+ */
+function fadeMask(start: boolean, end: boolean, direction: 'bottom' | 'right') {
+	if (!start && !end) {
+		return undefined;
+	}
+	const image = `linear-gradient(to ${direction}, ${start ? 'transparent, black 2.5rem' : 'black'}, ${end ? 'black calc(100% - 2.5rem), transparent' : 'black'})`;
+	return { maskImage: image, WebkitMaskImage: image };
+}
+
+/** Splits `items` into at most `maxColumns` columns of about the same length, filled top to bottom. */
+function wrapIntoColumns<T>(items: T[], rowsPerColumn: number, maxColumns: number) {
+	const columnCount = clamp(Math.ceil(items.length / rowsPerColumn), 1, maxColumns);
+	const perColumn = Math.ceil(items.length / columnCount);
+	return Array.from({ length: columnCount }, (_, index) => items.slice(index * perColumn, (index + 1) * perColumn))
+		.filter(column => column.length > 0);
 }
 
 function ChordKeyRow({
@@ -113,22 +148,22 @@ function ChordKeyRow({
 					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
 				}}
 				className={cn(
-					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
+					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(0,0,0,0.4)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
 						? block
 							? blockKeyClassName(block)
 							: isFailed
-								? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
-								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
-						: 'border-border/80 bg-background/95 text-foreground',
+								? cn(FAILED_KEY_CLASS_NAME, 'shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]')
+								: cn(RAN_KEY_CLASS_NAME, 'shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]')
+						: IDLE_KEY_CLASS_NAME,
 				)}
 			>
 				<KeyLabel label={token} />
 			</Kbd>
 			{error
 				? <div role="alert" className="line-clamp-2 max-w-80 text-red-600 dark:text-red-400" style={{ fontSize: `${descriptionFontSize}px` }}>{error}</div>
-				: <div style={{ fontSize: `${descriptionFontSize}px` }}>{description}</div>}
+				: <div className="min-w-0 truncate" style={{ fontSize: `${descriptionFontSize}px`, maxWidth: DESCRIPTION_MAX_WIDTH }}>{description}</div>}
 		</div>
 	);
 }
@@ -534,6 +569,51 @@ export function ChordsPageContent({
 		columnIndex = nextColumnIndex;
 	}
 
+	// The sidebar shows every option without a scroll bar. The current key's options wrap
+	// into more columns once they outgrow the panel's height; earlier keys show the options
+	// around the one chosen, faded where the list goes on; and keys before those collapse
+	// into a trail of keycaps, so a long chord never pushes the columns off the card.
+	const headerHeight = (commandLabel ? 28 : 0)
+		+ (loops.length > 0 ? (Math.min(loops.length, MAX_LISTED_LOOPS) + Number(loops.length > MAX_LISTED_LOOPS)) * 20 + 12 : 0)
+		+ (SHOW_DEVELOPMENT_LABEL ? keySize : 0);
+	const rowsPerColumn = Math.max(4, Math.floor((availableHeight - headerHeight + rowGap) / (keySize + rowGap)));
+	const lastColumnWraps = clamp(Math.ceil((keyColumns.at(-1)?.rows.length ?? 0) / rowsPerColumn), 1, MAX_WRAPPED_COLUMNS);
+	const fullColumnCount = Math.max(1, MAX_FULL_COLUMNS - (lastColumnWraps - 1));
+	const collapsedColumns = keyColumns.slice(0, Math.max(0, keyColumns.length - fullColumnCount));
+	const visibleColumns = keyColumns.slice(collapsedColumns.length).map((column, index, columns) => {
+		const isLast = index === columns.length - 1;
+		const selectedIndex = column.rows.findIndex(row => row.keys.includes(column.selectedToken));
+		if (isLast) {
+			const capacity = rowsPerColumn * MAX_WRAPPED_COLUMNS;
+			let rows = column.rows;
+			if (rows.length > capacity) {
+				// The last place goes to the count of the rest; the chosen key always shows.
+				rows = rows.slice(0, capacity - 1);
+				if (selectedIndex >= rows.length) {
+					rows[rows.length - 1] = column.rows[selectedIndex];
+				}
+			}
+			return {
+				...column,
+				isLast,
+				wrapped: wrapIntoColumns(rows, rowsPerColumn, MAX_WRAPPED_COLUMNS),
+				hiddenCount: column.rows.length - rows.length,
+				clippedStart: false,
+				clippedEnd: false,
+			};
+		}
+		const start = clamp(selectedIndex - Math.floor(rowsPerColumn / 2), 0, Math.max(0, column.rows.length - rowsPerColumn));
+		const rows = column.rows.slice(start, start + rowsPerColumn);
+		return {
+			...column,
+			isLast,
+			wrapped: [rows],
+			hiddenCount: 0,
+			clippedStart: start > 0,
+			clippedEnd: start + rows.length < column.rows.length,
+		};
+	});
+
 	// Typed quotes keep their text beside the keys; show it in place.
 	const floatingKeycaps = isTyping ? keyColumns.flatMap(column => column.selectedLabel ? [column.selectedLabel] : []) : floatingTokens;
 	const floatingDisplayTokens = withQuoteTexts(floatingKeycaps, floatingQuotes, showsBuffer && chordInputState.inserting);
@@ -561,12 +641,17 @@ export function ChordsPageContent({
 		emitSurfaceRect();
 	}, [currentPrefixLength, keyColumns.length, keySize, rowGap, descriptionFontSize, chordPanelState.isVisible, emitSurfaceRect]);
 
+	// A long chord keeps its latest keys in view; the start fades out on the left to show
+	// there is more before it.
 	useLayoutEffect(() => {
 		const keys = floatingKeysRef.current;
 		if (keys) {
 			keys.scrollLeft = keys.scrollWidth;
+			const mask = fadeMask(keys.scrollLeft > 0, false, 'right');
+			keys.style.maskImage = mask?.maskImage ?? '';
+			keys.style.webkitMaskImage = mask?.WebkitMaskImage ?? '';
 		}
-	}, [chordInputState.input, chordInputState.quotes, chordInputState.selectedInputEvent, isFloating]);
+	});
 
 	return (
 		<div className="relative size-full bg-transparent">
@@ -600,10 +685,10 @@ export function ChordsPageContent({
 													block
 														? blockKeyClassName(block)
 														: showsBuffer
-															? 'border-border/80 bg-background/95 text-foreground'
+															? IDLE_KEY_CLASS_NAME
 															: executionError
-																? 'border-red-400/90 bg-red-100 text-red-950'
-																: 'border-emerald-400/90 bg-emerald-100 text-emerald-950',
+																? FAILED_KEY_CLASS_NAME
+																: RAN_KEY_CLASS_NAME,
 													// Separates adjacent blocks, and blocks from the keys typed after them.
 													index + 1 < floatingDisplayTokens.length && floatingBlockEnds.includes(index + 1) && 'mr-1.5',
 												)}
@@ -614,7 +699,7 @@ export function ChordsPageContent({
 									}) : (
 									<Kbd
 										aria-label="No key pressed"
-										className="h-7 min-w-7 shrink-0 rounded-md border border-border/80 bg-background/95 px-1.5 text-sm text-foreground shadow-sm"
+										className={cn('h-7 min-w-7 shrink-0 rounded-md border px-1.5 text-sm shadow-sm', IDLE_KEY_CLASS_NAME)}
 									/>
 								)}
 								</div>
@@ -626,15 +711,16 @@ export function ChordsPageContent({
 						</div>
 					) : <>
 						{commandLabel && (
-							<div className="mb-3 text-xs text-foreground/70">
+							<div className="mb-3 max-w-md truncate text-xs text-foreground/70">
 								{commandLabel}
 							</div>
 						)}
 						{loops.length > 0 && (
-							<div className="mb-3 flex max-h-24 flex-col gap-1 overflow-y-auto text-xs text-foreground/80">
-								{loops.map(loop => (
-									<div key={loop.id}>Loop {loop.id}: <code>{loop.input}</code> · Halt: <code>{haltLoopTemplate.replace('{id}', String(loop.id))}</code></div>
+							<div className="mb-3 flex max-w-md flex-col gap-1 text-xs text-foreground/80">
+								{loops.slice(0, MAX_LISTED_LOOPS).map(loop => (
+									<div key={loop.id} className="truncate">Loop {loop.id}: <code>{loop.input}</code> · Halt: <code>{haltLoopTemplate.replace('{id}', String(loop.id))}</code></div>
 								))}
+								{loops.length > MAX_LISTED_LOOPS && <div className="text-foreground/60">{`${loops.length - MAX_LISTED_LOOPS} more running`}</div>}
 							</div>
 						)}
 					{insertText !== undefined ? (
@@ -646,34 +732,59 @@ export function ChordsPageContent({
 							<p className="text-xs text-foreground/60">Caps+Space closes the quote · Esc cancels</p>
 						</div>
 					) : (
-					<div className="relative flex items-start">
+					<div className="relative flex flex-col items-start">
+						{collapsedColumns.length > 0 && (
+							<div aria-label="Earlier keys" className="mb-3 flex max-w-full items-center gap-1 overflow-hidden text-xs text-foreground/60">
+								{collapsedColumns.map(column => {
+									const block = getColumnBlock(column.index);
+									return (
+										<Kbd
+											key={column.index}
+											className={cn('h-6 min-w-6 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : IDLE_KEY_CLASS_NAME)}
+										>
+											<KeyLabel label={column.selectedLabel ?? ''} />
+										</Kbd>
+									);
+								})}
+								<span aria-hidden className="ml-0.5 text-foreground/40">›</span>
+							</div>
+						)}
 						<div className="flex items-start gap-6">
-							{keyColumns.map((column, columnIndex) => (
+							{visibleColumns.map(column => (
 								<div
 									key={column.index}
-									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', column.index > 0 && selectedBlockEnds.includes(column.index) && 'ml-3')}
-									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px` }}
+									className={cn('flex items-start gap-x-6 px-1 py-1', column.index > 0 && selectedBlockEnds.includes(column.index) && 'ml-3')}
+									style={fadeMask(column.clippedStart, column.clippedEnd, 'bottom')}
 								>
-									{SHOW_DEVELOPMENT_LABEL && column.index === 0
-										? (
-												<div className="-mb-1 text-[10px] font-semibold tracking-[0.28em] text-foreground/55">
-													DEVELOPMENT
+									{column.wrapped.map((rows, wrappedIndex) => (
+										<div key={wrappedIndex} className="flex min-w-0 flex-col items-start" style={{ gap: `${rowGap}px` }}>
+											{SHOW_DEVELOPMENT_LABEL && column.index === 0 && wrappedIndex === 0
+												? (
+														<div className="-mb-1 text-[10px] font-semibold tracking-[0.28em] text-foreground/55">
+															DEVELOPMENT
+														</div>
+													)
+												: null}
+											{rows.map(row => (
+												<ChordKeyRow
+													key={row.token}
+													token={row.token === column.selectedToken ? column.selectedLabel : row.token}
+													description={row.description}
+													error={column.isLast && row.keys.includes(column.selectedToken) ? executionError : undefined}
+													isSelected={row.keys.includes(column.selectedToken)}
+													isFailed={executionError !== undefined}
+													isDimmed={Boolean(column.selectedToken) && !row.keys.includes(column.selectedToken)}
+													block={getColumnBlock(column.index)}
+													keySize={keySize}
+													descriptionFontSize={descriptionFontSize}
+												/>
+											))}
+											{wrappedIndex === column.wrapped.length - 1 && column.hiddenCount > 0 && (
+												<div className="text-foreground/60" style={{ fontSize: `${descriptionFontSize}px`, lineHeight: `${keySize}px` }}>
+													{`${column.hiddenCount} more · keep typing`}
 												</div>
-											)
-										: null}
-									{column.rows.map(row => (
-										<ChordKeyRow
-											key={row.token}
-											token={row.token === column.selectedToken ? column.selectedLabel : row.token}
-											description={row.description}
-											error={columnIndex === keyColumns.length - 1 && row.keys.includes(column.selectedToken) ? executionError : undefined}
-											isSelected={row.keys.includes(column.selectedToken)}
-											isFailed={executionError !== undefined}
-											isDimmed={Boolean(column.selectedToken) && !row.keys.includes(column.selectedToken)}
-											block={getColumnBlock(column.index)}
-											keySize={keySize}
-											descriptionFontSize={descriptionFontSize}
-										/>
+											)}
+										</div>
 									))}
 								</div>
 							))}

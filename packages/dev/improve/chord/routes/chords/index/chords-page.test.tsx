@@ -303,3 +303,73 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(html).toContain("border-dashed");
   });
 }
+
+function manyOptionsPackage(count: number): HintPanelPackage {
+  const path = "chords/dev/fixture/macos.toml";
+  const keys = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].map(letter => `Key${letter}`).concat(["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal", "BracketLeft", "BracketRight", "Semicolon", "Quote", "Comma", "Period", "Slash", "Backquote"]);
+  const chords = keys.slice(0, count).flatMap((first, index) => [
+    { rawTrigger: `x${index}`, trigger: { keys: ["KeyX", first] }, name: `Option ${index + 1}`, index, actions: [], fallback: false },
+  ]);
+  return { name: "@fixture/many", globalChords: [], chordsFiles: { [path]: { chords, chordHints: [] } } };
+}
+
+function sidebarWithOptions(count: number, input: string[]) {
+  return renderToString(<ChordsPageContent
+    chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
+    chordPanelData={{ isVisible: true, layout: ChordLayout.SidebarLeft }}
+    frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
+    hintPanelData={{ packages: [manyOptionsPackage(count)] }}
+    chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+    chordMacrosData={{ entries: [] }}
+  />);
+}
+
+test("the sidebar never scrolls: a long list of options wraps into columns", () => {
+  // At a 720pt viewport, 20 rows fit in a column, so these take two.
+  const html = sidebarWithOptions(40, ["KeyX"]);
+  expect(html.match(/class="flex min-w-0 flex-col items-start"/g)?.length).toBe(3);
+  expect(html).not.toContain("overflow-y-auto");
+  for (let index = 1; index <= 40; index++) expect(html).toContain(`>Option ${index}</div>`);
+  expect(html).not.toContain(" more · keep typing");
+});
+
+test("options past what three columns hold are counted instead of scrolled to", () => {
+  // A short display: 9 rows a column, so three columns hold 26 options and the count.
+  const height = window.innerHeight;
+  window.innerHeight = 300;
+  try {
+    const html = sidebarWithOptions(46, ["KeyX"]);
+    expect(html).not.toContain("overflow-y-auto");
+    expect(html).toContain("20 more · keep typing");
+  } finally {
+    window.innerHeight = height;
+  }
+});
+
+test("an earlier key shows the options around the chosen one, faded where the list goes on", () => {
+  // Minus is the 37th option.
+  const html = sidebarWithOptions(40, ["KeyX", "Minus"]);
+  expect(html).toContain("mask-image:linear-gradient(to bottom");
+  // The chosen key stays in view.
+  expect(html).toContain(">Option 37</div>");
+});
+
+test("keys before the last columns collapse into a trail", () => {
+  const path = "chords/dev/fixture/macos.toml";
+  const keys = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT"];
+  const render = (input: string[]) => renderToString(<ChordsPageContent
+    chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
+    chordPanelData={{ isVisible: true, layout: ChordLayout.SidebarLeft }}
+    frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
+    hintPanelData={{ packages: [{ name: "@fixture/deep", globalChords: [], chordsFiles: { [path]: {
+      chords: [{ rawTrigger: "qwert", trigger: { keys }, name: "Deep chord", index: 0, actions: [], fallback: false }],
+      chordHints: [],
+    } } }] }}
+    chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+    chordMacrosData={{ entries: [] }}
+  />);
+  expect(render(keys.slice(0, 2))).not.toContain('aria-label="Earlier keys"');
+  const deep = render(keys.slice(0, 4));
+  expect(deep).toContain('aria-label="Earlier keys"');
+  expect(deep).toContain("Deep chord");
+});
