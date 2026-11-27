@@ -104,8 +104,11 @@ test("Packages lists installed packages while Local Chords keeps personal editin
   const html = render(packages);
   expect(html).toContain('role="tablist"');
   expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Packages</);
-  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
-  expect(html).toMatch(/role="tab"[^>]*>Third-Party</);
+  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
+  // Third-party packages, folders and repositories are folded under Other sources.
+  expect(html).not.toMatch(/role="tab"[^>]*>Third-Party</);
+  expect(html).toContain("Other sources");
+  expect(html).toContain('aria-label="Third-party packages"');
   expect(html).toContain("Default global prefix for placeholders");
   expect(html).toMatch(/<input[^>]+maxLength="1"[^>]+value=";"/i);
   expect(html).toContain("2 packages");
@@ -121,7 +124,7 @@ test("Local Chords remains editable when no external packages are installed", ()
   const html = render([pkg("@me/work")]);
   expect(html).not.toContain('aria-label="Open @me/work"');
   expect(html).toContain("Your package library is empty");
-  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
+  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   // Local Chords covers personal folders, so the Packages tab no longer manages sources.
   expect(html).not.toContain("Manage sources");
@@ -174,14 +177,14 @@ test("blocked packages are reviewable in the Chords tab without appearing as ena
   expect(html).not.toContain('aria-label="Open @untrusted/test"');
   expect(html).not.toContain('aria-label="Select @untrusted/test"');
   expect(html).not.toContain('aria-label="Search third-party packages"');
-  // Approvals have their own tab, which flags the packages waiting for review.
-  expect(html).toMatch(/role="tab"[^>]*>Third-Party<span[^>]*aria-label="1 awaiting approval"/);
-  expect(html.indexOf('aria-label="Chord packages"')).toBeLessThan(
-    html.indexOf('aria-label="Third-party packages"'),
+  // A package waiting for review flags the Packages tab and leads it.
+  expect(html).toMatch(/role="tab"[^>]*>Packages<span[^>]*aria-label="1 awaiting approval"/);
+  expect(html.indexOf('aria-label="Third-party packages"')).toBeLessThan(
+    html.indexOf('aria-label="Chord packages"'),
   );
 });
 
-test("approved packages are listed in the Third-Party tab with Revoke", () => {
+test("approved packages are listed under Other sources with Revoke", () => {
   const html = render(
     [],
     [

@@ -13,9 +13,20 @@ import {
   useDesktopAppManagerState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
+import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card";
+import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
+import { LocalFoldersCard } from "@chord/dev.improve.chord.routes.settings._components.local-folders-card";
 import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
-import { Search, X } from "lucide-react";
-import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { ChevronRight, Search, X } from "lucide-react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 export function SettingsChordsPage({ configurePackage }: { configurePackage?: string }) {
   return (
@@ -31,12 +42,11 @@ export function SettingsChordsPage({ configurePackage }: { configurePackage?: st
   );
 }
 
-type View = "packages" | "personal" | "third-party";
+type View = "packages" | "personal";
 
 const views: { value: View; label: string }[] = [
   { value: "packages", label: "Packages" },
-  { value: "personal", label: "Local Chords" },
-  { value: "third-party", label: "Third-Party" },
+  { value: "personal", label: "My Chords" },
 ];
 
 /**
@@ -155,6 +165,9 @@ export function SettingsChordsPageContent({
   const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
   const pendingApprovals = thirdPartyPackages.filter((pkg) => !pkg.approved).length;
   const detail = openPackage ? shownPackages.find((pkg) => pkg.name === openPackage) : undefined;
+  const approvals = (
+    <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
+  );
 
   function panel(value: View) {
     return {
@@ -173,7 +186,7 @@ export function SettingsChordsPageContent({
           <SegmentedControl
             value={view}
             onChange={setView}
-            badges={{ "third-party": pendingApprovals }}
+            badges={{ packages: pendingApprovals }}
             idPrefix={idPrefix}
           />
           {view === "packages" && (
@@ -200,6 +213,8 @@ export function SettingsChordsPageContent({
           <PackageDetail entry={detail} apps={apps} onBack={() => setOpenPackage(undefined)} />
         ) : (
           <>
+            {/* Trust warnings lead only when there is a decision to make. */}
+            {pendingApprovals > 0 && approvals}
             <ChordLibrary
               packages={shownPackages}
               apps={apps}
@@ -208,16 +223,38 @@ export function SettingsChordsPageContent({
               onReorder={setPackageOrder}
             />
             <DefaultGlobalPrefixSetting />
+            <OtherSources>{pendingApprovals === 0 && approvals}</OtherSources>
           </>
         )}
       </div>
       <div {...panel("personal")}>
         <PersonalChords />
       </div>
-      <div {...panel("third-party")}>
-        <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
-      </div>
     </div>
+  );
+}
+
+/**
+ * Where packages come from besides Chord's own: third-party packages, folders and Git
+ * repositories. Folded away, since most people never need it.
+ */
+function OtherSources({ children }: { children?: ReactNode }) {
+  return (
+    <details className="mac-section other-sources">
+      <summary className="mac-section-header other-sources-summary">
+        <ChevronRight size={13} aria-hidden="true" className="other-sources-chevron" />
+        <span className="mac-section-title">Other sources</span>
+        <span className="mac-section-subtitle">
+          Third-party packages, local folders and GitHub repositories
+        </span>
+      </summary>
+      <div className="space-y-5 pt-2">
+        {children}
+        <LocalFoldersCard />
+        <ChordReposCard />
+        <ChordMonoreposCard />
+      </div>
+    </details>
   );
 }
 

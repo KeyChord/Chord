@@ -858,6 +858,27 @@ section + .mac-section {
   letter-spacing: var(--settings-header-tracking);
   color: var(--settings-label);
 }
+/* "Other sources" on the Chords page: a disclosure that folds the rarely used sources. */
+.other-sources-summary {
+  cursor: default;
+  align-items: center;
+  list-style: none;
+}
+.other-sources-summary::-webkit-details-marker {
+  display: none;
+}
+.other-sources-chevron {
+  flex-shrink: 0;
+  color: var(--settings-description);
+}
+.other-sources[open] .other-sources-chevron {
+  transform: rotate(90deg);
+}
+.mac-section-subtitle {
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
 .mac-section-footer {
   margin: 8px 16px 0;
   font: var(--settings-description-font);
