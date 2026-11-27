@@ -7,8 +7,8 @@ use arc_swap::ArcSwap;
 use nject::injectable;
 use objc2::rc::Retained;
 use objc2_app_kit::{
-    NSEvent, NSScreen, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
-    NSVisualEffectState, NSWindowAnimationBehavior, NSWindowOrderingMode, NSWindowStyleMask,
+    NSScreen, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+    NSWindowAnimationBehavior, NSWindowOrderingMode, NSWindowStyleMask,
 };
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -248,25 +248,16 @@ impl ChordModePanel {
         Ok(())
     }
 
-    /// The display the panel shows on: the one with the pointer, which is where the
-    /// person is looking even when no window has focus. `NSWindow.screen` alone is the
-    /// display the panel was last on, and is nil once that display is gone, which left
-    /// the panel off screen while chords still ran.
+    /// The display the panel shows on: the one it was last on, as before. When that
+    /// display is gone, `NSWindow.screen` is nil, which left the panel off screen while
+    /// chords still ran, so the main display takes its place.
     fn target_screen(panel: &PanelHandle<Wry>) -> Option<Retained<NSScreen>> {
         let mtm = MainThreadMarker::new()?;
-        let pointer = NSEvent::mouseLocation();
-        let screens = NSScreen::screens(mtm);
-        let under_pointer = screens.iter().find(|screen| {
-            let frame = screen.frame();
-            pointer.x >= frame.origin.x
-                && pointer.x <= frame.origin.x + frame.size.width
-                && pointer.y >= frame.origin.y
-                && pointer.y <= frame.origin.y + frame.size.height
-        });
-        under_pointer
-            .or_else(|| panel.as_panel().screen())
+        panel
+            .as_panel()
+            .screen()
             .or_else(|| NSScreen::mainScreen(mtm))
-            .or_else(|| screens.firstObject())
+            .or_else(|| NSScreen::screens(mtm).firstObject())
     }
 
     fn position_panel(panel: &PanelHandle<Wry>, layout: ChordLayout, extent: Option<PanelExtent>) {
