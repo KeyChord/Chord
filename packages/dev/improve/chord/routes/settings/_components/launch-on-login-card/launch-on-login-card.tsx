@@ -21,6 +21,18 @@ import {
   getAppearance,
   setAppearance,
 } from "@chord/dev.improve.chord.lib.state/appearance";
+import {
+  PANEL_KEY_FONTS,
+  PANEL_TEXT_FONTS,
+  type PanelKeyFont,
+  type PanelTextFont,
+  getCollapseEarlierKeys,
+  getPanelKeyFont,
+  getPanelTextFont,
+  setCollapseEarlierKeys,
+  setPanelKeyFont,
+  setPanelTextFont,
+} from "@chord/dev.improve.chord.lib.state/panel-preferences";
 import { useState } from "react";
 
 export function LaunchOnLoginCard() {
@@ -51,6 +63,7 @@ function LaunchOnLoginCardContent({
   const toggleDockIconMutation = useMutation({
     mutationFn: taurpc.toggleDockIcon,
   });
+  const [collapseEarlierKeys, setCollapseEarlierKeysState] = useState(getCollapseEarlierKeys);
   const toggleHideHintPanelByDefaultMutation = useMutation({
     mutationFn: taurpc.toggleHideHintPanelByDefault,
   });
@@ -109,6 +122,30 @@ function LaunchOnLoginCardContent({
               toggleHideHintPanelByDefaultMutation.mutate();
             }}
           />
+          <SettingSwitchRow
+            id="collapse-earlier-keys"
+            label="Fold earlier keys of long chords"
+            description="When a chord gets long, show its first keys as a compact trail beside the Hint Panel's columns."
+            checked={collapseEarlierKeys}
+            onCheckedChange={() => {
+              setCollapseEarlierKeys(!collapseEarlierKeys);
+              setCollapseEarlierKeysState(!collapseEarlierKeys);
+            }}
+          />
+          <ChoiceRow
+            id="panel-text-font"
+            label="Hint Panel font"
+            options={PANEL_TEXT_FONTS}
+            initial={getPanelTextFont()}
+            onChange={(font: PanelTextFont) => setPanelTextFont(font)}
+          />
+          <ChoiceRow
+            id="panel-key-font"
+            label="Hint Panel key font"
+            options={PANEL_KEY_FONTS}
+            initial={getPanelKeyFont()}
+            onChange={(font: PanelKeyFont) => setPanelKeyFont(font)}
+          />
         </div>
       </CardContent>
     </Card>
@@ -145,6 +182,48 @@ function AppearanceRow() {
         {APPEARANCES.map(({ value, label }) => (
           <ToggleGroupItem key={value} value={value} className="appearance-option">
             {label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
+/** A row with one choice among a few, shown as a segmented control. */
+function ChoiceRow<T extends string>({
+  id,
+  label,
+  options,
+  initial,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  options: Record<T, { label: string }>;
+  initial: T;
+  onChange: (value: T) => void;
+}) {
+  const [selected, setSelected] = useState(initial);
+  return (
+    <div className="preference-row">
+      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
+        <span id={`${id}-label`} className="preference-label">
+          {label}
+        </span>
+      </div>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        aria-labelledby={`${id}-label`}
+        value={selected}
+        onValueChange={(value) => {
+          setSelected(value as T);
+          onChange(value as T);
+        }}
+      >
+        {(Object.keys(options) as T[]).map((value) => (
+          <ToggleGroupItem key={value} value={value} className="appearance-option">
+            {options[value].label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>

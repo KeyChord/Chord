@@ -114,7 +114,8 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     />);
     expect(html).toContain('aria-label="Return"');
     if (layout === ChordLayout.SidebarLeft) {
-      expect(html).toContain("Repeat 3 times · `d2,i13` · Step 2");
+      // No label row above the keys.
+      expect(html).not.toContain("Repeat 3 times");
       // The next column offers the rest of the chord being typed.
       expect(html).toContain("Close tab");
     }
@@ -303,3 +304,31 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(html).toContain("border-dashed");
   });
 }
+
+test("keys before the last three columns fold into a trail beside them, unless turned off", () => {
+  const path = "chords/dev/fixture/macos.toml";
+  const keys = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT"];
+  const render = (input: string[]) => renderToString(<ChordsPageContent
+    chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
+    chordPanelData={{ isVisible: true, layout: ChordLayout.SidebarLeft }}
+    frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
+    hintPanelData={{ packages: [{ name: "@fixture/deep", globalChords: [], chordsFiles: { [path]: {
+      chords: [{ rawTrigger: "qwert", trigger: { keys }, name: "Deep chord", index: 0, actions: [], fallback: false }],
+      chordHints: [],
+    } } }] }}
+    chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+    chordMacrosData={{ entries: [] }}
+  />);
+  expect(render(keys.slice(0, 2))).not.toContain('aria-label="Earlier keys"');
+  const deep = render(keys.slice(0, 4));
+  expect(deep).toContain('aria-label="Earlier keys"');
+  expect(deep).toContain("Deep chord");
+
+  const storage = (window as { localStorage?: unknown }).localStorage;
+  (window as { localStorage?: unknown }).localStorage = { getItem: (key: string) => key === "chord-collapse-earlier-keys" ? "false" : null };
+  try {
+    expect(render(keys.slice(0, 4))).not.toContain('aria-label="Earlier keys"');
+  } finally {
+    (window as { localStorage?: unknown }).localStorage = storage;
+  }
+});

@@ -2,8 +2,9 @@ import type { Chord, ChordExecutionState, ChordHint, ChordInputState, ChordMacro
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
 import { useHintPanelState } from '@chord/dev.improve.chord.lib.state/hint-panel';
+import { getCollapseEarlierKeys } from '@chord/dev.improve.chord.lib.state/panel-preferences';
 import { emit, listen } from '@tauri-apps/api/event';
-import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
+import { blockDisplayEnds, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -19,6 +20,8 @@ const SIDEBAR_MAX_WIDTH = 640;
 const SIDEBAR_SHADOW_REACH = 18 + 60; // the sidebar card's x offset plus radius, to the right
 const FLOATING_SHADOW_REACH = 12 - 4; // the floating card's radius less y offset, above
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
+/** Columns the sidebar shows in full; earlier keys fold into a trail beside them. */
+const MAX_FULL_COLUMNS = 3;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
 
@@ -408,7 +411,6 @@ export function ChordsPageContent({
 	const currentPrefixLength = selectedTokens.length;
 	const commandPrefix = getCommandPrefix(selectedTokens);
 	const commandPrefixTokens = commandPrefix.tokens;
-	const commandLabel = getCommandLabel(commandPrefix);
 	const defaultPlaceholderToken = defaultGlobalPrefixForPlaceholders
 		? normalizeToken(defaultGlobalPrefixForPlaceholders)
 		: undefined;
@@ -534,6 +536,14 @@ export function ChordsPageContent({
 		columnIndex = nextColumnIndex;
 	}
 
+	// A long chord's earliest keys fold into a trail at the start of the column row, so
+	// the columns never run off the card and no row is added above them.
+	const collapsedColumns = getCollapseEarlierKeys()
+		? keyColumns.slice(0, Math.max(0, keyColumns.length - MAX_FULL_COLUMNS))
+		: [];
+	const visibleColumns = keyColumns.slice(collapsedColumns.length);
+	const lastColumnIndex = keyColumns.at(-1)?.index;
+
 	// Typed quotes keep their text beside the keys; show it in place.
 	const floatingKeycaps = isTyping ? keyColumns.flatMap(column => column.selectedLabel ? [column.selectedLabel] : []) : floatingTokens;
 	const floatingDisplayTokens = withQuoteTexts(floatingKeycaps, floatingQuotes, showsBuffer && chordInputState.inserting);
@@ -625,11 +635,6 @@ export function ChordsPageContent({
 							{escapeSuggestions && <ChordEscapeSuggestions result={escapeSuggestions} />}
 						</div>
 					) : <>
-						{commandLabel && (
-							<div className="mb-3 text-xs text-foreground/70">
-								{commandLabel}
-							</div>
-						)}
 						{loops.length > 0 && (
 							<div className="mb-3 flex max-h-24 flex-col gap-1 overflow-y-auto text-xs text-foreground/80">
 								{loops.map(loop => (
@@ -648,7 +653,23 @@ export function ChordsPageContent({
 					) : (
 					<div className="relative flex items-start">
 						<div className="flex items-start gap-6">
-							{keyColumns.map((column, columnIndex) => (
+							{collapsedColumns.length > 0 && (
+								<div aria-label="Earlier keys" className="flex shrink-0 items-center gap-1 px-1 py-1 text-xs text-foreground/60" style={{ height: keySize + 8 }}>
+									{collapsedColumns.map(column => {
+										const block = getColumnBlock(column.index);
+										return (
+											<Kbd
+												key={column.index}
+												className={cn('h-6 min-w-6 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : 'border-border/80 bg-background/95 text-foreground')}
+											>
+												<KeyLabel label={column.selectedLabel ?? ''} />
+											</Kbd>
+										);
+									})}
+									<span aria-hidden className="ml-0.5 text-foreground/40">›</span>
+								</div>
+							)}
+							{visibleColumns.map(column => (
 								<div
 									key={column.index}
 									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', column.index > 0 && selectedBlockEnds.includes(column.index) && 'ml-3')}
@@ -666,7 +687,7 @@ export function ChordsPageContent({
 											key={row.token}
 											token={row.token === column.selectedToken ? column.selectedLabel : row.token}
 											description={row.description}
-											error={columnIndex === keyColumns.length - 1 && row.keys.includes(column.selectedToken) ? executionError : undefined}
+											error={column.index === lastColumnIndex && row.keys.includes(column.selectedToken) ? executionError : undefined}
 											isSelected={row.keys.includes(column.selectedToken)}
 											isFailed={executionError !== undefined}
 											isDimmed={Boolean(column.selectedToken) && !row.keys.includes(column.selectedToken)}
