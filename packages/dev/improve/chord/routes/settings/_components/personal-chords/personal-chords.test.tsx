@@ -50,8 +50,8 @@ test("packages list their files with Edit buttons and leave editors closed initi
       pkg("default", ["chords/com/apple/finder/macos.toml", "chords/macos.toml"]),
     ],
   });
-  expect(html).toContain(">alpha</h3>");
-  expect(html).toContain(">default</h3>");
+  expect(html).toContain('<span class="mac-row-title">alpha</span>');
+  expect(html).toContain('<span class="mac-row-title">default</span>');
   expect(html).toContain(">com.apple.finder</span>");
   expect(html).toContain(">Every app</span>");
   // Each file is a row that opens it in the editor.

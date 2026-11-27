@@ -38,7 +38,16 @@ import {
   useChordPackageManagerState,
   useDesktopAppManagerState,
 } from "@chord/dev.improve.chord.lib.state";
-import { AppWindow, ChevronLeft, ChevronRight, Ellipsis, FileText, Globe } from "lucide-react";
+import {
+  AppWindow,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Ellipsis,
+  FileText,
+  Folder,
+  Globe,
+} from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ALL_APPS_PATHSLUG,
@@ -233,55 +242,82 @@ function PackageSection({
 }) {
   const problems = state?.error ? [state.error] : errors;
   const openFolder = useMutation({ mutationFn: () => taurpc.openPersonalPackage(pkg.dirname) });
+  const [open, setOpen] = useState(true);
+  const listId = useId();
   return (
     <section className="mac-section" aria-label={`${pkg.dirname} package`}>
-      <div className="mac-section-header">
-        <h3 className="mac-section-title truncate">{pkg.dirname}</h3>
-        {state?.name && state.name !== pkg.dirname && (
-          <span className="mac-row-subtitle">loads as {state.name}</span>
-        )}
-        <button
-          type="button"
-          className="mac-button ml-auto"
-          data-icon
-          data-borderless
-          aria-label={`${pkg.dirname} actions`}
-          title="Actions"
-          onClick={(event) =>
-            void showNativeMenu(
-              [
-                { label: "Add Chords File…", onSelect: onAddFile },
-                "separator",
-                { label: "Show in Finder", onSelect: () => openFolder.mutate() },
-              ],
-              event.currentTarget,
-            )
-          }
-        >
-          <Ellipsis size={15} aria-hidden="true" />
-        </button>
-      </div>
       {problems.length > 0 && <LoadErrors errors={problems} />}
-      <ul className="mac-list" data-icons aria-label={`Chords files in ${pkg.dirname}`}>
-        {pkg.files.length === 0 ? (
-          <li className="mac-row-empty">No chords files in this package.</li>
-        ) : (
-          pkg.files.map((pathslug) => {
-            const file = { dirname: pkg.dirname, pathslug };
-            return (
-              <li key={pathslug} className="contents">
-                <FileRow
-                  pathslug={pathslug}
-                  apps={apps}
-                  chordCount={loadedPackage?.compiledChordsFiles[pathslug]?.chords.length}
-                  unsaved={editKey(file) in edits}
-                  onSelect={() => onSelect(file)}
-                />
-              </li>
-            );
-          })
-        )}
-      </ul>
+      {/* A collapsible card like the Packages tab: the folder's files under its header. */}
+      <div className="mac-list mac-group" data-open={open || undefined}>
+        <div className="mac-group-bar">
+          <h3 className="min-w-0 flex-1">
+            <button
+              type="button"
+              className="mac-group-header"
+              aria-expanded={open}
+              aria-controls={listId}
+              onClick={() => setOpen(!open)}
+            >
+              <span className="mac-icon" aria-hidden="true">
+                <Folder size={17} strokeWidth={1.6} />
+              </span>
+              <span className="mac-row-text">
+                <span className="mac-row-title">{pkg.dirname}</span>
+                {state?.name && state.name !== pkg.dirname && (
+                  <span className="mac-row-subtitle">Loads as {state.name}</span>
+                )}
+              </span>
+              <span className="mac-row-detail">{pkg.files.length}</span>
+              <ChevronDown
+                className="mac-group-chevron"
+                size={15}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            </button>
+          </h3>
+          <button
+            type="button"
+            className="mac-button mr-3"
+            data-icon
+            data-borderless
+            aria-label={`${pkg.dirname} actions`}
+            title="Actions"
+            onClick={(event) =>
+              void showNativeMenu(
+                [
+                  { label: "Add Chords File…", onSelect: onAddFile },
+                  "separator",
+                  { label: "Show in Finder", onSelect: () => openFolder.mutate() },
+                ],
+                event.currentTarget,
+              )
+            }
+          >
+            <Ellipsis size={15} aria-hidden="true" />
+          </button>
+        </div>
+        <ul id={listId} aria-label={`Chords files in ${pkg.dirname}`} hidden={!open}>
+          {pkg.files.length === 0 ? (
+            <li className="mac-row-empty">No chords files in this package.</li>
+          ) : (
+            pkg.files.map((pathslug) => {
+              const file = { dirname: pkg.dirname, pathslug };
+              return (
+                <li key={pathslug}>
+                  <FileRow
+                    pathslug={pathslug}
+                    apps={apps}
+                    chordCount={loadedPackage?.compiledChordsFiles[pathslug]?.chords.length}
+                    unsaved={editKey(file) in edits}
+                    onSelect={() => onSelect(file)}
+                  />
+                </li>
+              );
+            })
+          )}
+        </ul>
+      </div>
       <p className="mac-section-footer truncate font-mono" title={pkg.path}>
         {pkg.path}
       </p>
