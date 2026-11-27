@@ -1,15 +1,15 @@
 name: release
 
-# Every push to `beta` or `prod` publishes a new versioned release: `v<version>-beta`
+# Every push to `staging` or `production` publishes a new versioned release: `v<version>-beta`
 # is a prerelease built with the beta identity, and `v<version>` is the latest
 # release built with the production identity from tauri.conf.json. Raise the app
 # version before each release on a channel. Published releases and their assets
 # are never replaced. The rolling `beta` release only keeps existing beta download
-# and updater URLs working. Promoting a build means pushing its commit to `prod`.
+# and updater URLs working. Promoting a build means pushing its commit to `production`.
 #
 # Signing: each Apple / Tauri signing step is gated on its secret (these live at
 # the org level). With them present the build is Developer ID signed and
-# notarized; without one `beta` degrades to an ad-hoc signed build, and any
+# notarized; without one `staging` degrades to an ad-hoc signed build, and any
 # other build fails rather than reach new users un-notarized.
 #
 # Running this by hand from any other branch builds and notarizes without
@@ -20,15 +20,12 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - beta
-      - prod
+      - staging
+      - production
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  RELEASE_CHANNEL: ${{ github.ref_name }}
 
 jobs:
   build:
@@ -229,7 +226,7 @@ jobs:
         run: |
           set -euo pipefail
           channel_config=""
-          if [ "$RELEASE_CHANNEL" = beta ]; then
+          if [ "$GITHUB_REF" = refs/heads/staging ]; then
             channel_config="src-tauri/tauri.beta.conf.json"
           fi
           bun tauri build \
@@ -297,7 +294,7 @@ jobs:
           # the ubuntu publish job to read.
           if bun "$scripts/_notarize.ts" --check "$PWD/$app" "$dmg"; then
             echo notarized > "$out/gatekeeper.txt"
-          elif [ "$RELEASE_CHANNEL" = beta ]; then
+          elif [ "$GITHUB_REF" = refs/heads/staging ]; then
             echo unsigned > "$out/gatekeeper.txt"
           else
             echo "::error::this build isn't fully notarized, so it can't be released; the reason is above"
@@ -388,7 +385,7 @@ jobs:
         run: |
           set -euo pipefail
           args=()
-          if [ "$RELEASE_CHANNEL" = beta ]; then
+          if [ "$GITHUB_REF" = refs/heads/staging ]; then
             args+=(--config src-tauri/tauri.beta.conf.json)
           fi
           bun tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} "${args[@]}"
@@ -432,7 +429,7 @@ jobs:
 
   publish:
     # Manual runs from other branches only produce build artifacts.
-    if: ${{ github.ref_name == 'beta' || github.ref_name == 'prod' }}
+    if: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production' }}
     needs: [build, build-desktop]
     permissions:
       contents: write
@@ -464,7 +461,7 @@ jobs:
           rm -f assets/gatekeeper.txt
           # Production is the repository's latest release, which the production
           # updater endpoint (releases/latest) resolves to; beta never is.
-          if [ "$RELEASE_CHANNEL" = prod ]; then
+          if [ "$GITHUB_REF" = refs/heads/production ]; then
             tag="v$version"
             title="Chord $version"
             channel="production"
@@ -478,7 +475,7 @@ jobs:
             flags=(--prerelease --latest=false)
           fi
           download="macOS: choose the DMG for Apple Silicon (aarch64) or Intel (x86_64). Linux x86_64: choose the AppImage or Debian package and follow the X11 input setup in the README. Windows x86_64: choose the setup.exe installer."
-          notes="Automatic $channel build from \`$RELEASE_CHANNEL\` @ ${short}. $download $gatekeeper"
+          notes="Automatic $channel build from \`$GITHUB_REF_NAME\` @ ${short}. $download $gatekeeper"
 
           # What installed copies of Chord read to update themselves. The updater only installs a
           # higher version. Read the moving endpoint, not the retired rolling production release.
@@ -527,7 +524,7 @@ jobs:
           done
           jq -n \
             --arg version "$version" \
-            --arg notes "Chord $version from \`$RELEASE_CHANNEL\` @ ${short}." \
+            --arg notes "Chord $version from \`$GITHUB_REF_NAME\` @ ${short}." \
             --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --arg arm "${signature[aarch64]}" \
             --arg arm_url "${url[aarch64]}" \
@@ -560,7 +557,7 @@ jobs:
           gh release upload "$tag" archives/* assets/* manifest/latest.json --clobber
           gh release edit "$tag" --draft=false --title "$title" --notes "$notes" "${flags[@]}"
 
-          if [ "$RELEASE_CHANNEL" = beta ]; then
+          if [ "$GITHUB_REF" = refs/heads/staging ]; then
             # Existing beta apps have this endpoint compiled in. Its manifest now
             # points to the versioned release; leave all its older archives alone.
             if ! gh release view beta >/dev/null 2>&1; then
@@ -574,7 +571,7 @@ jobs:
           gh release view "$tag" --json assets --jq '.assets[].name'
 
   deploy-website:
-    if: ${{ github.ref == 'refs/heads/prod' }}
+    if: ${{ github.ref == 'refs/heads/production' }}
     needs: publish
     permissions: {}
     runs-on: ubuntu-latest

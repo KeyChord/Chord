@@ -39,7 +39,7 @@ and frees the Vite/HMR ports 1420 and 1421 before starting the stack. Without
 ## Version control
 
 Chord uses Jujutsu (`jj`) in a colocated Git checkout, following Haniverse's
-workflow with `dev` as the integration bookmark. Existing Git history and remotes
+workflow with `trunk` as the integration bookmark. Existing Git history and remotes
 are reused. Install `jj` on macOS with `brew install jj`, then initialize each new
 checkout from the repository root:
 
@@ -54,15 +54,15 @@ are inherited.
 
 ```toml
 [revset-aliases]
-'trunk()' = 'dev@origin'
+'trunk()' = 'trunk@origin'
 
 [aliases]
 gf = ["git", "fetch"]
 pull = ["util", "exec", "--", "bash", "-c", """
 set -e
 jj git fetch
-jj bookmark set dev -r dev@origin --allow-backwards
-jj rebase -d dev
+jj bookmark set trunk -r trunk@origin --allow-backwards
+jj rebase -d trunk
 """]
 push = ["util", "exec", "--", "bash", "-c", """
 set -e
@@ -71,15 +71,15 @@ if [ -z "$target" ]; then
   echo "error: nothing to push (no described, non-empty commit on this branch)" >&2
   exit 1
 fi
-jj bookmark move dev --to "$target"
-exec jj git push -b dev "$@"
+jj bookmark move trunk --to "$target"
+exec jj git push -b trunk "$@"
 """, "bash"]
 ```
 
 Track the integration bookmark once:
 
 ```sh
-jj bookmark track dev --remote origin
+jj bookmark track trunk --remote origin
 ```
 
 Everyday commands:
@@ -89,8 +89,8 @@ jj st
 jj --no-pager diff --git
 jj --no-pager log
 jj describe -m "Describe the change"
-jj push       # advance dev to the latest described, non-empty change and push
-jj pull       # fetch origin, update dev, and rebase onto it
+jj push       # advance trunk to the latest described, non-empty change and push
+jj pull       # fetch origin, update trunk, and rebase onto it
 ```
 
 Changes are snapshotted automatically; there is no staging area. `jj push` skips
@@ -650,7 +650,7 @@ from a fresh virtual environment, so building one needs `python3`. The backgroun
 in under `packages/dev/improve/chord/configs/release/macos/@assets/dmg`; change it by editing
 `dmg-background.swift` and running `vpx _gen-dmg-background`.
 
-Every push to `beta` or `prod` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
+Every push to `staging` or `production` runs [`.github/workflows/release.yaml`](.github/workflows/release.yaml),
 which builds the app for Apple Silicon, Intel Macs, Linux x86-64, and Windows x86-64. All builds must succeed and upload assets before the draft is published. Windows uses an NSIS installer. Linux ships an AppImage for self-updates and a Debian package for system package management.
 Production releases are tagged `v<version>` and titled `Chord <version>`; beta prereleases are
 tagged `v<version>-beta` and titled `Chord <version> Beta`. Each gets its own publication date and
@@ -666,7 +666,7 @@ all older updater archives remain available for pending downloads.
 
 After publishing a production release, the `deploy-website` job starts the `deploy.yaml` workflow
 on `KeyChord/trychord.app`'s `prod` branch. The Chord repository's `website-deploy` environment is
-restricted to `prod` and provides `WEBSITE_DEPLOY_APP_CLIENT_ID` (a variable) and
+restricted to `production` and provides `WEBSITE_DEPLOY_APP_CLIENT_ID` (a variable) and
 `WEBSITE_DEPLOY_APP_PRIVATE_KEY` (a secret). The private GitHub App is installed on
 `KeyChord/trychord.app` with Actions read and write access. If dispatch fails after publication,
 rerun the failed job to retry the deploy.
@@ -699,18 +699,26 @@ listed there, and the list tells Chord which set an install from before `builtin
 was set up with. Keep a package's pin when its contents haven't changed. The mirror sync keeps an unchanged package's mirror commit for the same
 reason.
 
-To promote a build to production, push its commit to `prod`, for example the current `dev`:
+To publish a beta prerelease, promote a commit from `trunk` to `staging`:
 
 ```sh
-jj bookmark set prod -r dev --allow-backwards
-jj git push -b prod
+jj bookmark set staging -r trunk
+jj git push -b staging
+```
+
+To publish a tested staging commit as a stable release, promote it to `production`:
+
+```sh
+jj git fetch
+jj bookmark set production -r staging@origin
+jj git push -b production
 ```
 
 To see a build through notarization before publishing it, run the workflow by hand from any other
 branch. It does everything except publish, and leaves the result as the run's artifacts:
 
 ```sh
-gh workflow run release --ref dev
+gh workflow run release --ref trunk
 gh run download <run id> --name chord-aarch64 --dir target/e2e/ci
 vpx _e2e-macos journey --dmg target/e2e/ci/Chord-aarch64.dmg --site <local site>
 ```

@@ -7,7 +7,8 @@ Prefer Bun APIs over `node:*` in Chord handlers and Bun scripts. Use `Bun.file` 
 # Version control
 
 - This checkout uses Jujutsu (`jj`) with a colocated Git repository. Read [the jujutsu skill](./.agents/skills/jujutsu/SKILL.md) before version-control operations; use `jj` in this checkout.
-- `dev` is the integration bookmark. Repository-local configuration makes `trunk()` resolve to `dev@origin`, `jj pull` fetch and rebase onto `dev`, and `jj push` advance and push `dev` to the latest described, non-empty mutable ancestor of `@`.
+- `trunk` is the default branch and integration bookmark. Repository-local configuration makes `trunk()` resolve to `trunk@origin`, `jj pull` fetch and rebase onto `trunk`, and `jj push` advance and push `trunk` to the latest described, non-empty mutable ancestor of `@`.
+- `staging` publishes beta prereleases and `production` publishes stable releases. Advance these branches only when explicitly asked to release.
 - Use `jj --no-pager` for output and `jj --no-pager diff --git` for unified diffs. Describe changes with `jj describe -m "…"` to avoid opening an editor.
 - Preserve unrelated working-copy changes from the user's or other agents' parallel work. Do not create, split, switch, rebase, squash, restore, or abandon revisions to isolate task changes in a shared working copy. These protections take precedence over the skill's generic commit-refinement workflow.
 - Push only when requested. See [development.md](./development.md#version-control) for setup and everyday commands.

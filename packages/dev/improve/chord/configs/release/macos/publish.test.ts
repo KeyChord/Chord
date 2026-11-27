@@ -70,7 +70,7 @@ if (tool === "curl") {
 }
 `;
 
-async function fixture(channel = "prod", overrides: Partial<State> = {}) {
+async function fixture(branch = "production", overrides: Partial<State> = {}) {
   const dir = mkdtempSync(join(tmpdir(), "chord-publish-test-"));
   directories.push(dir);
   mkdirSync(join(dir, "bin"));
@@ -138,7 +138,8 @@ async function fixture(channel = "prod", overrides: Partial<State> = {}) {
         env: {
           ...process.env,
           PATH: `${dir}/bin:${process.env.PATH}`,
-          RELEASE_CHANNEL: channel,
+          GITHUB_REF: `refs/heads/${branch}`,
+          GITHUB_REF_NAME: branch,
           GITHUB_SHA: SHA,
         },
         stdout: "pipe",
@@ -198,7 +199,7 @@ test("successive production versions create distinct releases and keep earlier d
 });
 
 test("beta publishes a versioned prerelease and preserves the installed beta updater endpoint", async () => {
-  const f = await fixture("beta");
+  const f = await fixture("staging");
   expect(await f.run()).toMatchObject({ code: 0 });
   const { releases, calls } = await f.state();
   expect(releases["v0.2.10-beta"]!.isDraft).toBe(false);
@@ -211,10 +212,10 @@ test("beta publishes a versioned prerelease and preserves the installed beta upd
   expect(publish.args).toContain("--latest=false");
 });
 
-for (const channel of ["prod", "beta"]) {
+for (const branch of ["production", "staging"]) {
   for (const published of ["0.2.10", "0.2.11"]) {
-    test(`${channel} refuses a version that isn't above ${published}`, async () => {
-      const f = await fixture(channel, { published });
+    test(`${branch} refuses a version that isn't above ${published}`, async () => {
+      const f = await fixture(branch, { published });
       expect((await f.run()).code).not.toBe(0);
       expect((await f.state()).calls.every((call) => call.tool !== "gh")).toBe(true);
     });
@@ -226,7 +227,7 @@ test("published tags and drafts from other commits cannot be overwritten", async
     [false, SHA],
     [true, "another-commit"],
   ] as const) {
-    const f = await fixture("prod", {
+    const f = await fixture("production", {
       releases: { "v0.2.10": { isDraft, targetCommitish, assets: {} } },
     });
     expect((await f.run()).code).not.toBe(0);
@@ -237,13 +238,13 @@ test("published tags and drafts from other commits cannot be overwritten", async
 });
 
 test("an upload failure leaves the release unpublished", async () => {
-  const f = await fixture("prod", { failUpload: true });
+  const f = await fixture("production", { failUpload: true });
   expect((await f.run()).code).not.toBe(0);
   expect((await f.state()).releases["v0.2.10"]!.isDraft).toBe(true);
 });
 
 test("a draft from the same commit can be resumed", async () => {
-  const f = await fixture("prod", {
+  const f = await fixture("production", {
     releases: { "v0.2.10": { isDraft: true, targetCommitish: SHA, assets: {} } },
   });
   expect(await f.run()).toMatchObject({ code: 0 });
@@ -253,16 +254,16 @@ test("a draft from the same commit can be resumed", async () => {
 });
 
 test("an unavailable updater endpoint fails without publishing", async () => {
-  const f = await fixture("prod", { status: 503 });
+  const f = await fixture("production", { status: 503 });
   expect((await f.run()).code).not.toBe(0);
   expect((await f.state()).calls.every((call) => call.tool !== "gh")).toBe(true);
 });
 
-for (const channel of ["prod", "beta"]) {
-  test(`the first ${channel} release works without an existing updater endpoint`, async () => {
-    const f = await fixture(channel, { status: 404, releases: {} });
+for (const branch of ["production", "staging"]) {
+  test(`the first ${branch} release works without an existing updater endpoint`, async () => {
+    const f = await fixture(branch, { status: 404, releases: {} });
     expect(await f.run()).toMatchObject({ code: 0 });
-    if (channel === "beta") {
+    if (branch === "staging") {
       const { releases } = await f.state();
       expect(releases.beta!.assets["latest.json"]).toBe(
         releases["v0.2.10-beta"]!.assets["latest.json"],
