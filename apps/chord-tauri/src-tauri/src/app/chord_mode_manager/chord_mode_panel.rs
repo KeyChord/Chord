@@ -13,7 +13,7 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 use tauri::utils::config::BackgroundThrottlingPolicy;
@@ -32,7 +32,7 @@ const SURFACE_READY_TIMEOUT: Duration = Duration::from_millis(160);
 /// one is usually just slow to wake; one that misses several is stuck.
 const UNANSWERED_SHOWS_BEFORE_RELOAD: u32 = 3;
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeSurfaceRect {
     pub x: f64,
@@ -62,6 +62,15 @@ pub struct ChordModePanel {
     /// keeps pixels for the whole window, including its transparent parts.
     #[inject(parking_lot::Mutex::new(None))]
     extent: parking_lot::Mutex<Option<PanelExtent>>,
+
+    /// What the page last said its card needs, which `extent` catches up to once the panel
+    /// hides (see `fit_to_card`).
+    #[inject(parking_lot::Mutex::new(None))]
+    latest_extent: parking_lot::Mutex<Option<PanelExtent>>,
+
+    /// The panel is ordered in for a chord.
+    #[inject(AtomicBool::new(false))]
+    shown: AtomicBool,
 
     /// Shows in a row whose page did not report back in time (see
     /// `UNANSWERED_SHOWS_BEFORE_RELOAD`).
@@ -230,14 +239,37 @@ impl ChordModePanel {
     }
 
     /// Sizes the window to what the page says its card needs.
+    ///
+    /// While the panel shows, the window only grows. Each resize lands a frame or two after
+    /// the card changed, so following every change in height (a description of one line or
+    /// two, say) made the panel step visibly as keys were typed; a window that is already
+    /// big enough needs no resize. It shrinks to the card once the panel hides.
     pub fn fit_to_card(&self, extent: PanelExtent) -> Result<()> {
-        {
+        *self.latest_extent.lock() = Some(extent);
+        let applied = {
             let mut current = self.extent.lock();
-            if *current == Some(extent) {
+            let next = match *current {
+                Some(current)
+                    if self.shown.load(Ordering::SeqCst) && current.layout == extent.layout =>
+                {
+                    PanelExtent {
+                        layout: extent.layout,
+                        width: current.width.max(extent.width),
+                        height: current.height.max(extent.height),
+                    }
+                }
+                _ => extent,
+            };
+            if *current == Some(next) {
                 return Ok(());
             }
-            *current = Some(extent);
-        }
+            *current = Some(next);
+            next
+        };
+        self.apply_extent(applied)
+    }
+
+    fn apply_extent(&self, extent: PanelExtent) -> Result<()> {
         let layout = self.observable.get_state()?.layout;
         let panel = self.panel.load_full();
         self.handle.run_on_main_thread(move || {
@@ -420,20 +452,35 @@ impl ChordModePanel {
         handle: AppHandle,
         rect: NativeSurfaceRect,
     ) -> Result<()> {
+        // The page reports its card after every change, often several times over.
+        static LAST_RECT: parking_lot::Mutex<Option<NativeSurfaceRect>> =
+            parking_lot::Mutex::new(None);
+        let previous = LAST_RECT.lock().replace(rect);
+        if previous == Some(rect) {
+            return Ok(());
+        }
+        // Only a new shape needs a new view; a new size moves the one there.
+        let same_shape = previous.is_some_and(|previous| {
+            previous.radius == rect.radius && previous.flush_left == rect.flush_left
+        });
         let ns_view = Self::webview_ns_view(window)?;
 
         handle.run_on_main_thread(move || unsafe {
             let view: &NSView = &*(ns_view as *mut NSView);
-            if let Some(existing_view) = view.viewWithTag(NATIVE_SURFACE_TAG) {
-                existing_view.removeFromSuperview();
-            }
-
             // Only the edge-attached sidebar extends past its left corners.
             let left_extension = if rect.flush_left { rect.radius } else { 0.0 };
             let frame = NSRect::new(
                 NSPoint::new(rect.x - left_extension, rect.y),
                 NSSize::new(rect.width + left_extension, rect.height),
             );
+            if let Some(existing_view) = view.viewWithTag(NATIVE_SURFACE_TAG) {
+                // Rebuilding the view on every change left the glass a step behind the card.
+                if same_shape {
+                    existing_view.setFrame(frame);
+                    return;
+                }
+                existing_view.removeFromSuperview();
+            }
             let vibrancy_view = NSVisualEffectViewTagged::initWithFrame(
                 // Guaranteed by `run_on_main_thread`.
                 MainThreadMarker::new()
@@ -458,6 +505,7 @@ impl ChordModePanel {
     }
 
     fn show(&self) -> Result<()> {
+        self.shown.store(true, Ordering::SeqCst);
         let panel = self.panel.load_full();
         let layout = self.observable.get_state()?.layout;
         let extent = *self.extent.lock();
@@ -522,7 +570,21 @@ impl ChordModePanel {
             is_visible: false,
             ..prev
         })?;
+        self.shown.store(false, Ordering::SeqCst);
         self.hide()?;
+        // Now that no one sees it, the window shrinks to what the card needs.
+        let latest = *self.latest_extent.lock();
+        if let Some(latest) = latest {
+            let changed = {
+                let mut current = self.extent.lock();
+                let changed = *current != Some(latest);
+                *current = Some(latest);
+                changed
+            };
+            if changed {
+                self.apply_extent(latest)?;
+            }
+        }
         Ok(true)
     }
 
