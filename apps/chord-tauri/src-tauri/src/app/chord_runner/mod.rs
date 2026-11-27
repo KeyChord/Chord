@@ -2,6 +2,7 @@
 mod app;
 pub use app::*;
 mod handler;
+mod media_key;
 pub use handler::*;
 mod shell;
 pub use shell::*;

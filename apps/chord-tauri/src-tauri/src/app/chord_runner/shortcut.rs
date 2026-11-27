@@ -1,4 +1,6 @@
 use crate::app::chord_runner::ChordActionTask;
+#[cfg(target_os = "macos")]
+use crate::app::chord_runner::media_key::{self, MediaKey};
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 use anyhow::{Context, Result, anyhow};
 use nject::injectable;
@@ -16,17 +18,34 @@ impl ShortcutChordActionTaskRunner {
     // instead of enigo's input injection (this works better in some apps, e.g. cmd+1 in IntelliJ)
     #[cfg(target_os = "macos")]
     pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
-        let events: Vec<(rdev::EventType, bool)> = actions
+        /// One step of the shortcut. Media keys are not key codes on macOS (see `media_key`):
+        /// they are pressed whole when the shortcut presses them, and their release is skipped.
+        enum Step {
+            Key(rdev::EventType, bool),
+            Media(MediaKey),
+        }
+        let steps: Vec<Step> = actions
             .into_iter()
-            .map(|action| -> Result<(rdev::EventType, bool)> {
-                Ok(match action {
+            .filter_map(|action| -> Option<Result<Step>> {
+                let (key, pressed, suppress_shift) = match action {
                     SimulatedShortcutAction::Press(key, suppress_shift) => {
-                        (rdev::EventType::KeyPress(key.try_into()?), suppress_shift)
+                        (key, true, suppress_shift)
                     }
                     SimulatedShortcutAction::Release(key, suppress_shift) => {
-                        (rdev::EventType::KeyRelease(key.try_into()?), suppress_shift)
+                        (key, false, suppress_shift)
                     }
-                })
+                };
+                if let Some(media) = MediaKey::from_code(key.0) {
+                    return pressed.then_some(Ok(Step::Media(media)));
+                }
+                Some(key.try_into().map(|key| {
+                    let event = if pressed {
+                        rdev::EventType::KeyPress(key)
+                    } else {
+                        rdev::EventType::KeyRelease(key)
+                    };
+                    Step::Key(event, suppress_shift)
+                }))
             })
             .collect::<Result<_>>()?;
 
@@ -35,9 +54,15 @@ impl ShortcutChordActionTaskRunner {
         let (result_tx, result_rx) = std::sync::mpsc::sync_channel(1);
         self.handle.run_on_main_thread(move || {
             let mut result = Ok(());
-            for (event, suppress_shift) in events {
-                if let Err(e) = rdev::simulate(&event, suppress_shift) {
-                    result = Err(anyhow!("error simulating keypress: {e}"));
+            for step in steps {
+                let outcome = match step {
+                    Step::Key(event, suppress_shift) => rdev::simulate(&event, suppress_shift)
+                        .map_err(|e| anyhow!("error simulating keypress: {e}")),
+                    Step::Media(key) => media_key::press(key)
+                        .map_err(|e| anyhow!("error pressing media key {key:?}: {e:#}")),
+                };
+                if let Err(error) = outcome {
+                    result = Err(error);
                     break;
                 }
             }
