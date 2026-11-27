@@ -387,9 +387,11 @@ test("package titles use the app or the name after chords-", () => {
 
 test("chord sequences show placeholders as one key", () => {
   const html = renderToString(<ChordKeys sequence="<>ab" />);
-  expect(html.match(/<kbd/g)).toHaveLength(3);
+  // The whole sequence is one keycap; `<>` stays one token rather than two characters.
+  expect(html.match(/<kbd/g)).toHaveLength(1);
+  expect(html.match(/<span/g)).toHaveLength(3);
   expect(html).toContain('data-placeholder="true"');
-  expect(html).toContain("&lt;&gt;</kbd>");
+  expect(html).toContain("&lt;&gt;</span>");
 });
 
 test("placeholders list each token with its keys and default", () => {
