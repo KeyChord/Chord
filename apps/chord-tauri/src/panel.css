@@ -13,3 +13,11 @@
 @source '../../../packages/dev/improve/chord/routes/chords/index';
 @source '../../../packages/dev/improve/chord/components/ui/kbd';
 @source '../../../packages/dev/improve/chord/lib/state';
+
+/* The panel takes no clicks, so a scroll bar there could never be used. */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
