@@ -116,14 +116,14 @@ function ChordKeyRow({
 					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
 				}}
 				className={cn(
-					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
+					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.18)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
 						? block
 							? blockKeyClassName(block)
 							: isFailed
-								? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
-								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
+								? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)] dark:shadow-[0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
+								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)] dark:shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
@@ -587,8 +587,8 @@ export function ChordsPageContent({
 					className={cn(
 						'relative isolate overflow-hidden border border-white/30 bg-white/22 dark:border-white/10 dark:bg-zinc-950/24',
 						isFloating
-							? 'rounded-2xl px-3 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.34)]'
-							: 'rounded-r-[2rem] rounded-l-none border-l-0 px-5 py-5 pl-7 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]',
+							? 'rounded-2xl px-3 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.18)]'
+							: 'rounded-r-[2rem] rounded-l-none border-l-0 px-5 py-5 pl-7 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] dark:shadow-[18px_20px_60px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)]',
 					)}
 					style={{
 						// Move the native vibrancy surface offscreen too when toggled off.
