@@ -1,4 +1,4 @@
-import { setTheme } from '@tauri-apps/api/app';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 /** Light, Dark, or the macOS setting (which may itself be Auto). */
 export type Appearance = 'system' | 'light' | 'dark';
@@ -6,7 +6,7 @@ export type Appearance = 'system' | 'light' | 'dark';
 const STORAGE_KEY = 'chord-appearance';
 const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
 
-/** The appearance chosen in Settings. Settings and the Hint Panel share this storage. */
+/** The appearance chosen for the Settings window. */
 export function getAppearance(): Appearance {
 	try {
 		const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -26,14 +26,15 @@ function applyClasses() {
 }
 
 /**
- * Gives every Chord window the appearance, natively too, so the vibrancy behind the Hint
- * Panel matches its content. With 'system' the windows follow macOS again.
+ * Gives this window the appearance natively too, so its title bar and sidebar material
+ * match. Only this window: the Hint Panel keeps following macOS. With 'system' the window
+ * follows macOS again.
  */
 async function applyNativeTheme(appearance: Appearance) {
 	try {
-		await setTheme(appearance === 'system' ? null : appearance);
+		await getCurrentWindow().setTheme(appearance === 'system' ? null : appearance);
 	} catch (error) {
-		console.warn('Could not apply the appearance to Chord\'s windows', error);
+		console.warn('Could not apply the appearance to the window', error);
 	}
 }
 
@@ -51,7 +52,7 @@ export async function setAppearance(appearance: Appearance) {
 export function followAppearance() {
 	applyClasses();
 	darkScheme.addEventListener('change', applyClasses);
-	// Another Chord window changed it.
+	// Changed in another Settings window.
 	window.addEventListener('storage', event => {
 		if (event.key === STORAGE_KEY) {
 			applyClasses();

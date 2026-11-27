@@ -121,7 +121,7 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "dark", label: "Dark" },
 ];
 
-/** Light or Dark for Settings and the Hint Panel, or Auto to follow macOS. */
+/** Light or Dark for the Settings window, or Auto to follow macOS. */
 function AppearanceRow() {
   const [appearance, setSelected] = useState(getAppearance);
   return (
