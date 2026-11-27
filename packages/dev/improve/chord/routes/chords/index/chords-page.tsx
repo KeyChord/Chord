@@ -1,10 +1,10 @@
 import type { Chord, ChordExecutionState, ChordHint, ChordInputState, ChordMacrosState, ChordPanelState, ChordReference, FrontmostState, HintPanelState } from '@chord/dev.improve.chord.lib.typeshare';
 import { cn } from '@chord/com.npmjs.utils-cn';
-import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
+import { hasKeySymbol, Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
 import { useHintPanelState } from '@chord/dev.improve.chord.lib.state/hint-panel';
 import { getCollapseEarlierKeys } from '@chord/dev.improve.chord.lib.state/panel-preferences';
 import { emit, listen } from '@tauri-apps/api/event';
-import { blockDisplayEnds, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
+import { blockDisplayEnds, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, quoteTextPositions, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -24,7 +24,6 @@ const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const MAX_FULL_COLUMNS = 3;
 const MAX_TRAIL_KEYS = 3;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
-const ALPHANUMERIC_TOKEN_REGEX = /^[A-Z0-9]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
 
 function ChordEscapeSuggestions({ result }: { result: NonNullable<ReturnType<typeof getEscapeSuggestions>> }) {
@@ -79,6 +78,12 @@ function blockKeyClassName(block: BlockState) {
 	return cn('border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-400/70 dark:bg-sky-500/30 dark:text-sky-50', block === 'open' && 'border-dashed bg-sky-50 dark:bg-sky-500/15');
 }
 
+function ChordKeyLabel({ label }: { label: string | string[] }) {
+	if (typeof label === 'string') return <KeyLabel label={label} />;
+	if (!label.some(hasKeySymbol)) return label.join('');
+	return <span>{label.map((key, index) => <KeyLabel key={index} label={key} />)}</span>;
+}
+
 function ChordKeyRow({
 	token,
 	description = '',
@@ -90,7 +95,7 @@ function ChordKeyRow({
 	keySize,
 	descriptionFontSize,
 }: {
-	token: string
+	token: string | string[]
 	description?: string
 	/** Shown in place of the description. */
 	error?: string
@@ -129,7 +134,7 @@ function ChordKeyRow({
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
-				<KeyLabel label={token} />
+				<ChordKeyLabel label={token} />
 			</Kbd>
 			{error
 				? <div role="alert" className="line-clamp-2 min-w-0 max-w-80 wrap-anywhere text-red-600 dark:text-red-400" style={{ fontSize: `${descriptionFontSize}px` }}>{error}</div>
@@ -449,6 +454,8 @@ export function ChordsPageContent({
 	const columnCount = Math.max(1, currentPrefixLength + (shouldHighlightActiveChord || showsExecutedChord ? 0 : 1));
 	const typedChordStart = Math.max(blockLength, commandPrefixTokens.length);
 	const groupFreeText = isTyping || showsExecutedChord;
+	const quoteKeys = new Set(quoteTextPositions(selectedTokens, floatingQuotes.length, showsBuffer && chordInputState.inserting)
+		.flatMap(position => [position, position + 1]));
 	const keyColumns = [];
 	for (let columnIndex = 0; columnIndex < columnCount;) {
 		const prefixTokens = selectedTokens.slice(0, columnIndex);
@@ -484,13 +491,13 @@ export function ChordsPageContent({
 			? selectedToken
 			: undefined;
 		let nextColumnIndex = columnIndex + 1;
-		// Once a key has no matching continuation, keep the rest of its alphanumeric run together.
-		if (groupFreeText && columnIndex >= typedChordStart && unmatchedToken && ALPHANUMERIC_TOKEN_REGEX.test(unmatchedToken)) {
-			while (ALPHANUMERIC_TOKEN_REGEX.test(selectedTokens[nextColumnIndex] ?? '')) nextColumnIndex++;
+		// Once a key has no matching continuation, group the following keys up to any insert-mode quote.
+		if (groupFreeText && columnIndex >= typedChordStart && unmatchedToken && !quoteKeys.has(columnIndex)) {
+			while (nextColumnIndex < selectedTokens.length && !quoteKeys.has(nextColumnIndex)) nextColumnIndex++;
 		}
 		const selectedLabel = nextColumnIndex === columnIndex + 1
 			? selectedToken
-			: selectedTokens.slice(columnIndex, nextColumnIndex).join('');
+			: selectedTokens.slice(columnIndex, nextColumnIndex);
 		if (selectedToken) {
 			activeTokens.add(selectedToken);
 		}
@@ -623,7 +630,7 @@ export function ChordsPageContent({
 													index + 1 < floatingDisplayTokens.length && floatingBlockEnds.includes(index + 1) && 'mr-1.5',
 												)}
 											>
-											{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={token} /> : <KeyLabel label={token} />}
+										{insertText !== undefined && index === floatingDisplayTokens.length - 1 ? <InsertText text={insertText} /> : <ChordKeyLabel label={token} />}
 											</Kbd>
 										);
 									}) : (
@@ -668,7 +675,7 @@ export function ChordsPageContent({
 												key={column.index}
 												className={cn('h-6 min-w-6 max-w-10 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : 'border-border/80 bg-background/95 text-foreground')}
 											>
-												<span className="truncate"><KeyLabel label={column.selectedLabel ?? ''} /></span>
+												<span className="truncate"><ChordKeyLabel label={column.selectedLabel ?? ''} /></span>
 											</Kbd>
 										);
 									})}

@@ -13,21 +13,28 @@ export function normalizeChordTokens(keys: string[]) {
 
 const ENTER = normalizeToken('Enter');
 
-/**
- * Display tokens with insert-mode text: each typed quote is an adjacent `''` pair
- * in the keys, and while inserting the final `'` is still open.
- */
-export function withQuoteTexts(tokens: string[], quotes: string[], inserting: boolean) {
-	const result: string[] = [];
-	let quote = 0;
-	for (let index = 0; index < tokens.length; index++) {
-		const token = tokens[index]!;
-		result.push(token);
-		if (token !== "'" || quote >= quotes.length) continue;
+/** Insert-mode text starts at an adjacent `''` pair or at the final, open `'`. */
+export function quoteTextPositions(tokens: readonly (string | readonly string[])[], quoteCount: number, inserting: boolean) {
+	const positions: number[] = [];
+	for (let index = 0; index < tokens.length && positions.length < quoteCount; index++) {
+		if (tokens[index] !== "'") continue;
 		if (tokens[index + 1] === "'") {
-			result.push(quotes[quote++]!, "'");
+			positions.push(index);
 			index++;
 		} else if (inserting && index === tokens.length - 1) {
+			positions.push(index);
+		}
+	}
+	return positions;
+}
+
+export function withQuoteTexts<T extends string | readonly string[]>(tokens: T[], quotes: string[], inserting: boolean) {
+	const positions = quoteTextPositions(tokens, quotes.length, inserting);
+	const result: (T | string)[] = [];
+	let quote = 0;
+	for (const [index, token] of tokens.entries()) {
+		result.push(token);
+		if (index === positions[quote]) {
 			result.push(quotes[quote++]!);
 		}
 	}

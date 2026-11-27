@@ -164,8 +164,13 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(render(["Digit3", ...onePassword])).toMatch(/>3(?:<\/span>)?<\/kbd>.*>1P<\/kbd>/);
     expect(render(["Slash", "KeyP", "Digit1"])).toContain(">P1</kbd>");
     expect(render(["Slash", "Digit4", "KeyP"]).match(/>(?:4|P|4P)<\/kbd>/g)).toEqual([">4</kbd>", ">P</kbd>"]);
+    const punctuation = ["Slash", "Period", "Digit1", "Minus", "KeyP", "Quote", "KeyS"];
+    expect(render(punctuation)).toContain(">.1-P&#x27;S</kbd>");
+    const withArrow = render(["Slash", "KeyA", "ArrowUp", "KeyB"]);
+    expect(withArrow).toMatch(/<kbd[^>]*><span>A[^]*?aria-label="Up Arrow"[^]*?B<\/span><\/kbd>/);
     if (layout === ChordLayout.FloatingBottom) {
       expect(render(onePassword, true)).toContain(">1P</kbd>");
+      expect(render(punctuation, true)).toContain(">.1-P&#x27;S</kbd>");
     }
 
     const finder = render(["Slash", "KeyF"]);
@@ -322,6 +327,18 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(html).toContain("border-dashed");
   });
 }
+
+test("the floating panel keeps insert-mode quote text between its quote keys", () => {
+  const html = renderToString(<ChordsPageContent
+    chordInputData={{ input: ["Digit3", "Quote", "Quote"], quotes: ["Hello, World"], inserting: false, blocks: [], openBlock: false }}
+    chordPanelData={{ isVisible: true, layout: ChordLayout.FloatingBottom }}
+    frontmostData={{ filePickerActive: false }}
+    hintPanelData={{ packages: [] }}
+    chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
+    chordMacrosData={{ entries: [] }}
+  />);
+  expect(html).toMatch(/>&#x27;<\/kbd><kbd[^>]*>Hello, World<\/kbd><kbd[^>]*>&#x27;<\/kbd>/);
+});
 
 test("keys before the last three columns fold into a trail beside them, unless turned off", () => {
   const path = "chords/dev/fixture/macos.toml";
