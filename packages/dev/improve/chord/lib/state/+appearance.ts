@@ -1,1 +1,7 @@
-export { type Appearance, followAppearance, getAppearance, setAppearance } from '#appearance';
+export {
+	type Appearance,
+	followAppearance,
+	getAppearance,
+	refreshAppearance,
+	setAppearance,
+} from '#appearance';

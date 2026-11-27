@@ -6,7 +6,7 @@ export type Appearance = 'system' | 'light' | 'dark';
 const STORAGE_KEY = 'chord-appearance';
 const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
 
-/** The appearance chosen for the Settings window. */
+/** The appearance chosen in Settings, for Settings and the Hint Panel. */
 export function getAppearance(): Appearance {
 	try {
 		const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -26,9 +26,9 @@ function applyClasses() {
 }
 
 /**
- * Gives this window the appearance natively too, so its title bar and sidebar material
- * match. Only this window: the Hint Panel keeps following macOS. With 'system' the window
- * follows macOS again.
+ * Gives this window the appearance natively too, so its title bar, sidebar material and
+ * the Hint Panel's frosted glass match its content. With 'system' the window follows macOS
+ * again.
  */
 async function applyNativeTheme(appearance: Appearance) {
 	try {
@@ -48,15 +48,29 @@ export async function setAppearance(appearance: Appearance) {
 	await applyNativeTheme(appearance);
 }
 
+let appliedNativeTheme: Appearance | undefined;
+
+/**
+ * Applies the stored appearance to this window. Cheap when nothing changed, so the Hint
+ * Panel calls it before every show: storage events don't reliably reach its page.
+ */
+export function refreshAppearance() {
+	applyClasses();
+	const appearance = getAppearance();
+	if (appearance !== appliedNativeTheme) {
+		appliedNativeTheme = appearance;
+		void applyNativeTheme(appearance);
+	}
+}
+
 /** Applies the appearance before the first render and keeps it current. */
 export function followAppearance() {
-	applyClasses();
+	refreshAppearance();
 	darkScheme.addEventListener('change', applyClasses);
-	// Changed in another Settings window.
+	// Changed in another window.
 	window.addEventListener('storage', event => {
 		if (event.key === STORAGE_KEY) {
-			applyClasses();
+			refreshAppearance();
 		}
 	});
-	void applyNativeTheme(getAppearance());
 }

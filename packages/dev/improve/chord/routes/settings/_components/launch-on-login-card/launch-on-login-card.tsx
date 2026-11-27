@@ -153,7 +153,7 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
 ];
 
 /**
- * Light or Dark for the Settings window, or Auto to follow macOS, picked from small window
+ * Light or Dark for Settings and the Hint Panel, or Auto to follow macOS, picked from small window
  * previews like System Settings' Appearance.
  */
 function AppearanceRow() {
