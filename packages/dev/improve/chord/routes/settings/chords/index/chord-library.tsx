@@ -10,8 +10,11 @@ import {
   type PlaceholderEntry,
 } from "@chord/dev.improve.chord.routes.settings._components.package-placeholders";
 import {
+  AppWindow,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Globe,
   GripVertical,
   Keyboard,
   Package,
@@ -283,37 +286,92 @@ function PackageIcon({ entry, app }: { entry: LibraryPackage; app?: DesktopAppMe
   );
 }
 
-/** A chord sequence as keycaps. A placeholder such as `<>` is one dashed cap. */
+/**
+ * A chord sequence on one keycap, like Homerow's hint labels. A placeholder such as `<>` is
+ * dimmed, since the user's prefix replaces it.
+ */
 export function ChordKeys({ sequence }: { sequence: string }) {
   const keys = sequence.match(/<[^<>]*>|[\s\S]/gu) ?? [];
   return (
-    <span className="mac-keys" title={sequence} aria-label={sequence}>
+    <kbd className="mac-keycap" title={sequence} aria-label={sequence}>
       {keys.map((key, index) => (
-        <kbd
-          key={index}
-          className="mac-key"
-          data-placeholder={key.length > 1 || undefined}
-          aria-hidden="true"
-        >
+        <span key={index} data-placeholder={key.length > 1 || undefined} aria-hidden="true">
           {key === " " ? "␣" : key}
-        </kbd>
+        </span>
       ))}
-    </span>
+    </kbd>
   );
 }
 
-/** A chord as a preference row: its name leads and its keys trail, like a shortcut setting. */
+/** A chord: its name and action type lead, and its keys trail on one keycap. */
 function ChordRow({ entry }: { entry: LibraryChord }) {
   const kind = entry.chord.actions[0] ? actionKinds[entry.chord.actions[0].type] : undefined;
   return (
-    <div className="mac-row" data-compact>
+    <div className="mac-row" data-chord>
       <span className="mac-row-text">
         <span className="mac-row-title" title={entry.chord.name}>
           {entry.chord.name}
         </span>
+        <span className="mac-row-subtitle">{kind?.label ?? "No actions"}</span>
       </span>
-      <span className="sr-only">{kind?.label ?? "No actions"}</span>
       <ChordKeys sequence={entry.chord.rawTrigger} />
+    </div>
+  );
+}
+
+/** One app's chords in a card that collapses under its header, like Homerow's app groups. */
+function ChordGroup({
+  appId,
+  chords,
+  apps,
+}: {
+  appId: string | undefined;
+  chords: LibraryChord[];
+  apps: Record<string, DesktopAppMetadata>;
+}) {
+  const [open, setOpen] = useState(true);
+  const listId = useId();
+  const label = chords[0]!.appLabel;
+  const icon = appId ? apps[appId]?.iconDataUrl : undefined;
+  return (
+    <div className="mac-section">
+      <div className="mac-list mac-group" data-open={open || undefined}>
+        <h3>
+          <button
+            type="button"
+            className="mac-group-header"
+            aria-expanded={open}
+            aria-controls={listId}
+            title={appId}
+            onClick={() => setOpen(!open)}
+          >
+            <span className="mac-icon" aria-hidden="true">
+              {icon ? (
+                <img src={icon} alt="" />
+              ) : appId ? (
+                <AppWindow size={17} strokeWidth={1.6} />
+              ) : (
+                <Globe size={17} strokeWidth={1.6} />
+              )}
+            </span>
+            <span className="mac-row-title flex-1">{label}</span>
+            <span className="mac-row-detail">{chords.length}</span>
+            <ChevronDown
+              className="mac-group-chevron"
+              size={15}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </button>
+        </h3>
+        <div id={listId} role="list" aria-label={`${label} chords`} hidden={!open}>
+          {chords.map((row) => (
+            <div key={row.id} role="listitem">
+              <ChordRow entry={row} />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -361,20 +419,7 @@ export function PackageDetail({
       <PackagePlaceholders entries={entry.placeholders} apps={apps} />
 
       {groups.map(([appId, chords]) => (
-        <div key={appId ?? "global"} className="mac-section">
-          <div className="mac-section-header">
-            <h3 className="mac-section-title" title={appId}>
-              {chords[0]!.appLabel}
-            </h3>
-          </div>
-          <div className="mac-list" role="list" aria-label={`${chords[0]!.appLabel} chords`}>
-            {chords.map((row) => (
-              <div key={row.id} role="listitem" className="contents">
-                <ChordRow entry={row} />
-              </div>
-            ))}
-          </div>
-        </div>
+        <ChordGroup key={appId ?? "global"} appId={appId} chords={chords} apps={apps} />
       ))}
       {entry.chords.length === 0 && (
         <div className="mac-section">

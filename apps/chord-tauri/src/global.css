@@ -1298,3 +1298,77 @@ a.mac-row:active {
 .dark .mac-page .checkbox:not([data-selected="true"]) .checkbox__control {
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 30%);
 }
+
+/* A collapsible app group: the header is part of the card, and rows have no dividers. */
+.mac-group {
+  padding: 0;
+}
+.mac-group-header {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  text-align: left;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-label);
+  cursor: default;
+  outline: none;
+}
+.mac-group-header .mac-icon {
+  width: 24px;
+  height: 24px;
+}
+.mac-group-header:focus-visible {
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-group-chevron {
+  flex-shrink: 0;
+  color: var(--mac-tertiary);
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+.mac-group[data-open] .mac-group-chevron {
+  transform: none;
+}
+.mac-group[data-open] .mac-group-header {
+  border-bottom: 0.5px solid var(--settings-separator);
+}
+.mac-group [role="list"] {
+  padding: 4px 0 6px;
+}
+.mac-row[data-chord] {
+  min-height: 46px;
+  padding-block: 6px;
+}
+.mac-group .mac-row::before {
+  display: none;
+}
+
+/* Every key of a chord on one cap. */
+.mac-keycap {
+  display: inline-flex;
+  min-width: 52px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 9px;
+  border-radius: 6px;
+  background: var(--settings-key);
+  box-shadow: inset 0 0 0 0.5px var(--mac-keycap-edge);
+  font:
+    600 11.5px/1 "Geist Mono Variable",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.04em;
+  color: var(--settings-key-foreground);
+}
+.mac-keycap [data-placeholder] {
+  margin-right: 2px;
+  font-weight: 500;
+  color: var(--mac-secondary);
+}
