@@ -2,7 +2,7 @@ import { ChevronRight } from "lucide-react";
 import { useId, useState, type HTMLAttributes, type ReactNode } from "react";
 
 /**
- * A group of rows in one rounded card, like Homerow's app groups: the header sits inside the
+ * A group of rows in one rounded card: the header sits inside the
  * card, with an optional icon, a title and subtitle, a count, actions, and a disclosure chevron
  * that collapses the rows. A single hairline under the header is the card's only divider.
  */

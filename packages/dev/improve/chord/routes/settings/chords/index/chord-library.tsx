@@ -289,7 +289,7 @@ export function placeholderKeys(entries: PlaceholderEntry[]): PlaceholderKeys {
 }
 
 /**
- * A chord sequence on one keycap, like Homerow's hint labels. Placeholders such as `<>` show the
+ * A chord sequence on one keycap. Placeholders such as `<>` show the
  * keys they stand for, so the cap reads as what you press; one without keys stays dimmed.
  */
 export function ChordKeys({
@@ -363,7 +363,7 @@ export function PackageContents({
   const resolve = useMemo(() => placeholderKeys(entry.placeholders), [entry.placeholders]);
   return (
     <>
-      {/* Inside the package's card, like Homerow's rows: small headings mark each part. */}
+      {/* Inside the package's card, small headings mark each part. */}
       {entry.placeholders.length > 0 && (
         <>
           <div className="mac-row mac-subheader">Placeholders</div>
@@ -637,7 +637,7 @@ export function ChordLibrary({
     const rankLabel = rankGroups[entry.rank]?.label ?? "Local";
     return (
       <div key={entry.name} role="listitem" className="mac-section">
-        {/* Each package is its own card, like an app in Homerow: its chords sit inside. */}
+        {/* Each package is its own card: its chords sit inside. */}
         <GroupCard
           icon={<PackageIcon entry={entry} app={app} />}
           title={packageTitle(entry, app)}

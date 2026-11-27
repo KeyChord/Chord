@@ -24,7 +24,7 @@ pub fn build_app_menu<R: Runtime>(handle: &AppHandle<R>) -> tauri::Result<Menu<R
         // Tauri's default macOS menu starts with the app submenu, with About first.
         app_menu.insert(&check_for_updates, 1)?;
 
-        // Chord lives in the menu bar, like Homerow: its chords and Hint Panel are the app,
+        // Chord lives in the menu bar: its chords and Hint Panel are the app,
         // and Settings is only a window of it. So ⌘Q closes Settings and Chord keeps
         // running in the background; quitting for good is ⌥⌘Q here, or Quit Chord in the
         // menu bar icon's menu. The Dock's Quit and logging out still quit as usual.

@@ -190,7 +190,7 @@
   margin: 0 16px;
   padding-bottom: 9px;
 }
-/* The window header: a clear page title over one line on what the page is for, like Homerow. */
+/* The window header: a clear page title over one line on what the page is for */
 .settings-page-title {
   font:
     650 17px/22px "Inter Variable",
@@ -938,7 +938,7 @@ section + .mac-section,
   padding-block: 7px;
 }
 /*
- * A row's disclosed contents sit in a rounded rectangle nested inside the group, like Homerow.
+ * A row's disclosed contents sit in a rounded rectangle nested inside the group.
  * Its text lines up with the row's title above it.
  */
 .mac-disclosure {
@@ -1368,7 +1368,7 @@ a.mac-row {
 }
 
 /*
- * A card whose header sits inside it, like Homerow's app groups. The hairline under the header
+ * A card whose header sits inside it. The hairline under the header
  * is the card's only divider; rows below it are set apart by spacing.
  */
 .mac-group {
@@ -1435,7 +1435,7 @@ a.mac-row {
 }
 
 /*
- * Cards as in Homerow: a fill a step off the window with a thin visible border, and a
+ * Cards: a fill a step off the window with a thin visible border, and a
  * hairline under the header as the only divider.
  */
 /* Groups like the General page's: no border, and hairlines inset on both sides between rows. */
@@ -1475,7 +1475,7 @@ a.mac-row {
 /*
  * An expanded package keeps its row in line with its siblings. Below it, each part of the
  * package (its placeholders, then each app's chords) is a box of its own, starting at the
- * row's title, with its heading inside like a small Homerow card.
+ * row's title, with its heading inside like a small card.
  */
 .mac-group-list .mac-disclosure {
   margin: 0;
@@ -1520,7 +1520,7 @@ a.mac-row {
   padding: 0;
 }
 
-/* Homerow's type: bright 13px titles over 11px secondary lines. */
+/* Type: bright 13px titles over 11px secondary lines. */
 .mac-page .mac-row-title {
   font: 400 13px/17px var(--mac-font);
   letter-spacing: -0.003em;
@@ -1544,7 +1544,7 @@ a.mac-row {
   letter-spacing: 0.02em;
   color: var(--mac-secondary);
 }
-/* Rows in a package's card, like Homerow's hints: title and kind, keys at the end. */
+/* Rows in a package's card: title and kind, keys at the end. */
 .mac-group-list .mac-row[data-chord] {
   min-height: 46px;
   padding-block: 6px;
@@ -1758,7 +1758,7 @@ ul.mac-group-list > li > .mac-card-editor {
 
 /*
  * A card's contents sit in a tinted box inset under its header, so they read as inside it,
- * like Homerow's nested sections. The box replaces the line under the header.
+ * like nested sections. The box replaces the line under the header.
  */
 .mac-group[data-open] > .mac-group-bar::after {
   display: none;

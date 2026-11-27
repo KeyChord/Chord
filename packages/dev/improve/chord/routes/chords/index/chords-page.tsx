@@ -122,8 +122,8 @@ function ChordKeyRow({
 						? block
 							? blockKeyClassName(block)
 							: isFailed
-								? 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/70 dark:bg-red-500/30 dark:text-red-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)] dark:shadow-[0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
-								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/70 dark:bg-emerald-500/30 dark:text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)] dark:shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
+								? 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/70 dark:bg-red-500/30 dark:text-red-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.18)]'
+								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/70 dark:bg-emerald-500/30 dark:text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.18)]'
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
