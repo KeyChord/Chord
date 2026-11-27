@@ -177,6 +177,42 @@ export function ChordsPage() {
 	);
 }
 
+const REMEMBERED_HINT_PANEL_KEY = 'chord-hint-panel';
+
+function readRememberedHintPanel(): HintPanelState | undefined {
+	try {
+		const stored = window.localStorage.getItem(REMEMBERED_HINT_PANEL_KEY);
+		return stored ? JSON.parse(stored) as HintPanelState : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Packages take a while to load after Chord starts, and until they have the panel had no
+ * hints to show. The hints from the last run stand in until then, and the latest loaded
+ * hints are kept for the next start.
+ */
+function useRememberedHintPanel(current: HintPanelState | undefined) {
+	const [remembered] = useState(readRememberedHintPanel);
+	const loaded = current && current.packages.length > 0 ? current : undefined;
+	useEffect(() => {
+		if (!loaded) {
+			return;
+		}
+		// Saved a moment later so a burst of updates while packages load is written once.
+		const timer = window.setTimeout(() => {
+			try {
+				window.localStorage.setItem(REMEMBERED_HINT_PANEL_KEY, JSON.stringify(loaded));
+			} catch {
+				// Too large for storage, or none: the next start waits for packages again.
+			}
+		}, 2000);
+		return () => window.clearTimeout(timer);
+	}, [loaded]);
+	return loaded ?? remembered ?? current;
+}
+
 /**
  * Renders once every state the panel draws from has loaded. The panel takes no clicks, so
  * unlike `StateQueries` it offers no retry; leaving it out also keeps HeroUI's button, and
@@ -202,14 +238,15 @@ function HintPanelStates({ children }: {
 		useHintPanelState('chord-macros'),
 		useHintPanelState('settings'),
 	] as const;
+	const hintPanelData = useRememberedHintPanel(queries[3].data);
 	if (queries.some(query => query.isError && query.data === undefined)) {
 		return <div role="alert" className="p-4 text-sm text-muted-foreground">Could not load app state.</div>;
 	}
-	const [chordInput, chordPanel, frontmost, hintPanel, chordExecution, chordMacros, settings] = queries;
-	if (!chordInput.data || !chordPanel.data || !frontmost.data || !hintPanel.data || !chordExecution.data || !chordMacros.data || !settings.data) {
+	const [chordInput, chordPanel, frontmost, , chordExecution, chordMacros, settings] = queries;
+	if (!chordInput.data || !chordPanel.data || !frontmost.data || !hintPanelData || !chordExecution.data || !chordMacros.data || !settings.data) {
 		return null;
 	}
-	return children(chordInput.data, chordPanel.data, frontmost.data, hintPanel.data, chordExecution.data, chordMacros.data, settings.data.defaultGlobalPrefixForPlaceholders);
+	return children(chordInput.data, chordPanel.data, frontmost.data, hintPanelData, chordExecution.data, chordMacros.data, settings.data.defaultGlobalPrefixForPlaceholders);
 }
 
 export function ChordsPageContent({
