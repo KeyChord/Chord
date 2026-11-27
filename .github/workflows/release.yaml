@@ -571,7 +571,7 @@ jobs:
           gh release view "$tag" --json assets --jq '.assets[].name'
 
   deploy-website:
-    if: ${{ github.ref == 'refs/heads/production' }}
+    if: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/production' }}
     needs: publish
     permissions: {}
     runs-on: ubuntu-latest
@@ -590,4 +590,9 @@ jobs:
       - name: Redeploy trychord.app
         env:
           GH_TOKEN: ${{ steps.website-token.outputs.token }}
-        run: gh api --method POST repos/KeyChord/trychord.app/actions/workflows/deploy.yaml/dispatches -f ref=prod
+        run: |
+          website_branch=prod
+          if [ "$GITHUB_REF" = refs/heads/staging ]; then
+            website_branch=staging
+          fi
+          gh api --method POST repos/KeyChord/trychord.app/actions/workflows/deploy.yaml/dispatches -f ref="$website_branch"

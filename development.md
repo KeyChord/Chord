@@ -664,9 +664,11 @@ keeps its disk images and `latest.json` current for existing links and installed
 manifest points at archives on the new versioned prerelease. The old rolling `prod` release and
 all older updater archives remain available for pending downloads.
 
-After publishing a production release, the `deploy-website` job starts the `deploy.yaml` workflow
-on `KeyChord/trychord.app`'s `prod` branch. The Chord repository's `website-deploy` environment is
-restricted to `production` and provides `WEBSITE_DEPLOY_APP_CLIENT_ID` (a variable) and
+After publication, the `deploy-website` job dispatches `deploy.yaml` in `KeyChord/trychord.app`.
+A beta release from `staging` refreshes `staging.trychord.app` from the website's `staging` branch.
+A stable release from `production` refreshes `trychord.app` from the website's `prod` branch.
+Chord's `website-deploy` environment allows both desktop release branches and provides
+`WEBSITE_DEPLOY_APP_CLIENT_ID` (a variable) and
 `WEBSITE_DEPLOY_APP_PRIVATE_KEY` (a secret). The private GitHub App is installed on
 `KeyChord/trychord.app` with Actions read and write access. If dispatch fails after publication,
 rerun the failed job to retry the deploy.
