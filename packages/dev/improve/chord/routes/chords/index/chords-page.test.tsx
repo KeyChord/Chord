@@ -123,8 +123,12 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
 
   test(`${layout} displays unmatched keys while keeping launcher chords available`, () => {
     const path = "chords/dev/fixture/macos.toml";
-    const render = (input: string[]) => renderToString(<ChordsPageContent
-      chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
+    const render = (input: string[], executed = false) => renderToString(<ChordsPageContent
+      chordInputData={{
+        input: executed ? [] : input,
+        quotes: [], inserting: false, blocks: [], openBlock: false,
+        selectedInputEvent: executed ? { input, quotes: [] } : undefined,
+      }}
       chordPanelData={{ isVisible: true, layout }}
       frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
       hintPanelData={{ packages: [{
@@ -135,6 +139,7 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
             chords: [
               { rawTrigger: "/f", trigger: { keys: ["Slash", "KeyF"] }, name: "Open Finder", index: 0, actions: [], fallback: false },
               { rawTrigger: "/b", trigger: { keys: ["Slash", "KeyB"] }, name: "Open Browser", index: 1, actions: [], fallback: false },
+              { rawTrigger: "/4p", trigger: { keys: ["Slash", "Digit4", "KeyP"] }, name: "Open Project", index: 2, actions: [], fallback: false },
             ],
             chordHints: [{ rawPattern: "/", pattern: { keys: ["Slash"] }, description: "Launch" }],
           },
@@ -149,6 +154,19 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
     expect(notion).toContain(">NOTION</kbd>");
     expect(notion).not.toContain(">N</kbd>");
     expect(render(["Slash", "KeyN", "KeyO"])).toContain(">NO</kbd>");
+
+    const onePassword = ["Slash", "Digit1", "KeyP"];
+    const launcherText = render(onePassword);
+    expect(launcherText).toContain(">/</kbd>");
+    expect(launcherText).toContain(">1P</kbd>");
+    expect(launcherText).not.toContain(">1</kbd>");
+    expect(launcherText).not.toContain(">P</kbd>");
+    expect(render(["Digit3", ...onePassword])).toMatch(/>3(?:<\/span>)?<\/kbd>.*>1P<\/kbd>/);
+    expect(render(["Slash", "KeyP", "Digit1"])).toContain(">P1</kbd>");
+    expect(render(["Slash", "Digit4", "KeyP"]).match(/>(?:4|P|4P)<\/kbd>/g)).toEqual([">4</kbd>", ">P</kbd>"]);
+    if (layout === ChordLayout.FloatingBottom) {
+      expect(render(onePassword, true)).toContain(">1P</kbd>");
+    }
 
     const finder = render(["Slash", "KeyF"]);
     expect(finder).toContain(">/</kbd>");

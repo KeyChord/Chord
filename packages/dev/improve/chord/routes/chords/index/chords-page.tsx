@@ -24,6 +24,7 @@ const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const MAX_FULL_COLUMNS = 3;
 const MAX_TRAIL_KEYS = 3;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
+const ALPHANUMERIC_TOKEN_REGEX = /^[A-Z0-9]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
 
 function ChordEscapeSuggestions({ result }: { result: NonNullable<ReturnType<typeof getEscapeSuggestions>> }) {
@@ -384,10 +385,11 @@ export function ChordsPageContent({
 	const shouldHighlightActiveChord
 		= executionError !== undefined
 			&& normalizedActiveChordTokens.length > 0;
-	const selectedTokens = shouldHighlightActiveChord
+	const showsBuffer = isTyping || !chordInputState.selectedInputEvent;
+	const showsExecutedChord = isFloating && !showsBuffer && !shouldHighlightActiveChord;
+	const selectedTokens = shouldHighlightActiveChord || showsExecutedChord
 		? normalizedActiveChordTokens
 		: normalizedBufferTokens;
-	const showsBuffer = isTyping || !chordInputState.selectedInputEvent;
 	const floatingTokens = showsBuffer
 		? normalizedBufferTokens
 		: normalizedActiveChordTokens;
@@ -444,8 +446,9 @@ export function ChordsPageContent({
 	);
 	const descriptionFontSize = clamp(Math.round(keySize * 0.42), 11, 16);
 
-	const columnCount = Math.max(1, currentPrefixLength + (shouldHighlightActiveChord ? 0 : 1));
+	const columnCount = Math.max(1, currentPrefixLength + (shouldHighlightActiveChord || showsExecutedChord ? 0 : 1));
 	const typedChordStart = Math.max(blockLength, commandPrefixTokens.length);
+	const groupFreeText = isTyping || showsExecutedChord;
 	const keyColumns = [];
 	for (let columnIndex = 0; columnIndex < columnCount;) {
 		const prefixTokens = selectedTokens.slice(0, columnIndex);
@@ -481,9 +484,9 @@ export function ChordsPageContent({
 			? selectedToken
 			: undefined;
 		let nextColumnIndex = columnIndex + 1;
-		// Once a letter has no matching continuation, the rest of its letter run is free text.
-		if (isTyping && columnIndex >= typedChordStart && unmatchedToken && SINGLE_LETTER_TOKEN_REGEX.test(unmatchedToken)) {
-			while (SINGLE_LETTER_TOKEN_REGEX.test(selectedTokens[nextColumnIndex] ?? '')) nextColumnIndex++;
+		// Once a key has no matching continuation, keep the rest of its alphanumeric run together.
+		if (groupFreeText && columnIndex >= typedChordStart && unmatchedToken && ALPHANUMERIC_TOKEN_REGEX.test(unmatchedToken)) {
+			while (ALPHANUMERIC_TOKEN_REGEX.test(selectedTokens[nextColumnIndex] ?? '')) nextColumnIndex++;
 		}
 		const selectedLabel = nextColumnIndex === columnIndex + 1
 			? selectedToken
@@ -547,7 +550,7 @@ export function ChordsPageContent({
 	const lastColumnIndex = keyColumns.at(-1)?.index;
 
 	// Typed quotes keep their text beside the keys; show it in place.
-	const floatingKeycaps = isTyping ? keyColumns.flatMap(column => column.selectedLabel ? [column.selectedLabel] : []) : floatingTokens;
+	const floatingKeycaps = groupFreeText ? keyColumns.flatMap(column => column.selectedLabel ? [column.selectedLabel] : []) : floatingTokens;
 	const floatingDisplayTokens = withQuoteTexts(floatingKeycaps, floatingQuotes, showsBuffer && chordInputState.inserting);
 
 	// Typing never narrows the floating bar, even when the description shortens;
