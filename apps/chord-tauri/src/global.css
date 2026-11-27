@@ -1333,7 +1333,11 @@ a.mac-row:active {
 .mac-group[data-open] .mac-group-chevron {
   transform: none;
 }
-.mac-group[data-open] .mac-group-header {
+.mac-group-bar {
+  display: flex;
+  align-items: center;
+}
+.mac-group[data-open] .mac-group-bar {
   border-bottom: 0.5px solid var(--settings-separator);
 }
 .mac-group [role="list"] {
@@ -1367,8 +1371,12 @@ a.mac-row:active {
   letter-spacing: 0.04em;
   color: var(--settings-key-foreground);
 }
+/* A placeholder's keys sit a little apart from the chord's own keys. */
+.mac-keycap [data-prefix] {
+  margin-right: 4px;
+}
 .mac-keycap [data-placeholder] {
-  margin-right: 2px;
+  margin-right: 4px;
   font-weight: 500;
   color: var(--mac-secondary);
 }

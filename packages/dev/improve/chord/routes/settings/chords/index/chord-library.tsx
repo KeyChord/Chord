@@ -28,6 +28,7 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type ReactNode,
 } from "react";
 import { flushSync } from "react-dom";
 
@@ -286,17 +287,45 @@ function PackageIcon({ entry, app }: { entry: LibraryPackage; app?: DesktopAppMe
   );
 }
 
+/** The keys each placeholder stands for in one chords file: the user's keys, else the default. */
+export type PlaceholderKeys = (pathslug: string, name: string) => string | undefined;
+
+export function placeholderKeys(entries: PlaceholderEntry[]): PlaceholderKeys {
+  return (pathslug, name) => {
+    const match =
+      entries.find((e) => e.pathslug === pathslug && e.placeholder.name === name) ??
+      entries.find((e) => e.placeholder.name === name);
+    return match ? (match.placeholder.assigned ?? match.placeholder.default) : undefined;
+  };
+}
+
 /**
- * A chord sequence on one keycap, like Homerow's hint labels. A placeholder such as `<>` is
- * dimmed, since the user's prefix replaces it.
+ * A chord sequence on one keycap, like Homerow's hint labels. Placeholders such as `<>` show the
+ * keys they stand for, so the cap reads as what you press; one without keys stays dimmed.
  */
-export function ChordKeys({ sequence }: { sequence: string }) {
-  const keys = sequence.match(/<[^<>]*>|[\s\S]/gu) ?? [];
+export function ChordKeys({
+  sequence,
+  resolve,
+}: {
+  sequence: string;
+  resolve?: (name: string) => string | undefined;
+}) {
+  const tokens = (sequence.match(/<[^<>]*>|[\s\S]/gu) ?? []).map((token) => {
+    if (token.length === 1) return { text: token === " " ? "␣" : token };
+    const keys = resolve?.(token);
+    return keys ? { text: keys, prefix: true } : { text: token, unresolved: true };
+  });
+  const pressed = tokens.map((token) => token.text).join("");
   return (
-    <kbd className="mac-keycap" title={sequence} aria-label={sequence}>
-      {keys.map((key, index) => (
-        <span key={index} data-placeholder={key.length > 1 || undefined} aria-hidden="true">
-          {key === " " ? "␣" : key}
+    <kbd className="mac-keycap" title={pressed} aria-label={pressed}>
+      {tokens.map((token, index) => (
+        <span
+          key={index}
+          data-prefix={token.prefix || undefined}
+          data-placeholder={token.unresolved || undefined}
+          aria-hidden="true"
+        >
+          {token.text}
         </span>
       ))}
     </kbd>
@@ -304,7 +333,7 @@ export function ChordKeys({ sequence }: { sequence: string }) {
 }
 
 /** A chord: its name and action type lead, and its keys trail on one keycap. */
-function ChordRow({ entry }: { entry: LibraryChord }) {
+function ChordRow({ entry, resolve }: { entry: LibraryChord; resolve?: PlaceholderKeys }) {
   const kind = entry.chord.actions[0] ? actionKinds[entry.chord.actions[0].type] : undefined;
   return (
     <div className="mac-row" data-chord>
@@ -314,48 +343,59 @@ function ChordRow({ entry }: { entry: LibraryChord }) {
         </span>
         <span className="mac-row-subtitle">{kind?.label ?? "No actions"}</span>
       </span>
-      <ChordKeys sequence={entry.chord.rawTrigger} />
+      <ChordKeys
+        sequence={entry.chord.rawTrigger}
+        resolve={resolve && ((name) => resolve(entry.pathslug, name))}
+      />
     </div>
   );
 }
 
-/** One app's chords in a card that collapses under its header, like Homerow's app groups. */
-function ChordGroup({
-  appId,
-  chords,
-  apps,
+/**
+ * A card whose header collapses its rows, like Homerow's app groups. Header actions sit beside
+ * the disclosure button rather than inside it.
+ */
+function GroupCard({
+  icon,
+  title,
+  count,
+  actions,
+  listLabel,
+  children,
+  dragging,
 }: {
-  appId: string | undefined;
-  chords: LibraryChord[];
-  apps: Record<string, DesktopAppMetadata>;
+  icon?: ReactNode;
+  title: string;
+  count: number;
+  actions?: ReactNode;
+  listLabel: string;
+  children: ReactNode;
+  dragging?: boolean;
 }) {
   const [open, setOpen] = useState(true);
   const listId = useId();
-  const label = chords[0]!.appLabel;
-  const icon = appId ? apps[appId]?.iconDataUrl : undefined;
   return (
-    <div className="mac-section">
-      <div className="mac-list mac-group" data-open={open || undefined}>
-        <h3>
+    <div
+      className="mac-list mac-group"
+      data-open={open || undefined}
+      data-dragging={dragging || undefined}
+    >
+      <div className="mac-group-bar">
+        <h3 className="min-w-0 flex-1">
           <button
             type="button"
             className="mac-group-header"
             aria-expanded={open}
             aria-controls={listId}
-            title={appId}
             onClick={() => setOpen(!open)}
           >
-            <span className="mac-icon" aria-hidden="true">
-              {icon ? (
-                <img src={icon} alt="" />
-              ) : appId ? (
-                <AppWindow size={17} strokeWidth={1.6} />
-              ) : (
-                <Globe size={17} strokeWidth={1.6} />
-              )}
-            </span>
-            <span className="mac-row-title flex-1">{label}</span>
-            <span className="mac-row-detail">{chords.length}</span>
+            {icon && (
+              <span className="mac-icon" aria-hidden="true">
+                {icon}
+              </span>
+            )}
+            <span className="mac-row-title flex-1">{title}</span>
+            <span className="mac-row-detail">{count}</span>
             <ChevronDown
               className="mac-group-chevron"
               size={15}
@@ -364,14 +404,50 @@ function ChordGroup({
             />
           </button>
         </h3>
-        <div id={listId} role="list" aria-label={`${label} chords`} hidden={!open}>
-          {chords.map((row) => (
-            <div key={row.id} role="listitem">
-              <ChordRow entry={row} />
-            </div>
-          ))}
-        </div>
+        {actions}
       </div>
+      <div id={listId} role="list" aria-label={listLabel} hidden={!open}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ChordGroup({
+  appId,
+  chords,
+  apps,
+  resolve,
+}: {
+  appId: string | undefined;
+  chords: LibraryChord[];
+  apps: Record<string, DesktopAppMetadata>;
+  resolve: PlaceholderKeys;
+}) {
+  const label = chords[0]!.appLabel;
+  const icon = appId ? apps[appId]?.iconDataUrl : undefined;
+  return (
+    <div className="mac-section">
+      <GroupCard
+        title={label}
+        count={chords.length}
+        listLabel={`${label} chords`}
+        icon={
+          icon ? (
+            <img src={icon} alt="" />
+          ) : appId ? (
+            <AppWindow size={17} strokeWidth={1.6} />
+          ) : (
+            <Globe size={17} strokeWidth={1.6} />
+          )
+        }
+      >
+        {chords.map((row) => (
+          <div key={row.id} role="listitem">
+            <ChordRow entry={row} resolve={resolve} />
+          </div>
+        ))}
+      </GroupCard>
     </div>
   );
 }
@@ -397,6 +473,7 @@ export function PackageDetail({
     return [...byApp];
   }, [entry.chords]);
   const rankLabel = rankGroups[entry.rank]?.label ?? "Local";
+  const resolve = useMemo(() => placeholderKeys(entry.placeholders), [entry.placeholders]);
 
   return (
     <section aria-label={`${entry.name} details`}>
@@ -419,7 +496,13 @@ export function PackageDetail({
       <PackagePlaceholders entries={entry.placeholders} apps={apps} />
 
       {groups.map(([appId, chords]) => (
-        <ChordGroup key={appId ?? "global"} appId={appId} chords={chords} apps={apps} />
+        <ChordGroup
+          key={appId ?? "global"}
+          appId={appId}
+          chords={chords}
+          apps={apps}
+          resolve={resolve}
+        />
       ))}
       {entry.chords.length === 0 && (
         <div className="mac-section">
@@ -686,23 +769,31 @@ export function ChordLibrary({
         const showEdit = canReorder && rank === "installed";
         return (
           <div key={rank} className="mac-section">
-            <div className="mac-section-header">
-              <h3 className="mac-section-title">{group?.label ?? "Local"}</h3>
-              {showEdit && (
-                <button
-                  type="button"
-                  className="mac-button -mr-2.5 ml-auto"
-                  data-borderless
-                  aria-pressed={reordering}
-                  onClick={() => setEditing(!reordering)}
-                >
-                  {reordering ? "Done" : "Edit Order"}
-                </button>
-              )}
-            </div>
-            <div className="mac-list" data-icons data-dragging={isDragging || undefined}>
-              {rows.map(renderRow)}
-            </div>
+            <GroupCard
+              title={group?.label ?? "Local"}
+              count={rows.length}
+              listLabel={`${group?.label ?? "Local"} packages`}
+              dragging={isDragging}
+              actions={
+                showEdit && (
+                  <button
+                    type="button"
+                    className="mac-button mr-3"
+                    data-borderless
+                    aria-pressed={reordering}
+                    onClick={() => setEditing(!reordering)}
+                  >
+                    {reordering ? "Done" : "Edit Order"}
+                  </button>
+                )
+              }
+            >
+              {rows.map((entry) => (
+                <div key={entry.name} role="listitem">
+                  {renderRow(entry)}
+                </div>
+              ))}
+            </GroupCard>
             {group && <p className="mac-section-footer">{group.description}</p>}
           </div>
         );

@@ -394,6 +394,15 @@ test("chord sequences show placeholders as one key", () => {
   expect(html).toContain("&lt;&gt;</span>");
 });
 
+test("chord keys show the keys a placeholder stands for", () => {
+  const html = renderToString(
+    <ChordKeys sequence="<>ab" resolve={(name) => (name === "<>" ? ";s" : undefined)} />,
+  );
+  expect(html).toContain('aria-label=";sab"');
+  expect(html).toContain('data-prefix="true"');
+  expect(html).not.toContain("&lt;&gt;");
+});
+
 test("placeholders list each token with its keys and default", () => {
   const rift = pkg("@keychord/chords-rift");
   const placeholder = {
