@@ -70,7 +70,7 @@ function sortTokens(tokens: Iterable<string>) {
 	return [...letterTokens, ...otherTokens];
 }
 
-/** Keys typed with Shift held, which stay after every run until Backspace removes them. */
+/** Retained keys: a locked global prefix, or a local block typed with Shift held. */
 type BlockState = 'solid' | 'open';
 
 /** Class names for a key in a block; an open block is still being typed with Shift held. */
@@ -608,6 +608,15 @@ export function ChordsPageContent({
 						opacity: chordPanelState.isVisible ? 1 : 0,
 					}}
 				>
+					{chordInputState.instantMode != null && (
+						<div
+							role="status"
+							className="mb-1.5 text-center text-xs font-medium text-sky-800 dark:text-sky-200"
+							title={chordInputState.instantMode ? 'Release Shift to type a multikey chord' : 'Press Shift to run buffered keys'}
+						>
+							{chordInputState.instantMode ? 'Instant Mode' : 'Buffering'}
+						</div>
+					)}
 					{isFloating || escapeSuggestions ? (
 						<div className="flex flex-col items-center gap-1.5" aria-live="polite">
 							<div ref={floatingKeysRef} className="w-full overflow-x-hidden py-0.5">

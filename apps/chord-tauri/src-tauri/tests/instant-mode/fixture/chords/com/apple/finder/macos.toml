@@ -1,0 +1,2 @@
+[chords]
+'gde' = { name = 'LEON-562 local block regression', shell = "printf '%s\\n' 'gde' >> /tmp/chord-leon562-native.log" }

@@ -1,6 +1,7 @@
 #![allow(unused)]
 mod app;
 pub use app::*;
+mod instant_mode;
 mod chord_input_manager;
 pub use chord_input_manager::*;
 mod chord_loops;

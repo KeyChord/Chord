@@ -369,3 +369,27 @@ test("keys before the last three columns fold into a trail beside them, unless t
     (window as { localStorage?: unknown }).localStorage = storage;
   }
 });
+
+for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
+  test(`${layout} distinguishes Instant Mode from a buffered suffix`, () => {
+    const props: Parameters<typeof ChordsPageContent>[0] = {
+      chordInputData: { input: ["Minus", "KeyW"], quotes: [], inserting: false, blocks: [2], openBlock: false, instantMode: true },
+      chordPanelData: { isVisible: true, layout },
+      frontmostData: { filePickerActive: false },
+      hintPanelData: { packages: [] },
+      chordExecutionData: { loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" },
+      chordMacrosData: { entries: [] },
+    };
+    const instant = renderToString(<ChordsPageContent {...props} />);
+    expect(instant).toContain("Instant Mode");
+    expect(instant).toContain("Release Shift to type a multikey chord");
+    expect(instant).not.toContain("border-dashed");
+    const buffered = renderToString(<ChordsPageContent {...props} chordInputData={{ ...props.chordInputData!, input: ["Minus", "KeyW", "KeyA", "KeyB"], instantMode: false }} />);
+    expect(buffered).toContain("Buffering");
+    expect(buffered).toContain("Press Shift to run buffered keys");
+    expect(buffered).not.toContain("Instant Mode");
+    const local = renderToString(<ChordsPageContent {...props} chordInputData={{ ...props.chordInputData!, instantMode: undefined }} />);
+    expect(local).not.toContain("Instant Mode");
+    expect(local).not.toContain("Press Shift to run buffered keys");
+  });
+}

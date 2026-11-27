@@ -1,0 +1,12 @@
+[chords]
+'-' = { name = 'LEON-562 -', shell = "printf '%s\\n' 'UNEXPECTED_PREFIX' >> /tmp/chord-leon562-native.log" }
+'-a' = { name = 'LEON-562 -a', shell = "printf '%s\\n' '-a' >> /tmp/chord-leon562-native.log" }
+'-b' = { name = 'LEON-562 -b', shell = "printf '%s\\n' '-b' >> /tmp/chord-leon562-native.log" }
+'-ab' = { name = 'LEON-562 -ab', shell = "printf '%s\\n' '-ab' >> /tmp/chord-leon562-native.log" }
+'-cd' = { name = 'LEON-562 -cd', shell = "printf '%s\\n' '-cd' >> /tmp/chord-leon562-native.log" }
+'-ef' = { name = 'LEON-562 -ef', shell = "printf '%s\\n' '-ef' >> /tmp/chord-leon562-native.log" }
+'-wma' = { name = 'LEON-562 -wma', shell = "printf '%s\\n' '-wma' >> /tmp/chord-leon562-native.log" }
+'-wmab' = { name = 'LEON-562 -wmab', shell = "printf '%s\\n' '-wmab' >> /tmp/chord-leon562-native.log" }
+'-wmcd' = { name = 'LEON-562 -wmcd', shell = "printf '%s\\n' '-wmcd' >> /tmp/chord-leon562-native.log" }
+'-;' = { name = 'LEON-562 -;', shell = "printf '%s\\n' '-;' >> /tmp/chord-leon562-native.log" }
+'-/' = { name = 'LEON-562 -/', shell = "printf '%s\\n' '-/' >> /tmp/chord-leon562-native.log" }

@@ -1,5 +1,6 @@
 use super::chord_loops::{ChordLoops, run_plan, select_run_window};
 use super::chord_sequence::{ChordSequence, ChordSequenceDispatch, ChordTaskQueue};
+use super::instant_mode::{InstantInput, handle_instant_key_event};
 use crate::app::AppHandleExt;
 use crate::app::chord_runner::{ChordActionTask, release_chord_sequences};
 use crate::app::state::AppSingleton;
@@ -156,7 +157,20 @@ impl ChordInputManager {
 
     // Called only while Chord mode is active.
     pub fn handle_key_event(&self, key_event: &KeyEvent) -> Result<()> {
-        let event = track_key_event(&mut self.held_keys.lock(), key_event);
+        let (event, first_shift, non_shift_modifier) = {
+            let mut held = self.held_keys.lock();
+            let first_shift = !held.iter().any(|key| {
+                matches!(
+                    key.0,
+                    KeyMappingCode::ShiftLeft | KeyMappingCode::ShiftRight
+                )
+            });
+            let event = track_key_event(&mut held, key_event);
+            let non_shift_modifier = held
+                .iter()
+                .any(|key| Key::non_shift_modifiers().contains(key));
+            (event, first_shift, non_shift_modifier)
+        };
         let fresh_press = !event.repeat;
         let (KeyEvent::Press(key) | KeyEvent::Release(key)) = key_event;
         let press_triggers = [ChordEventTrigger::Keydown, ChordEventTrigger::Keypress];
@@ -179,6 +193,50 @@ impl ChordInputManager {
             }
         }
 
+        // This is the keyboard entry point used by Chord mode. Instant input runs
+        // against a snapshot of the locked prefix; it never appends the action key.
+        let mut state = self.observable.get_state()?;
+        let instant = if non_shift_modifier
+            && !matches!(
+                key_event,
+                KeyEvent::Release(Key(KeyMappingCode::ShiftLeft | KeyMappingCode::ShiftRight))
+            ) {
+            InstantInput::Pass
+        } else {
+            handle_instant_key_event(&mut state, key_event, &event, first_shift)
+        };
+        match instant {
+            InstantInput::Execute {
+                input,
+                quotes,
+                hold,
+            } => {
+                self.observable.set_state(|_| state)?;
+                return self.execute_input(
+                    &input,
+                    &quotes,
+                    &[
+                        ChordEventTrigger::Keydown,
+                        ChordEventTrigger::Keypress,
+                        ChordEventTrigger::Input,
+                    ],
+                    &event,
+                    hold,
+                );
+            }
+            InstantInput::Changed => {
+                self.observable.set_state(|_| state)?;
+                return self.dispatch_current_buffer(
+                    if matches!(key_event, KeyEvent::Press(_)) {
+                        &press_triggers
+                    } else {
+                        &[ChordEventTrigger::Keyup]
+                    },
+                    &event,
+                );
+            }
+            InstantInput::Pass => {}
+        }
         if !fresh_press {
             return self.dispatch_current_buffer(&press_triggers, &event);
         }
@@ -261,8 +319,16 @@ impl ChordInputManager {
                         .toggle()?;
                 } else {
                     // Typed escapes other than complete macro references expand only on Tab.
-                    let selected = select_escape(&state.input, &self.sequence.lock().macros)?;
-                    if let Some(input) = selected {
+                    let locked_len = if state.instant_mode.is_some() {
+                        state.block_len()
+                    } else {
+                        0
+                    };
+                    let selected =
+                        select_escape(&state.input[locked_len..], &self.sequence.lock().macros)?;
+                    if let Some(suffix) = selected {
+                        let mut input = state.input[..locked_len].to_vec();
+                        input.extend(suffix);
                         let blocks = rebase_blocks(state.blocks, &state.input, &input);
                         self.edit_buffer(input, blocks, state.open_block, state.quotes, false)?;
                     }
@@ -560,6 +626,7 @@ impl ChordInputManager {
                 inserting: false,
                 blocks: state.blocks,
                 open_block: state.open_block,
+                instant_mode: state.instant_mode,
                 pressed_input_event: None,
                 // Nothing ran, so no application received the chord.
                 selected_input_event: Some(ChordInputEvent {
@@ -640,6 +707,11 @@ impl ChordInputManager {
     /// after the solid blocks; see `ChordInputState::blocks`.
     fn handle_key_press(&self, key: &Key, event: &ChordKeyboardEvent, shifted: bool) -> Result<()> {
         let state = self.observable.get_state()?;
+        let locked_len = if state.instant_mode.is_some() {
+            state.block_len()
+        } else {
+            0
+        };
         let mut blocks = state.blocks;
         if state.open_block && !shifted {
             blocks = close_block(&state.input, blocks);
@@ -648,7 +720,8 @@ impl ChordInputManager {
         blocks = rebase_blocks(blocks, &state.input, &next_key_buffer);
         let grew = next_key_buffer.len() > state.input.len();
         if grew {
-            let expanded = self.expand_typed_reference(next_key_buffer.clone());
+            let mut expanded = next_key_buffer[..locked_len].to_vec();
+            expanded.extend(self.expand_typed_reference(next_key_buffer[locked_len..].to_vec()));
             blocks = rebase_blocks(blocks, &next_key_buffer, &expanded);
             next_key_buffer = expanded;
         }
@@ -685,6 +758,7 @@ impl ChordInputManager {
         self.observable.set_state(|state| ChordInputState {
             blocks: vec![],
             open_block: false,
+            instant_mode: None,
             ..state
         })?;
         self.clear_loose_keys()
@@ -722,17 +796,26 @@ impl ChordInputManager {
         if inserting {
             *self.carried_keys.lock() = self.held_keys.lock().clone();
         }
-        self.observable.set_state(|state| ChordInputState {
-            input,
-            quotes,
-            inserting,
-            blocks,
-            open_block,
-            description: None,
-            selected_input_event: None,
-            pressed_input_event: None,
-            error: None,
-            ..state
+        self.observable.set_state(|state| {
+            let locked_len = state.block_len();
+            let instant_mode = state.instant_mode.filter(|_| {
+                locked_len > 0
+                    && blocks == state.blocks
+                    && input.starts_with(&state.input[..locked_len])
+            });
+            ChordInputState {
+                input,
+                quotes,
+                inserting,
+                blocks,
+                open_block,
+                instant_mode,
+                description: None,
+                selected_input_event: None,
+                pressed_input_event: None,
+                error: None,
+                ..state
+            }
         })
     }
 
@@ -793,7 +876,6 @@ impl ChordInputManager {
             false,
         )
     }
-
 }
 
 /// `blocks` with the keys of `input` after them made solid as one more block.

@@ -123,7 +123,7 @@ export interface ChordHint {
 export interface ChordInputState {
 	/**
 	 * The keys a user has pressed for a chord but not yet executed. Think of it as the equivalent
-	 * of an HTML <input />'s `value`. Reset to its blocks when executed.
+	 * of an HTML <input />'s `value`. Reset to its retained prefix when executed.
 	 */
 	input: ChordInput;
 	/** Insert-mode text for each quote in `input`, in order; see `ChordInputEvent::quotes`. */
@@ -134,15 +134,21 @@ export interface ChordInputState {
 	 */
 	inserting: boolean;
 	/**
-	 * Where each block of `input` ends, ascending. Keys typed with Shift held form a
-	 * block, which stays in `input` after every run until Backspace removes it.
+	 * Retained prefix boundaries in `input`, ascending. Global Instant Mode has
+	 * one boundary fixed when Shift locks the buffer. Local chords retain their
+	 * existing Shift blocks. Backspace removes a whole block when no suffix remains.
 	 */
 	blocks: number[];
 	/**
-	 * Shift is held after typing a key, so the keys after `blocks` are a block that
-	 * becomes solid when Shift is released.
+	 * A local block is still being typed with Shift held; it becomes solid on
+	 * release. Global Instant Mode always keeps this false.
 	 */
 	openBlock: boolean;
+	/**
+	 * A global prefix is locked in `blocks`: true while Shift is held, false while
+	 * buffering a suffix. None keeps the existing local-chord block behavior.
+	 */
+	instantMode?: boolean;
 	/** The chord currently being pressed down. */
 	pressedInputEvent?: ChordInputEvent;
 	/** The chord that is "active" */
