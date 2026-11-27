@@ -1,1 +1,1 @@
-export { SettingsCommandLinePage } from '#settings-command-line-page';
+export { SettingsCommandLinePage } from "#settings-command-line-page";

@@ -1,1 +1,1 @@
-export * from '#permissions-card';
+export * from "#permissions-card";

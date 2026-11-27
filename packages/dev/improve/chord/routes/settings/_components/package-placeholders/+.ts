@@ -1,1 +1,1 @@
-export * from '#package-placeholders';
+export * from "#package-placeholders";

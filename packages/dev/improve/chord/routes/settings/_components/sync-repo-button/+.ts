@@ -1,1 +1,1 @@
-export * from '#sync-repo-button';
+export * from "#sync-repo-button";

@@ -159,8 +159,8 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
 function AppearanceRow() {
   const [appearance, setSelected] = useState(getAppearance);
   return (
-    <div className="preference-row items-start">
-      <span id="appearance-label" className="preference-label pt-1">
+    <div className="preference-row appearance-row">
+      <span id="appearance-label" className="preference-label">
         Appearance
       </span>
       <div role="radiogroup" aria-labelledby="appearance-label" className="appearance-picker">

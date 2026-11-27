@@ -1,1 +1,1 @@
-export * from '#active-chords-tab';
+export * from "#active-chords-tab";

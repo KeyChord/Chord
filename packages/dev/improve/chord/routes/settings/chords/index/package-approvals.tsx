@@ -160,12 +160,14 @@ export function PackageApprovals({
             <>
               {pkg.approved ? (
                 failures.length > 0 ? (
-                  <span className="text-destructive">Approved · didn&apos;t load</span>
+                  <span className="text-destructive">Third-party · didn&apos;t load</span>
                 ) : (
-                  "Approved"
+                  "Third-party · approved"
                 )
               ) : (
-                <span className="text-amber-700 dark:text-amber-300">Awaiting approval</span>
+                <span className="text-amber-700 dark:text-amber-300">
+                  Third-party · awaiting approval
+                </span>
               )}
               {" · "}
               <span title={pkg.path}>{displayPath}</span>
@@ -212,20 +214,19 @@ export function PackageApprovals({
 
   return (
     <section aria-label="Third-party packages">
-      <div className="mac-callout-warning" role="note">
-        <ShieldAlert size={22} strokeWidth={1.8} aria-hidden="true" />
-        <div className="min-w-0">
-          <h3 className="mac-callout-title">Third-Party Packages</h3>
-          <p className="mac-callout-body">{PACKAGE_CODE_WARNING}</p>
-          <p className="mac-callout-body font-medium" role="status">
-            {pending.length > 0
-              ? `${pending.length} awaiting approval. Review before allowing code to run.`
-              : approved.length > 0
-                ? "Manage which packages can run code."
-                : "No third-party packages installed."}
-          </p>
+      {/* The trust warning shows while something waits for approval, where it matters. */}
+      {pending.length > 0 && (
+        <div className="mac-callout-warning" role="note">
+          <ShieldAlert size={22} strokeWidth={1.8} aria-hidden="true" />
+          <div className="min-w-0">
+            <h3 className="mac-callout-title">Third-Party Packages</h3>
+            <p className="mac-callout-body">{PACKAGE_CODE_WARNING}</p>
+            <p className="mac-callout-body font-medium" role="status">
+              {`${pending.length} awaiting approval. Review before allowing code to run.`}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {errorMessage && (
         <p role="alert" className="mt-3 wrap-anywhere text-xs text-destructive">

@@ -1,25 +1,25 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.reset-chords-card",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#reset-chords-card": "./reset-chords-card.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
-		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
-		"lucide-react": "^1.57.0",
-		"react": "^19.3.1",
-		"@chord/dev.improve.chord.components.ui.toast": "workspace:*"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.reset-chords-card",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#reset-chords-card": "./reset-chords-card.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

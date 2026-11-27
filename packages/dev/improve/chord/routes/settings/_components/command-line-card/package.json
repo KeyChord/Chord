@@ -1,23 +1,23 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.command-line-card",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#command-line-card": "./command-line-card.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
-		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"react": "^19.3.1",
-		"@chord/dev.improve.chord.lib.state": "workspace:*"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.command-line-card",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#command-line-card": "./command-line-card.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

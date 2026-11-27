@@ -1,33 +1,33 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.chord-repos-card",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#chord-repos-card": "./chord-repos-card.tsx",
-		"#monorepo-package-picker": "./monorepo-package-picker.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
-		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"@chord/dev.improve.chord.lib.state": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
-		"lucide-react": "^1.57.0",
-		"react": "^19.3.1",
-		"@chord/dev.improve.chord.components.ui.toast": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.checkbox": "workspace:*"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.chord-repos-card",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#chord-repos-card": "./chord-repos-card.tsx",
+    "#monorepo-package-picker": "./monorepo-package-picker.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.add-repo-button": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

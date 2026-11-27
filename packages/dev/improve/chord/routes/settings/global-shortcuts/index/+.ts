@@ -1,1 +1,1 @@
-export { SettingsGlobalShortcutsPage } from '#settings-global-shortcuts-page';
+export { SettingsGlobalShortcutsPage } from "#settings-global-shortcuts-page";

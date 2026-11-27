@@ -81,7 +81,7 @@ test("app files show the app's name when Chord knows it", () => {
       />
     </QueryClientProvider>,
   ).replaceAll("<!-- -->", "");
-  expect(html).toContain('mac-group-title">Finder</span>');
+  expect(html).toContain('mac-row-title">Finder</span>');
   expect(html).toContain("chords/com/apple/finder/macos.toml");
 });
 

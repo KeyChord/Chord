@@ -1,1 +1,1 @@
-export * from '#apps-needing-relaunch-card';
+export * from "#apps-needing-relaunch-card";

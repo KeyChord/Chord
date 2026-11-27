@@ -14,6 +14,7 @@ import { GripVertical, Keyboard, Package } from "lucide-react";
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -199,6 +200,8 @@ interface DragState {
   rank: PackageRank;
   /** The pointer's latest viewport y. */
   y: number;
+  /** How far below the card's top edge the pointer grabbed it, so the card follows the pointer. */
+  grab: number;
   scroller: HTMLElement;
   drop?: Drop;
   /** The pending auto-scroll frame, while the pointer rests near the scroller's edge. */
@@ -452,32 +455,59 @@ export function ChordLibrary({
   }
 
   /** Where the dragged package would land: between the packages of its group. */
+  /** The list's cards by package, with their resting tops (ignoring any slide in progress). */
+  function cards() {
+    const list = listRef.current?.querySelector<HTMLElement>(".mac-card-list");
+    const listTop = list?.getBoundingClientRect().top ?? 0;
+    return [...(list?.querySelectorAll<HTMLElement>("[data-package]") ?? [])].map((card) => ({
+      card,
+      name: card.dataset.package!,
+      rank: card.dataset.rank,
+      top: listTop + card.offsetTop,
+    }));
+  }
+
+  /**
+   * Where the lifted package would land, as on macOS: once its centre passes another card's
+   * middle, that card makes room. Only cards of the same group count.
+   */
   function findDrop(drag: DragState): Drop | undefined {
-    const rows = listRef.current?.querySelectorAll<HTMLElement>(
-      `[data-package][data-rank="${drag.rank}"]`,
-    );
-    const blocks = [...(rows ?? [])].map((row) => {
-      const { top, bottom } = row.getBoundingClientRect();
-      return { name: row.dataset.package!, middle: (top + bottom) / 2 };
-    });
-    const slot = blocks.filter((block) => block.middle < drag.y).length;
-    const target = blocks[Math.min(slot, blocks.length - 1)];
+    const all = cards();
+    const lifted = all.find((entry) => entry.name === drag.name);
+    if (!lifted) return undefined;
+    const centre = drag.y - drag.grab + lifted.card.offsetHeight / 2;
+    const others = all.filter((entry) => entry.rank === drag.rank && entry.name !== drag.name);
+    const slot = others.filter((entry) => entry.top + entry.card.offsetHeight / 2 < centre).length;
+    const target = others[Math.min(slot, others.length - 1)];
     if (!target) return undefined;
-    const place: DropPlace = slot < blocks.length ? "before" : "after";
+    const place: DropPlace = slot < others.length ? "before" : "after";
     const order = movePackage(packages, drag.name, target.name, place);
     return order && { target: target.name, place, order };
+  }
+
+  /** Keeps the lifted card under the pointer, wherever its slot in the list is now. */
+  function follow() {
+    const drag = dragRef.current;
+    const lifted = drag && cards().find((entry) => entry.name === drag.name);
+    if (!drag || !lifted) return;
+    lifted.card.style.transform = `translateY(${drag.y - drag.grab - lifted.top}px) scale(1.015)`;
   }
 
   function track() {
     const drag = dragRef.current;
     if (!drag) return;
     const drop = findDrop(drag);
-    drag.drop = drop;
-    setDragging((shown) =>
-      shown?.drop?.target === drop?.target && shown?.drop?.place === drop?.place
-        ? shown
-        : { name: drag.name, drop },
-    );
+    if (drop?.order.join() !== drag.drop?.order.join()) {
+      // Note where the other cards are now, so they can slide from there to their new places.
+      slideFrom.current = new Map(
+        cards()
+          .filter((entry) => entry.name !== drag.name)
+          .map((entry) => [entry.name, entry.card.getBoundingClientRect().top]),
+      );
+      drag.drop = drop;
+      setDragging({ name: drag.name, drop });
+    }
+    follow();
   }
 
   function autoScroll() {
@@ -498,6 +528,15 @@ export function ChordLibrary({
     if (!drag) return;
     dragRef.current = null;
     if (drag.frame !== undefined) cancelAnimationFrame(drag.frame);
+    // Settle the lifted card into its slot.
+    const lifted = cards().find((entry) => entry.name === drag.name)?.card;
+    if (lifted) {
+      lifted.style.transition = "transform 180ms ease";
+      lifted.style.transform = "";
+      lifted.addEventListener("transitionend", () => (lifted.style.transition = ""), {
+        once: true,
+      });
+    }
     setDragging(null);
     if (commit && drag.drop) save(drag.name, drag.drop);
   }
@@ -506,20 +545,21 @@ export function ChordLibrary({
     if (event.button !== 0 || dragRef.current) return;
     // Keep the press from selecting text or starting a native drag.
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const card = event.currentTarget.closest<HTMLElement>("[data-package]");
     dragRef.current = {
       name: entry.name,
       rank: entry.rank,
       y: event.clientY,
+      grab: event.clientY - (card?.getBoundingClientRect().top ?? event.clientY),
       scroller: scrollParent(event.currentTarget),
     };
     setDragging({ name: entry.name });
   }
 
-  function moveDrag(event: PointerEvent<HTMLButtonElement>) {
+  function moveDrag(y: number) {
     const drag = dragRef.current;
     if (!drag) return;
-    drag.y = event.clientY;
+    drag.y = y;
     track();
     if (drag.frame === undefined) autoScroll();
   }
@@ -542,6 +582,27 @@ export function ChordLibrary({
   }
 
   const isDragging = dragging !== null;
+  // Slide the other cards from where they were to their new places, like a macOS list.
+  const slideFrom = useRef<Map<string, number> | null>(null);
+  useLayoutEffect(() => {
+    const from = slideFrom.current;
+    slideFrom.current = null;
+    if (from) {
+      for (const { card, name } of cards()) {
+        const before = from.get(name);
+        if (before === undefined) continue;
+        const delta = before - card.getBoundingClientRect().top;
+        if (!delta) continue;
+        card.style.transition = "none";
+        card.style.transform = `translateY(${delta}px)`;
+        requestAnimationFrame(() => {
+          card.style.transition = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+          card.style.transform = "";
+        });
+      }
+    }
+    follow();
+  }, [dragging]);
   useEffect(() => {
     if (!isDragging) return;
     const cancel = (event: globalThis.KeyboardEvent) => {
@@ -550,10 +611,21 @@ export function ChordLibrary({
       event.stopPropagation();
       end(false);
     };
-    // Scrolling moves rows under a resting pointer, so the drop target can change.
+    // The window follows the pointer, not the handle: the list moves the held card as it
+    // reorders, and a moved element loses its pointer capture.
+    const move = (event: globalThis.PointerEvent) => moveDrag(event.clientY);
+    const up = () => end(true);
+    const lost = () => end(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", lost);
+    // Scrolling moves cards under a resting pointer, so the drop target can change.
     window.addEventListener("scroll", track, { capture: true, passive: true });
     window.addEventListener("keydown", cancel, true);
     return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", lost);
       window.removeEventListener("scroll", track, { capture: true });
       window.removeEventListener("keydown", cancel, true);
     };
@@ -561,7 +633,6 @@ export function ChordLibrary({
 
   function renderCard(entry: LibraryPackage) {
     const app = entry.appId ? apps[entry.appId] : undefined;
-    const drop = dragging?.drop?.target === entry.name ? dragging.drop.place : undefined;
     const needsKeys = entry.placeholders.some(placeholderNeedsKeys);
     const rankLabel = rankGroups[entry.rank]?.label ?? "Local";
     return (
@@ -582,12 +653,11 @@ export function ChordLibrary({
           headerLabel={`Show ${entry.name} chords`}
           listLabel={`${entry.name} details`}
           open={!reordering && expanded.has(entry.name)}
+          dragging={dragging?.name === entry.name}
           onOpenChange={() => toggle(entry.name)}
           rootProps={{
             "data-package": entry.name,
             "data-rank": entry.rank,
-            "data-dragging": dragging?.name === entry.name || undefined,
-            "data-drop": drop,
           }}
           actions={
             reordering &&
@@ -600,10 +670,6 @@ export function ChordLibrary({
                 aria-describedby={hintId}
                 title="Drag to reorder"
                 onPointerDown={(event) => startDrag(event, entry)}
-                onPointerMove={moveDrag}
-                onPointerUp={() => end(true)}
-                onPointerCancel={() => end(false)}
-                onLostPointerCapture={() => end(false)}
                 onKeyDown={(event) => stepDrag(event, entry)}
               >
                 <GripVertical size={15} strokeWidth={1.8} aria-hidden="true" />
@@ -637,7 +703,10 @@ export function ChordLibrary({
         className="mac-card-list"
         data-dragging={isDragging || undefined}
       >
-        {visible.map(renderCard)}
+        {/* While dragging, the list shows where everything would land. */}
+        {(dragging?.drop ? applyPackageOrder(visible, dragging.drop.order) : visible).map(
+          renderCard,
+        )}
       </div>
       {visible.length === 0 && (
         <div className="mac-list">

@@ -17,16 +17,8 @@ import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._co
 import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { LocalFoldersCard } from "@chord/dev.improve.chord.routes.settings._components.local-folders-card";
 import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
-import { ArrowUpDown, ChevronRight, Search, X } from "lucide-react";
-import {
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { ChevronRight, ListOrdered, Search, X } from "lucide-react";
+import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 export function SettingsChordsPage({ configurePackage }: { configurePackage?: string }) {
   return (
@@ -46,7 +38,7 @@ type View = "packages" | "personal";
 
 const views: { value: View; label: string }[] = [
   { value: "packages", label: "Packages" },
-  { value: "personal", label: "My Chords" },
+  { value: "personal", label: "Local Chords" },
 ];
 
 /**
@@ -130,6 +122,8 @@ export function SettingsChordsPageContent({
   const idPrefix = useId();
   const [view, setView] = useState<View>("packages");
   const [search, setSearch] = useState("");
+  // Local Chords keeps its own query, so switching tabs doesn't carry a search across.
+  const [localSearch, setLocalSearch] = useState("");
   const [editingOrder, setEditingOrder] = useState(false);
   const { packages, personalPackages } = chordPackageManagerData;
   const apps = useMemo(
@@ -163,8 +157,11 @@ export function SettingsChordsPageContent({
       : libraryPackages;
   const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
   const pendingApprovals = thirdPartyPackages.filter((pkg) => !pkg.approved).length;
-  const approvals = (
-    <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
+
+  const thirdParty = (
+    <div className="mac-third-party">
+      <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
+    </div>
   );
 
   function panel(value: View) {
@@ -198,30 +195,39 @@ export function SettingsChordsPageContent({
             }
             onClick={() => setEditingOrder(!editingOrder)}
           >
-            <ArrowUpDown size={15} strokeWidth={2} aria-hidden="true" />
+            <ListOrdered size={15} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
-        {view === "packages" && (
+        {
           <label className="mac-search">
             <Search size={13} aria-hidden="true" />
             <input
-              aria-label="Search packages"
+              aria-label={view === "packages" ? "Search packages" : "Search your chords files"}
               placeholder="Search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={view === "packages" ? search : localSearch}
+              onChange={(event) =>
+                (view === "packages" ? setSearch : setLocalSearch)(event.target.value)
+              }
             />
-            {search && (
-              <button type="button" aria-label="Clear search" onClick={() => setSearch("")}>
+            {(view === "packages" ? search : localSearch) && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => (view === "packages" ? setSearch : setLocalSearch)("")}
+              >
                 <X size={13} />
               </button>
             )}
           </label>
-        )}
+        }
       </div>
 
       <div {...panel("packages")}>
-        {/* Trust warnings lead only when there is a decision to make. */}
-        {pendingApprovals > 0 && approvals}
+        {/*
+         * Third-party packages live among the others, not in a tab of their own: at the top
+         * while one waits for approval, so it's seen, and at the end otherwise.
+         */}
+        {pendingApprovals > 0 && thirdParty}
         {/* Opening Chords to configure a package discloses that package in place. */}
         <ChordLibrary
           packages={shownPackages}
@@ -232,31 +238,29 @@ export function SettingsChordsPageContent({
           onReorder={setPackageOrder}
         />
         <DefaultGlobalPrefixSetting />
-        <OtherSources>{pendingApprovals === 0 && approvals}</OtherSources>
+        {pendingApprovals === 0 && thirdParty}
+        <OtherSources />
       </div>
       <div {...panel("personal")}>
-        <PersonalChords />
+        <PersonalChords search={localSearch} />
       </div>
     </div>
   );
 }
 
 /**
- * Where packages come from besides Chord's own: third-party packages, folders and Git
- * repositories. Folded away, since most people never need it.
+ * Packages from places besides Chord's own catalog: a local folder, a GitHub repository or a
+ * local monorepo. Folded away, since most people never need it.
  */
-function OtherSources({ children }: { children?: ReactNode }) {
+function OtherSources() {
   return (
     <details className="mac-section other-sources">
       <summary className="mac-section-header other-sources-summary">
         <ChevronRight size={13} aria-hidden="true" className="other-sources-chevron" />
         <span className="mac-section-title">Other sources</span>
-        <span className="mac-section-subtitle">
-          Third-party packages, local folders and GitHub repositories
-        </span>
+        <span className="mac-section-subtitle">Local folders and GitHub repositories</span>
       </summary>
       <div className="space-y-5 pt-2">
-        {children}
         <LocalFoldersCard />
         <ChordReposCard />
         <ChordMonoreposCard />

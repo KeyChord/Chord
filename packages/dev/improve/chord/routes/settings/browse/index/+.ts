@@ -1,1 +1,1 @@
-export { SettingsBrowsePage } from '#settings-browse-page';
+export { SettingsBrowsePage } from "#settings-browse-page";

@@ -1,1 +1,1 @@
-export * from '#quit-chord-card';
+export * from "#quit-chord-card";

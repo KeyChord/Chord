@@ -33,9 +33,7 @@ function PermissionsCardContent({
     <Card size="sm">
       <CardHeader>
         <CardTitle>Permissions</CardTitle>
-        <CardDescription>
-          macOS has to allow Chord to use your keyboard.
-        </CardDescription>
+        <CardDescription>macOS has to allow Chord to use your keyboard.</CardDescription>
       </CardHeader>
       <CardContent className="preference-group">
         <div className="preference-row">

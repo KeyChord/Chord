@@ -1,20 +1,20 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.shortcut-keys",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#shortcut-keys": "./shortcut-keys.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
-		"pretty-key": "^0.2.0",
-		"react": "^19.3.1"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.shortcut-keys",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#shortcut-keys": "./shortcut-keys.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
+    "pretty-key": "^0.2.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

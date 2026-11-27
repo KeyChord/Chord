@@ -104,11 +104,9 @@ test("Packages lists installed packages while Local Chords keeps personal editin
   const html = render(packages);
   expect(html).toContain('role="tablist"');
   expect(html).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Packages</);
-  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
-  // Third-party packages, folders and repositories are folded under Other sources.
+  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
+  // Third-party packages live on the Packages tab, so there are only two segments.
   expect(html).not.toMatch(/role="tab"[^>]*>Third-Party</);
-  expect(html).toContain("Other sources");
-  expect(html).toContain('aria-label="Third-party packages"');
   expect(html).toContain("Default global prefix for placeholders");
   expect(html).toMatch(/<input[^>]+maxLength="1"[^>]+value=";"/i);
   expect(html).toContain("2 packages");
@@ -124,7 +122,7 @@ test("Local Chords remains editable when no external packages are installed", ()
   const html = render([pkg("@me/work")]);
   expect(html).not.toContain('aria-label="Show @me/work chords"');
   expect(html).toContain("Your package library is empty");
-  expect(html).toMatch(/role="tab"[^>]*>My Chords</);
+  expect(html).toMatch(/role="tab"[^>]*>Local Chords</);
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   // Local Chords covers personal folders, so the Packages tab no longer manages sources.
   expect(html).not.toContain("Manage sources");
@@ -182,14 +180,14 @@ test("blocked packages are reviewable in the Chords tab without appearing as ena
   expect(html).not.toContain('aria-label="Show @untrusted/test chords"');
   expect(html).not.toContain('aria-label="Select @untrusted/test"');
   expect(html).not.toContain('aria-label="Search third-party packages"');
-  // A package waiting for review flags the Packages tab and leads it.
+  // The Packages segment flags packages waiting for review, and they come first on its tab.
   expect(html).toMatch(/role="tab"[^>]*>Packages<span[^>]*aria-label="1 awaiting approval"/);
   expect(html.indexOf('aria-label="Third-party packages"')).toBeLessThan(
     html.indexOf('aria-label="Chord packages"'),
   );
 });
 
-test("approved packages are listed under Other sources with Revoke", () => {
+test("approved third-party packages follow the others on the Packages tab with Revoke", () => {
   const html = render(
     [],
     [
@@ -201,12 +199,15 @@ test("approved packages are listed under Other sources with Revoke", () => {
       },
     ],
   );
-  // Each package is its own card, marked approved.
-  expect(html).toContain("Approved · ");
+  // Each package is its own card, marked third-party and approved.
+  expect(html).toContain("Third-party · approved");
   expect(html).toContain('aria-label="Revoke approval for test"');
-  expect(html).toContain("Manage which packages can run code.");
-  // Nothing awaits approval, so the tab carries no badge.
+  // Nothing awaits approval, so there's no warning and no badge, and they come last.
   expect(html).not.toContain("awaiting approval");
+  expect(html).not.toContain('role="note"');
+  expect(html.indexOf("Default global prefix")).toBeLessThan(
+    html.indexOf('aria-label="Third-party packages"'),
+  );
   expect(html.indexOf('aria-label="Chord packages"')).toBeLessThan(
     html.indexOf("Default global prefix"),
   );
@@ -240,7 +241,8 @@ test("blocked packages stay alphabetized and longer approval queues expose searc
 
 test("empty approval queues keep the installation instructions available", () => {
   const html = render([]);
-  expect(html).toContain("No third-party packages installed.");
+  // With no third-party packages there's nothing to warn about.
+  expect(html).not.toContain('role="note"');
   expect(html).toContain("Install a third-party package");
   expect(html).not.toContain('aria-label="Select all visible third-party packages"');
 });
@@ -473,4 +475,10 @@ test("placeholders are configured inside their package, not in a separate sectio
   expect(html).not.toContain("Window management prefix");
   // Without onReorder, there is nothing to reorder.
   expect(html).not.toContain("Edit Order");
+});
+
+test("Packages keeps the original sources: local folders, GitHub repositories and monorepos", () => {
+  const html = render([pkg("@keychord/finder")]);
+  expect(html).toContain("Other sources");
+  expect(html).toContain("Local folders and GitHub repositories");
 });

@@ -2,7 +2,12 @@ import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { useNavigate } from "@chord/com.npmjs.tanstack__react-router";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import { Card, CardContent, CardHeader, CardTitle } from "@chord/dev.improve.chord.components.ui.card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@chord/dev.improve.chord.components.ui.card";
 
 export function GettingStartedCard() {
   const navigate = useNavigate();

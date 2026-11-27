@@ -1,1 +1,1 @@
-export * from '#launch-on-login-card';
+export * from "#launch-on-login-card";

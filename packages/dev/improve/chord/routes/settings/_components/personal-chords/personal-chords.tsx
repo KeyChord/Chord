@@ -38,7 +38,7 @@ import {
   useChordPackageManagerState,
   useDesktopAppManagerState,
 } from "@chord/dev.improve.chord.lib.state";
-import { AppWindow, FileText, Folder, Globe } from "lucide-react";
+import { AppWindow, ChevronRight, FileText, Folder, Globe } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ALL_APPS_PATHSLUG,
@@ -74,7 +74,7 @@ function editKey({ dirname, pathslug }: FileRef) {
   return `${dirname}/${pathslug}`;
 }
 
-export function PersonalChords() {
+export function PersonalChords({ search = "" }: { search?: string }) {
   const personalPackagesQuery = useQuery({
     queryKey: PERSONAL_PACKAGES_KEY,
     queryFn: () => taurpc.listPersonalPackages(),
@@ -90,6 +90,7 @@ export function PersonalChords() {
           packages={packages}
           appIds={appIdsWithChords(packages)}
           apps={apps}
+          search={search}
         />
       )}
     </StateQueries>
@@ -115,6 +116,7 @@ export function PersonalChordsContent({
   packages = [],
   appIds,
   apps = {},
+  search = "",
 }: {
   listing: PersonalPackages;
   /** The packages as the last reload saw them. */
@@ -124,6 +126,8 @@ export function PersonalChordsContent({
   packages?: ChordPackage[];
   appIds: string[];
   apps?: Record<string, DesktopAppMetadata>;
+  /** Filters files by app, file name, path or package folder. */
+  search?: string;
 }) {
   const [selected, setSelected] = useState<FileRef | null>(null);
   // Drafts are kept per file so switching files doesn't discard unsaved edits.
@@ -169,6 +173,7 @@ export function PersonalChordsContent({
               edits={edits}
               openFile={current?.dirname === pkg.dirname ? current.pathslug : undefined}
               renderEditor={editor}
+              search={search}
               onSelect={(file) =>
                 // Like a disclosure: the open file's card closes it again.
                 setSelected(current && editKey(current) === editKey(file) ? null : file)
@@ -226,6 +231,7 @@ function PackageSection({
   openFile,
   renderEditor,
   onSelect,
+  search = "",
 }: {
   pkg: PersonalPackageFiles;
   state: PersonalPackageState | undefined;
@@ -237,11 +243,23 @@ function PackageSection({
   openFile: string | undefined;
   renderEditor: (file: FileRef) => ReactNode;
   onSelect: (file: FileRef) => void;
+  search?: string;
 }) {
   const problems = state?.error ? [state.error] : errors;
   const folder = pkg.path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
   const loadsAs = state?.name && state.name !== pkg.dirname ? ` · loads as ${state.name}` : "";
-  // The folder is the section: one card with its files nested inside as smaller boxes.
+  const query = search.trim().toLocaleLowerCase();
+  const files = pkg.files.filter((pathslug) => {
+    if (!query) return true;
+    const { title, appId } = describeChordsFile(pathslug);
+    const appName = appId ? apps[appId]?.displayName : undefined;
+    return [pkg.dirname, pathslug, title, appName ?? ""].some((value) =>
+      value.toLocaleLowerCase().includes(query),
+    );
+  });
+  // A search hides folders with no matching files.
+  if (query && files.length === 0) return null;
+  // The folder is the section: one card with its files as rows, like a General page group.
   return (
     <div className="mac-section">
       {problems.length > 0 && <LoadErrors errors={problems} />}
@@ -257,43 +275,52 @@ function PackageSection({
         count={pkg.files.length}
         headerLabel={`${pkg.dirname} files`}
         listLabel={`Chords files in ${pkg.dirname}`}
+        as="ul"
       >
-        <div className="mac-nested-cards">
-          {pkg.files.length === 0 ? (
-            <p className="mac-row mac-row-muted">No chords files yet.</p>
-          ) : (
-            pkg.files.map((pathslug) => {
-              const file = { dirname: pkg.dirname, pathslug };
-              const { title, appId } = describeChordsFile(pathslug);
-              const appName = appId ? apps[appId]?.displayName?.trim() : undefined;
-              const chordCount = loadedPackage?.compiledChordsFiles[pathslug]?.chords.length;
-              const unsaved = editKey(file) in edits;
-              return (
-                <div key={pathslug} role="listitem">
-                  <GroupCard
-                    icon={<FileIcon pathslug={pathslug} apps={apps} />}
-                    title={appName || title}
-                    subtitle={
-                      <span title={`${pkg.path}/${pathslug}`}>
-                        {unsaved && (
-                          <span className="text-amber-700 dark:text-amber-300">Unsaved · </span>
-                        )}
-                        <span className="font-mono">{pathslug}</span>
-                      </span>
-                    }
-                    count={chordCount}
-                    headerLabel={`Edit ${pathslug}`}
-                    listLabel={`Edit ${folder}/${pathslug}`}
-                    open={openFile === pathslug}
-                    onOpenChange={() => onSelect(file)}
-                  >
-                    <div className="mac-card-editor">{renderEditor(file)}</div>
-                  </GroupCard>
-                </div>
-              );
-            })
-          )}
-        </div>
+        {files.length === 0 ? (
+          <li className="mac-row mac-row-muted">No chords files yet.</li>
+        ) : (
+          files.map((pathslug) => {
+            const file = { dirname: pkg.dirname, pathslug };
+            const { title, appId } = describeChordsFile(pathslug);
+            const appName = appId ? apps[appId]?.displayName?.trim() : undefined;
+            const chordCount = loadedPackage?.compiledChordsFiles[pathslug]?.chords.length;
+            const unsaved = editKey(file) in edits;
+            const open = openFile === pathslug;
+            return (
+              <li key={pathslug}>
+                <button
+                  type="button"
+                  className="mac-row"
+                  aria-label={`Edit ${pathslug}`}
+                  aria-expanded={open}
+                  onClick={() => onSelect(file)}
+                >
+                  <span className="mac-icon" aria-hidden="true">
+                    <FileIcon pathslug={pathslug} apps={apps} />
+                  </span>
+                  <span className="mac-row-text">
+                    <span className="mac-row-title">{appName || title}</span>
+                    <span className="mac-row-subtitle" title={`${pkg.path}/${pathslug}`}>
+                      {unsaved && (
+                        <span className="text-amber-700 dark:text-amber-300">Unsaved · </span>
+                      )}
+                      <span className="font-mono">{pathslug}</span>
+                    </span>
+                  </span>
+                  {chordCount !== undefined && <span className="mac-row-detail">{chordCount}</span>}
+                  <ChevronRight
+                    className="mac-disclosure-chevron"
+                    size={14}
+                    strokeWidth={2.2}
+                    aria-hidden="true"
+                  />
+                </button>
+                {open && <div className="mac-card-editor">{renderEditor(file)}</div>}
+              </li>
+            );
+          })
+        )}
       </GroupCard>
     </div>
   );

@@ -1435,11 +1435,38 @@ a.mac-row {
  * Cards as in Homerow: a fill a step off the window with a thin visible border, and a
  * hairline under the header as the only divider.
  */
+/* Groups like the General page's: no border, and hairlines inset on both sides between rows. */
 .mac-group {
-  box-shadow: inset 0 0 0 0.5px var(--mac-card-edge);
+  background: var(--settings-group);
+  box-shadow:
+    inset 0 0 0 1px var(--settings-group-edge),
+    0 1px 0 rgb(0 0 0 / 4%);
 }
-.mac-group[data-open] .mac-group-bar {
-  box-shadow: inset 0 -0.5px 0 var(--mac-card-edge);
+.mac-group-bar {
+  position: relative;
+}
+.mac-group[data-open] > .mac-group-bar::after,
+.mac-group-list > li + li > .mac-row:first-child::before,
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  content: "";
+  position: absolute;
+  right: 16px;
+  left: 16px;
+  height: 0.5px;
+  background: var(--settings-separator);
+  pointer-events: none;
+}
+.mac-group[data-open] > .mac-group-bar::after {
+  bottom: 0;
+}
+.mac-group-list > li + li > .mac-row:first-child::before {
+  top: 0;
+}
+.mac-group-list > [role="listitem"] {
+  position: relative;
+}
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  top: 0;
 }
 
 /*
@@ -1519,29 +1546,17 @@ a.mac-row {
   min-height: 46px;
   padding-block: 6px;
 }
-/* A card being dragged or dropped next to, while reordering. */
-.mac-group[data-dragging] {
-  opacity: 0.55;
-}
-.mac-group[data-drop] {
+/* While reordering: the card you hold lifts above the others and follows the pointer. */
+.mac-card-list {
   position: relative;
-  overflow: visible;
 }
-.mac-group[data-drop]::after {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--focus);
-  pointer-events: none;
-}
-.mac-group[data-drop="before"]::after {
-  top: -11px;
-}
-.mac-group[data-drop="after"]::after {
-  bottom: -11px;
+.mac-group[data-dragging] {
+  position: relative;
+  z-index: 2;
+  box-shadow:
+    0 0 0 0.5px var(--mac-card-edge),
+    0 12px 28px rgb(0 0 0 / 18%),
+    0 2px 6px rgb(0 0 0 / 10%);
 }
 /* A stack of cards, one per package, closer together than separate sections. */
 .mac-card-list > .mac-section + .mac-section {
@@ -1589,33 +1604,6 @@ a.mac-row {
 }
 .mac-card-list:empty {
   display: none;
-}
-
-/* A folder's files as smaller boxes nested inside the folder's card. */
-.mac-group-list > .mac-nested-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 4px 12px 12px;
-}
-.mac-group:has(> .mac-group-list > .mac-nested-cards) > .mac-group-list {
-  padding-bottom: 0;
-}
-.mac-nested-cards .mac-group {
-  border-radius: 12px;
-  background: var(--mac-box);
-}
-.mac-nested-cards .mac-group-header {
-  min-height: 48px;
-  padding-block: 8px;
-  padding-inline: 12px;
-}
-.mac-nested-cards .mac-card-editor {
-  padding: 4px 12px 10px;
-}
-/* The folder's header divider gives way to the boxes' own edges. */
-.mac-group:has(> .mac-group-list > .mac-nested-cards)[data-open] > .mac-group-bar {
-  box-shadow: none;
 }
 
 /* A round icon button, like the toolbar buttons in macOS 26. */
@@ -1813,4 +1801,41 @@ a.mac-row {
 .preference-intro + .preference-row {
   border-top: 0.5px solid var(--settings-separator);
   padding-top: 9.5px;
+}
+
+/* The Appearance label lines up with the middle of the window previews, not the whole row. */
+.preference-row.appearance-row {
+  align-items: flex-start;
+}
+.appearance-row > .preference-label {
+  margin-top: 15px;
+}
+
+/*
+ * A folder's files sit indented under its name, like a Finder outline, so they read as
+ * inside it. Their dividers start at the same edge.
+ */
+ul.mac-group-list > li > .mac-row {
+  padding-left: 48px;
+}
+ul.mac-group-list > li + li > .mac-row:first-child::before {
+  left: 48px;
+}
+ul.mac-group-list > li > .mac-card-editor {
+  padding-left: 48px;
+}
+.mac-group:has(> ul.mac-group-list)[data-open] > .mac-group-bar::after {
+  left: 48px;
+}
+
+/* Third-party packages on the Packages tab: set apart from the cards above or below them. */
+.mac-third-party:first-child {
+  margin-bottom: 20px;
+}
+.mac-third-party:not(:first-child) {
+  margin-top: 20px;
+}
+.mac-third-party .mac-list-tools:first-child,
+.mac-third-party .mac-card-list:first-child {
+  margin-top: 0;
 }
