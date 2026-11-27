@@ -9,6 +9,7 @@ import {
 } from "@chord/dev.improve.chord.components.ui.card";
 import { Switch } from "@chord/dev.improve.chord.components.ui.switch";
 import { Label } from "@chord/dev.improve.chord.components.ui.label";
+import { Select } from "@chord/dev.improve.chord.components.ui.select";
 import {
   StateQueries,
   desktopPlatform,
@@ -24,7 +25,15 @@ import {
 } from "@chord/dev.improve.chord.lib.state/appearance";
 import {
   getCollapseEarlierKeys,
+  getPanelKeyFont,
+  getPanelTextFont,
+  PANEL_KEY_FONTS,
+  PANEL_TEXT_FONTS,
   setCollapseEarlierKeys,
+  setPanelKeyFont,
+  setPanelTextFont,
+  type PanelKeyFont,
+  type PanelTextFont,
 } from "@chord/dev.improve.chord.lib.state/panel-preferences";
 import { useState, type CSSProperties } from "react";
 
@@ -142,9 +151,59 @@ function LaunchOnLoginCardContent({
                 setCollapseEarlierKeysState(!collapseEarlierKeys);
               }}
             />
+            <HintPanelFontRows />
           </div>
         </CardContent>
       </Card>
+    </>
+  );
+}
+
+const textFontOptions = Object.entries(PANEL_TEXT_FONTS).map(([value, { label }]) => ({
+  value,
+  label,
+}));
+const keyFontOptions = Object.entries(PANEL_KEY_FONTS).map(([value, { label }]) => ({
+  value,
+  label,
+}));
+
+function HintPanelFontRows() {
+  const [textFont, setTextFont] = useState(getPanelTextFont);
+  const [keyFont, setKeyFont] = useState(getPanelKeyFont);
+
+  return (
+    <>
+      <div className="preference-row">
+        <Label htmlFor="hint-panel-text-font" className="preference-label">
+          Text font
+        </Label>
+        <Select
+          id="hint-panel-text-font"
+          value={textFont}
+          options={textFontOptions}
+          onValueChange={(value) => {
+            const font = value as PanelTextFont;
+            setPanelTextFont(font);
+            setTextFont(font);
+          }}
+        />
+      </div>
+      <div className="preference-row">
+        <Label htmlFor="hint-panel-key-font" className="preference-label">
+          Keycap font
+        </Label>
+        <Select
+          id="hint-panel-key-font"
+          value={keyFont}
+          options={keyFontOptions}
+          onValueChange={(value) => {
+            const font = value as PanelKeyFont;
+            setPanelKeyFont(font);
+            setKeyFont(font);
+          }}
+        />
+      </div>
     </>
   );
 }

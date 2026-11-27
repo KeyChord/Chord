@@ -22,6 +22,7 @@ const FLOATING_SHADOW_REACH = 12 - 4; // the floating card's radius less y offse
 const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 /** Columns the sidebar shows in full; earlier keys fold into a trail beside them. */
 const MAX_FULL_COLUMNS = 3;
+const MAX_TRAIL_KEYS = 3;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
 
@@ -104,7 +105,7 @@ function ChordKeyRow({
 	return (
 		<div
 			className={cn(
-				'flex shrink-0 items-center gap-3',
+				'flex max-w-full min-w-0 shrink-0 items-center gap-3',
 				isDimmed ? 'opacity-35' : 'opacity-100',
 				'text-foreground/95',
 			)}
@@ -116,7 +117,7 @@ function ChordKeyRow({
 					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
 				}}
 				className={cn(
-					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.18)]',
+					'max-w-full shrink-0 overflow-hidden rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_1px_2px_rgba(0,0,0,0.18)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
 						? block
@@ -130,8 +131,8 @@ function ChordKeyRow({
 				<KeyLabel label={token} />
 			</Kbd>
 			{error
-				? <div role="alert" className="line-clamp-2 max-w-80 text-red-600 dark:text-red-400" style={{ fontSize: `${descriptionFontSize}px` }}>{error}</div>
-				: <div style={{ fontSize: `${descriptionFontSize}px` }}>{description}</div>}
+				? <div role="alert" className="line-clamp-2 min-w-0 max-w-80 wrap-anywhere text-red-600 dark:text-red-400" style={{ fontSize: `${descriptionFontSize}px` }}>{error}</div>
+				: <div className="min-w-0 wrap-anywhere" style={{ fontSize: `${descriptionFontSize}px` }}>{description}</div>}
 		</div>
 	);
 }
@@ -536,11 +537,12 @@ export function ChordsPageContent({
 		columnIndex = nextColumnIndex;
 	}
 
-	// A long chord's earliest keys fold into a trail at the start of the column row, so
-	// the columns never run off the card and no row is added above them.
+	// Show the most recent folded keys so the trail leaves room for the active columns.
 	const collapsedColumns = getCollapseEarlierKeys()
 		? keyColumns.slice(0, Math.max(0, keyColumns.length - MAX_FULL_COLUMNS))
 		: [];
+	const trailColumns = collapsedColumns.slice(-MAX_TRAIL_KEYS);
+	const omittedKeys = collapsedColumns.length - trailColumns.length;
 	const visibleColumns = keyColumns.slice(collapsedColumns.length);
 	const lastColumnIndex = keyColumns.at(-1)?.index;
 
@@ -652,17 +654,18 @@ export function ChordsPageContent({
 						</div>
 					) : (
 					<div className="relative flex items-start">
-						<div className="flex items-start gap-6">
+						<div className={cn('flex items-start', trailColumns.length ? 'gap-3' : 'gap-6')}>
 							{collapsedColumns.length > 0 && (
 								<div aria-label="Earlier keys" className="flex shrink-0 items-center gap-1 px-1 py-1 text-xs text-foreground/60" style={{ height: keySize + 8 }}>
-									{collapsedColumns.map(column => {
+									{omittedKeys > 0 && <span aria-label={`${omittedKeys} earlier key groups omitted`}>…</span>}
+									{trailColumns.map(column => {
 										const block = getColumnBlock(column.index);
 										return (
 											<Kbd
 												key={column.index}
-												className={cn('h-6 min-w-6 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : 'border-border/80 bg-background/95 text-foreground')}
+												className={cn('h-6 min-w-6 max-w-10 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : 'border-border/80 bg-background/95 text-foreground')}
 											>
-												<KeyLabel label={column.selectedLabel ?? ''} />
+												<span className="truncate"><KeyLabel label={column.selectedLabel ?? ''} /></span>
 											</Kbd>
 										);
 									})}
@@ -673,7 +676,7 @@ export function ChordsPageContent({
 								<div
 									key={column.index}
 									className={cn('flex flex-col items-start overflow-y-auto px-1 py-1', column.index > 0 && selectedBlockEnds.includes(column.index) && 'ml-3')}
-									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px` }}
+									style={{ gap: `${rowGap}px`, maxHeight: `${availableHeight}px`, minWidth: trailColumns.length ? keySize + 8 : undefined }}
 								>
 									{SHOW_DEVELOPMENT_LABEL && column.index === 0
 										? (

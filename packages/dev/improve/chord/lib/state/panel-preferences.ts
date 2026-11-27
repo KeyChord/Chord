@@ -48,7 +48,7 @@ export function setCollapseEarlierKeys(collapse: boolean) {
 
 export function getPanelTextFont(): PanelTextFont {
 	const stored = read(TEXT_FONT_KEY);
-	return stored && stored in PANEL_TEXT_FONTS ? stored as PanelTextFont : 'geist';
+	return stored && Object.hasOwn(PANEL_TEXT_FONTS, stored) ? stored as PanelTextFont : 'geist';
 }
 
 export function setPanelTextFont(font: PanelTextFont) {
@@ -57,7 +57,7 @@ export function setPanelTextFont(font: PanelTextFont) {
 
 export function getPanelKeyFont(): PanelKeyFont {
 	const stored = read(KEY_FONT_KEY);
-	return stored && stored in PANEL_KEY_FONTS ? stored as PanelKeyFont : 'geist';
+	return stored && Object.hasOwn(PANEL_KEY_FONTS, stored) ? stored as PanelKeyFont : 'geist';
 }
 
 export function setPanelKeyFont(font: PanelKeyFont) {

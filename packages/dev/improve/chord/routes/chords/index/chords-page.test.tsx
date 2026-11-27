@@ -307,27 +307,29 @@ for (const layout of [ChordLayout.SidebarLeft, ChordLayout.FloatingBottom]) {
 
 test("keys before the last three columns fold into a trail beside them, unless turned off", () => {
   const path = "chords/dev/fixture/macos.toml";
-  const keys = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT"];
+  const sequence = "abcdefghijklmnopqrstuv";
+  const keys = Array.from(sequence, letter => `Key${letter.toUpperCase()}`);
   const render = (input: string[]) => renderToString(<ChordsPageContent
     chordInputData={{ input, quotes: [], inserting: false, blocks: [], openBlock: false }}
     chordPanelData={{ isVisible: true, layout: ChordLayout.SidebarLeft }}
     frontmostData={{ frontmostAppBundleId: "dev.fixture", filePickerActive: false }}
     hintPanelData={{ packages: [{ name: "@fixture/deep", globalChords: [], chordsFiles: { [path]: {
-      chords: [{ rawTrigger: "qwert", trigger: { keys }, name: "Deep chord", index: 0, actions: [], fallback: false }],
+      chords: [{ rawTrigger: sequence, trigger: { keys }, name: "Deep chord", index: 0, actions: [], fallback: false }],
       chordHints: [],
     } } }] }}
     chordExecutionData={{ loops: [], metaCommands: [], haltLoopTemplate: "0h{id}" }}
     chordMacrosData={{ entries: [] }}
   />);
   expect(render(keys.slice(0, 2))).not.toContain('aria-label="Earlier keys"');
-  const deep = render(keys.slice(0, 4));
+  const deep = render(keys.slice(0, -1));
   expect(deep).toContain('aria-label="Earlier keys"');
+  expect(deep).toContain('aria-label="16 earlier key groups omitted"');
   expect(deep).toContain("Deep chord");
 
   const storage = (window as { localStorage?: unknown }).localStorage;
   (window as { localStorage?: unknown }).localStorage = { getItem: (key: string) => key === "chord-collapse-earlier-keys" ? "false" : null };
   try {
-    expect(render(keys.slice(0, 4))).not.toContain('aria-label="Earlier keys"');
+    expect(render(keys.slice(0, -1))).not.toContain('aria-label="Earlier keys"');
   } finally {
     (window as { localStorage?: unknown }).localStorage = storage;
   }

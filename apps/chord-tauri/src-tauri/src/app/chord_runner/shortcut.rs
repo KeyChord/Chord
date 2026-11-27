@@ -4,6 +4,8 @@ use crate::app::chord_runner::media_key::{self, MediaKey};
 use crate::models::{ShortcutChordAction, SimulatedShortcutAction};
 use anyhow::{Context, Result, anyhow};
 use nject::injectable;
+#[cfg(target_os = "macos")]
+use objc2_app_kit::NSEventModifierFlags;
 use tauri::AppHandle;
 use tauri::async_runtime::JoinHandle;
 
@@ -13,41 +15,57 @@ pub struct ShortcutChordActionTaskRunner {
     handle: AppHandle,
 }
 
+#[cfg(target_os = "macos")]
+enum ShortcutStep {
+    Key(rdev::EventType, bool),
+    Media(MediaKey, NSEventModifierFlags, bool),
+}
+
+#[cfg(target_os = "macos")]
+fn macos_shortcut_steps(actions: Vec<SimulatedShortcutAction>) -> Result<Vec<ShortcutStep>> {
+    let mut steps = Vec::with_capacity(actions.len());
+    // Quartz may process the posted modifier events after we construct the media event.
+    let mut held = Vec::new();
+    for action in actions {
+        let (key, pressed, suppress_shift) = match action {
+            SimulatedShortcutAction::Press(key, suppress_shift) => (key, true, suppress_shift),
+            SimulatedShortcutAction::Release(key, suppress_shift) => (key, false, suppress_shift),
+        };
+        if let Some(media) = MediaKey::from_code(key.0) {
+            // A media press posts both edges together.
+            if pressed {
+                let flags = held
+                    .iter()
+                    .fold(NSEventModifierFlags::empty(), |flags, (_, flag)| {
+                        flags | *flag
+                    });
+                steps.push(ShortcutStep::Media(media, flags, suppress_shift));
+            }
+            continue;
+        }
+        if let Some(flag) = media_key::modifier_flag(key.0) {
+            held.retain(|(code, _)| *code != key.0);
+            if pressed {
+                held.push((key.0, flag));
+            }
+        }
+        let key = key.try_into()?;
+        let event = if pressed {
+            rdev::EventType::KeyPress(key)
+        } else {
+            rdev::EventType::KeyRelease(key)
+        };
+        steps.push(ShortcutStep::Key(event, suppress_shift));
+    }
+    Ok(steps)
+}
+
 impl ShortcutChordActionTaskRunner {
     // We use `rdev` for simulate instead of Enigo because rdev sends actual keypresses
     // instead of enigo's input injection (this works better in some apps, e.g. cmd+1 in IntelliJ)
     #[cfg(target_os = "macos")]
     pub fn simulate_shortcut_actions(&self, actions: Vec<SimulatedShortcutAction>) -> Result<()> {
-        /// One step of the shortcut. Media keys are not key codes on macOS (see `media_key`):
-        /// they are pressed whole when the shortcut presses them, and their release is skipped.
-        enum Step {
-            Key(rdev::EventType, bool),
-            Media(MediaKey),
-        }
-        let steps: Vec<Step> = actions
-            .into_iter()
-            .filter_map(|action| -> Option<Result<Step>> {
-                let (key, pressed, suppress_shift) = match action {
-                    SimulatedShortcutAction::Press(key, suppress_shift) => {
-                        (key, true, suppress_shift)
-                    }
-                    SimulatedShortcutAction::Release(key, suppress_shift) => {
-                        (key, false, suppress_shift)
-                    }
-                };
-                if let Some(media) = MediaKey::from_code(key.0) {
-                    return pressed.then_some(Ok(Step::Media(media)));
-                }
-                Some(key.try_into().map(|key| {
-                    let event = if pressed {
-                        rdev::EventType::KeyPress(key)
-                    } else {
-                        rdev::EventType::KeyRelease(key)
-                    };
-                    Step::Key(event, suppress_shift)
-                }))
-            })
-            .collect::<Result<_>>()?;
+        let steps = macos_shortcut_steps(actions)?;
 
         // rdev must be run on the main thread. Wait for the closure so failures can
         // propagate to the task runner and trigger user feedback.
@@ -56,10 +74,14 @@ impl ShortcutChordActionTaskRunner {
             let mut result = Ok(());
             for step in steps {
                 let outcome = match step {
-                    Step::Key(event, suppress_shift) => rdev::simulate(&event, suppress_shift)
-                        .map_err(|e| anyhow!("error simulating keypress: {e}")),
-                    Step::Media(key) => media_key::press(key)
-                        .map_err(|e| anyhow!("error pressing media key {key:?}: {e:#}")),
+                    ShortcutStep::Key(event, suppress_shift) => {
+                        rdev::simulate(&event, suppress_shift)
+                            .map_err(|e| anyhow!("error simulating keypress: {e}"))
+                    }
+                    ShortcutStep::Media(key, flags, suppress_shift) => {
+                        media_key::press(key, flags, suppress_shift)
+                            .map_err(|e| anyhow!("error pressing media key {key:?}: {e:#}"))
+                    }
                 };
                 if let Err(error) = outcome {
                     result = Err(error);
@@ -209,6 +231,39 @@ mod tests {
     use super::*;
     use crate::models::Key;
     use keycode::KeyMappingCode;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn shortcut_steps_carry_modifiers_to_media_keys_until_release() {
+        use SimulatedShortcutAction::{Press, Release};
+        let option = Key(KeyMappingCode::AltLeft);
+        let brightness = Key(KeyMappingCode::BrightnessDown);
+        let volume = Key(KeyMappingCode::AudioVolumeUp);
+        let steps = macos_shortcut_steps(vec![
+            Press(option, true),
+            Press(brightness, true),
+            Release(brightness, true),
+            Release(option, true),
+            Press(volume, true),
+        ])
+        .unwrap();
+        let media: Vec<_> = steps
+            .into_iter()
+            .filter_map(|step| match step {
+                ShortcutStep::Media(key, flags, suppress_shift) => {
+                    Some((key, flags, suppress_shift))
+                }
+                ShortcutStep::Key(..) => None,
+            })
+            .collect();
+        assert_eq!(
+            media,
+            [
+                (MediaKey::BrightnessDown, NSEventModifierFlags::Option, true),
+                (MediaKey::VolumeUp, NSEventModifierFlags::empty(), true),
+            ]
+        );
+    }
 
     #[tokio::test]
     async fn finite_shortcut_repetition_releases_between_runs_and_holds_only_the_last() {

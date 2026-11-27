@@ -3,6 +3,19 @@
 //! shortcut such as `shortcut = 'BrightnessDown'` cannot be pressed like an ordinary key.
 
 use keycode::KeyMappingCode;
+#[cfg(target_os = "macos")]
+use objc2_app_kit::NSEventModifierFlags;
+
+#[cfg(target_os = "macos")]
+pub fn modifier_flag(code: KeyMappingCode) -> Option<NSEventModifierFlags> {
+    Some(match code {
+        KeyMappingCode::ShiftLeft | KeyMappingCode::ShiftRight => NSEventModifierFlags::Shift,
+        KeyMappingCode::ControlLeft | KeyMappingCode::ControlRight => NSEventModifierFlags::Control,
+        KeyMappingCode::AltLeft | KeyMappingCode::AltRight => NSEventModifierFlags::Option,
+        KeyMappingCode::MetaLeft | KeyMappingCode::MetaRight => NSEventModifierFlags::Command,
+        _ => return None,
+    })
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MediaKey {
@@ -51,21 +64,49 @@ impl MediaKey {
 
 /// Presses and releases `key`. Runs on the main thread.
 #[cfg(target_os = "macos")]
-pub fn press(key: MediaKey) -> anyhow::Result<()> {
+pub fn press(
+    key: MediaKey,
+    simulated_modifiers: NSEventModifierFlags,
+    suppress_shift: bool,
+) -> anyhow::Result<()> {
+    use objc2_core_graphics::{CGEventSource, CGEventSourceStateID};
+
+    let physical = CGEventSource::flags_state(CGEventSourceStateID::HIDSystemState);
+    let modifiers = effective_modifiers(physical.bits(), simulated_modifiers, suppress_shift);
     // Many Macs, Apple silicon ones especially, accept a synthesized brightness key and
-    // change nothing, so brightness is set directly where macOS allows it.
-    if matches!(key, MediaKey::BrightnessUp | MediaKey::BrightnessDown)
+    // change nothing. Plain presses can set brightness directly. Modified presses are
+    // system shortcuts, such as Option+Brightness opening Displays settings.
+    if modifiers.is_empty()
+        && matches!(key, MediaKey::BrightnessUp | MediaKey::BrightnessDown)
         && brightness::step(key == MediaKey::BrightnessUp)
     {
         return Ok(());
     }
-    post_system_defined(key.nx_key_type())
+    post_system_defined(key.nx_key_type(), modifiers)
 }
 
 #[cfg(target_os = "macos")]
-fn post_system_defined(nx_key_type: isize) -> anyhow::Result<()> {
+fn effective_modifiers(
+    physical: u64,
+    simulated: NSEventModifierFlags,
+    suppress_shift: bool,
+) -> NSEventModifierFlags {
+    let shortcut_modifiers = NSEventModifierFlags::Shift
+        | NSEventModifierFlags::Control
+        | NSEventModifierFlags::Option
+        | NSEventModifierFlags::Command
+        | NSEventModifierFlags::Function;
+    let mut flags = (NSEventModifierFlags(physical as usize) | simulated) & shortcut_modifiers;
+    if suppress_shift {
+        flags.remove(NSEventModifierFlags::Shift);
+    }
+    flags
+}
+
+#[cfg(target_os = "macos")]
+fn post_system_defined(nx_key_type: isize, modifiers: NSEventModifierFlags) -> anyhow::Result<()> {
     use anyhow::Context;
-    use objc2_app_kit::{NSEvent, NSEventModifierFlags, NSEventType};
+    use objc2_app_kit::{NSEvent, NSEventType};
     use objc2_core_graphics::{CGEvent, CGEventTapLocation};
     use objc2_foundation::NSPoint;
 
@@ -77,7 +118,7 @@ fn post_system_defined(nx_key_type: isize) -> anyhow::Result<()> {
             NSEvent::otherEventWithType_location_modifierFlags_timestamp_windowNumber_context_subtype_data1_data2(
                 NSEventType::SystemDefined,
                 NSPoint::new(0.0, 0.0),
-                NSEventModifierFlags((state as usize) << 8),
+                modifiers | NSEventModifierFlags((state as usize) << 8),
                 0.0,
                 0,
                 None,
@@ -198,5 +239,20 @@ mod tests {
             Some(16)
         );
         assert_eq!(MediaKey::from_code(KeyMappingCode::KeyA), None);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn media_keys_combine_simulated_and_physical_modifiers() {
+        let physical = NSEventModifierFlags::CapsLock | NSEventModifierFlags::Shift;
+        let simulated = NSEventModifierFlags::Option;
+        assert_eq!(
+            effective_modifiers(physical.bits() as u64, simulated, false),
+            simulated | NSEventModifierFlags::Shift
+        );
+        assert_eq!(
+            effective_modifiers(physical.bits() as u64, simulated, true),
+            simulated
+        );
     }
 }
