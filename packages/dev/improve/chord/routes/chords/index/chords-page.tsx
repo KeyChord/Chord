@@ -3,7 +3,7 @@ import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
 import { useHintPanelState } from '@chord/dev.improve.chord.lib.state/hint-panel';
 import { emit, listen } from '@tauri-apps/api/event';
-import { blockDisplayEnds, getCommandLabel, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
+import { blockDisplayEnds, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
@@ -26,7 +26,6 @@ const MAX_LISTED_LOOPS = 3;
 // whole window, transparent or not. (Tailwind reads comments, so no class names here.)
 const SIDEBAR_SHADOW_REACH = 18 + 60; // the sidebar card's x offset plus radius, to the right
 const FLOATING_SHADOW_REACH = 12 - 4; // the floating card's radius less y offset, above
-const SHOW_DEVELOPMENT_LABEL = import.meta.env.DEV;
 const SINGLE_LETTER_TOKEN_REGEX = /^[A-Z]$/;
 const MAX_ESCAPE_SUGGESTIONS = 10;
 
@@ -80,14 +79,14 @@ type BlockState = 'solid' | 'open';
 /** Class names for a key in a block; an open block is still being typed with Shift held. */
 function blockKeyClassName(block: BlockState) {
 	return cn(
-		'border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-400/60 dark:bg-sky-500/25 dark:text-sky-50',
+		'border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-300/80 dark:bg-sky-500/40 dark:text-white',
 		block === 'open' && 'border-dashed bg-sky-50 dark:bg-sky-500/10',
 	);
 }
 
-const IDLE_KEY_CLASS_NAME = 'border-border/80 bg-background/95 text-foreground dark:border-white/12 dark:bg-white/10';
-const RAN_KEY_CLASS_NAME = 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/60 dark:bg-emerald-500/25 dark:text-emerald-50';
-const FAILED_KEY_CLASS_NAME = 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/60 dark:bg-red-500/25 dark:text-red-50';
+const IDLE_KEY_CLASS_NAME = 'border-black/15 bg-white text-neutral-900 dark:border-white/25 dark:bg-white/[0.16] dark:text-white';
+const RAN_KEY_CLASS_NAME = 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-300/80 dark:bg-emerald-500/45 dark:text-white';
+const FAILED_KEY_CLASS_NAME = 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-300/80 dark:bg-red-500/45 dark:text-white';
 
 /**
  * Hides the part of a list that does not fit behind a fade at that edge, the way macOS
@@ -137,8 +136,8 @@ function ChordKeyRow({
 		<div
 			className={cn(
 				'flex shrink-0 items-center gap-3',
-				isDimmed ? 'opacity-35' : 'opacity-100',
-				'text-foreground/95',
+				isDimmed ? 'opacity-40 dark:opacity-50' : 'opacity-100',
+				'text-foreground',
 			)}
 		>
 			<Kbd
@@ -443,7 +442,6 @@ export function ChordsPageContent({
 	const currentPrefixLength = selectedTokens.length;
 	const commandPrefix = getCommandPrefix(selectedTokens);
 	const commandPrefixTokens = commandPrefix.tokens;
-	const commandLabel = getCommandLabel(commandPrefix);
 	const defaultPlaceholderToken = defaultGlobalPrefixForPlaceholders
 		? normalizeToken(defaultGlobalPrefixForPlaceholders)
 		: undefined;
@@ -573,9 +571,7 @@ export function ChordsPageContent({
 	// into more columns once they outgrow the panel's height; earlier keys show the options
 	// around the one chosen, faded where the list goes on; and keys before those collapse
 	// into a trail of keycaps, so a long chord never pushes the columns off the card.
-	const headerHeight = (commandLabel ? 28 : 0)
-		+ (loops.length > 0 ? (Math.min(loops.length, MAX_LISTED_LOOPS) + Number(loops.length > MAX_LISTED_LOOPS)) * 20 + 12 : 0)
-		+ (SHOW_DEVELOPMENT_LABEL ? keySize : 0);
+	const headerHeight = loops.length > 0 ? (Math.min(loops.length, MAX_LISTED_LOOPS) + Number(loops.length > MAX_LISTED_LOOPS)) * 20 + 12 : 0;
 	const rowsPerColumn = Math.max(4, Math.floor((availableHeight - headerHeight + rowGap) / (keySize + rowGap)));
 	const lastColumnWraps = clamp(Math.ceil((keyColumns.at(-1)?.rows.length ?? 0) / rowsPerColumn), 1, MAX_WRAPPED_COLUMNS);
 	const fullColumnCount = Math.max(1, MAX_FULL_COLUMNS - (lastColumnWraps - 1));
@@ -660,7 +656,7 @@ export function ChordsPageContent({
 					key={surfaceVersion}
 					ref={surfaceRef}
 					className={cn(
-						'relative isolate overflow-hidden border border-white/30 bg-white/22 dark:border-white/10 dark:bg-zinc-950/24',
+						'relative isolate overflow-hidden border border-black/[0.08] bg-white/60 dark:border-white/15 dark:bg-black/55',
 						isFloating
 							? 'rounded-2xl px-3 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.34)]'
 							: 'rounded-r-[2rem] rounded-l-none border-l-0 px-5 py-5 pl-7 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]',
@@ -710,11 +706,6 @@ export function ChordsPageContent({
 							{escapeSuggestions && <ChordEscapeSuggestions result={escapeSuggestions} />}
 						</div>
 					) : <>
-						{commandLabel && (
-							<div className="mb-3 max-w-md truncate text-xs text-foreground/70">
-								{commandLabel}
-							</div>
-						)}
 						{loops.length > 0 && (
 							<div className="mb-3 flex max-w-md flex-col gap-1 text-xs text-foreground/80">
 								{loops.slice(0, MAX_LISTED_LOOPS).map(loop => (
@@ -758,13 +749,6 @@ export function ChordsPageContent({
 								>
 									{column.wrapped.map((rows, wrappedIndex) => (
 										<div key={wrappedIndex} className="flex min-w-0 flex-col items-start" style={{ gap: `${rowGap}px` }}>
-											{SHOW_DEVELOPMENT_LABEL && column.index === 0 && wrappedIndex === 0
-												? (
-														<div className="-mb-1 text-[10px] font-semibold tracking-[0.28em] text-foreground/55">
-															DEVELOPMENT
-														</div>
-													)
-												: null}
 											{rows.map(row => (
 												<ChordKeyRow
 													key={row.token}

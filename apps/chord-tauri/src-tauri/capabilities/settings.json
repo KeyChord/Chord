@@ -5,6 +5,7 @@
 	"windows": ["settings"],
 	"permissions": [
 		"core:default",
+		"core:app:allow-set-app-theme",
 		"autostart:default",
 		"log:default",
 		"opener:allow-default-urls",

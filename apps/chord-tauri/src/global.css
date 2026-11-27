@@ -469,6 +469,12 @@
 .dark .preferences-page [data-variant="outline"]:active:not(:disabled) {
   background: #454545;
 }
+.preferences-page .appearance-option {
+  height: 24px;
+  padding: 0 10px;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+}
 .chord-library-filter:focus-visible,
 .chord-library-table th button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus) 30%, transparent);

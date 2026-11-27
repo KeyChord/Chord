@@ -9,6 +9,7 @@
 		"@chord/com.npmjs.tanstack__react-router": "workspace:*",
 		"@chord/com.npmjs.utils-cn": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.routes": "workspace:*",
 		"@chord/dev.improve.chord.routes.chords.index": "workspace:*",

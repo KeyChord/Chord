@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@chord/dev.improve.chord.components.ui.card";
 import { Switch } from "@chord/dev.improve.chord.components.ui.switch";
+import { ToggleGroup, ToggleGroupItem } from "@chord/dev.improve.chord.components.ui.toggle-group";
 import { Label } from "@chord/dev.improve.chord.components.ui.label";
 import {
   StateQueries,
@@ -15,6 +16,12 @@ import {
   usePermissionsState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
+import {
+  type Appearance,
+  getAppearance,
+  setAppearance,
+} from "@chord/dev.improve.chord.lib.state/appearance";
+import { useState } from "react";
 
 export function LaunchOnLoginCard() {
   return (
@@ -53,12 +60,13 @@ function LaunchOnLoginCardContent({
       <CardHeader>
         <CardTitle>Application</CardTitle>
         <CardDescription>
-          Control how Chord starts, where its icon appears, and whether the Hint Panel is shown by
-          default.
+          Control how Chord looks and starts, where its icon appears, and whether the Hint Panel
+          is shown by default.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="preference-group">
+          <AppearanceRow />
           <SettingSwitchRow
             id="launch-on-login"
             label="Launch on login"
@@ -104,6 +112,43 @@ function LaunchOnLoginCardContent({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+const APPEARANCES: { value: Appearance; label: string }[] = [
+  { value: "system", label: "Auto" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+];
+
+/** Light or Dark for Settings and the Hint Panel, or Auto to follow macOS. */
+function AppearanceRow() {
+  const [appearance, setSelected] = useState(getAppearance);
+  return (
+    <div className="preference-row">
+      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
+        <span id="appearance-label" className="preference-label">
+          Appearance
+        </span>
+      </div>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        aria-labelledby="appearance-label"
+        value={appearance}
+        onValueChange={(value) => {
+          const next = value as Appearance;
+          setSelected(next);
+          void setAppearance(next);
+        }}
+      >
+        {APPEARANCES.map(({ value, label }) => (
+          <ToggleGroupItem key={value} value={value} className="appearance-option">
+            {label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
   );
 }
 

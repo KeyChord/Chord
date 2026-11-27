@@ -4,9 +4,9 @@ import { QueryClient, QueryClientProvider } from '@chord/com.npmjs.tanstack__rea
 import { ChordsPage } from '@chord/dev.improve.chord.routes.chords.index';
 import { attachConsole } from '@tauri-apps/plugin-log';
 import ReactDOM from 'react-dom/client';
-import { followSystemAppearance } from './appearance.ts';
+import { followAppearance } from '@chord/dev.improve.chord.lib.state/appearance';
 
-followSystemAppearance();
+followAppearance();
 
 if (import.meta.env.DEV) {
 	void attachConsole();

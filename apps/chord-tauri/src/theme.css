@@ -83,9 +83,9 @@
   --sidebar-foreground: var(--foreground);
 }
 @theme inline {
-  --font-sans: "Geist Variable", sans-serif;
-  /* Used for keycaps: its slashed zero keeps 0 distinct from O. ui-monospace draws the key symbols it lacks, such as ↩. */
-  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  /* The system fonts, SF Pro and SF Mono, as in macOS's own panels. SF Mono's slashed zero keeps 0 distinct from O. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
