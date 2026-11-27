@@ -14,6 +14,7 @@
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
 		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
 		"@chord/dev.improve.chord.lib.state": "workspace:*",
 		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",

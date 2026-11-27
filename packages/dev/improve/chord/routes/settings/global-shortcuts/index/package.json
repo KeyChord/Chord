@@ -11,14 +11,9 @@
 	"dependencies": {
 		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
+		"@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
 		"@chord/dev.improve.chord.lib.state": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
-		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
 		"lucide-react": "^1.57.0",
 		"react": "^19.3.1"
 	},

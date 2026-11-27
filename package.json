@@ -53,7 +53,7 @@
     "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
     "@chord/dev.improve.chord.lib.github": "workspace:*",
     "@chord/dev.improve.chord.lib.permissions": "workspace:*",
-    "@chord/dev.improve.chord.lib.native-menu": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
     "@chord/dev.improve.chord.lib.state": "workspace:*",
     "@chord/dev.improve.chord.routes.chords.index": "workspace:*",
     "@chord/dev.improve.chord.routes": "workspace:*",

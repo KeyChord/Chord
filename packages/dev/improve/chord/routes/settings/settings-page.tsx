@@ -8,7 +8,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
-import { desktopPlatform,
+import {
+  desktopPlatform,
   useAppUpdateState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
@@ -30,6 +31,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Each page's description shows under its title in the window header, so every page says what
+ * it's for. Advanced pages run from everyday tools to the reset that can't be undone.
+ */
 const navigationGroups = [
   {
     label: "Configuration",
@@ -39,16 +44,19 @@ const navigationGroups = [
         label: "General",
         to: "/settings/general",
         icon: Settings2,
+        description: "Startup, permissions and how chord mode looks.",
       },
       {
         label: "Chords",
         to: "/settings/chords",
         icon: Keyboard,
+        description: "Your packages, your own chords and third-party code.",
       },
       {
         label: "Browse",
         to: "/settings/browse",
         icon: Compass,
+        description: "Find and install chord packages.",
       },
     ],
   },
@@ -57,29 +65,34 @@ const navigationGroups = [
     collapsible: true,
     items: [
       {
-        label: "Log",
-        to: "/settings/log",
-        icon: Terminal,
-      },
-      {
-        label: "Danger Zone",
-        to: "/settings/danger",
-        icon: TriangleAlert,
-      },
-      {
         label: "Macros",
         to: "/settings/macros",
         icon: Braces,
+        description: "Saved text and key presses you can insert while typing a chord.",
       },
       {
         label: "Global Shortcuts",
         to: "/settings/global-shortcuts",
         icon: Command,
+        description: "Shortcuts packages reserve so Chord can trigger actions inside apps.",
       },
       {
         label: "Command Line",
         to: "/settings/command-line",
         icon: SquareTerminal,
+        description: "Run chords and scripts from Terminal with the chord command.",
+      },
+      {
+        label: "Log",
+        to: "/settings/log",
+        icon: Terminal,
+        description: "What Chord has been doing, for tracking down problems.",
+      },
+      {
+        label: "Danger Zone",
+        to: "/settings/danger",
+        icon: TriangleAlert,
+        description: "Actions that can't be undone.",
       },
     ],
   },
@@ -143,7 +156,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
         aria-expanded={!isSidebarCollapsed}
         aria-label={sidebarToggleLabel}
         title={sidebarToggleLabel}
-        className="absolute left-[84px] top-[12px]z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute left-[84px] top-[12px] z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
         onClick={() => {
           toggleSidebarMutation.mutate();
         }}
@@ -214,9 +227,12 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
           className="flex h-[62px] shrink-0 items-center px-4 transition-[padding] duration-200 ease-out motion-reduce:transition-none data-sidebar-collapsed:pl-[120px]"
           onMouseDown={handleTitleBarMouseDown}
         >
-          <h1 className="settings-page-title cursor-default select-none">
-            {currentPage?.label === "General" ? "Configuration" : (currentPage?.label ?? "Chord")}
-          </h1>
+          <div className="min-w-0 cursor-default select-none">
+            <h1 className="settings-page-title">{currentPage?.label ?? "Chord"}</h1>
+            {currentPage?.description && (
+              <p className="settings-page-description truncate">{currentPage.description}</p>
+            )}
+          </div>
         </header>
         <div
           ref={scrollContainerRef}

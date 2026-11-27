@@ -184,10 +184,20 @@
   margin: 0 16px;
   padding-bottom: 9px;
 }
+/* The window header: a clear page title over one line on what the page is for, like Homerow. */
 .settings-page-title {
-  font: var(--settings-title-font);
-  letter-spacing: var(--settings-title-tracking);
-  color: var(--settings-label);
+  font:
+    650 17px/22px "Inter Variable",
+    sans-serif;
+  letter-spacing: -0.015em;
+  color: var(--mac-label, var(--settings-label));
+}
+.settings-page-description {
+  margin-top: 1px;
+  font:
+    400 12px/16px "Inter Variable",
+    sans-serif;
+  color: var(--mac-secondary, var(--settings-description));
 }
 .preference-info {
   display: inline-flex;
@@ -469,12 +479,6 @@
 .dark .preferences-page [data-variant="outline"]:active:not(:disabled) {
   background: #454545;
 }
-.preferences-page .appearance-option {
-  height: 24px;
-  padding: 0 10px;
-  font: var(--settings-label-font);
-  letter-spacing: var(--settings-label-tracking);
-}
 .chord-library-filter:focus-visible,
 .chord-library-table th button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--focus) 30%, transparent);
@@ -682,6 +686,12 @@
   --mac-warning-edge: #f0d47a;
   --mac-warning-fg: #6b4b00;
   --mac-warning-icon: #c98a00;
+  --mac-nested: rgb(0 0 0 / 3.5%);
+  --mac-card-edge: rgb(0 0 0 / 9%);
+  --mac-circle-on: rgb(0 0 0 / 15%);
+  --mac-box: rgb(0 0 0 / 2%);
+  --mac-keycap-fill: rgb(0 0 0 / 4%);
+  --mac-keycap-border: rgb(0 0 0 / 11%);
 }
 .dark {
   --mac-list: rgb(255 255 255 / 5%);
@@ -700,6 +710,12 @@
   --mac-warning-edge: rgb(255 196 0 / 32%);
   --mac-warning-fg: #f5dc93;
   --mac-warning-icon: #ffc93d;
+  --mac-nested: rgb(255 255 255 / 4.5%);
+  --mac-card-edge: rgb(255 255 255 / 10%);
+  --mac-circle-on: rgb(255 255 255 / 22%);
+  --mac-box: rgb(255 255 255 / 3%);
+  --mac-keycap-fill: rgb(255 255 255 / 8%);
+  --mac-keycap-border: rgb(255 255 255 / 12%);
 }
 
 /* The scrollbar's space is always reserved, so switching tabs never changes the content width. */
@@ -841,10 +857,13 @@
 }
 
 /* A section: bold header, then an inset grouped list, then an optional footnote. */
+/* Cards stand apart with space, not lines. */
 .mac-section + .mac-section,
 .mac-section + section > .mac-section:first-of-type,
-section + .mac-section {
-  margin-top: 22px;
+section + .mac-section,
+.mac-list-tools + .mac-section,
+.mac-callout-warning + .mac-section {
+  margin-top: 20px;
 }
 .mac-section-header {
   display: flex;
@@ -898,10 +917,10 @@ section + .mac-section {
   position: relative;
   display: flex;
   width: 100%;
-  min-height: 44px;
+  min-height: 52px;
   align-items: center;
   gap: 12px;
-  padding: 9px 16px;
+  padding: 10px 16px;
   text-align: left;
   font: var(--settings-label-font);
   letter-spacing: var(--settings-label-tracking);
@@ -912,32 +931,24 @@ section + .mac-section {
   min-height: 38px;
   padding-block: 7px;
 }
-/* Hairline separators inset on both sides, like the General page. */
-.mac-row + .mac-row::before,
-.mac-list > * + .mac-row::before,
-.mac-list > .contents + .contents > .mac-row::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 16px;
-  left: var(--mac-row-inset, 16px);
-  height: 0.5px;
-  background: var(--settings-separator);
+/*
+ * A row's disclosed contents sit in a rounded rectangle nested inside the group, like Homerow.
+ * Its text lines up with the row's title above it.
+ */
+.mac-disclosure {
+  margin: 0 12px 10px 36px;
+  position: relative;
+  border-radius: 12px;
+  padding: 4px 0;
+  background: var(--mac-nested);
 }
-.mac-list[data-icons] {
-  --mac-row-inset: 48px;
+.mac-disclosure .mac-row {
+  min-height: 40px;
+  padding: 6px 12px;
 }
 button.mac-row,
 a.mac-row {
   cursor: default;
-}
-button.mac-row:hover,
-a.mac-row:hover {
-  background: var(--mac-row-hover);
-}
-button.mac-row:active,
-a.mac-row:active {
-  background: var(--mac-row-active);
 }
 .mac-row:focus-visible {
   box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
@@ -1165,65 +1176,6 @@ a.mac-row:active {
   font: 12px/16px var(--mac-font);
 }
 
-/* A pushed detail view: a back button and actions on one line, then the title. */
-.mac-detail-bar {
-  display: flex;
-  height: 28px;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.mac-back {
-  display: inline-flex;
-  height: 28px;
-  align-items: center;
-  gap: 2px;
-  /* The chevron's own inset lines it up with the content edge. */
-  margin-left: -8px;
-  padding: 0 8px 0 3px;
-  border-radius: 7px;
-  font: var(--settings-label-font);
-  letter-spacing: var(--settings-label-tracking);
-  color: var(--mac-secondary);
-  cursor: default;
-  outline: none;
-}
-.mac-back:hover {
-  background: var(--mac-row-hover);
-  color: var(--mac-label);
-}
-.mac-back:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
-}
-.mac-detail-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-.mac-detail-header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.mac-detail-header .mac-icon {
-  width: 32px;
-  height: 32px;
-}
-.mac-detail-title {
-  font: 600 17px/22px var(--mac-font);
-  letter-spacing: -0.015em;
-  color: var(--settings-label);
-}
-.mac-detail-subtitle {
-  margin-top: 1px;
-  font: var(--settings-description-font);
-  letter-spacing: var(--settings-description-tracking);
-  color: var(--settings-description);
-}
-
 /* Actions for the whole list, under it, like the buttons below a macOS table. */
 .mac-list-actions {
   display: flex;
@@ -1284,32 +1236,27 @@ a.mac-row:active {
 .mac-editor {
   display: flex;
   flex-direction: column;
-  /* The window header, the page's padding and the Chords toolbar sit above it. */
-  height: calc(100vh - 62px - 16px - 48px - 44px);
-  min-height: 360px;
 }
+/* Inside a white group, the editor is set off by a hairline rather than its own card. */
 .mac-editor-surface {
-  min-height: 0;
-  flex: 1;
+  height: 380px;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 8px;
   background: var(--settings-group);
-  box-shadow:
-    inset 0 0 0 1px var(--settings-group-edge),
-    0 0 0 0.5px var(--mac-list-edge),
-    0 1px 0 rgb(0 0 0 / 4%);
+  box-shadow: 0 0 0 0.5px var(--settings-separator);
 }
 .mac-editor-surface:focus-within {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 40%, transparent);
 }
 .mac-editor-status {
   display: flex;
-  min-height: 28px;
+  min-height: 24px;
   align-items: center;
   gap: 12px;
-  padding: 6px 4px 0;
-  font: 11px/14px var(--mac-font);
-  color: var(--mac-secondary);
+  padding: 8px 4px 0;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
 }
 
 /* Unchecked boxes need an edge to stand out on the grey page and white groups. */
@@ -1320,14 +1267,123 @@ a.mac-row:active {
   box-shadow: inset 0 0 0 1px rgb(255 255 255 / 30%);
 }
 
-/* A collapsible app group: the header is part of the card, and rows have no dividers. */
+/* Every key of a chord on one cap. */
+.mac-keycap {
+  display: inline-flex;
+  min-width: 48px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--mac-keycap-fill);
+  box-shadow: inset 0 0 0 1px var(--mac-keycap-border);
+  font: 650 12px/1 var(--mac-font);
+  letter-spacing: 0.03em;
+  color: var(--mac-label);
+}
+/* A placeholder's keys sit a little apart from the chord's own keys. */
+.mac-keycap [data-prefix] {
+  margin-right: 4px;
+}
+.mac-keycap [data-placeholder] {
+  margin-right: 4px;
+  font-weight: 500;
+  color: var(--mac-secondary);
+}
+
+/* A disclosure chevron: points right, and turns down while its row is open. */
+.mac-disclosure-chevron {
+  flex-shrink: 0;
+  color: var(--mac-tertiary);
+  transition: transform 160ms ease;
+}
+[aria-expanded="true"] > .mac-disclosure-chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mac-disclosure-chevron {
+    transition: none;
+  }
+}
+
+.mac-row[data-chord] {
+  min-height: 44px;
+}
+/* A small heading inside disclosed contents, such as the app a group of chords is for. */
+.mac-disclosure .mac-subheader {
+  min-height: 0;
+  padding-top: 10px;
+  padding-bottom: 2px;
+  font: var(--settings-header-font);
+  letter-spacing: var(--settings-header-tracking);
+  color: var(--settings-description);
+}
+.mac-row-muted {
+  color: var(--settings-description);
+}
+.mac-section-subtitle {
+  min-width: 0;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+/* A text button in a section header, like Edit in a settings list. */
+.mac-link-button {
+  margin-left: auto;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--accent);
+  cursor: default;
+  outline: none;
+}
+.mac-link-button:focus-visible {
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A file's editor, disclosed under its row. */
+.mac-disclosure > .mac-editor {
+  padding: 8px;
+}
+.mac-editor-alert {
+  margin-bottom: 8px;
+  font: var(--settings-description-font);
+  color: var(--destructive);
+}
+.mac-editor-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/*
+ * A card whose header sits inside it, like Homerow's app groups. The hairline under the header
+ * is the card's only divider; rows below it are set apart by spacing.
+ */
 .mac-group {
   padding: 0;
 }
+/* Like Homerow: the header shares the card's fill, set off only by a hairline under it. */
+.mac-group-bar {
+  display: flex;
+  align-items: center;
+}
+.mac-group[data-open] .mac-group-bar {
+  box-shadow: inset 0 -0.5px 0 var(--settings-separator);
+}
+.mac-group-bar .mac-icon {
+  color: var(--settings-label);
+}
 .mac-group-header {
   display: flex;
+  min-width: 0;
   width: 100%;
-  min-height: 48px;
+  min-height: 56px;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
@@ -1338,66 +1394,423 @@ a.mac-row:active {
   cursor: default;
   outline: none;
 }
-.mac-group-header .mac-icon {
-  width: 24px;
-  height: 24px;
-}
 .mac-group-header:focus-visible {
   box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
 }
-.mac-group-chevron {
-  flex-shrink: 0;
-  color: var(--mac-tertiary);
-  transform: rotate(-90deg);
-  transition: transform 160ms ease;
+.mac-group-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 14px/18px var(--mac-font);
+  letter-spacing: -0.005em;
+  color: var(--mac-label);
 }
-.mac-group[data-open] .mac-group-chevron {
-  transform: none;
-}
-.mac-group-bar {
+.mac-group-actions {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+}
+.mac-group-list {
+  padding: 6px 0;
+}
+/* Rows above or around a list, such as Select all and search. */
+.mac-list-tools {
+  display: flex;
+  min-height: 28px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 20px;
+  padding: 0 16px;
+}
+.mac-list-tools label {
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-label);
+}
+
+/*
+ * Cards as in Homerow: a fill a step off the window with a thin visible border, and a
+ * hairline under the header as the only divider.
+ */
+.mac-group {
+  box-shadow: inset 0 0 0 0.5px var(--mac-card-edge);
 }
 .mac-group[data-open] .mac-group-bar {
-  border-bottom: 0.5px solid var(--settings-separator);
+  box-shadow: inset 0 -0.5px 0 var(--mac-card-edge);
 }
-.mac-group [role="list"] {
-  padding: 4px 0 6px;
+
+/*
+ * An expanded package keeps its row in line with its siblings. Below it, each part of the
+ * package (its placeholders, then each app's chords) is a box of its own, starting at the
+ * row's title, with its heading inside like a small Homerow card.
+ */
+.mac-group-list .mac-disclosure {
+  margin: 0;
+  border-radius: 0;
+  padding: 0 16px 12px 48px;
+  background: none;
 }
-.mac-row[data-chord] {
+.mac-box {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--mac-box);
+  box-shadow: inset 0 0 0 0.5px var(--mac-card-edge);
+}
+.mac-box + .mac-box {
+  margin-top: 8px;
+}
+.mac-box-header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  box-shadow: inset 0 -0.5px 0 var(--mac-card-edge);
+  font: 600 11px/14px var(--mac-font);
+  letter-spacing: 0.02em;
+  color: var(--mac-secondary);
+}
+.mac-box-count {
+  font-weight: 400;
+}
+.mac-box .mac-row {
+  min-height: 46px;
+  padding: 6px 12px;
+}
+.mac-box > :nth-child(2) {
+  padding-top: 2px;
+}
+.mac-box > :last-child {
+  padding-bottom: 2px;
+}
+.mac-group-list .mac-disclosure > .mac-editor {
+  padding: 0;
+}
+
+/* Homerow's type: bright 13px titles over 11px secondary lines. */
+.mac-page .mac-row-title {
+  font: 400 13px/17px var(--mac-font);
+  letter-spacing: -0.003em;
+  color: var(--mac-label);
+}
+.mac-page .mac-row-subtitle {
+  font: 400 11px/14px var(--mac-font);
+  letter-spacing: 0.005em;
+  color: var(--mac-secondary);
+}
+.mac-page .mac-row-detail {
+  font: 400 12.5px/16px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+/* Small headings inside a card, such as Placeholders or the app a group of chords is for. */
+.mac-group-list .mac-subheader {
+  min-height: 0;
+  padding: 12px 16px 2px;
+  font: 600 11px/14px var(--mac-font);
+  letter-spacing: 0.02em;
+  color: var(--mac-secondary);
+}
+/* Rows in a package's card, like Homerow's hints: title and kind, keys at the end. */
+.mac-group-list .mac-row[data-chord] {
   min-height: 46px;
   padding-block: 6px;
 }
-.mac-group .mac-row::before {
+/* A card being dragged or dropped next to, while reordering. */
+.mac-group[data-dragging] {
+  opacity: 0.55;
+}
+.mac-group[data-drop] {
+  position: relative;
+  overflow: visible;
+}
+.mac-group[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--focus);
+  pointer-events: none;
+}
+.mac-group[data-drop="before"]::after {
+  top: -11px;
+}
+.mac-group[data-drop="after"]::after {
+  bottom: -11px;
+}
+/* A stack of cards, one per package, closer together than separate sections. */
+.mac-card-list > .mac-section + .mac-section {
+  margin-top: 10px;
+}
+.mac-card-list[data-dragging],
+.mac-card-list[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+/* A control before a card's header, such as a checkbox, in the icon column. */
+.mac-group-leading {
+  display: flex;
+  width: 20px;
+  flex-shrink: 0;
+  justify-content: center;
+  margin-left: 16px;
+  margin-right: -4px;
+}
+
+/* The toolbar's trailing items: Edit Order, then search. */
+.mac-toolbar > .mac-search {
+  width: 100%;
+  max-width: 200px;
+}
+.mac-toolbar > .mac-segmented + .mac-search {
+  margin-left: auto;
+}
+/* A chords file's editor, inside its card. */
+.mac-card-editor {
+  padding: 6px 16px 10px;
+}
+/* Spacing around stacks of cards. */
+.mac-list-tools + .mac-card-list,
+.mac-callout-warning + .mac-card-list,
+.mac-card-list + .mac-card-list {
+  margin-top: 20px;
+}
+.mac-card-list + .mac-section {
+  margin-top: 10px;
+}
+.mac-card-list + .mac-list-actions {
+  margin-top: 20px;
+}
+.mac-card-list:empty {
   display: none;
 }
 
-/* Every key of a chord on one cap. */
-.mac-keycap {
+/* A folder's files as smaller boxes nested inside the folder's card. */
+.mac-group-list > .mac-nested-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 12px 12px;
+}
+.mac-group:has(> .mac-group-list > .mac-nested-cards) > .mac-group-list {
+  padding-bottom: 0;
+}
+.mac-nested-cards .mac-group {
+  border-radius: 12px;
+  background: var(--mac-box);
+}
+.mac-nested-cards .mac-group-header {
+  min-height: 48px;
+  padding-block: 8px;
+  padding-inline: 12px;
+}
+.mac-nested-cards .mac-card-editor {
+  padding: 4px 12px 10px;
+}
+/* The folder's header divider gives way to the boxes' own edges. */
+.mac-group:has(> .mac-group-list > .mac-nested-cards)[data-open] > .mac-group-bar {
+  box-shadow: none;
+}
+
+/* A round icon button, like the toolbar buttons in macOS 26. */
+.mac-circle-button {
   display: inline-flex;
-  min-width: 52px;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--mac-control);
+  color: var(--mac-label);
+  cursor: default;
+  outline: none;
+}
+.mac-circle-button[aria-pressed="true"] {
+  background: var(--mac-circle-on);
+}
+.mac-circle-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A shortcut you click and then press keys to change, like macOS's shortcut recorders. */
+.mac-shortcut-field {
+  display: inline-flex;
+  min-width: 120px;
   height: 26px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 0 9px;
-  border-radius: 6px;
-  background: var(--settings-key);
-  box-shadow: inset 0 0 0 0.5px var(--mac-keycap-edge);
-  font:
-    600 11.5px/1 "Geist Mono Variable",
-    ui-monospace,
-    monospace;
-  letter-spacing: 0.04em;
-  color: var(--settings-key-foreground);
-}
-/* A placeholder's keys sit a little apart from the chord's own keys. */
-.mac-keycap [data-prefix] {
-  margin-right: 4px;
-}
-.mac-keycap [data-placeholder] {
-  margin-right: 4px;
-  font-weight: 500;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--mac-keycap-fill);
+  box-shadow: inset 0 0 0 1px var(--mac-keycap-border);
+  font: 12px var(--mac-font);
   color: var(--mac-secondary);
+  cursor: default;
+  outline: none;
+}
+.mac-shortcut-field[data-recording] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+  color: var(--mac-label);
+}
+.mac-shortcut-field:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* Macros: a form row to add or edit a macro, and the buffer rows below. */
+.mac-form-row {
+  display: block;
+}
+.mac-macro-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mac-macro-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+.mac-macro-actions {
+  display: flex;
+  height: 26px;
+  align-items: center;
+  gap: 8px;
+}
+.mac-page .mac-field {
+  min-height: 26px;
+  font: 12.5px/16px var(--mac-font);
+}
+.mac-textarea {
+  display: block;
+  width: 100%;
+  resize: none;
+  padding-block: 5px;
+  font-family: ui-monospace, "SF Mono", "Geist Mono Variable", monospace !important;
+  field-sizing: content;
+}
+.mac-buffer-row {
+  align-items: flex-start;
+}
+.mac-buffer-row > .mac-button {
+  margin-top: 1px;
+}
+.mac-buffer-label {
+  width: 24px;
+  flex-shrink: 0;
+  font:
+    500 12.5px/26px ui-monospace,
+    "SF Mono",
+    "Geist Mono Variable",
+    monospace;
+  color: var(--mac-secondary);
+}
+.mac-card-note {
+  min-height: 0;
+  padding-top: 8px;
+  font-size: 11px;
+}
+.mac-row-text code {
+  font-size: inherit;
+}
+
+/*
+ * Appearance, like System Settings: a small window preview per choice, its label beneath, and
+ * a ring around the one in use. Auto shows light and dark side by side.
+ */
+.appearance-picker {
+  display: flex;
+  gap: 14px;
+}
+.appearance-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+  outline: none;
+}
+.appearance-preview {
+  display: block;
+  width: 68px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 8px;
+  padding: 7px 0 0 9px;
+  background: linear-gradient(135deg, #7fb0ff, #b48cff 55%, #ff9fbf);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 18%),
+    0 0 0 3px transparent;
+  transition: box-shadow 120ms ease;
+}
+.appearance-preview[data-appearance="dark"] {
+  background: linear-gradient(135deg, #1f2a5c, #3b2a6b 55%, #5a2a4f);
+}
+.appearance-preview[data-appearance="system"] {
+  background: linear-gradient(90deg, #7fb0ff 50%, #1f2a5c 50%);
+}
+.appearance-preview-window {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 4px 0 0 0;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+}
+.appearance-preview-sidebar {
+  width: 16px;
+  background: #ececee;
+}
+.appearance-preview-content {
+  flex: 1;
+  background: #fff;
+}
+.appearance-preview[data-appearance="dark"] .appearance-preview-sidebar {
+  background: #3a3a3d;
+}
+.appearance-preview[data-appearance="dark"] .appearance-preview-content {
+  background: #1f1f21;
+}
+.appearance-preview[data-appearance="system"] .appearance-preview-content {
+  background: linear-gradient(90deg, #fff 9px, #1f1f21 9px);
+}
+.appearance-choice[aria-checked="true"] .appearance-preview {
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 18%),
+    0 0 0 3px var(--accent);
+}
+.appearance-choice:focus-visible .appearance-preview {
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 18%),
+    0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.appearance-choice-label {
+  font: var(--settings-description-font);
+  font-size: 11px;
+  color: var(--settings-description);
+}
+.appearance-choice[aria-checked="true"] .appearance-choice-label {
+  font-weight: 600;
+  color: var(--settings-label);
+}
+
+/* A short explanation at the top of a preference group, such as what the Hint Panel is. */
+.preference-intro {
+  margin: 0 16px;
+  padding: 9px 0;
+  font: var(--settings-description-font);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--settings-description);
+}
+.preference-intro + .preference-row {
+  border-top: 0.5px solid var(--settings-separator);
+  padding-top: 9.5px;
 }

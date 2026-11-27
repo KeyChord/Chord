@@ -31,6 +31,7 @@
         "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.label": "workspace:*",
@@ -49,7 +50,6 @@
         "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
         "@chord/dev.improve.chord.lib.github": "workspace:*",
-        "@chord/dev.improve.chord.lib.native-menu": "workspace:*",
         "@chord/dev.improve.chord.lib.permissions": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
@@ -384,6 +384,16 @@
       "devDependencies": {
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
+      },
+    },
+    "packages/dev/improve/chord/components/ui/group-card": {
+      "name": "@chord/dev.improve.chord.components.ui.group-card",
+      "dependencies": {
+        "lucide-react": "^1.57.0",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
       },
     },
     "packages/dev/improve/chord/components/ui/input": {
@@ -820,7 +830,6 @@
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.label": "workspace:*",
         "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.toggle-group": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "react": "^19.3.1",
       },
@@ -926,9 +935,9 @@
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.select": "workspace:*",
-        "@chord/dev.improve.chord.lib.native-menu": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "lucide-react": "^1.57.0",
@@ -974,8 +983,9 @@
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+        "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
       "devDependencies": {
@@ -1062,6 +1072,7 @@
         "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
@@ -1135,13 +1146,8 @@
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
-        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
@@ -1172,12 +1178,8 @@
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.textarea": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "lucide-react": "^1.57.0",
@@ -1327,6 +1329,8 @@
     "@chord/dev.improve.chord.components.ui.dropdown-menu": ["@chord/dev.improve.chord.components.ui.dropdown-menu@workspace:packages/dev/improve/chord/components/ui/dropdown-menu"],
 
     "@chord/dev.improve.chord.components.ui.empty": ["@chord/dev.improve.chord.components.ui.empty@workspace:packages/dev/improve/chord/components/ui/empty"],
+
+    "@chord/dev.improve.chord.components.ui.group-card": ["@chord/dev.improve.chord.components.ui.group-card@workspace:packages/dev/improve/chord/components/ui/group-card"],
 
     "@chord/dev.improve.chord.components.ui.input": ["@chord/dev.improve.chord.components.ui.input@workspace:packages/dev/improve/chord/components/ui/input"],
 

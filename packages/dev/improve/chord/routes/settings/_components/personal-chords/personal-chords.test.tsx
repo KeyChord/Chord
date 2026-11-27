@@ -50,14 +50,16 @@ test("packages list their files with Edit buttons and leave editors closed initi
       pkg("default", ["chords/com/apple/finder/macos.toml", "chords/macos.toml"]),
     ],
   });
-  expect(html).toContain('<span class="mac-row-title">alpha</span>');
-  expect(html).toContain('<span class="mac-row-title">default</span>');
+  // Each file is its own card, showing which package folder it's in.
+  expect(html).toContain('aria-label="Chords files in alpha"');
+  expect(html).toContain('aria-label="Chords files in default"');
   expect(html).toContain(">com.apple.finder</span>");
   expect(html).toContain(">Every app</span>");
   // Each file is a row that opens it in the editor.
   expect(html).toContain('aria-label="Edit chords/com/apple/finder/macos.toml"');
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
-  expect(html).toContain('aria-label="alpha actions"');
+  // Files are added from Add File, which picks the package, so cards carry no menu.
+  expect(html).toContain("Add File");
   expect(html).not.toContain('aria-label="Loading editor"');
   expect(html).not.toContain(">Save</button>");
   expect(html).not.toContain("Unsaved");
@@ -79,7 +81,7 @@ test("app files show the app's name when Chord knows it", () => {
       />
     </QueryClientProvider>,
   ).replaceAll("<!-- -->", "");
-  expect(html).toContain('mac-row-title">Finder</span>');
+  expect(html).toContain('mac-group-title">Finder</span>');
   expect(html).toContain("chords/com/apple/finder/macos.toml");
 });
 

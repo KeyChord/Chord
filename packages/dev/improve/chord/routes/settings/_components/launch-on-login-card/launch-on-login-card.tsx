@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from "@chord/dev.improve.chord.components.ui.card";
 import { Switch } from "@chord/dev.improve.chord.components.ui.switch";
-import { ToggleGroup, ToggleGroupItem } from "@chord/dev.improve.chord.components.ui.toggle-group";
 import { Label } from "@chord/dev.improve.chord.components.ui.label";
 import {
   StateQueries,
@@ -22,16 +21,8 @@ import {
   setAppearance,
 } from "@chord/dev.improve.chord.lib.state/appearance";
 import {
-  PANEL_KEY_FONTS,
-  PANEL_TEXT_FONTS,
-  type PanelKeyFont,
-  type PanelTextFont,
   getCollapseEarlierKeys,
-  getPanelKeyFont,
-  getPanelTextFont,
   setCollapseEarlierKeys,
-  setPanelKeyFont,
-  setPanelTextFont,
 } from "@chord/dev.improve.chord.lib.state/panel-preferences";
 import { useState } from "react";
 
@@ -69,86 +60,89 @@ function LaunchOnLoginCardContent({
   });
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>Application</CardTitle>
-        <CardDescription>
-          Control how Chord looks and starts, where its icon appears, and whether the Hint Panel
-          is shown by default.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="preference-group">
-          <AppearanceRow />
-          <SettingSwitchRow
-            id="launch-on-login"
-            label="Launch on login"
-            description="Start Chord automatically when you sign in."
-            checked={permissions.isAutostartEnabled === true}
-            disabled={toggleAutostartMutation.isPending}
-            onCheckedChange={() => {
-              toggleAutostartMutation.mutate();
-            }}
-          />
-          <SettingSwitchRow
-            id="menu-bar-show-icon"
-            label={desktopPlatform === "macos" ? "Show menu bar icon" : "Show tray icon"}
-            description="Access settings and reload chords from the Chord icon."
-            checked={settings.showMenuBarIcon}
-            disabled={toggleMenuBarIconMutation.isPending}
-            onCheckedChange={() => {
-              toggleMenuBarIconMutation.mutate();
-            }}
-          />
-          {desktopPlatform === "macos" && (
+    <>
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Application</CardTitle>
+          <CardDescription>How Chord looks and starts, and where its icon appears.</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="preference-group">
+            <AppearanceRow />
             <SettingSwitchRow
-              id="show-dock-icon"
-              label="Show Dock icon"
-              description="Keep Chord visible in the Dock while it is running."
-              checked={settings.showDockIcon}
-              disabled={toggleDockIconMutation.isPending}
+              id="launch-on-login"
+              label="Launch on login"
+              description="Start Chord automatically when you sign in."
+              checked={permissions.isAutostartEnabled === true}
+              disabled={toggleAutostartMutation.isPending}
               onCheckedChange={() => {
-                toggleDockIconMutation.mutate();
+                toggleAutostartMutation.mutate();
               }}
             />
-          )}
-          <SettingSwitchRow
-            id="hide-hint-panel-by-default"
-            label="Hide Hint Panel by default"
-            description="Start chord mode with the Hint Panel hidden. Press Tab to reveal it when needed."
-            checked={settings.isChordPanelHiddenByDefault}
-            disabled={toggleHideHintPanelByDefaultMutation.isPending}
-            onCheckedChange={() => {
-              toggleHideHintPanelByDefaultMutation.mutate();
-            }}
-          />
-          <SettingSwitchRow
-            id="collapse-earlier-keys"
-            label="Fold earlier keys of long chords"
-            description="When a chord gets long, show its first keys as a compact trail beside the Hint Panel's columns."
-            checked={collapseEarlierKeys}
-            onCheckedChange={() => {
-              setCollapseEarlierKeys(!collapseEarlierKeys);
-              setCollapseEarlierKeysState(!collapseEarlierKeys);
-            }}
-          />
-          <ChoiceRow
-            id="panel-text-font"
-            label="Hint Panel font"
-            options={PANEL_TEXT_FONTS}
-            initial={getPanelTextFont()}
-            onChange={(font: PanelTextFont) => setPanelTextFont(font)}
-          />
-          <ChoiceRow
-            id="panel-key-font"
-            label="Hint Panel key font"
-            options={PANEL_KEY_FONTS}
-            initial={getPanelKeyFont()}
-            onChange={(font: PanelKeyFont) => setPanelKeyFont(font)}
-          />
-        </div>
-      </CardContent>
-    </Card>
+            <SettingSwitchRow
+              id="menu-bar-show-icon"
+              label={desktopPlatform === "macos" ? "Show menu bar icon" : "Show tray icon"}
+              description="Access settings and reload chords from the Chord icon."
+              checked={settings.showMenuBarIcon}
+              disabled={toggleMenuBarIconMutation.isPending}
+              onCheckedChange={() => {
+                toggleMenuBarIconMutation.mutate();
+              }}
+            />
+            {desktopPlatform === "macos" && (
+              <SettingSwitchRow
+                id="show-dock-icon"
+                label="Show Dock icon"
+                description="Keep Chord visible in the Dock while it is running."
+                checked={settings.showDockIcon}
+                disabled={toggleDockIconMutation.isPending}
+                onCheckedChange={() => {
+                  toggleDockIconMutation.mutate();
+                }}
+              />
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle>Hint Panel</CardTitle>
+          <CardDescription>
+            The keys you can press next, shown while you type a chord.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="preference-group">
+            {/* Says what the panel is, since its name alone doesn't. */}
+            <p className="preference-intro">
+              While you type a chord, the Hint Panel lists the keys you can press next and what each
+              one does.
+            </p>
+            <SettingSwitchRow
+              id="hide-hint-panel-by-default"
+              label="Hide until I press Tab"
+              description="Start chord mode without the panel. Press Tab to show it when you need a reminder."
+              checked={settings.isChordPanelHiddenByDefault}
+              disabled={toggleHideHintPanelByDefaultMutation.isPending}
+              onCheckedChange={() => {
+                toggleHideHintPanelByDefaultMutation.mutate();
+              }}
+            />
+            <SettingSwitchRow
+              id="collapse-earlier-keys"
+              label="Fold earlier keys of long chords"
+              description="When a chord gets long, show the keys you've already typed as a short trail beside the panel."
+              checked={collapseEarlierKeys}
+              onCheckedChange={() => {
+                setCollapseEarlierKeys(!collapseEarlierKeys);
+                setCollapseEarlierKeysState(!collapseEarlierKeys);
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
@@ -158,75 +152,40 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "dark", label: "Dark" },
 ];
 
-/** Light or Dark for the Settings window, or Auto to follow macOS. */
+/**
+ * Light or Dark for the Settings window, or Auto to follow macOS, picked from small window
+ * previews like System Settings' Appearance.
+ */
 function AppearanceRow() {
   const [appearance, setSelected] = useState(getAppearance);
   return (
-    <div className="preference-row">
-      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
-        <span id="appearance-label" className="preference-label">
-          Appearance
-        </span>
-      </div>
-      <ToggleGroup
-        type="single"
-        size="sm"
-        aria-labelledby="appearance-label"
-        value={appearance}
-        onValueChange={(value) => {
-          const next = value as Appearance;
-          setSelected(next);
-          void setAppearance(next);
-        }}
-      >
+    <div className="preference-row items-start">
+      <span id="appearance-label" className="preference-label pt-1">
+        Appearance
+      </span>
+      <div role="radiogroup" aria-labelledby="appearance-label" className="appearance-picker">
         {APPEARANCES.map(({ value, label }) => (
-          <ToggleGroupItem key={value} value={value} className="appearance-option">
-            {label}
-          </ToggleGroupItem>
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={appearance === value}
+            className="appearance-choice"
+            onClick={() => {
+              setSelected(value);
+              void setAppearance(value);
+            }}
+          >
+            <span className="appearance-preview" data-appearance={value} aria-hidden="true">
+              <span className="appearance-preview-window">
+                <span className="appearance-preview-sidebar" />
+                <span className="appearance-preview-content" />
+              </span>
+            </span>
+            <span className="appearance-choice-label">{label}</span>
+          </button>
         ))}
-      </ToggleGroup>
-    </div>
-  );
-}
-
-/** A row with one choice among a few, shown as a segmented control. */
-function ChoiceRow<T extends string>({
-  id,
-  label,
-  options,
-  initial,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  options: Record<T, { label: string }>;
-  initial: T;
-  onChange: (value: T) => void;
-}) {
-  const [selected, setSelected] = useState(initial);
-  return (
-    <div className="preference-row">
-      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
-        <span id={`${id}-label`} className="preference-label">
-          {label}
-        </span>
       </div>
-      <ToggleGroup
-        type="single"
-        size="sm"
-        aria-labelledby={`${id}-label`}
-        value={selected}
-        onValueChange={(value) => {
-          setSelected(value as T);
-          onChange(value as T);
-        }}
-      >
-        {(Object.keys(options) as T[]).map((value) => (
-          <ToggleGroupItem key={value} value={value} className="appearance-option">
-            {options[value].label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
     </div>
   );
 }

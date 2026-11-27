@@ -43,12 +43,30 @@ export function placeholderNeedsKeys({ placeholder }: PlaceholderEntry): boolean
 export function PackagePlaceholders({
   entries,
   apps,
+  inline = false,
 }: {
   entries: PlaceholderEntry[];
   apps: Record<string, DesktopAppMetadata>;
+  /** Render only the rows, for a package's disclosed contents. */
+  inline?: boolean;
 }) {
   const headingId = useId();
   if (entries.length === 0) return null;
+  const rows = entries.map((entry) => (
+    <PlaceholderRow
+      // Remount when the saved value or its inherited default changes.
+      key={`${entry.pathslug}:${entry.placeholder.name}:${entry.placeholder.assigned ?? entry.placeholder.default ?? ""}`}
+      entry={entry}
+      app={entry.appId ? apps[entry.appId] : undefined}
+    />
+  ));
+  if (inline) {
+    return (
+      <div role="group" aria-label="Placeholders">
+        {rows}
+      </div>
+    );
+  }
   return (
     <section aria-labelledby={headingId} className="mac-section">
       <div className="mac-section-header">
@@ -56,16 +74,7 @@ export function PackagePlaceholders({
           Placeholders
         </h3>
       </div>
-      <div className="mac-list">
-        {entries.map((entry) => (
-          <PlaceholderRow
-            // Remount when the saved value or its inherited default changes.
-            key={`${entry.pathslug}:${entry.placeholder.name}:${entry.placeholder.assigned ?? entry.placeholder.default ?? ""}`}
-            entry={entry}
-            app={entry.appId ? apps[entry.appId] : undefined}
-          />
-        ))}
-      </div>
+      <div className="mac-list">{rows}</div>
       <p className="mac-section-footer">
         Choose the keys this package&apos;s chords use for each placeholder, such as a prefix shared
         by every chord. Press Return to save; the package&apos;s chords reload.

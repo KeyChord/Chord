@@ -333,8 +333,6 @@ export function SettingsLogPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-3">
-      <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em]">Application Log</h2>
-
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
           <Button
@@ -347,7 +345,7 @@ export function SettingsLogPage() {
             }}
           >
             {copied ? <Check /> : <Copy />}
-            {copied ? "Copied" : "Copy to pasteboard"}
+            {copied ? "Copied" : "Copy"}
           </Button>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

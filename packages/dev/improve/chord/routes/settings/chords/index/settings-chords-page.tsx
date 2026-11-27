@@ -1,8 +1,8 @@
 import {
   applyPackageOrder,
+  canReorderPackages,
   ChordLibrary,
   listLibraryPackages,
-  PackageDetail,
 } from "#chord-library";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
@@ -17,7 +17,7 @@ import { ChordMonoreposCard } from "@chord/dev.improve.chord.routes.settings._co
 import { ChordReposCard } from "@chord/dev.improve.chord.routes.settings._components.chord-repos-card";
 import { LocalFoldersCard } from "@chord/dev.improve.chord.routes.settings._components.local-folders-card";
 import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ArrowUpDown, ChevronRight, Search, X } from "lucide-react";
 import {
   useId,
   useMemo,
@@ -130,6 +130,7 @@ export function SettingsChordsPageContent({
   const idPrefix = useId();
   const [view, setView] = useState<View>("packages");
   const [search, setSearch] = useState("");
+  const [editingOrder, setEditingOrder] = useState(false);
   const { packages, personalPackages } = chordPackageManagerData;
   const apps = useMemo(
     () => desktopAppManagerData?.appsMetadata ?? {},
@@ -146,8 +147,6 @@ export function SettingsChordsPageContent({
       new Set(chordPackageManagerData.builtinPackages ?? []),
     );
   }, [packages, personalPackages, apps, chordPackageManagerData.builtinPackages]);
-  // Opening Chords to configure a package goes straight to that package.
-  const [openPackage, setOpenPackage] = useState<string | undefined>(configurePackage);
   const {
     mutate: setPackageOrder,
     variables: savingOrder,
@@ -164,7 +163,6 @@ export function SettingsChordsPageContent({
       : libraryPackages;
   const thirdPartyPackages = chordPackageManagerData.thirdPartyPackages ?? [];
   const pendingApprovals = thirdPartyPackages.filter((pkg) => !pkg.approved).length;
-  const detail = openPackage ? shownPackages.find((pkg) => pkg.name === openPackage) : undefined;
   const approvals = (
     <PackageApprovals packages={thirdPartyPackages} errors={chordPackageManagerData.errors} />
   );
@@ -180,52 +178,61 @@ export function SettingsChordsPageContent({
 
   return (
     <div className="mac-page">
-      {/* An open package replaces the toolbar with its own back button, like a navigation stack. */}
-      {!(view === "packages" && detail) && (
-        <div className="mac-toolbar">
-          <SegmentedControl
-            value={view}
-            onChange={setView}
-            badges={{ packages: pendingApprovals }}
-            idPrefix={idPrefix}
-          />
-          {view === "packages" && (
-            <label className="mac-search mac-toolbar-end">
-              <Search size={13} aria-hidden="true" />
-              <input
-                aria-label="Search packages"
-                placeholder="Search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button type="button" aria-label="Clear search" onClick={() => setSearch("")}>
-                  <X size={13} />
-                </button>
-              )}
-            </label>
-          )}
-        </div>
-      )}
+      <div className="mac-toolbar">
+        <SegmentedControl
+          value={view}
+          onChange={setView}
+          badges={{ packages: pendingApprovals }}
+          idPrefix={idPrefix}
+        />
+        {view === "packages" && canReorderPackages(shownPackages, search) && (
+          <button
+            type="button"
+            className="mac-circle-button ml-auto"
+            aria-pressed={editingOrder}
+            aria-label={editingOrder ? "Done Editing Order" : "Edit Order"}
+            title={
+              editingOrder
+                ? "Done"
+                : "Edit Order: when two packages define the same chord, the higher one runs."
+            }
+            onClick={() => setEditingOrder(!editingOrder)}
+          >
+            <ArrowUpDown size={15} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+        {view === "packages" && (
+          <label className="mac-search">
+            <Search size={13} aria-hidden="true" />
+            <input
+              aria-label="Search packages"
+              placeholder="Search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search && (
+              <button type="button" aria-label="Clear search" onClick={() => setSearch("")}>
+                <X size={13} />
+              </button>
+            )}
+          </label>
+        )}
+      </div>
 
       <div {...panel("packages")}>
-        {detail ? (
-          <PackageDetail entry={detail} apps={apps} onBack={() => setOpenPackage(undefined)} />
-        ) : (
-          <>
-            {/* Trust warnings lead only when there is a decision to make. */}
-            {pendingApprovals > 0 && approvals}
-            <ChordLibrary
-              packages={shownPackages}
-              apps={apps}
-              search={search}
-              onOpen={setOpenPackage}
-              onReorder={setPackageOrder}
-            />
-            <DefaultGlobalPrefixSetting />
-            <OtherSources>{pendingApprovals === 0 && approvals}</OtherSources>
-          </>
-        )}
+        {/* Trust warnings lead only when there is a decision to make. */}
+        {pendingApprovals > 0 && approvals}
+        {/* Opening Chords to configure a package discloses that package in place. */}
+        <ChordLibrary
+          packages={shownPackages}
+          apps={apps}
+          search={search}
+          initiallyExpanded={configurePackage}
+          editing={editingOrder && canReorderPackages(shownPackages, search)}
+          onReorder={setPackageOrder}
+        />
+        <DefaultGlobalPrefixSetting />
+        <OtherSources>{pendingApprovals === 0 && approvals}</OtherSources>
       </div>
       <div {...panel("personal")}>
         <PersonalChords />
@@ -271,15 +278,12 @@ function DefaultGlobalPrefixSetting() {
 
   return (
     <div className="mac-section">
-      <div className="mac-section-header">
-        <h3 className="mac-section-title">Placeholders</h3>
-      </div>
       <div className="mac-list">
         <div className="mac-row">
           <label htmlFor={inputId} className="mac-row-text">
             <span className="mac-row-title">Default global prefix for placeholders</span>
             <span id={`${inputId}-help`} className="mac-row-subtitle">
-              Added before a package&apos;s prefix letter, unless the package has a custom prefix.
+              Added before each package&apos;s prefix letter. Expand a package to give it its own.
             </span>
           </label>
           <input
@@ -306,9 +310,7 @@ function DefaultGlobalPrefixSetting() {
             ? String(save.error.Message)
             : String(save.error)}
         </p>
-      ) : (
-        <p className="mac-section-footer">Open a package to give it a different prefix.</p>
-      )}
+      ) : null}
     </div>
   );
 }

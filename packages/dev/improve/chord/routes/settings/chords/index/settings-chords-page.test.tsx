@@ -112,8 +112,8 @@ test("Packages lists installed packages while Local Chords keeps personal editin
   expect(html).toContain("Default global prefix for placeholders");
   expect(html).toMatch(/<input[^>]+maxLength="1"[^>]+value=";"/i);
   expect(html).toContain("2 packages");
-  expect(html).toContain('aria-label="Open @keychord/finder"');
-  expect(html).not.toContain('aria-label="Open @me/work"');
+  expect(html).toContain('aria-label="Show @keychord/finder chords"');
+  expect(html).not.toContain('aria-label="Show @me/work chords"');
   expect(html).toContain('aria-label="Local Chords"');
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   expect(html).not.toContain('title="@me/work action"');
@@ -122,7 +122,7 @@ test("Packages lists installed packages while Local Chords keeps personal editin
 
 test("Local Chords remains editable when no external packages are installed", () => {
   const html = render([pkg("@me/work")]);
-  expect(html).not.toContain('aria-label="Open @me/work"');
+  expect(html).not.toContain('aria-label="Show @me/work chords"');
   expect(html).toContain("Your package library is empty");
   expect(html).toMatch(/role="tab"[^>]*>My Chords</);
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
@@ -130,28 +130,33 @@ test("Local Chords remains editable when no external packages are installed", ()
   expect(html).not.toContain("Manage sources");
 });
 
-test("opening Chords to configure a package shows only that package", () => {
+test("opening Chords to configure a package discloses it in place", () => {
   const finder = "@keychord/chords-finder";
   const terminal = "@keychord/chords-terminal";
   const html = render([pkg(finder), pkg(terminal)], [], [], terminal);
 
+  // Every package stays listed; only the one to configure shows its chords.
+  expect(html).toMatch(
+    new RegExp(`aria-expanded="true" aria-controls="[^"]*" aria-label="Show ${terminal} chords"`),
+  );
+  expect(html).toMatch(
+    new RegExp(`aria-expanded="false" aria-controls="[^"]*" aria-label="Show ${finder} chords"`),
+  );
   expect(html).toContain(`aria-label="${terminal} details"`);
   expect(html).toContain(`title="${terminal} action"`);
-  expect(html).toContain(">Packages</button>");
-  expect(html).not.toContain(`aria-label="Open ${finder}"`);
   expect(html).not.toContain(`title="${finder} action"`);
 
   // Without a package to configure, the library lists every package and no chords.
   const library = render([pkg(finder), pkg(terminal)]);
-  expect(library).toContain(`aria-label="Open ${finder}"`);
-  expect(library).toContain(`aria-label="Open ${terminal}"`);
+  expect(library).toContain(`aria-label="Show ${finder} chords"`);
+  expect(library).toContain(`aria-label="Show ${terminal} chords"`);
   expect(library).not.toContain(`title="${terminal} action"`);
 });
 
 test("an empty personal package stays editable in Local Chords", () => {
   const empty = { ...pkg("@me/work"), compiledChordsFiles: {} };
   const html = render([pkg("@keychord/finder"), empty]);
-  expect(html).not.toContain('aria-label="Open @me/work"');
+  expect(html).not.toContain('aria-label="Show @me/work chords"');
   expect(html).toContain('aria-label="Edit chords/macos.toml"');
   expect(html).toContain("Add File");
 });
@@ -174,7 +179,7 @@ test("blocked packages are reviewable in the Chords tab without appearing as ena
   expect(html).toContain('title="/Users/me/.chord/packages/downloaded"');
   expect(html).toContain("~/.chord/packages/downloaded");
   expect(html).toContain("Install a third-party package");
-  expect(html).not.toContain('aria-label="Open @untrusted/test"');
+  expect(html).not.toContain('aria-label="Show @untrusted/test chords"');
   expect(html).not.toContain('aria-label="Select @untrusted/test"');
   expect(html).not.toContain('aria-label="Search third-party packages"');
   // A package waiting for review flags the Packages tab and leads it.
@@ -196,7 +201,8 @@ test("approved packages are listed under Other sources with Revoke", () => {
       },
     ],
   );
-  expect(html).toContain("Approved packages (1)");
+  // Each package is its own card, marked approved.
+  expect(html).toContain("Approved · ");
   expect(html).toContain('aria-label="Revoke approval for test"');
   expect(html).toContain("Manage which packages can run code.");
   // Nothing awaits approval, so the tab carries no badge.
@@ -350,25 +356,26 @@ test("moves among many packages land exactly where they are dropped", () => {
   expect(movePackage(rows, "a", "e", "after")).toEqual(["b", "c", "d", "e", "a"]);
 });
 
-test("the library groups core, installed and built-in packages, reordered in Edit Order", () => {
+test("each package is its own card in rank order, reordered in Edit Order", () => {
   const html = render(
     ["@keychord/chords-chord", "@keychord/raycast", "@keychord/warp", "@keychord/finder"].map(pkg),
     [],
     ["@keychord/finder"],
   );
-  const core = html.indexOf(">Core<");
-  expect(core).toBeGreaterThan(-1);
-  expect(core).toBeLessThan(html.indexOf('aria-label="Open @keychord/chords-chord"'));
-  const installed = html.indexOf(">Installed<");
-  const builtin = html.indexOf(">Built-in<");
-  expect(installed).toBeGreaterThan(html.indexOf('aria-label="Open @keychord/chords-chord"'));
-  expect(builtin).toBeGreaterThan(html.indexOf('aria-label="Open @keychord/warp"'));
-  expect(builtin).toBeLessThan(html.indexOf('aria-label="Open @keychord/finder"'));
-  expect(html).toContain("Installed packages always override them.");
+  const card = (name: string) => html.indexOf(`data-package="${name}"`);
+  // Core, then installed, then built-in, each card naming its rank.
+  expect(card("@keychord/chords-chord")).toBeGreaterThan(-1);
+  expect(card("@keychord/chords-chord")).toBeLessThan(card("@keychord/raycast"));
+  expect(card("@keychord/warp")).toBeLessThan(card("@keychord/finder"));
+  expect(html).toContain("Core · ");
+  expect(html).toContain("Installed · ");
+  expect(html).toContain("Built-in · ");
+  expect(html).toContain("the higher one runs.");
   // Packages read by name, with the full package name beneath.
   expect(html).toContain(">Raycast</span>");
   // Handles appear only after Edit Order, so rows stay plain until the user reorders.
-  expect(html).toMatch(/aria-pressed="false"[^>]*>Edit Order</);
+  // Edit Order is a round icon button in the toolbar, named for screen readers.
+  expect(html).toMatch(/aria-pressed="false" aria-label="Edit Order"/);
   expect(html).not.toContain('aria-label="Reorder');
   expect(html).toContain("press the Up or Down arrow key");
 });
@@ -452,7 +459,8 @@ test("placeholders are configured inside their package, not in a separate sectio
   // The Chords page has no standalone placeholder section any more.
   const page = render([rift]);
   expect(page).not.toContain("Window management prefix");
-  expect(page).toContain("1 placeholder");
+  // The package's own card holds them, collapsed until the user opens it.
+  expect(page).toMatch(/aria-expanded="false"[^>]*aria-label="Show @keychord\/chords-rift chords"/);
 
   // Collapsed packages flag a placeholder whose chords stay off until it gets keys.
   const html = renderToString(

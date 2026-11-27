@@ -1,20 +1,10 @@
 import type { ChordMacroEntry, ChordMacroName } from "@chord/dev.improve.chord.lib.typeshare";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
-import { Badge } from "@chord/dev.improve.chord.components.ui.badge";
-import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
-import { Input } from "@chord/dev.improve.chord.components.ui.input";
+import { GroupCard } from "@chord/dev.improve.chord.components.ui.group-card";
 import { KeyLabel } from "@chord/dev.improve.chord.components.ui.kbd";
-import { Textarea } from "@chord/dev.improve.chord.components.ui.textarea";
 import { StateQueries, useChordMacrosState } from "@chord/dev.improve.chord.lib.state";
-import { Pencil, Trash2 } from "lucide-react";
+import { Braces, Hash, Pencil, Trash2 } from "lucide-react";
 import { Fragment, useState, type ComponentProps } from "react";
 import { sequenceLines, sequenceToText, textToSequence } from "#macro-sequence-text";
 
@@ -26,40 +16,47 @@ export function SettingsMacrosPage() {
   );
 }
 
+/**
+ * Two cards, like the rest of Settings: named macros, each a row you can edit or delete with
+ * a form to add one at the end, and the nine temporary buffers as rows of their own.
+ */
 export function MacrosContent({ entries }: { entries: ChordMacroEntry[] }) {
   const named = entries.filter((entry) => entry.target.type === "named");
   return (
-    <div className="space-y-4">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Named Macros</CardTitle>
-          <CardDescription>
-            Expand a macro with <code>{"\\name="}</code>. Names starting with 1–9, or with n, up,
-            left, down, or right in macro text, need the leading <code>=</code> of{" "}
-            <code>{"\\=name="}</code>. Names starting with a digit clear when Chord restarts; other
-            names are saved. <EnterHint />
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <NamedMacroEditor />
-          <div className="space-y-2 border-t pt-4">
-            {named.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No named macros yet.</p>
-            ) : (
-              named.map((entry) => <NamedMacroRow key={JSON.stringify(entry)} entry={entry} />)
-            )}
+    <div className="mac-page">
+      <div className="mac-section">
+        <GroupCard
+          icon={<Braces size={17} strokeWidth={1.6} />}
+          title="Named macros"
+          subtitle={
+            <>
+              Type <code>{"\\name="}</code> while typing a chord to insert one. Names starting with
+              a digit clear when Chord restarts.
+            </>
+          }
+          count={named.length}
+          listLabel="Named macros"
+        >
+          {named.map((entry) => (
+            <NamedMacroRow key={JSON.stringify(entry)} entry={entry} />
+          ))}
+          <div className="mac-row mac-form-row" role="listitem">
+            <NamedMacroEditor />
           </div>
-        </CardContent>
-      </Card>
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Temporary Buffers</CardTitle>
-          <CardDescription>
-            Use <code>{"\\1"}</code> through <code>{"\\9"}</code> to expand these buffers. They
-            clear when Chord restarts. <EnterHint />
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
+        </GroupCard>
+      </div>
+      <div className="mac-section">
+        <GroupCard
+          icon={<Hash size={17} strokeWidth={1.6} />}
+          title="Temporary buffers"
+          subtitle={
+            <>
+              Type <code>{"\\1"}</code> to <code>{"\\9"}</code> to insert one. They clear when Chord
+              restarts.
+            </>
+          }
+          listLabel="Temporary buffers"
+        >
           {Array.from({ length: 9 }, (_, index) => {
             const digit = index + 1;
             const entry = entries.find(
@@ -69,8 +66,11 @@ export function MacrosContent({ entries }: { entries: ChordMacroEntry[] }) {
               <BufferRow key={`${digit}:${entry?.sequence ?? ""}`} digit={digit} entry={entry} />
             );
           })}
-        </CardContent>
-      </Card>
+          <p className="mac-row mac-row-muted mac-card-note">
+            <EnterHint />
+          </p>
+        </GroupCard>
+      </div>
     </div>
   );
 }
@@ -95,55 +95,52 @@ function NamedMacroEditor({ entry, onDone }: { entry?: ChordMacroEntry; onDone?:
   });
   return (
     <form
-      className="space-y-2"
+      className="mac-macro-form"
       onSubmit={(event) => {
         event.preventDefault();
         save.mutate();
       }}
     >
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_auto] sm:items-start">
-        <label className="min-w-0 space-y-1 text-xs text-muted-foreground">
-          <span>Name</span>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-            placeholder="window-size"
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect="off"
-            aria-label={entry ? `Name for ${reference(entry.target)}` : "New macro name"}
-            disabled={save.isPending}
-          />
-        </label>
-        <label className="min-w-0 space-y-1 text-xs text-muted-foreground">
-          <span>Sequence</span>
-          <SequenceTextarea
-            value={text}
-            onValueChange={setText}
-            placeholder="1720x864"
-            aria-label={entry ? `Sequence for ${reference(entry.target)}` : "New macro sequence"}
-            disabled={save.isPending}
-          />
-        </label>
-        {/* Line up with the inputs below their labels while the sequence grows. */}
-        <div className="flex items-center gap-2 sm:pt-5">
+      <div className="mac-macro-fields">
+        <input
+          className="mac-field"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          required
+          placeholder={entry ? "Name" : "New macro name"}
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect="off"
+          aria-label={entry ? `Name for ${reference(entry.target)}` : "New macro name"}
+          disabled={save.isPending}
+        />
+        <SequenceTextarea
+          value={text}
+          onValueChange={setText}
+          placeholder="Text to insert"
+          aria-label={entry ? `Sequence for ${reference(entry.target)}` : "New macro sequence"}
+          disabled={save.isPending}
+        />
+        <div className="mac-macro-actions">
           {onDone && (
-            <Button type="button" variant="outline" onClick={onDone} disabled={save.isPending}>
+            <button type="button" className="mac-button" onClick={onDone} disabled={save.isPending}>
               Cancel
-            </Button>
+            </button>
           )}
-          <Button type="submit" disabled={!name || save.isPending}>
-            {save.isPending ? "Saving…" : entry ? "Save" : "Add macro"}
-          </Button>
+          <button
+            type="submit"
+            className="mac-button"
+            data-default
+            disabled={!name || save.isPending}
+          >
+            {save.isPending ? "Saving…" : entry ? "Save" : "Add"}
+          </button>
         </div>
       </div>
       {name && (
-        <p className="text-xs text-muted-foreground">
+        <p className="mac-row-subtitle">
           <code>{reference({ type: "named", value: name })}</code> ·{" "}
-          {/^[0-9]/.test(name)
-            ? "Temporary — clears on restart"
-            : "Persistent — saved across restarts"}
+          {/^[0-9]/.test(name) ? "Clears when Chord restarts" : "Kept across restarts"}
         </p>
       )}
       {save.isError && <MacroError error={save.error} />}
@@ -154,43 +151,45 @@ function NamedMacroEditor({ entry, onDone }: { entry?: ChordMacroEntry; onDone?:
 function NamedMacroRow({ entry }: { entry: ChordMacroEntry }) {
   const [editing, setEditing] = useState(false);
   const remove = useMutation({ mutationFn: () => taurpc.removeChordMacro(entry.target) });
-  return (
-    <div className="rounded-lg border bg-background/80 p-3">
-      {editing ? (
+  if (editing) {
+    return (
+      <div className="mac-row mac-form-row" role="listitem">
         <NamedMacroEditor entry={entry} onDone={() => setEditing(false)} />
-      ) : (
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1 space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="break-all text-sm font-medium">{reference(entry.target)}</code>
-              <Badge variant="outline">{entry.persistent ? "Persistent" : "Temporary"}</Badge>
-            </div>
-            <SequencePreview sequence={entry.sequence} />
-          </div>
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            aria-label={`Edit ${reference(entry.target)}`}
-            onClick={() => setEditing(true)}
-            disabled={remove.isPending}
-          >
-            <Pencil />
-          </Button>
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            aria-label={`Delete ${reference(entry.target)}`}
-            onClick={() => remove.mutate()}
-            disabled={remove.isPending}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      )}
-      {remove.isError && <MacroError error={remove.error} />}
+      </div>
+    );
+  }
+  return (
+    <div className="mac-row" role="listitem">
+      <span className="mac-row-text">
+        <code className="mac-row-title font-mono">{reference(entry.target)}</code>
+        <SequencePreview sequence={entry.sequence} />
+        {remove.isError && <MacroError error={remove.error} />}
+      </span>
+      <span className="mac-row-detail">{entry.persistent ? "Kept" : "Until restart"}</span>
+      <button
+        type="button"
+        className="mac-button"
+        data-icon
+        data-borderless
+        aria-label={`Edit ${reference(entry.target)}`}
+        title="Edit"
+        onClick={() => setEditing(true)}
+        disabled={remove.isPending}
+      >
+        <Pencil size={14} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="mac-button"
+        data-icon
+        data-borderless
+        aria-label={`Delete ${reference(entry.target)}`}
+        title="Delete"
+        onClick={() => remove.mutate()}
+        disabled={remove.isPending}
+      >
+        <Trash2 size={14} aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -205,46 +204,41 @@ function BufferRow({ digit, entry }: { digit: number; entry?: ChordMacroEntry })
   const dirty = sequence !== (entry?.sequence ?? "");
   return (
     <form
+      role="listitem"
+      className="mac-row mac-buffer-row"
       onSubmit={(event) => {
         event.preventDefault();
         save.mutate();
       }}
-      className="space-y-1"
     >
       {/* Multiline buffers grow downward; the label and buttons stay on the first line. */}
-      <div className="flex items-start gap-2">
-        <label
-          htmlFor={`macro-buffer-${digit}`}
-          className="w-7 shrink-0 font-mono text-sm leading-8"
-        >{`\\${digit}`}</label>
+      <label htmlFor={`macro-buffer-${digit}`} className="mac-buffer-label">{`\\${digit}`}</label>
+      <div className="min-w-0 flex-1">
         <SequenceTextarea
           id={`macro-buffer-${digit}`}
           aria-label={`Buffer ${digit} sequence`}
           value={text}
           onValueChange={setText}
           placeholder="Empty"
-          className="min-w-0 flex-1"
           disabled={pending}
         />
-        <div className="flex h-8 shrink-0 items-center gap-2">
-          {dirty && (
-            <Button type="submit" size="sm" disabled={pending}>
-              {save.isPending ? "Saving…" : "Save"}
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={`Clear buffer ${digit}`}
-            disabled={pending || !entry}
-            onClick={() => clear.mutate()}
-          >
-            Clear
-          </Button>
-        </div>
+        {(save.isError || clear.isError) && <MacroError error={save.error ?? clear.error} />}
       </div>
-      {(save.isError || clear.isError) && <MacroError error={save.error ?? clear.error} />}
+      {dirty && (
+        <button type="submit" className="mac-button" data-default disabled={pending}>
+          {save.isPending ? "Saving…" : "Save"}
+        </button>
+      )}
+      <button
+        type="button"
+        className="mac-button"
+        data-borderless
+        aria-label={`Clear buffer ${digit}`}
+        disabled={pending || !entry}
+        onClick={() => clear.mutate()}
+      >
+        Clear
+      </button>
     </form>
   );
 }
@@ -271,12 +265,12 @@ function SequenceTextarea({
   onValueChange,
   className,
   ...props
-}: Omit<ComponentProps<typeof Textarea>, "value" | "onChange" | "rows"> & {
+}: Omit<ComponentProps<"textarea">, "value" | "onChange" | "rows"> & {
   value: string;
   onValueChange: (value: string) => void;
 }) {
   return (
-    <Textarea
+    <textarea
       {...props}
       value={value}
       onChange={(event) => onValueChange(event.target.value)}
@@ -291,7 +285,7 @@ function SequenceTextarea({
       spellCheck={false}
       autoCapitalize="none"
       autoCorrect="off"
-      className={`min-h-8 resize-none py-1.25 font-mono ${className ?? ""}`}
+      className={`mac-field mac-textarea ${className ?? ""}`}
     />
   );
 }
@@ -300,7 +294,7 @@ function SequenceTextarea({
 function SequencePreview({ sequence }: { sequence: string }) {
   const lines = sequenceLines(sequence);
   return (
-    <p className="whitespace-pre-wrap break-all font-mono text-xs text-muted-foreground">
+    <p className="mac-row-subtitle whitespace-pre-wrap break-all font-mono">
       {sequence === ""
         ? "(empty sequence)"
         : lines.map((line, index) => (
@@ -308,7 +302,7 @@ function SequencePreview({ sequence }: { sequence: string }) {
               {line}
               {index < lines.length - 1 && (
                 <>
-                  <span title="Enter" className="text-muted-foreground/60">
+                  <span title="Enter" className="opacity-60">
                     ↩
                   </span>
                   {"\n"}
@@ -341,7 +335,7 @@ function MacroError({ error }: { error: unknown }) {
           ? String(error.Message)
           : "Could not update this macro. Try again.";
   return (
-    <p role="alert" className="text-xs text-destructive">
+    <p role="alert" className="mac-row-subtitle text-destructive">
       {message}
     </p>
   );
