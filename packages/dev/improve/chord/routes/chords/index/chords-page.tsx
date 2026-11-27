@@ -74,7 +74,7 @@ type BlockState = 'solid' | 'open';
 
 /** Class names for a key in a block; an open block is still being typed with Shift held. */
 function blockKeyClassName(block: BlockState) {
-	return cn('border-sky-400/90 bg-sky-100 text-sky-950', block === 'open' && 'border-dashed bg-sky-50');
+	return cn('border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-400/70 dark:bg-sky-500/30 dark:text-sky-50', block === 'open' && 'border-dashed bg-sky-50 dark:bg-sky-500/15');
 }
 
 function ChordKeyRow({
@@ -122,8 +122,8 @@ function ChordKeyRow({
 						? block
 							? blockKeyClassName(block)
 							: isFailed
-								? 'border-red-400/90 bg-red-100 text-red-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)] dark:shadow-[0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
-								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)] dark:shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
+								? 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/70 dark:bg-red-500/30 dark:text-red-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)] dark:shadow-[0_0_0_1px_rgba(248,113,113,0.35),0_4px_10px_rgba(239,68,68,0.25)]'
+								: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/70 dark:bg-emerald-500/30 dark:text-emerald-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)] dark:shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_4px_10px_rgba(16,185,129,0.25)]'
 						: 'border-border/80 bg-background/95 text-foreground',
 				)}
 			>
@@ -612,8 +612,8 @@ export function ChordsPageContent({
 														: showsBuffer
 															? 'border-border/80 bg-background/95 text-foreground'
 															: executionError
-																? 'border-red-400/90 bg-red-100 text-red-950'
-																: 'border-emerald-400/90 bg-emerald-100 text-emerald-950',
+																? 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-400/70 dark:bg-red-500/30 dark:text-red-50'
+																: 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-400/70 dark:bg-emerald-500/30 dark:text-emerald-50',
 													// Separates adjacent blocks, and blocks from the keys typed after them.
 													index + 1 < floatingDisplayTokens.length && floatingBlockEnds.includes(index + 1) && 'mr-1.5',
 												)}
