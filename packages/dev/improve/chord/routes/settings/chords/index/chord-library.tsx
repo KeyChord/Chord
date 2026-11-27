@@ -715,7 +715,7 @@ export function ChordLibrary({
             <p>{packages.length === 0 ? "Your package library is empty" : "No packages found"}</p>
             <p className="mac-row-subtitle mt-1">
               {packages.length === 0
-                ? "Find a package in Browse to get started."
+                ? "Use Browse Chords to find a package."
                 : "Try a different package name or app."}
             </p>
           </div>

@@ -47,7 +47,6 @@
         "@chord/dev.improve.chord.configs.dev.tauri": "workspace:*",
         "@chord/dev.improve.chord.configs.e2e.macos": "workspace:*",
         "@chord/dev.improve.chord.configs.release.macos": "workspace:*",
-        "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
         "@chord/dev.improve.chord.lib.chord-files": "workspace:*",
         "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.permissions": "workspace:*",
@@ -78,7 +77,6 @@
         "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.configure.index": "workspace:*",
@@ -118,7 +116,6 @@
         "@chord/dev.improve.chord.routes": "workspace:*",
         "@chord/dev.improve.chord.routes.chords.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings.configure.index": "workspace:*",
@@ -573,16 +570,6 @@
         "@types/bun": "^1.4.3",
       },
     },
-    "packages/dev/improve/chord/data/official-chord-repos": {
-      "name": "@chord/dev.improve.chord.data.official-chord-repos",
-      "bin": {
-        "_gen-official-chord-repos": "./_gen-official-chord-repos.ts",
-      },
-      "devDependencies": {
-        "@chord/dev.improve.chord.lib.github": "workspace:*",
-        "@types/bun": "^1.4.3",
-      },
-    },
     "packages/dev/improve/chord/lib/chord-files": {
       "name": "@chord/dev.improve.chord.lib.chord-files",
       "dependencies": {
@@ -665,12 +652,15 @@
         "@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.permissions-dialog": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.update-card": "workspace:*",
         "@tauri-apps/api": "^2.12.4",
+        "@tauri-apps/plugin-opener": "^2.7.2",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
@@ -1036,34 +1026,6 @@
         "react-dom": "^19.3.1",
       },
     },
-    "packages/dev/improve/chord/routes/settings/browse/index": {
-      "name": "@chord/dev.improve.chord.routes.settings.browse.index",
-      "dependencies": {
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
-        "@chord/com.npmjs.tanstack__react-table": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
-        "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
-        "@chord/dev.improve.chord.lib.github": "workspace:*",
-        "@chord/dev.improve.chord.lib.state": "workspace:*",
-        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.open-repo-button": "workspace:*",
-        "@tauri-apps/plugin-opener": "^2.7.2",
-        "lucide-react": "^1.57.0",
-        "react": "^19.3.1",
-      },
-      "devDependencies": {
-        "@types/react": "^19.3.0",
-        "@types/react-dom": "^19.3.0",
-        "react-dom": "^19.3.1",
-      },
-    },
     "packages/dev/improve/chord/routes/settings/chords/index": {
       "name": "@chord/dev.improve.chord.routes.settings.chords.index",
       "dependencies": {
@@ -1201,8 +1163,6 @@
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
-        "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
-        "@chord/dev.improve.chord.lib.github": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@tauri-apps/api": "^2.12.4",
@@ -1362,8 +1322,6 @@
 
     "@chord/dev.improve.chord.configs.release.macos": ["@chord/dev.improve.chord.configs.release.macos@workspace:packages/dev/improve/chord/configs/release/macos"],
 
-    "@chord/dev.improve.chord.data.official-chord-repos": ["@chord/dev.improve.chord.data.official-chord-repos@workspace:packages/dev/improve/chord/data/official-chord-repos"],
-
     "@chord/dev.improve.chord.lib.chord-files": ["@chord/dev.improve.chord.lib.chord-files@workspace:packages/dev/improve/chord/lib/chord-files"],
 
     "@chord/dev.improve.chord.lib.github": ["@chord/dev.improve.chord.lib.github@workspace:packages/dev/improve/chord/lib/github"],
@@ -1427,8 +1385,6 @@
     "@chord/dev.improve.chord.routes.settings._components.sync-repo-button": ["@chord/dev.improve.chord.routes.settings._components.sync-repo-button@workspace:packages/dev/improve/chord/routes/settings/_components/sync-repo-button"],
 
     "@chord/dev.improve.chord.routes.settings._components.update-card": ["@chord/dev.improve.chord.routes.settings._components.update-card@workspace:packages/dev/improve/chord/routes/settings/_components/update-card"],
-
-    "@chord/dev.improve.chord.routes.settings.browse.index": ["@chord/dev.improve.chord.routes.settings.browse.index@workspace:packages/dev/improve/chord/routes/settings/browse/index"],
 
     "@chord/dev.improve.chord.routes.settings.chords.index": ["@chord/dev.improve.chord.routes.settings.chords.index@workspace:packages/dev/improve/chord/routes/settings/chords/index"],
 

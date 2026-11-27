@@ -14,7 +14,6 @@
 		"@chord/dev.improve.chord.routes": "workspace:*",
 		"@chord/dev.improve.chord.routes.chords.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings.browse.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings.chords.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings.command-line.index": "workspace:*",
 		"@chord/dev.improve.chord.routes.settings.configure.index": "workspace:*",

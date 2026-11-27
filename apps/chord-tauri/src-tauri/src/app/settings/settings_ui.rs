@@ -88,11 +88,12 @@ impl SettingsUi {
         Ok(())
     }
 
-    pub fn open_package_browser(&self) -> Result<()> {
+    pub fn open_chords(&self) -> Result<WebviewWindow> {
         let window = self.get_or_create_window()?;
-        let url = window.url()?.join("/settings/browse")?;
+        let url = window.url()?.join("/settings/chords")?;
         window.navigate(url)?;
-        self.open()
+        self.open()?;
+        Ok(window)
     }
 
     #[allow(dead_code)]

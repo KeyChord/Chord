@@ -12,7 +12,6 @@ import { Route as SettingsRouteRouteImport } from './routes/settings/route'
 import { Route as ChordsIndexRouteImport } from './routes/chords/index'
 import { Route as OnboardingIndexRouteImport } from './routes/onboarding/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
-import { Route as SettingsBrowseIndexRouteImport } from './routes/settings/browse/index'
 import { Route as SettingsChordsIndexRouteImport } from './routes/settings/chords/index'
 import { Route as SettingsCommandLineIndexRouteImport } from './routes/settings/command-line/index'
 import { Route as SettingsConfigureIndexRouteImport } from './routes/settings/configure/index'
@@ -46,11 +45,6 @@ const OnboardingIndexRoute = OnboardingIndexRouteImport.update({
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => SettingsRouteRoute,
-} as any)
-const SettingsBrowseIndexRoute = SettingsBrowseIndexRouteImport.update({
-  id: '/browse/',
-  path: '/browse/',
   getParentRoute: () => SettingsRouteRoute,
 } as any)
 const SettingsChordsIndexRoute = SettingsChordsIndexRouteImport.update({
@@ -107,7 +101,6 @@ export interface FileRoutesByFullPath {
   '/chords/': typeof ChordsIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
   '/settings/command-line/': typeof SettingsCommandLineIndexRoute
   '/settings/configure/': typeof SettingsConfigureIndexRoute
@@ -123,7 +116,6 @@ export interface FileRoutesByTo {
   '/chords': typeof ChordsIndexRoute
   '/onboarding': typeof OnboardingIndexRoute
   '/settings': typeof SettingsIndexRoute
-  '/settings/browse': typeof SettingsBrowseIndexRoute
   '/settings/chords': typeof SettingsChordsIndexRoute
   '/settings/command-line': typeof SettingsCommandLineIndexRoute
   '/settings/configure': typeof SettingsConfigureIndexRoute
@@ -141,7 +133,6 @@ export interface FileRoutesById {
   '/chords/': typeof ChordsIndexRoute
   '/onboarding/': typeof OnboardingIndexRoute
   '/settings/': typeof SettingsIndexRoute
-  '/settings/browse/': typeof SettingsBrowseIndexRoute
   '/settings/chords/': typeof SettingsChordsIndexRoute
   '/settings/command-line/': typeof SettingsCommandLineIndexRoute
   '/settings/configure/': typeof SettingsConfigureIndexRoute
@@ -160,7 +151,6 @@ export interface FileRouteTypes {
     | '/chords/'
     | '/onboarding/'
     | '/settings/'
-    | '/settings/browse/'
     | '/settings/chords/'
     | '/settings/command-line/'
     | '/settings/configure/'
@@ -176,7 +166,6 @@ export interface FileRouteTypes {
     | '/chords'
     | '/onboarding'
     | '/settings'
-    | '/settings/browse'
     | '/settings/chords'
     | '/settings/command-line'
     | '/settings/configure'
@@ -193,7 +182,6 @@ export interface FileRouteTypes {
     | '/chords/'
     | '/onboarding/'
     | '/settings/'
-    | '/settings/browse/'
     | '/settings/chords/'
     | '/settings/command-line/'
     | '/settings/configure/'
@@ -247,13 +235,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof SettingsRouteRoute
-    }
-    '/settings/browse/': {
-      id: '/settings/browse/'
-      path: '/browse'
-      fullPath: '/settings/browse/'
-      preLoaderRoute: typeof SettingsBrowseIndexRouteImport
       parentRoute: typeof SettingsRouteRoute
     }
     '/settings/chords/': {
@@ -324,7 +305,6 @@ declare module '@tanstack/react-router' {
 
 interface SettingsRouteRouteChildren {
   SettingsIndexRoute: typeof SettingsIndexRoute
-  SettingsBrowseIndexRoute: typeof SettingsBrowseIndexRoute
   SettingsChordsIndexRoute: typeof SettingsChordsIndexRoute
   SettingsCommandLineIndexRoute: typeof SettingsCommandLineIndexRoute
   SettingsConfigureIndexRoute: typeof SettingsConfigureIndexRoute
@@ -338,7 +318,6 @@ interface SettingsRouteRouteChildren {
 
 const SettingsRouteRouteChildren: SettingsRouteRouteChildren = {
   SettingsIndexRoute: SettingsIndexRoute,
-  SettingsBrowseIndexRoute: SettingsBrowseIndexRoute,
   SettingsChordsIndexRoute: SettingsChordsIndexRoute,
   SettingsCommandLineIndexRoute: SettingsCommandLineIndexRoute,
   SettingsConfigureIndexRoute: SettingsConfigureIndexRoute,

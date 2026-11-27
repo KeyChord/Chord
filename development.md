@@ -139,7 +139,6 @@ vpx _build                     # type-check and build the frontend
 vpx _release-macos             # package the production macOS app
 vpx _lint                      # lint and apply fixes
 vpx _gen-types                 # regenerate Rust model types
-vpx _gen-official-chord-repos   # regenerate the package catalog
 vpx _e2e-macos test --build     # build and test the production app in Tart
 vpx _e2e-macos journey --build  # go from the website to a first chord, as a new user, in Tart
 ```
@@ -451,17 +450,10 @@ the monorepo's copies. Duplicate package names within one monorepo are rejected.
 
 ## Browse catalog
 
-Settings → Browse lists every package under `@keychord/` in the sibling `../chords` checkout,
-except private ones and the default packages in `apps/chord-tauri/data/default-packages.toml`,
-which Chord installs itself and shows among the installed chords.
-Each listing's name, description, categories and repo URL come from the `displayName`,
-`description`, `categories` and `repository.url` fields of the package's `package.json`.
-After adding or removing a package, changing those fields or changing the defaults, run
-`vpx _gen-official-chord-repos` and commit the regenerated `official-chord-repos.gen.json`;
-a test fails while it is out of date (and is skipped without the sibling checkout).
-Community packages are not listed: Browse links to a GitHub search for the `chordpack` topic.
-The chords monorepo's mirror sync adds that topic to every official `chords-*` mirror, and
-community authors add it to their own repos.
+The **Browse Chords** button in Settings → Chords opens [the package catalog](https://trychord.app/packages).
+The website discovers packages in the public `KeyChord/chords` repository and links to
+their individual GitHub mirrors. **Add to Chord** opens the app and asks for confirmation
+before installing a mirror. Manage installed packages and their sources in Settings → Chords.
 
 ## Stores
 
@@ -696,18 +688,15 @@ an update without releasing, start a release build with `CHORD_UPDATE_ENDPOINT` 
 `latest.json`; what it lists must still carry this repository's updater signature.
 
 Chord installs the packages pinned in `apps/chord-tauri/data/default-packages.toml` on first launch.
-It never moves an installed package to another commit by itself. Instead, **Settings → Browse →
-Updates** lists each built-in package installed at a different commit from its current pin, and each
-installed package that follows its repository whose mirror has a newer commit. It checks at launch,
-once a day, and on **Check Again**. Updating installs that exact commit.
+Chord keeps the installed revision until the user updates it. Use **Settings → Chords → Other sources**
+to sync repositories that follow their latest revision.
 
 When the defaults gain a package, an existing install gets it once, on its first launch after the
 update; `builtin-packages.json` in the app data folder records which built-in packages it has had,
 so one the user removed stays removed. When you change the set, keep the one it replaces in the
 file's `[[previous]]` list. A package the defaults drop is removed while it's still at a revision
 listed there, and the list tells Chord which set an install from before `builtin-packages.json`
-was set up with. Pin a package that didn't change to the same commit as before: a new pin shows up
-as an update for everyone. The mirror sync keeps an unchanged package's mirror commit for the same
+was set up with. Keep a package's pin when its contents haven't changed. The mirror sync keeps an unchanged package's mirror commit for the same
 reason.
 
 To promote a build to production, push its commit to `prod`, for example the current `dev`:

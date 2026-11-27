@@ -6,15 +6,14 @@ import { useEffect, useState } from "react";
 import { DoneStep, useFinishOnboarding } from "#step-done";
 import { type CreatedChord, FirstChordStep } from "#step-first-chord";
 import { MoveStep } from "#step-move";
-import { PacksStep } from "#step-packs";
 import { PermissionStep } from "#step-permission";
 import { PracticeStep } from "#step-practice";
 import { WelcomeStep } from "#step-welcome";
 
-type Step = "welcome" | "permission" | "first-chord" | "practice" | "packs" | "done";
+type Step = "welcome" | "permission" | "first-chord" | "practice" | "done";
 
 /** The numbered steps after the welcome screen. */
-const NUMBERED_STEPS: Step[] = ["permission", "first-chord", "practice", "packs"];
+const NUMBERED_STEPS: Step[] = ["permission", "first-chord", "practice"];
 
 export function OnboardingPage() {
   const navigate = useNavigate();
@@ -89,7 +88,7 @@ export function OnboardingPage() {
         <PermissionStep
           {...numbers("permission")}
           paneName={info.data?.accessibilityPaneName ?? "Accessibility"}
-          onSkip={() => setStep("packs")}
+          onSkip={() => setStep("done")}
         />
       );
     case "first-chord":
@@ -100,7 +99,7 @@ export function OnboardingPage() {
             setChord(created);
             setStep("practice");
           }}
-          onSkip={() => setStep("packs")}
+          onSkip={() => setStep("done")}
         />
       );
     case "practice":
@@ -109,11 +108,9 @@ export function OnboardingPage() {
           {...numbers("practice")}
           sequence={chord?.sequence ?? ""}
           appName={chord?.appName ?? ""}
-          onContinue={() => setStep("packs")}
+          onContinue={() => setStep("done")}
         />
       );
-    case "packs":
-      return <PacksStep {...numbers("packs")} onContinue={() => setStep("done")} />;
     case "done":
       return (
         <DoneStep

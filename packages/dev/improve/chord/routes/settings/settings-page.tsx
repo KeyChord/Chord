@@ -1,11 +1,13 @@
 import { TanStackDevtools } from "@chord/com.npmjs.tanstack__react-devtools";
 import { Link, Outlet, useRouterState } from "@chord/com.npmjs.tanstack__react-router";
 import { TanStackRouterDevtoolsPanel } from "@chord/com.npmjs.tanstack__react-router-devtools";
+import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
+import { toast } from "@chord/dev.improve.chord.components.ui.toast";
 import {
   desktopPlatform,
   useAppUpdateState,
@@ -15,10 +17,11 @@ import { LogStreamProvider } from "@chord/dev.improve.chord.routes.settings._com
 import { PermissionsDialog } from "@chord/dev.improve.chord.routes.settings._components.permissions-dialog";
 import { UpdateCard } from "@chord/dev.improve.chord.routes.settings._components.update-card";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Command,
   ChevronRight,
-  Compass,
+  ExternalLink,
   Keyboard,
   Braces,
   Settings2,
@@ -48,12 +51,6 @@ const navigationGroups = [
         to: "/settings/chords",
         icon: Keyboard,
         description: "Your packages, your own chords and third-party code.",
-      },
-      {
-        label: "Browse",
-        to: "/settings/browse",
-        icon: Compass,
-        description: "Find and install chord packages.",
       },
     ],
   },
@@ -117,10 +114,8 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   const settings = useSettingsState();
   const appUpdate = useAppUpdateState();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  // These pages fill the window and scroll inside themselves.
-  const fillsWindow = ["/settings/log", "/settings/browse"].some(
-    (path) => pathname === path || pathname === `${path}/`,
-  );
+  // The log fills the window and scrolls inside itself.
+  const fillsWindow = pathname === "/settings/log" || pathname === "/settings/log/";
   const currentPage = navigationGroups
     .map((group) => group.items.find((item) => pathname === item.to || pathname === `${item.to}/`))
     .find((item) => item !== undefined);
@@ -204,7 +199,7 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
       <main className="settings-content-surface flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
         <header
           data-sidebar-collapsed={isSidebarCollapsed || undefined}
-          className="flex h-[62px] shrink-0 items-center px-4 transition-[padding] duration-200 ease-out motion-reduce:transition-none data-sidebar-collapsed:pl-[120px]"
+          className="flex h-[62px] shrink-0 items-center justify-between gap-3 px-4 transition-[padding] duration-200 ease-out motion-reduce:transition-none data-sidebar-collapsed:pl-[120px]"
           onMouseDown={handleTitleBarMouseDown}
         >
           <div className="min-w-0 cursor-default select-none">
@@ -213,6 +208,23 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
               <p className="settings-page-description truncate">{currentPage.description}</p>
             )}
           </div>
+          {currentPage?.to === "/settings/chords" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => {
+                void openUrl("https://trychord.app/packages").catch(() =>
+                  toast.danger("Could not open the Chord catalog."),
+                );
+              }}
+            >
+              Browse Chords
+              <ExternalLink aria-hidden="true" />
+            </Button>
+          )}
         </header>
         <div
           ref={scrollContainerRef}

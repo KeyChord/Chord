@@ -11,7 +11,6 @@
     "#step-first-chord": "./step-first-chord.tsx",
     "#step-layout": "./step-layout.tsx",
     "#step-move": "./step-move.tsx",
-    "#step-packs": "./step-packs.tsx",
     "#step-permission": "./step-permission.tsx",
     "#step-practice": "./step-practice.tsx",
     "#step-welcome": "./step-welcome.tsx"
@@ -27,8 +26,6 @@
     "@chord/dev.improve.chord.components.ui.button": "workspace:*",
     "@chord/dev.improve.chord.components.ui.input": "workspace:*",
     "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
-    "@chord/dev.improve.chord.data.official-chord-repos": "workspace:*",
-    "@chord/dev.improve.chord.lib.github": "workspace:*",
     "@chord/dev.improve.chord.lib.state": "workspace:*",
     "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
     "@tauri-apps/api": "^2.12.4",

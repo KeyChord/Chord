@@ -1,6 +1,5 @@
 # Packages Chord installs, at these revisions, on first launch and when chords are reset. An
-# install with one at another revision sees this one as an update in Browse; Chord never moves an
-# installed package by itself.
+# install with one at another revision keeps it until the user chooses to update it.
 # Pin each to its mirror's commit, and run `vpx _e2e-macos journey --build` after changing one:
 # its last steps fail when a default package has chords this app can't load.
 #

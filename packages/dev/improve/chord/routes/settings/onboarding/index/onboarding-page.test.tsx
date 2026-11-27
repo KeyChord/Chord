@@ -8,7 +8,6 @@ const previousWindow = globalThis.window;
 globalThis.window = { Proxy, screen: {} } as unknown as Window & typeof globalThis;
 const { PermissionStep } = await import("#step-permission");
 const { PracticeView } = await import("#step-practice");
-const { PacksView } = await import("#step-packs");
 const { WelcomeStep } = await import("#step-welcome");
 const { DoneStep } = await import("#step-done");
 const { MoveStep } = await import("#step-move");
@@ -35,7 +34,7 @@ test("the permission step uses the name of the page macOS actually shows", () =>
     <PermissionStep
       paneName="Device Control and Data Access"
       stepNumber={1}
-      stepCount={4}
+      stepCount={3}
       onSkip={() => {}}
     />,
   );
@@ -46,7 +45,7 @@ test("the permission step uses the name of the page macOS actually shows", () =>
 
 test("the permission step prepares people for the wording macOS uses", () => {
   const html = render(
-    <PermissionStep paneName="Accessibility" stepNumber={1} stepCount={4} onSkip={() => {}} />,
+    <PermissionStep paneName="Accessibility" stepNumber={1} stepCount={3} onSkip={() => {}} />,
   );
   expect(html).toContain("monitor your keyboard");
   expect(html).toContain("doesn&#x27;t record what you type");
@@ -165,28 +164,6 @@ test("practice celebrates the chord running", () => {
     <PracticeView progress={{ ...initialPractice, ran: true }} sequence="/s" appName="Safari" />,
   );
   expect(html).toContain("opened Safari");
-});
-
-test("packs show which are added, and every official pack is offered", () => {
-  const html = render(
-    <PacksView installedSlugs={new Set(["keychord/chords-vscode"])} onAdd={() => {}} />,
-  );
-  expect(html).toContain("VSCode Chords");
-  expect(html).toContain("Added");
-  expect(html).toContain("Add Chromium Chords");
-  expect(html).not.toContain("Add VSCode Chords");
-});
-
-test("a pack still loading its chords says so, even once it is saved", () => {
-  const html = render(
-    <PacksView
-      installedSlugs={new Set(["keychord/chords-terminal"])}
-      pendingUrl="https://github.com/KeyChord/chords-terminal"
-      onAdd={() => {}}
-    />,
-  );
-  expect(html).toContain("Adding…");
-  expect(html).not.toContain("Added");
 });
 
 test("finishing without the permission warns that chords will not work", () => {
