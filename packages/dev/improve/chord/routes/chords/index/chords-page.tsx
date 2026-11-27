@@ -2,6 +2,7 @@ import type { Chord, ChordExecutionState, ChordHint, ChordInputState, ChordMacro
 import { cn } from '@chord/com.npmjs.utils-cn';
 import { Kbd, KeyLabel } from '@chord/dev.improve.chord.components.ui.kbd';
 import { useHintPanelState } from '@chord/dev.improve.chord.lib.state/hint-panel';
+import { getCollapseEarlierKeys } from '@chord/dev.improve.chord.lib.state/panel-preferences';
 import { emit, listen } from '@tauri-apps/api/event';
 import { blockDisplayEnds, getCommandPrefix, getRangeHint, isDeletionOf, normalizeChordTokens, normalizeToken, withQuoteTexts } from '#chord-tokens';
 import { getEscapeSuggestions } from '#chord-suggestions';
@@ -78,15 +79,12 @@ type BlockState = 'solid' | 'open';
 
 /** Class names for a key in a block; an open block is still being typed with Shift held. */
 function blockKeyClassName(block: BlockState) {
-	return cn(
-		'border-sky-400/90 bg-sky-100 text-sky-950 dark:border-sky-300/80 dark:bg-sky-500/40 dark:text-white',
-		block === 'open' && 'border-dashed bg-sky-50 dark:bg-sky-500/10',
-	);
+	return cn('border-sky-400/90 bg-sky-100 text-sky-950', block === 'open' && 'border-dashed bg-sky-50');
 }
 
-const IDLE_KEY_CLASS_NAME = 'border-black/15 bg-white text-neutral-900 dark:border-white/25 dark:bg-white/[0.16] dark:text-white';
-const RAN_KEY_CLASS_NAME = 'border-emerald-400/90 bg-emerald-100 text-emerald-950 dark:border-emerald-300/80 dark:bg-emerald-500/45 dark:text-white';
-const FAILED_KEY_CLASS_NAME = 'border-red-400/90 bg-red-100 text-red-950 dark:border-red-300/80 dark:bg-red-500/45 dark:text-white';
+const IDLE_KEY_CLASS_NAME = 'border-border/80 bg-background/95 text-foreground';
+const RAN_KEY_CLASS_NAME = 'border-emerald-400/90 bg-emerald-100 text-emerald-950';
+const FAILED_KEY_CLASS_NAME = 'border-red-400/90 bg-red-100 text-red-950';
 
 /**
  * Hides the part of a list that does not fit behind a fade at that edge, the way macOS
@@ -136,8 +134,8 @@ function ChordKeyRow({
 		<div
 			className={cn(
 				'flex shrink-0 items-center gap-3',
-				isDimmed ? 'opacity-40 dark:opacity-50' : 'opacity-100',
-				'text-foreground',
+				isDimmed ? 'opacity-35' : 'opacity-100',
+				'text-foreground/95',
 			)}
 		>
 			<Kbd
@@ -147,7 +145,7 @@ function ChordKeyRow({
 					fontSize: `${Math.max(12, Math.round(keySize * 0.48))}px`,
 				}}
 				className={cn(
-					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_1px_2px_rgba(0,0,0,0.4)]',
+					'shrink-0 rounded-md border shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_1px_2px_rgba(0,0,0,0.18)]',
 					token.length > 1 ? 'px-2' : 'px-0',
 					isSelected
 						? block
@@ -611,7 +609,7 @@ export function ChordsPageContent({
 	const headerHeight = loops.length > 0 ? (Math.min(loops.length, MAX_LISTED_LOOPS) + Number(loops.length > MAX_LISTED_LOOPS)) * 20 + 12 : 0;
 	const rowsPerColumn = Math.max(4, Math.floor((availableHeight - headerHeight + rowGap) / (keySize + rowGap)));
 	const lastColumnWraps = clamp(Math.ceil((keyColumns.at(-1)?.rows.length ?? 0) / rowsPerColumn), 1, MAX_WRAPPED_COLUMNS);
-	const fullColumnCount = Math.max(1, MAX_FULL_COLUMNS - (lastColumnWraps - 1));
+	const fullColumnCount = getCollapseEarlierKeys() ? Math.max(1, MAX_FULL_COLUMNS - (lastColumnWraps - 1)) : keyColumns.length;
 	const collapsedColumns = keyColumns.slice(0, Math.max(0, keyColumns.length - fullColumnCount));
 	const visibleColumns = keyColumns.slice(collapsedColumns.length).map((column, index, columns) => {
 		const isLast = index === columns.length - 1;
@@ -693,7 +691,7 @@ export function ChordsPageContent({
 					key={surfaceVersion}
 					ref={surfaceRef}
 					className={cn(
-						'relative isolate overflow-hidden border border-black/[0.08] bg-white/60 dark:border-white/15 dark:bg-black/55',
+						'relative isolate overflow-hidden border border-white/30 bg-white/22 dark:border-white/10 dark:bg-zinc-950/24',
 						isFloating
 							? 'rounded-2xl px-3 py-2.5 shadow-[0_4px_12px_rgba(15,23,42,0.18)] dark:shadow-[0_4px_12px_rgba(0,0,0,0.34)]'
 							: 'rounded-r-[2rem] rounded-l-none border-l-0 px-5 py-5 pl-7 shadow-[18px_20px_60px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.42)] dark:shadow-[18px_20px_60px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.1)]',
@@ -760,24 +758,24 @@ export function ChordsPageContent({
 							<p className="text-xs text-foreground/60">Caps+Space closes the quote · Esc cancels</p>
 						</div>
 					) : (
-					<div className="relative flex flex-col items-start">
-						{collapsedColumns.length > 0 && (
-							<div aria-label="Earlier keys" className="mb-3 flex max-w-full items-center gap-1 overflow-hidden text-xs text-foreground/60">
-								{collapsedColumns.map(column => {
-									const block = getColumnBlock(column.index);
-									return (
-										<Kbd
-											key={column.index}
-											className={cn('h-6 min-w-6 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : IDLE_KEY_CLASS_NAME)}
-										>
-											<KeyLabel label={column.selectedLabel ?? ''} />
-										</Kbd>
-									);
-								})}
-								<span aria-hidden className="ml-0.5 text-foreground/40">›</span>
-							</div>
-						)}
+					<div className="relative flex items-start">
 						<div className="flex items-start gap-6">
+							{collapsedColumns.length > 0 && (
+								<div aria-label="Earlier keys" className="flex shrink-0 items-center gap-1 px-1 py-1 text-xs text-foreground/60" style={{ height: keySize + 8 }}>
+									{collapsedColumns.map(column => {
+										const block = getColumnBlock(column.index);
+										return (
+											<Kbd
+												key={column.index}
+												className={cn('h-6 min-w-6 shrink-0 rounded-md border px-1 text-xs shadow-sm', block ? blockKeyClassName(block) : IDLE_KEY_CLASS_NAME)}
+											>
+												<KeyLabel label={column.selectedLabel ?? ''} />
+											</Kbd>
+										);
+									})}
+									<span aria-hidden className="ml-0.5 text-foreground/40">›</span>
+								</div>
+							)}
 							{visibleColumns.map(column => (
 								<div
 									key={column.index}

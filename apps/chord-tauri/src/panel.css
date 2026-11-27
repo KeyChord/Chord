@@ -5,6 +5,8 @@
 @import "@heroui/styles/components/kbd.css" layer(components);
 @import "@heroui/styles/utilities";
 @import "@heroui/styles/variants";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 @import "./theme.css";
 
 @source './panel.tsx';

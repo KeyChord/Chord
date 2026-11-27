@@ -373,4 +373,15 @@ test("keys before the last columns collapse into a trail", () => {
   const deep = render(keys.slice(0, 4));
   expect(deep).toContain('aria-label="Earlier keys"');
   expect(deep).toContain("Deep chord");
+
+  // Turned off in Settings: every key keeps its column.
+  const storage = (window as { localStorage?: unknown }).localStorage;
+  (window as { localStorage?: unknown }).localStorage = { getItem: (key: string) => key === "chord-collapse-earlier-keys" ? "false" : null };
+  try {
+    const unfolded = render(keys.slice(0, 4));
+    expect(unfolded).not.toContain('aria-label="Earlier keys"');
+    expect(unfolded).toContain("Deep chord");
+  } finally {
+    (window as { localStorage?: unknown }).localStorage = storage;
+  }
 });
