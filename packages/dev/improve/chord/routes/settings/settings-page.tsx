@@ -1,8 +1,6 @@
 import { TanStackDevtools } from "@chord/com.npmjs.tanstack__react-devtools";
-import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { Link, Outlet, useRouterState } from "@chord/com.npmjs.tanstack__react-router";
 import { TanStackRouterDevtoolsPanel } from "@chord/com.npmjs.tanstack__react-router-devtools";
-import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
   Collapsible,
   CollapsibleContent,
@@ -23,7 +21,6 @@ import {
   Compass,
   Keyboard,
   Braces,
-  PanelLeft,
   Settings2,
   SquareTerminal,
   Terminal,
@@ -119,7 +116,6 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
   const settings = useSettingsState();
   const appUpdate = useAppUpdateState();
-  const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // These pages fill the window and scroll inside themselves.
   const fillsWindow = ["/settings/log", "/settings/browse"].some(
@@ -141,28 +137,12 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const isSidebarCollapsed = settings.data?.isSettingsSidebarCollapsed ?? false;
-  const sidebarToggleLabel = isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar";
+  // The sidebar always shows; there's no button to hide it, so a saved hidden state is ignored.
+  const isSidebarCollapsed = false;
   const hasUpdateCard = appUpdate.data !== undefined && appUpdate.data.status !== "idle";
 
   return (
     <div className="settings-window-shell relative flex min-h-0 h-full w-full">
-      {/* Beside the traffic lights, where it stays put whether the sidebar is open or not.
-          Their centres sit 26px from the top (`traffic_light_position` in settings_ui.rs),
-          so this 28px button starts 14px above that. */}
-      <button
-        type="button"
-        aria-controls="settings-sidebar"
-        aria-expanded={!isSidebarCollapsed}
-        aria-label={sidebarToggleLabel}
-        title={sidebarToggleLabel}
-        className="absolute left-[84px] top-[12px] z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => {
-          toggleSidebarMutation.mutate();
-        }}
-      >
-        <PanelLeft className="size-4" strokeWidth={1.8} />
-      </button>
 
       <aside
         id="settings-sidebar"

@@ -15,6 +15,7 @@
     "@chord/dev.improve.chord.components.ui.label": "workspace:*",
     "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
     "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
     "react": "^19.3.1"
   },
   "devDependencies": {

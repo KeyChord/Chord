@@ -21,6 +21,7 @@ export function GroupCard({
   onOpenChange,
   headerLabel,
   rootProps,
+  className,
   children,
 }: {
   /** A control before the header, such as a selection checkbox. */
@@ -43,6 +44,8 @@ export function GroupCard({
   headerLabel?: string;
   /** Attributes for the card itself, such as data attributes a list uses to find it. */
   rootProps?: HTMLAttributes<HTMLDivElement> & Record<`data-${string}`, unknown>;
+  /** Extra classes for the card, such as a tint for a warning. */
+  className?: string;
   /** Leave out for a card that is only its header, with nothing to disclose. */
   children?: ReactNode;
 }) {
@@ -71,7 +74,7 @@ export function GroupCard({
   return (
     <div
       {...rootProps}
-      className="mac-list mac-group"
+      className={className ? `mac-list mac-group ${className}` : "mac-list mac-group"}
       data-open={(disclosable && open) || undefined}
       data-dragging={dragging || undefined}
     >

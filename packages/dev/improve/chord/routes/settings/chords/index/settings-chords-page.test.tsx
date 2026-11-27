@@ -199,8 +199,9 @@ test("approved third-party packages follow the others on the Packages tab with R
       },
     ],
   );
-  // Each package is its own card, marked third-party and approved.
-  expect(html).toContain("Third-party · approved");
+  // Each package is a row of the one third-party card, marked approved.
+  expect(html).toContain(">Third-party packages<");
+  expect(html).toContain("Approved · ");
   expect(html).toContain('aria-label="Revoke approval for test"');
   // Nothing awaits approval, so there's no warning and no badge, and they come last.
   expect(html).not.toContain("awaiting approval");

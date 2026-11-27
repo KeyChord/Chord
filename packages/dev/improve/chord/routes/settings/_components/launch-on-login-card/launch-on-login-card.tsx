@@ -12,9 +12,11 @@ import { Label } from "@chord/dev.improve.chord.components.ui.label";
 import {
   StateQueries,
   desktopPlatform,
+  useChordPanelState,
   usePermissionsState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
+import { ChordLayout } from "@chord/dev.improve.chord.lib.typeshare";
 import {
   type Appearance,
   getAppearance,
@@ -24,7 +26,7 @@ import {
   getCollapseEarlierKeys,
   setCollapseEarlierKeys,
 } from "@chord/dev.improve.chord.lib.state/panel-preferences";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 export function LaunchOnLoginCard() {
   return (
@@ -119,6 +121,7 @@ function LaunchOnLoginCardContent({
               While you type a chord, the Hint Panel lists the keys you can press next and what each
               one does.
             </p>
+            <HintPanelStyleRow />
             <SettingSwitchRow
               id="hide-hint-panel-by-default"
               label="Hide until I press Tab"
@@ -152,37 +155,84 @@ const APPEARANCES: { value: Appearance; label: string }[] = [
   { value: "dark", label: "Dark" },
 ];
 
+const HINT_PANEL_STYLES: { value: ChordLayout; label: string }[] = [
+  { value: ChordLayout.SidebarLeft, label: "Sidebar" },
+  { value: ChordLayout.FloatingBottom, label: "Overlay" },
+];
+
 /**
- * Light or Dark for Settings and the Hint Panel, or Auto to follow macOS, picked from small window
- * previews like System Settings' Appearance.
+ * Sidebar, which lists the keys you can press next beside the latest one, or the original
+ * overlay along the bottom, which shows everything you've typed from left to right.
  */
+function HintPanelStyleRow() {
+  const layout = useChordPanelState().data?.layout ?? ChordLayout.SidebarLeft;
+  const setLayout = useMutation({ mutationFn: taurpc.setHintPanelLayout });
+  const shown = setLayout.isPending && setLayout.variables ? setLayout.variables : layout;
+  const index = HINT_PANEL_STYLES.findIndex(({ value }) => value === shown);
+  return (
+    <div className="preference-row">
+      <div className="min-w-0 flex-1">
+        <span id="hint-panel-style-label" className="preference-label">
+          Style
+        </span>
+        <p className="preference-description">
+          {shown === ChordLayout.FloatingBottom
+            ? "Everything you type, left to right, in an overlay along the bottom of the screen."
+            : "The keys you can press next, in a sidebar beside the last key you typed."}
+        </p>
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby="hint-panel-style-label"
+        className="mac-segmented appearance-segmented"
+        style={{ "--count": HINT_PANEL_STYLES.length, "--index": index } as CSSProperties}
+      >
+        {HINT_PANEL_STYLES.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={shown === value}
+            className="mac-segment"
+            disabled={setLayout.isPending}
+            onClick={() => setLayout.mutate(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Light or Dark for Settings and the Hint Panel, or Auto to follow macOS, as a segmented control. */
 function AppearanceRow() {
   const [appearance, setSelected] = useState(getAppearance);
+  const index = APPEARANCES.findIndex(({ value }) => value === appearance);
   return (
-    <div className="preference-row appearance-row">
+    <div className="preference-row">
       <span id="appearance-label" className="preference-label">
         Appearance
       </span>
-      <div role="radiogroup" aria-labelledby="appearance-label" className="appearance-picker">
+      <div
+        role="radiogroup"
+        aria-labelledby="appearance-label"
+        className="mac-segmented appearance-segmented"
+        style={{ "--count": APPEARANCES.length, "--index": index } as CSSProperties}
+      >
         {APPEARANCES.map(({ value, label }) => (
           <button
             key={value}
             type="button"
             role="radio"
             aria-checked={appearance === value}
-            className="appearance-choice"
+            className="mac-segment"
             onClick={() => {
               setSelected(value);
               void setAppearance(value);
             }}
           >
-            <span className="appearance-preview" data-appearance={value} aria-hidden="true">
-              <span className="appearance-preview-window">
-                <span className="appearance-preview-sidebar" />
-                <span className="appearance-preview-content" />
-              </span>
-            </span>
-            <span className="appearance-choice-label">{label}</span>
+            {label}
           </button>
         ))}
       </div>

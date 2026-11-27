@@ -38,6 +38,12 @@
 @import "@fontsource-variable/inter";
 @import "./theme.css";
 
+/*
+ * `dark:` follows the Appearance choice that every Chord window applies as the `dark` class,
+ * not just the system setting, so the Hint Panel switches with Settings.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../../packages/dev/improve/chord';
 
 /*
@@ -1368,13 +1374,10 @@ a.mac-row {
 .mac-group {
   padding: 0;
 }
-/* Like Homerow: the header shares the card's fill, set off only by a hairline under it. */
+/* The header shares the card's fill; the inset box below sets the contents apart. */
 .mac-group-bar {
   display: flex;
   align-items: center;
-}
-.mac-group[data-open] .mac-group-bar {
-  box-shadow: inset 0 -0.5px 0 var(--settings-separator);
 }
 .mac-group-bar .mac-icon {
   color: var(--settings-label);
@@ -1710,85 +1713,6 @@ a.mac-row {
   font-size: inherit;
 }
 
-/*
- * Appearance, like System Settings: a small window preview per choice, its label beneath, and
- * a ring around the one in use. Auto shows light and dark side by side.
- */
-.appearance-picker {
-  display: flex;
-  gap: 14px;
-}
-.appearance-choice {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  cursor: default;
-  outline: none;
-}
-.appearance-preview {
-  display: block;
-  width: 68px;
-  height: 46px;
-  overflow: hidden;
-  border-radius: 8px;
-  padding: 7px 0 0 9px;
-  background: linear-gradient(135deg, #7fb0ff, #b48cff 55%, #ff9fbf);
-  box-shadow:
-    0 0 0 0.5px rgb(0 0 0 / 18%),
-    0 0 0 3px transparent;
-  transition: box-shadow 120ms ease;
-}
-.appearance-preview[data-appearance="dark"] {
-  background: linear-gradient(135deg, #1f2a5c, #3b2a6b 55%, #5a2a4f);
-}
-.appearance-preview[data-appearance="system"] {
-  background: linear-gradient(90deg, #7fb0ff 50%, #1f2a5c 50%);
-}
-.appearance-preview-window {
-  display: flex;
-  height: 100%;
-  overflow: hidden;
-  border-radius: 4px 0 0 0;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
-}
-.appearance-preview-sidebar {
-  width: 16px;
-  background: #ececee;
-}
-.appearance-preview-content {
-  flex: 1;
-  background: #fff;
-}
-.appearance-preview[data-appearance="dark"] .appearance-preview-sidebar {
-  background: #3a3a3d;
-}
-.appearance-preview[data-appearance="dark"] .appearance-preview-content {
-  background: #1f1f21;
-}
-.appearance-preview[data-appearance="system"] .appearance-preview-content {
-  background: linear-gradient(90deg, #fff 9px, #1f1f21 9px);
-}
-.appearance-choice[aria-checked="true"] .appearance-preview {
-  box-shadow:
-    0 0 0 0.5px rgb(0 0 0 / 18%),
-    0 0 0 3px var(--accent);
-}
-.appearance-choice:focus-visible .appearance-preview {
-  box-shadow:
-    0 0 0 0.5px rgb(0 0 0 / 18%),
-    0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
-}
-.appearance-choice-label {
-  font: var(--settings-description-font);
-  font-size: 11px;
-  color: var(--settings-description);
-}
-.appearance-choice[aria-checked="true"] .appearance-choice-label {
-  font-weight: 600;
-  color: var(--settings-label);
-}
-
 /* A short explanation at the top of a preference group, such as what the Hint Panel is. */
 .preference-intro {
   margin: 0 16px;
@@ -1801,14 +1725,6 @@ a.mac-row {
 .preference-intro + .preference-row {
   border-top: 0.5px solid var(--settings-separator);
   padding-top: 9.5px;
-}
-
-/* The Appearance label lines up with the middle of the window previews, not the whole row. */
-.preference-row.appearance-row {
-  align-items: flex-start;
-}
-.appearance-row > .preference-label {
-  margin-top: 15px;
 }
 
 /*
@@ -1838,4 +1754,121 @@ ul.mac-group-list > li > .mac-card-editor {
 .mac-third-party .mac-list-tools:first-child,
 .mac-third-party .mac-card-list:first-child {
   margin-top: 0;
+}
+
+/*
+ * A card's contents sit in a tinted box inset under its header, so they read as inside it,
+ * like Homerow's nested sections. The box replaces the line under the header.
+ */
+.mac-group[data-open] > .mac-group-bar::after {
+  display: none;
+}
+.mac-group > .mac-group-list {
+  margin: 0 10px 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 4px 0;
+  background: var(--mac-nest);
+}
+.mac-group > .mac-group-list:empty {
+  display: none;
+}
+ul.mac-group-list > li > .mac-row {
+  padding-left: 14px;
+}
+ul.mac-group-list > li + li > .mac-row:first-child::before {
+  left: 14px;
+}
+ul.mac-group-list > li > .mac-card-editor {
+  padding-left: 14px;
+}
+.mac-group-list .mac-row,
+.mac-group-list .mac-card-editor {
+  padding-inline: 14px;
+}
+.mac-group-list > li + li > .mac-row:first-child::before,
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  right: 14px;
+  left: 14px;
+}
+:root {
+  --mac-nest: rgb(0 0 0 / 3.5%);
+}
+.dark {
+  --mac-nest: rgb(255 255 255 / 4.5%);
+}
+
+/* A card's inset box sets its contents apart on its own: no line under the header. */
+.mac-group[data-open] > .mac-group-bar::after {
+  display: none;
+}
+.mac-group > .mac-group-list {
+  margin-top: 2px;
+}
+
+/* The third-party card: Select all in its header, then bulk actions and the install note. */
+.mac-group-actions .checkbox,
+.mac-group-actions label:not(.mac-search) {
+  font: var(--settings-label-font);
+  color: var(--mac-secondary);
+}
+.mac-bulk-row {
+  min-height: 44px;
+  gap: 8px;
+}
+.mac-install-row {
+  align-items: flex-start;
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
+/* Appearance in the Application group: a compact segmented control, like System Settings. */
+.appearance-segmented .mac-segment {
+  min-width: 64px;
+  height: 22px;
+  padding: 0 12px;
+}
+.mac-segment[aria-checked="true"] {
+  font-weight: 560;
+  color: var(--mac-label);
+}
+
+/*
+ * The Hint Panel window behaves like a native panel: the window itself never scrolls, and
+ * columns that scroll do so without a visible scrollbar.
+ */
+.hint-panel-window,
+.hint-panel-window body {
+  overflow: hidden;
+}
+.hint-panel-window * {
+  scrollbar-width: none;
+}
+.hint-panel-window *::-webkit-scrollbar {
+  display: none;
+}
+
+/* The third-party card is yellow throughout, header and rows, as a standing trust warning. */
+.mac-group.mac-group-warning {
+  background: var(--mac-warning-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-warning-edge);
+}
+.mac-group-warning .mac-group-bar .mac-icon {
+  color: var(--mac-warning-icon);
+}
+.mac-group-warning .mac-group-title {
+  color: var(--mac-warning-fg);
+}
+.mac-group-warning > .mac-group-list {
+  background: rgb(255 255 255 / 55%);
+}
+.dark .mac-group-warning > .mac-group-list {
+  background: rgb(0 0 0 / 18%);
+}
+
+/* Select all in a card's header, at the header's text size. */
+.mac-group-actions .label,
+.mac-group-actions [data-slot="label"] {
+  font: 400 12.5px/16px var(--mac-font) !important;
+  color: var(--mac-secondary) !important;
 }

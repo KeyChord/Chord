@@ -14,7 +14,7 @@ import { Button } from "@chord/dev.improve.chord.components.ui.button";
 import { Checkbox } from "@chord/dev.improve.chord.components.ui.checkbox";
 import type { ThirdPartyPackage } from "@chord/dev.improve.chord.lib.typeshare";
 import { GroupCard } from "@chord/dev.improve.chord.components.ui.group-card";
-import { Clock, FolderDown, Search, ShieldAlert, ShieldCheck, X } from "lucide-react";
+import { FolderDown, Search, ShieldAlert, X } from "lucide-react";
 import { useState } from "react";
 
 const PACKAGE_CODE_WARNING =
@@ -129,131 +129,139 @@ export function PackageApprovals({
     });
   }
 
+  /** One package as a row of the third-party card: select, name and status, then its action. */
   function renderPackage(pkg: ThirdPartyPackage) {
     const displayPath = pkg.path.replace(
       /^.*?[\\/]\.chord[\\/]packages[\\/]/,
       "~/.chord/packages/",
     );
     const failures = pkg.approved ? (errors[pkg.name] ?? []) : [];
-    // Each package is its own card, like the Packages tab; load errors open inside it.
     return (
-      <div key={pkg.identity} role="listitem" className="mac-section">
-        <GroupCard
-          leading={
-            canSelect && (
-              <Checkbox
-                aria-label={`Select ${pkg.name}`}
-                checked={selection.has(pkg.identity)}
-                onCheckedChange={(checked) => updateSelection([pkg], checked)}
-              />
-            )
-          }
-          icon={
-            pkg.approved ? (
-              <ShieldCheck size={17} strokeWidth={1.6} />
-            ) : (
-              <Clock size={17} strokeWidth={1.6} />
-            )
-          }
-          title={pkg.name}
-          subtitle={
-            <>
-              {pkg.approved ? (
-                failures.length > 0 ? (
-                  <span className="text-destructive">Third-party · didn&apos;t load</span>
-                ) : (
-                  "Third-party · approved"
-                )
+      <div key={pkg.identity} role="listitem" className="mac-row">
+        {canSelect && (
+          <span className="mac-icon">
+            <Checkbox
+              aria-label={`Select ${pkg.name}`}
+              checked={selection.has(pkg.identity)}
+              onCheckedChange={(checked) => updateSelection([pkg], checked)}
+            />
+          </span>
+        )}
+        <span className="mac-row-text">
+          <span className="mac-row-title">{pkg.name}</span>
+          <span className="mac-row-subtitle">
+            {pkg.approved ? (
+              failures.length > 0 ? (
+                <span className="text-destructive">Approved · didn&apos;t load</span>
               ) : (
-                <span className="text-amber-700 dark:text-amber-300">
-                  Third-party · awaiting approval
-                </span>
-              )}
-              {" · "}
-              <span title={pkg.path}>{displayPath}</span>
-            </>
-          }
-          listLabel={`${pkg.name} errors`}
-          actions={
-            pkg.approved ? (
-              <button
-                type="button"
-                className="mac-button"
-                disabled={isPending}
-                aria-label={`Revoke approval for ${pkg.name}`}
-                title="Turns the package off until you approve it again."
-                onClick={() => setApprovals({ targets: [pkg], approved: false })}
-              >
-                Revoke
-              </button>
+                "Approved"
+              )
             ) : (
-              <ApproveDialog
-                packages={[pkg]}
-                disabled={isPending}
-                label="Review…"
-                ariaLabel={`Review ${pkg.name} for approval`}
-                onApprove={() => setApprovals({ targets: [pkg], approved: true })}
-              />
-            )
-          }
-        >
-          {failures.length > 0 &&
-            failures.map((message) => (
-              <p
-                key={message}
-                role="alert"
-                className="mac-row wrap-anywhere whitespace-pre-wrap text-destructive"
-              >
-                {message}
-              </p>
-            ))}
-        </GroupCard>
+              <span className="text-amber-700 dark:text-amber-300">Awaiting approval</span>
+            )}
+            {" · "}
+            <span title={pkg.path}>{displayPath}</span>
+          </span>
+          {failures.map((message) => (
+            <span
+              key={message}
+              role="alert"
+              className="mac-row-subtitle wrap-anywhere whitespace-pre-wrap text-destructive"
+            >
+              {message}
+            </span>
+          ))}
+        </span>
+        {pkg.approved ? (
+          <button
+            type="button"
+            className="mac-button"
+            disabled={isPending}
+            aria-label={`Revoke approval for ${pkg.name}`}
+            title="Turns the package off until you approve it again."
+            onClick={() => setApprovals({ targets: [pkg], approved: false })}
+          >
+            Revoke
+          </button>
+        ) : (
+          <ApproveDialog
+            packages={[pkg]}
+            disabled={isPending}
+            label="Review…"
+            ariaLabel={`Review ${pkg.name} for approval`}
+            onApprove={() => setApprovals({ targets: [pkg], approved: true })}
+          />
+        )}
       </div>
     );
   }
 
+  // One card holds everything third-party: its header says what these are and carries Select
+  // all and search; the packages and how to add one are its rows.
   return (
     <section aria-label="Third-party packages">
-      {/* The trust warning shows while something waits for approval, where it matters. */}
-      {pending.length > 0 && (
-        <div className="mac-callout-warning" role="note">
-          <ShieldAlert size={22} strokeWidth={1.8} aria-hidden="true" />
-          <div className="min-w-0">
-            <h3 className="mac-callout-title">Third-Party Packages</h3>
-            <p className="mac-callout-body">{PACKAGE_CODE_WARNING}</p>
-            <p className="mac-callout-body font-medium" role="status">
-              {`${pending.length} awaiting approval. Review before allowing code to run.`}
-            </p>
-          </div>
-        </div>
-      )}
-
       {errorMessage && (
         <p role="alert" className="mt-3 wrap-anywhere text-xs text-destructive">
           {errorMessage}
         </p>
       )}
 
-      {(showSearch || canSelect) && (
-        <div className="mac-list-tools">
-          {canSelect && (
-            <Checkbox
-              aria-label="Select all visible third-party packages"
-              checked={allSelected}
-              isIndeterminate={selected.length > 0 && !allSelected}
-              onCheckedChange={(checked) => updateSelection(visible, checked)}
-              className="text-xs"
-            >
-              {selected.length === 0 ? "Select all" : null}
-            </Checkbox>
-          )}
+      <div className="mac-section">
+        <GroupCard
+          // Yellow throughout, so it reads apart from Chord's own packages: this code runs
+          // with your permissions.
+          className="mac-group-warning"
+          icon={<ShieldAlert size={17} strokeWidth={1.7} />}
+          title="Third-party packages"
+          subtitle={
+            pending.length > 0 ? (
+              <span role="status">
+                {pending.length} awaiting approval. Approve only packages you trust.
+              </span>
+            ) : (
+              "Their code runs with your permissions. Approve only packages you trust."
+            )
+          }
+          count={packages.length}
+          listLabel="Third-party packages list"
+          actions={
+            <>
+              {showSearch && (
+                <label className="mac-search">
+                  <Search size={13} aria-hidden="true" />
+                  <input
+                    aria-label="Search third-party packages"
+                    placeholder="Search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      aria-label="Clear third-party package search"
+                      onClick={() => setSearch("")}
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </label>
+              )}
+              {canSelect && (
+                <Checkbox
+                  aria-label="Select all visible third-party packages"
+                  checked={allSelected}
+                  isIndeterminate={selected.length > 0 && !allSelected}
+                  onCheckedChange={(checked) => updateSelection(visible, checked)}
+                >
+                  Select all
+                </Checkbox>
+              )}
+            </>
+          }
+        >
           {selected.length > 0 && (
-            <div
-              role="group"
-              aria-label="Bulk actions"
-              className="flex flex-wrap items-center gap-2"
-            >
-              <span className="mac-row-subtitle" role="status">
+            <div role="group" aria-label="Bulk actions" className="mac-row mac-bulk-row">
+              <span className="mac-row-subtitle flex-1" role="status">
                 {selected.length} selected
               </span>
               {selectedPending.length > 0 && (
@@ -286,54 +294,23 @@ export function PackageApprovals({
               </button>
             </div>
           )}
-          {showSearch && (
-            <label className="mac-search ml-auto">
-              <Search size={13} aria-hidden="true" />
-              <input
-                aria-label="Search third-party packages"
-                placeholder="Search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {search && (
-                <button
-                  type="button"
-                  aria-label="Clear third-party package search"
-                  onClick={() => setSearch("")}
-                >
-                  <X size={13} />
-                </button>
-              )}
-            </label>
-          )}
-        </div>
-      )}
-
-      <div className="mac-card-list" role="list" aria-label="Third-party packages list">
-        {visiblePending.map(renderPackage)}
-        {visibleApproved.map(renderPackage)}
-      </div>
-      {query && visible.length === 0 && (
-        <div className="mac-section">
-          <GroupCard title="No packages match your search" />
-        </div>
-      )}
-
-      <div className="mac-section">
-        <GroupCard
-          icon={<FolderDown size={17} strokeWidth={1.6} />}
-          title="Install a third-party package"
-          subtitle="Extract it into ~/.chord/packages, then restart Chord."
-          defaultOpen={packages.length === 0}
-          listLabel="How to install a third-party package"
-        >
-          <div className="mac-row">
-            <p className="min-w-0 flex-1 pl-8 leading-relaxed">
-              Extract the package into <code>~/.chord/packages/&lt;name&gt;</code>, then quit and
-              restart Chord. It appears above, waiting for your review. Official packages live in{" "}
-              <code>~/.chord/packages/@keychord/</code>.
+          {visiblePending.map(renderPackage)}
+          {visibleApproved.map(renderPackage)}
+          {query && visible.length === 0 && (
+            <p role="listitem" className="mac-row mac-row-muted">
+              No third-party packages match your search.
             </p>
-          </div>
+          )}
+          <p role="listitem" className="mac-row mac-row-muted mac-install-row">
+            <span className="mac-icon" aria-hidden="true">
+              <FolderDown size={16} strokeWidth={1.6} />
+            </span>
+            <span className="min-w-0 flex-1">
+              Install a third-party package: extract it into{" "}
+              <code>~/.chord/packages/&lt;name&gt;</code>, then restart Chord. It appears here,
+              waiting for your review.
+            </span>
+          </p>
         </GroupCard>
       </div>
     </section>
