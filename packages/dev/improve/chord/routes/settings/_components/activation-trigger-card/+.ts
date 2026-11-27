@@ -1,1 +1,1 @@
-export * from '#activation-trigger-card';
+export * from "#activation-trigger-card";

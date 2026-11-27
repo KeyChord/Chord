@@ -1,1 +1,1 @@
-export * from '#open-repo-button';
+export * from "#open-repo-button";

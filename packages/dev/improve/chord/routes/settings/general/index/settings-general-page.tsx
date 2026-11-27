@@ -13,7 +13,12 @@ export function SettingsGeneralPage() {
       <LaunchOnLoginCard />
       {desktopPlatform === "macos" && <PermissionsCard />}
       {desktopPlatform === "linux" && (
-        <a className="text-sm underline" href="https://github.com/KeyChord/Chord#linux-and-windows" target="_blank" rel="noreferrer">
+        <a
+          className="text-sm underline"
+          href="https://github.com/KeyChord/Chord#linux-and-windows"
+          target="_blank"
+          rel="noreferrer"
+        >
           Linux keyboard setup
         </a>
       )}

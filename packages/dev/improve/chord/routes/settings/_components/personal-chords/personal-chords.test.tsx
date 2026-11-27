@@ -50,25 +50,39 @@ test("packages list their files with Edit buttons and leave editors closed initi
       pkg("default", ["chords/com/apple/finder/macos.toml", "chords/macos.toml"]),
     ],
   });
-  expect(html).toContain(">alpha</h3>");
-  expect(html).toContain(">default</h3>");
+  // Each file is its own card, showing which package folder it's in.
+  expect(html).toContain('aria-label="Chords files in alpha"');
+  expect(html).toContain('aria-label="Chords files in default"');
   expect(html).toContain(">com.apple.finder</span>");
   expect(html).toContain(">Every app</span>");
-  expect(html).toContain(
-    'aria-label="Edit chords/com/apple/finder/macos.toml" aria-expanded="false"',
-  );
-  expect(html).toContain('aria-label="Edit chords/macos.toml" aria-expanded="false"');
+  // Each file is a row that opens it in the editor.
+  expect(html).toContain('aria-label="Edit chords/com/apple/finder/macos.toml"');
+  expect(html).toContain('aria-label="Edit chords/macos.toml"');
+  // Files are added from Add File, which picks the package, so cards carry no menu.
+  expect(html).toContain("Add File");
   expect(html).not.toContain('aria-label="Loading editor"');
   expect(html).not.toContain(">Save</button>");
   expect(html).not.toContain("Unsaved");
-  // With more than one package, new files ask which package they belong to.
-  expect(html).toContain('aria-label="Package for the new chords file"');
+  // New files are added from a sheet, which stays closed until Add File is pressed.
+  expect(html).toContain("Add File");
+  expect(html).not.toContain('aria-label="Package for the new chords file"');
 });
 
-test("a single package needs no package choice for new files", () => {
-  const html = render({ root, packages: [pkg("default", ["chords/macos.toml"])] });
-  expect(html).not.toContain('aria-label="Package for the new chords file"');
-  expect(html).toContain("Add File");
+test("app files show the app's name when Chord knows it", () => {
+  const client = new QueryClient();
+  const html = renderToString(
+    <QueryClientProvider client={client}>
+      <PersonalChordsContent
+        listing={{ root, packages: [pkg("default", ["chords/com/apple/finder/macos.toml"])] }}
+        states={[{ dirname: "default", name: "default" }]}
+        errors={{}}
+        appIds={[]}
+        apps={{ "com.apple.finder": { bundleId: "com.apple.finder", displayName: "Finder" } }}
+      />
+    </QueryClientProvider>,
+  ).replaceAll("<!-- -->", "");
+  expect(html).toContain('mac-row-title">Finder</span>');
+  expect(html).toContain("chords/com/apple/finder/macos.toml");
 });
 
 test("folders that failed to load and files with load errors are reported per package", () => {

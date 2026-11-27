@@ -1,1 +1,1 @@
-export { PersonalChords, usePersonalChordsEditor } from "#personal-chords";
+export { PersonalChords } from "#personal-chords";

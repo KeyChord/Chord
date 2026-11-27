@@ -1,14 +1,13 @@
 import { TanStackDevtools } from "@chord/com.npmjs.tanstack__react-devtools";
-import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { Link, Outlet, useRouterState } from "@chord/com.npmjs.tanstack__react-router";
 import { TanStackRouterDevtoolsPanel } from "@chord/com.npmjs.tanstack__react-router-devtools";
-import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@chord/dev.improve.chord.components.ui.collapsible";
-import { desktopPlatform,
+import {
+  desktopPlatform,
   useAppUpdateState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
@@ -22,7 +21,6 @@ import {
   Compass,
   Keyboard,
   Braces,
-  PanelLeft,
   Settings2,
   SquareTerminal,
   Terminal,
@@ -30,6 +28,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Each page's description shows under its title in the window header, so every page says what
+ * it's for. Advanced pages run from everyday tools to the reset that can't be undone.
+ */
 const navigationGroups = [
   {
     label: "Configuration",
@@ -39,16 +41,19 @@ const navigationGroups = [
         label: "General",
         to: "/settings/general",
         icon: Settings2,
+        description: "Startup, permissions and how chord mode looks.",
       },
       {
         label: "Chords",
         to: "/settings/chords",
         icon: Keyboard,
+        description: "Your packages, your own chords and third-party code.",
       },
       {
         label: "Browse",
         to: "/settings/browse",
         icon: Compass,
+        description: "Find and install chord packages.",
       },
     ],
   },
@@ -57,29 +62,34 @@ const navigationGroups = [
     collapsible: true,
     items: [
       {
-        label: "Log",
-        to: "/settings/log",
-        icon: Terminal,
-      },
-      {
-        label: "Danger Zone",
-        to: "/settings/danger",
-        icon: TriangleAlert,
-      },
-      {
         label: "Macros",
         to: "/settings/macros",
         icon: Braces,
+        description: "Saved text and key presses you can insert while typing a chord.",
       },
       {
         label: "Global Shortcuts",
         to: "/settings/global-shortcuts",
         icon: Command,
+        description: "Shortcuts packages reserve so Chord can trigger actions inside apps.",
       },
       {
         label: "Command Line",
         to: "/settings/command-line",
         icon: SquareTerminal,
+        description: "Run chords and scripts from Terminal with the chord command.",
+      },
+      {
+        label: "Log",
+        to: "/settings/log",
+        icon: Terminal,
+        description: "What Chord has been doing, for tracking down problems.",
+      },
+      {
+        label: "Danger Zone",
+        to: "/settings/danger",
+        icon: TriangleAlert,
+        description: "Actions that can't be undone.",
       },
     ],
   },
@@ -106,7 +116,6 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
   const [advancedOpen, setAdvancedOpen] = useState(isAdvancedPage);
   const settings = useSettingsState();
   const appUpdate = useAppUpdateState();
-  const toggleSidebarMutation = useMutation({ mutationFn: taurpc.toggleSettingsSidebar });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   // These pages fill the window and scroll inside themselves.
   const fillsWindow = ["/settings/log", "/settings/browse"].some(
@@ -128,34 +137,18 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  const isSidebarCollapsed = settings.data?.isSettingsSidebarCollapsed ?? false;
-  const sidebarToggleLabel = isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar";
+  // The sidebar always shows; there's no button to hide it, so a saved hidden state is ignored.
+  const isSidebarCollapsed = false;
   const hasUpdateCard = appUpdate.data !== undefined && appUpdate.data.status !== "idle";
 
   return (
     <div className="settings-window-shell relative flex min-h-0 h-full w-full">
-      {/* Beside the traffic lights, where it stays put whether the sidebar is open or not.
-          Their centres sit 26px from the top (`traffic_light_position` in settings_ui.rs),
-          so this 28px button starts 14px above that. */}
-      <button
-        type="button"
-        aria-controls="settings-sidebar"
-        aria-expanded={!isSidebarCollapsed}
-        aria-label={sidebarToggleLabel}
-        title={sidebarToggleLabel}
-        className="absolute left-[84px] top-[12px]z-10 flex size-7 items-center justify-center rounded-lg text-sidebar-foreground/60 outline-none hover:bg-foreground/5 hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        onClick={() => {
-          toggleSidebarMutation.mutate();
-        }}
-      >
-        <PanelLeft className="size-4" strokeWidth={1.8} />
-      </button>
 
       <aside
         id="settings-sidebar"
         inert={isSidebarCollapsed}
         data-collapsed={isSidebarCollapsed || undefined}
-        className="settings-window-sidebar flex w-[15.5rem] shrink-0 select-none flex-col overflow-hidden border-r border-black/[0.08] text-sidebar-foreground transition-[width] duration-200 ease-out motion-reduce:transition-none data-collapsed:w-0 data-collapsed:border-r-0"
+        className="settings-window-sidebar flex w-[15.5rem] shrink-0 select-none flex-col overflow-hidden border-r border-black/[0.08] dark:border-white/[0.08] text-sidebar-foreground transition-[width] duration-200 ease-out motion-reduce:transition-none data-collapsed:w-0 data-collapsed:border-r-0"
       >
         <div className="h-[50px] shrink-0" onMouseDown={handleTitleBarMouseDown} />
 
@@ -214,9 +207,12 @@ function SettingsShell({ children }: { children: React.ReactNode }) {
           className="flex h-[62px] shrink-0 items-center px-4 transition-[padding] duration-200 ease-out motion-reduce:transition-none data-sidebar-collapsed:pl-[120px]"
           onMouseDown={handleTitleBarMouseDown}
         >
-          <h1 className="settings-page-title cursor-default select-none">
-            {currentPage?.label === "General" ? "Configuration" : (currentPage?.label ?? "Chord")}
-          </h1>
+          <div className="min-w-0 cursor-default select-none">
+            <h1 className="settings-page-title">{currentPage?.label ?? "Chord"}</h1>
+            {currentPage?.description && (
+              <p className="settings-page-description truncate">{currentPage.description}</p>
+            )}
+          </div>
         </header>
         <div
           ref={scrollContainerRef}

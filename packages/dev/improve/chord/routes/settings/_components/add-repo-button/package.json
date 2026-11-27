@@ -1,23 +1,23 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.add-repo-button",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#add-repo-button": "./add-repo-button.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
-		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"react": "^19.3.1",
-		"@chord/dev.improve.chord.components.ui.toast": "workspace:*"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.add-repo-button",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#add-repo-button": "./add-repo-button.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

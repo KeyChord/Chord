@@ -1,22 +1,22 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.open-repo-button",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#open-repo-button": "./open-repo-button.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@tauri-apps/plugin-opener": "^2.7.2",
-		"lucide-react": "^1.57.0",
-		"react": "^19.3.1"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.open-repo-button",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#open-repo-button": "./open-repo-button.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@tauri-apps/plugin-opener": "^2.7.2",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

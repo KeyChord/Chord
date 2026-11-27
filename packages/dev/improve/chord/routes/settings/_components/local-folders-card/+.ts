@@ -1,1 +1,1 @@
-export * from '#local-folders-card';
+export * from "#local-folders-card";

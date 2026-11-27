@@ -3,7 +3,11 @@ import type {
   PersonalPackageFiles,
   PersonalPackages,
 } from "@chord/dev.improve.chord.api.taurpc";
-import type { ChordPackage, PersonalPackageState } from "@chord/dev.improve.chord.lib.typeshare";
+import type {
+  ChordPackage,
+  DesktopAppMetadata,
+  PersonalPackageState,
+} from "@chord/dev.improve.chord.lib.typeshare";
 import { useMutation, useQuery, useQueryClient } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import {
@@ -17,13 +21,6 @@ import {
   AlertDialogTitle,
 } from "@chord/dev.improve.chord.components.ui.alert-dialog";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
 import type { CodeEditorDiagnostic } from "@chord/dev.improve.chord.components.ui.code-editor";
 import {
   Dialog,
@@ -33,22 +30,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@chord/dev.improve.chord.components.ui.dialog";
-import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import { KeyLabel } from "@chord/dev.improve.chord.components.ui.kbd";
+import { GroupCard } from "@chord/dev.improve.chord.components.ui.group-card";
 import { Select } from "@chord/dev.improve.chord.components.ui.select";
-import { StateQueries, useChordPackageManagerState } from "@chord/dev.improve.chord.lib.state";
 import {
-  AppWindow,
-  FileText,
-  FolderOpen,
-  Globe,
-  Package,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+  StateQueries,
+  useChordPackageManagerState,
+  useDesktopAppManagerState,
+} from "@chord/dev.improve.chord.lib.state";
+import { AppWindow, ChevronRight, FileText, Folder, Globe } from "lucide-react";
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ALL_APPS_PATHSLUG,
   chordsFileAppId,
@@ -83,37 +74,12 @@ function editKey({ dirname, pathslug }: FileRef) {
   return `${dirname}/${pathslug}`;
 }
 
-/** The library opens a file beneath the chosen chord, retaining drafts when rows close. */
-export function usePersonalChordsEditor() {
-  const [selected, setSelected] = useState<{ rowId: string; file: FileRef } | null>(null);
-  const [edits, setEdits] = useState<Record<string, Edit>>({});
-  return {
-    open: (rowId: string, file: FileRef) => setSelected({ rowId, file }),
-    rowId: selected?.rowId,
-    hasDraft: (file: FileRef) => editKey(file) in edits,
-    editor: selected ? (
-      <FileEditor
-        key={editKey(selected.file)}
-        file={selected.file}
-        edit={edits[editKey(selected.file)] ?? null}
-        onClose={() => setSelected(null)}
-        onEdit={(update) => {
-          const key = editKey(selected.file);
-          setEdits(({ [key]: previous, ...others }) => {
-            const next = update(previous ?? null);
-            return next ? { ...others, [key]: next } : others;
-          });
-        }}
-      />
-    ) : null,
-  };
-}
-
-export function PersonalChords() {
+export function PersonalChords({ search = "" }: { search?: string }) {
   const personalPackagesQuery = useQuery({
     queryKey: PERSONAL_PACKAGES_KEY,
     queryFn: () => taurpc.listPersonalPackages(),
   });
+  const apps = useDesktopAppManagerState().data?.appsMetadata;
   return (
     <StateQueries queries={[personalPackagesQuery, useChordPackageManagerState()]}>
       {(listing, { packages, errors, personalPackages }) => (
@@ -123,6 +89,8 @@ export function PersonalChords() {
           errors={errors}
           packages={packages}
           appIds={appIdsWithChords(packages)}
+          apps={apps}
+          search={search}
         />
       )}
     </StateQueries>
@@ -147,6 +115,8 @@ export function PersonalChordsContent({
   errors,
   packages = [],
   appIds,
+  apps = {},
+  search = "",
 }: {
   listing: PersonalPackages;
   /** The packages as the last reload saw them. */
@@ -155,64 +125,81 @@ export function PersonalChordsContent({
   errors: Record<string, string[]>;
   packages?: ChordPackage[];
   appIds: string[];
+  apps?: Record<string, DesktopAppMetadata>;
+  /** Filters files by app, file name, path or package folder. */
+  search?: string;
 }) {
   const [selected, setSelected] = useState<FileRef | null>(null);
   // Drafts are kept per file so switching files doesn't discard unsaved edits.
   const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [addingTo, setAddingTo] = useState<string | null>(null);
   const current = currentFile(listing.packages, selected);
+  const existing = listing.packages.map((pkg) => pkg.dirname);
+
+  function editor(file: FileRef) {
+    const key = editKey(file);
+    return (
+      <FileEditor
+        key={key}
+        file={file}
+        edit={edits[key] ?? null}
+        onEdit={(update) => {
+          setEdits(({ [key]: previous, ...others }) => {
+            const next = update(previous ?? null);
+            return next ? { ...others, [key]: next } : others;
+          });
+        }}
+      />
+    );
+  }
 
   return (
-    <section aria-label="Local Chords" className="space-y-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <h3 className="text-sm font-semibold">Local Chords</h3>
-          <p className="text-sm text-muted-foreground">
-            Your chords take priority over installed packages. Save to apply your changes.
-          </p>
+    <section aria-label="Local Chords">
+      {listing.packages.length === 0 ? (
+        <div className="mac-list">
+          <p className="mac-row-empty">No packages yet. Create one to start writing chords.</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <OpenInFinderButton label="Open in Finder" />
-          <NewPackageButton existing={listing.packages.map((pkg) => pkg.dirname)} />
-        </div>
-      </div>
-      <div className="divide-y border-y">
-        {listing.packages.length === 0 ? (
-          <p className="py-5 text-sm text-muted-foreground">
-            No packages yet. Create one to start writing chords.
-          </p>
-        ) : (
-          listing.packages.map((pkg) => {
-            const state = states.find((candidate) => candidate.dirname === pkg.dirname);
-            return (
-              <PackageSection
-                key={pkg.dirname}
-                pkg={pkg}
-                state={state}
-                errors={state?.name ? (errors[state.name] ?? []) : []}
-                loadedPackage={packages.find((loaded) => loaded.name === state?.name)}
-                current={current}
-                edits={edits}
-                onSelect={setSelected}
-                onEdit={(file, update) => {
-                  const key = editKey(file);
-                  setEdits(({ [key]: previous, ...others }) => {
-                    const next = update(previous ?? null);
-                    return next ? { ...others, [key]: next } : others;
-                  });
-                }}
-              />
-            );
-          })
+      ) : (
+        listing.packages.map((pkg) => {
+          const state = states.find((candidate) => candidate.dirname === pkg.dirname);
+          return (
+            <PackageSection
+              key={pkg.dirname}
+              pkg={pkg}
+              state={state}
+              errors={state?.name ? (errors[state.name] ?? []) : []}
+              loadedPackage={packages.find((loaded) => loaded.name === state?.name)}
+              apps={apps}
+              edits={edits}
+              openFile={current?.dirname === pkg.dirname ? current.pathslug : undefined}
+              renderEditor={editor}
+              search={search}
+              onSelect={(file) =>
+                // Like a disclosure: the open file's card closes it again.
+                setSelected(current && editKey(current) === editKey(file) ? null : file)
+              }
+            />
+          );
+        })
+      )}
+      <div className="mac-list-actions">
+        <OpenInFinderButton label="Open in Finder" />
+        <span className="flex-1" />
+        <NewPackageButton existing={existing} />
+        {listing.packages.length > 0 && (
+          <AddFileButton
+            packages={listing.packages}
+            defaultDirname={addingTo ?? DEFAULT_PACKAGE}
+            appIds={appIds}
+            open={addingTo !== null}
+            onOpenChange={(open) => setAddingTo(open ? (addingTo ?? DEFAULT_PACKAGE) : null)}
+            onOpen={(file) => {
+              setAddingTo(null);
+              setSelected(file);
+            }}
+          />
         )}
       </div>
-      {listing.packages.length > 0 && (
-        <NewFileForm
-          packages={listing.packages}
-          defaultDirname={current?.dirname ?? DEFAULT_PACKAGE}
-          appIds={appIds}
-          onOpen={setSelected}
-        />
-      )}
     </section>
   );
 }
@@ -230,118 +217,126 @@ function currentFile(packages: PersonalPackageFiles[], selected: FileRef | null)
   return null;
 }
 
+/**
+ * A local package's chords files, one card each like the Packages tab: the app, the file's
+ * place in the package and its chord count in the header, and its editor inside when opened.
+ */
 function PackageSection({
   pkg,
   state,
   errors,
   loadedPackage,
-  current,
+  apps,
   edits,
+  openFile,
+  renderEditor,
   onSelect,
-  onEdit,
+  search = "",
 }: {
   pkg: PersonalPackageFiles;
   state: PersonalPackageState | undefined;
   errors: string[];
   loadedPackage: ChordPackage | undefined;
-  current: FileRef | null;
+  apps: Record<string, DesktopAppMetadata>;
   edits: Record<string, Edit>;
-  onSelect: (file: FileRef | null) => void;
-  onEdit: (file: FileRef, update: EditUpdate) => void;
+  /** The pathslug of the file whose editor is open, if it's in this package. */
+  openFile: string | undefined;
+  renderEditor: (file: FileRef) => ReactNode;
+  onSelect: (file: FileRef) => void;
+  search?: string;
 }) {
   const problems = state?.error ? [state.error] : errors;
+  const folder = pkg.path.replace(/^\/(?:Users|home)\/[^/]+/, "~");
+  const loadsAs = state?.name && state.name !== pkg.dirname ? ` · loads as ${state.name}` : "";
+  const query = search.trim().toLocaleLowerCase();
+  const files = pkg.files.filter((pathslug) => {
+    if (!query) return true;
+    const { title, appId } = describeChordsFile(pathslug);
+    const appName = appId ? apps[appId]?.displayName : undefined;
+    return [pkg.dirname, pathslug, title, appName ?? ""].some((value) =>
+      value.toLocaleLowerCase().includes(query),
+    );
+  });
+  // A search hides folders with no matching files.
+  if (query && files.length === 0) return null;
+  // The folder is the section: one card with its files as rows, like a General page group.
   return (
-    <section className="space-y-3 py-4" aria-label={`${pkg.dirname} package`}>
-      <div className="flex items-center gap-2">
-        <Package className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
-        <h3 className="min-w-0 truncate text-sm font-semibold">{pkg.dirname}</h3>
-        <span className="rounded border px-1.5 py-0.5 text-[11px] text-muted-foreground">
-          Local Chords
-        </span>
-        {state?.name && state.name !== pkg.dirname && (
-          <span className="truncate text-xs text-muted-foreground">loads as {state.name}</span>
-        )}
-        <span className="flex-1" />
-        <OpenInFinderButton
-          dirname={pkg.dirname}
-          label={`Open ${pkg.dirname} in Finder`}
-          iconOnly
-        />
-      </div>
-      <p className="truncate font-mono text-xs text-muted-foreground" title={pkg.path}>
-        {pkg.path}
-      </p>
+    <div className="mac-section">
       {problems.length > 0 && <LoadErrors errors={problems} />}
-      {pkg.files.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No chords files in this package.</p>
-      ) : (
-        <ul className="space-y-2" aria-label={`Chords files in ${pkg.dirname}`}>
-          {pkg.files.map((pathslug) => {
+      <GroupCard
+        icon={<Folder size={17} strokeWidth={1.6} />}
+        title={pkg.dirname}
+        subtitle={
+          <span className="font-mono" title={pkg.path}>
+            {folder}
+            {loadsAs && <span className="font-sans">{loadsAs}</span>}
+          </span>
+        }
+        count={pkg.files.length}
+        headerLabel={`${pkg.dirname} files`}
+        listLabel={`Chords files in ${pkg.dirname}`}
+        as="ul"
+      >
+        {files.length === 0 ? (
+          <li className="mac-row mac-row-muted">No chords files yet.</li>
+        ) : (
+          files.map((pathslug) => {
             const file = { dirname: pkg.dirname, pathslug };
+            const { title, appId } = describeChordsFile(pathslug);
+            const appName = appId ? apps[appId]?.displayName?.trim() : undefined;
+            const chordCount = loadedPackage?.compiledChordsFiles[pathslug]?.chords.length;
+            const unsaved = editKey(file) in edits;
+            const open = openFile === pathslug;
             return (
-              <li key={pathslug} className="space-y-2">
-                <FileRow
-                  pathslug={pathslug}
-                  selected={current?.dirname === pkg.dirname && current.pathslug === pathslug}
-                  unsaved={editKey(file) in edits}
-                  onSelect={() =>
-                    onSelect(
-                      current?.dirname === pkg.dirname && current.pathslug === pathslug
-                        ? null
-                        : file,
-                    )
-                  }
-                />
-                {current?.dirname === pkg.dirname && current.pathslug === pathslug ? (
-                  <FileEditor
-                    file={file}
-                    edit={edits[editKey(file)] ?? null}
-                    onEdit={(update) => onEdit(file, update)}
-                    onClose={() => onSelect(null)}
+              <li key={pathslug}>
+                <button
+                  type="button"
+                  className="mac-row"
+                  aria-label={`Edit ${pathslug}`}
+                  aria-expanded={open}
+                  onClick={() => onSelect(file)}
+                >
+                  <span className="mac-icon" aria-hidden="true">
+                    <FileIcon pathslug={pathslug} apps={apps} />
+                  </span>
+                  <span className="mac-row-text">
+                    <span className="mac-row-title">{appName || title}</span>
+                    <span className="mac-row-subtitle" title={`${pkg.path}/${pathslug}`}>
+                      {unsaved && (
+                        <span className="text-amber-700 dark:text-amber-300">Unsaved · </span>
+                      )}
+                      <span className="font-mono">{pathslug}</span>
+                    </span>
+                  </span>
+                  {chordCount !== undefined && <span className="mac-row-detail">{chordCount}</span>}
+                  <ChevronRight
+                    className="mac-disclosure-chevron"
+                    size={14}
+                    strokeWidth={2.2}
+                    aria-hidden="true"
                   />
-                ) : (
-                  loadedPackage?.compiledChordsFiles[pathslug]?.chords.map((chord) => (
-                    <div key={chord.rawTrigger} className="flex items-baseline gap-3 pl-7 text-xs">
-                      <code className="min-w-12 shrink-0 text-muted-foreground">
-                        {chord.rawTrigger}
-                      </code>
-                      <span className="text-muted-foreground">{chord.name}</span>
-                    </div>
-                  ))
-                )}
+                </button>
+                {open && <div className="mac-card-editor">{renderEditor(file)}</div>}
               </li>
             );
-          })}
-        </ul>
-      )}
-    </section>
+          })
+        )}
+      </GroupCard>
+    </div>
   );
 }
 
-function OpenInFinderButton({
-  dirname,
-  label,
-  iconOnly = false,
-}: {
-  dirname?: string;
-  label: string;
-  iconOnly?: boolean;
-}) {
+function OpenInFinderButton({ dirname, label }: { dirname?: string; label: string }) {
   const open = useMutation({ mutationFn: () => taurpc.openPersonalPackage(dirname ?? null) });
   return (
-    <Button
+    <button
       type="button"
-      variant={iconOnly ? "ghost" : "outline"}
-      size={iconOnly ? "icon-sm" : "sm"}
-      aria-label={iconOnly ? label : undefined}
-      title={iconOnly ? label : undefined}
+      className="mac-button"
       onClick={() => open.mutate()}
       disabled={open.isPending}
-      className={iconOnly ? "text-muted-foreground" : undefined}
     >
-      <FolderOpen />
-      {!iconOnly && label}
-    </Button>
+      {label}
+    </button>
   );
 }
 
@@ -368,14 +363,13 @@ function NewPackageButton({ existing }: { existing: string[] }) {
         create.reset();
       }}
     >
-      <Button type="button" variant="outline" size="sm">
-        <Plus />
-        New Package
+      <Button type="button" variant="outline" size="sm" className="mac-button">
+        New Package…
       </Button>
 
       <DialogContent>
         <form
-          className="space-y-4"
+          className="mac-page space-y-4"
           onSubmit={(event) => {
             event.preventDefault();
             if (trimmed && !invalid && !taken) create.mutate();
@@ -387,7 +381,8 @@ function NewPackageButton({ existing }: { existing: string[] }) {
               Creates a folder in your packages folder with a starter chords file.
             </DialogDescription>
           </DialogHeader>
-          <Input
+          <input
+            className="mac-field w-full"
             aria-label="Package folder name"
             aria-invalid={invalid || taken || undefined}
             placeholder="work"
@@ -408,9 +403,14 @@ function NewPackageButton({ existing }: { existing: string[] }) {
           )}
           {create.isError && <ErrorMessage error={create.error} />}
           <DialogFooter>
-            <Button type="submit" disabled={!trimmed || invalid || taken || create.isPending}>
+            <button
+              type="submit"
+              className="mac-button"
+              data-default
+              disabled={!trimmed || invalid || taken || create.isPending}
+            >
               {create.isPending ? "Creating…" : "Create Package"}
-            </Button>
+            </button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -422,9 +422,9 @@ function LoadErrors({ errors }: { errors: string[] }) {
   return (
     <div
       role="alert"
-      className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+      className="mb-2 space-y-2 rounded-[10px] border border-destructive/30 bg-destructive/5 p-3"
     >
-      <p className="text-sm font-medium text-destructive">
+      <p className="text-[13px] font-medium text-destructive">
         Some of these chords didn't load on the last reload.
       </p>
       {errors.map((error) => (
@@ -439,51 +439,36 @@ function LoadErrors({ errors }: { errors: string[] }) {
   );
 }
 
-function FileRow({
+/** The icon for a chords file: the app's own icon when Chord knows it. */
+/** The icon for a chords file in its card's header: the app's own icon when Chord knows it. */
+function FileIcon({
   pathslug,
-  selected,
-  unsaved,
-  onSelect,
+  apps,
 }: {
   pathslug: string;
-  selected: boolean;
-  unsaved: boolean;
-  onSelect: () => void;
+  apps: Record<string, DesktopAppMetadata>;
 }) {
-  const { title, appId } = describeChordsFile(pathslug);
+  const { appId } = describeChordsFile(pathslug);
+  const icon = appId ? apps[appId]?.iconDataUrl : undefined;
+  if (icon) return <img src={icon} alt="" />;
   const Icon = appId ? AppWindow : pathslug === ALL_APPS_PATHSLUG ? Globe : FileText;
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <Icon className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{title}</span>
-        <span className="block truncate font-mono text-xs text-muted-foreground">{pathslug}</span>
-      </span>
-      {unsaved && <span className="shrink-0 text-xs text-muted-foreground">Unsaved</span>}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={onSelect}
-        aria-label={`Edit ${pathslug}`}
-        aria-expanded={selected}
-      >
-        <Pencil />
-        Edit
-      </Button>
-    </div>
-  );
+  return <Icon size={17} strokeWidth={1.6} />;
 }
 
-function NewFileForm({
+/** A sheet that adds a chords file for every app or one app, then opens it. */
+function AddFileButton({
   packages,
   defaultDirname,
   appIds,
+  open,
+  onOpenChange,
   onOpen,
 }: {
   packages: PersonalPackageFiles[];
   defaultDirname: string;
   appIds: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onOpen: (file: FileRef) => void;
 }) {
   const queryClient = useQueryClient();
@@ -512,66 +497,100 @@ function NewFileForm({
   });
   const suggestions = appIds.filter((id) => !files.includes(chordsFilePathslug(id)));
   return (
-    <form
-      className="space-y-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (appId.trim() !== "" && !isValidAppId(appId)) {
-          setInvalid(true);
-          return;
-        }
-        const file = { dirname, pathslug: chordsFilePathslug(appId) };
-        if (files.includes(file.pathslug)) {
-          setAppId("");
-          onOpen(file);
-        } else {
-          create.mutate(file);
-        }
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        setDirname(null);
+        create.reset();
       }}
     >
-      <div className="flex flex-col gap-2 sm:flex-row">
-        {packages.length > 1 && (
-          <Select
-            aria-label="Package for the new chords file"
-            value={dirname}
-            onValueChange={setDirname}
-            disabled={create.isPending}
-            options={packages.map((pkg) => ({ value: pkg.dirname, label: pkg.dirname }))}
-          />
-        )}
-        <Input
-          aria-label="App bundle ID for a new chords file"
-          aria-invalid={invalid || undefined}
-          placeholder="App bundle ID, such as com.apple.finder (empty for every app)"
-          list="personal-chords-app-ids"
-          value={appId}
-          onChange={(event) => {
-            setAppId(event.target.value);
-            setInvalid(false);
+      <Button type="button" variant="outline" size="sm" className="mac-button">
+        Add File…
+      </Button>
+      <DialogContent>
+        <form
+          className="mac-page space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (appId.trim() !== "" && !isValidAppId(appId)) {
+              setInvalid(true);
+              return;
+            }
+            const file = { dirname, pathslug: chordsFilePathslug(appId) };
+            if (files.includes(file.pathslug)) {
+              setAppId("");
+              onOpen(file);
+            } else {
+              create.mutate(file);
+            }
           }}
-          spellCheck={false}
-          autoCapitalize="none"
-          autoCorrect="off"
-          autoComplete="off"
-          disabled={create.isPending}
-        />
-        <datalist id="personal-chords-app-ids">
-          {suggestions.map((id) => (
-            <option key={id} value={id} />
-          ))}
-        </datalist>
-        <Button type="submit" variant="outline" disabled={create.isPending} className="shrink-0">
-          <Plus />
-          {create.isPending ? "Adding…" : "Add File"}
-        </Button>
-      </div>
-      {invalid && (
-        <p role="alert" className="text-xs text-destructive">
-          Use a bundle ID made of letters, digits, hyphens, and periods, such as com.apple.finder.
-        </p>
-      )}
-      {create.isError && <ErrorMessage error={create.error} />}
-    </form>
+        >
+          <DialogHeader>
+            <DialogTitle>Add Chords File</DialogTitle>
+            <DialogDescription>
+              Leave the app empty for chords that work in every app.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-3">
+            {packages.length > 1 && (
+              <>
+                <label className="text-right text-[13px]" htmlFor="personal-chords-package">
+                  Package:
+                </label>
+                <Select
+                  id="personal-chords-package"
+                  aria-label="Package for the new chords file"
+                  value={dirname}
+                  onValueChange={setDirname}
+                  disabled={create.isPending}
+                  options={packages.map((pkg) => ({ value: pkg.dirname, label: pkg.dirname }))}
+                  className="justify-self-start"
+                />
+              </>
+            )}
+            <label className="text-right text-[13px]" htmlFor="personal-chords-app-id">
+              App:
+            </label>
+            <input
+              id="personal-chords-app-id"
+              className="mac-field w-full"
+              aria-label="App bundle ID for a new chords file"
+              aria-invalid={invalid || undefined}
+              placeholder="com.apple.finder"
+              list="personal-chords-app-ids"
+              value={appId}
+              onChange={(event) => {
+                setAppId(event.target.value);
+                setInvalid(false);
+              }}
+              spellCheck={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="off"
+              disabled={create.isPending}
+            />
+          </div>
+          <datalist id="personal-chords-app-ids">
+            {suggestions.map((id) => (
+              <option key={id} value={id} />
+            ))}
+          </datalist>
+          {invalid && (
+            <p role="alert" className="text-xs text-destructive">
+              Use a bundle ID made of letters, digits, hyphens, and periods, such as
+              com.apple.finder.
+            </p>
+          )}
+          {create.isError && <ErrorMessage error={create.error} />}
+          <DialogFooter>
+            <button type="submit" className="mac-button" data-default disabled={create.isPending}>
+              {create.isPending ? "Adding…" : "Add File"}
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -599,19 +618,19 @@ function useChordsFileProblem(contents: string) {
   return checked;
 }
 
+/** A chords file's editor, disclosed under its row. Its actions sit in the footer. */
 function FileEditor({
   file,
   edit,
   onEdit,
-  onClose,
 }: {
   file: FileRef;
   edit: Edit | null;
   onEdit: (update: EditUpdate) => void;
-  onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
+  const formId = useId();
   const fileQuery = useQuery({
     queryKey: fileKey(file),
     queryFn: () => taurpc.readPersonalChordsFile(file.dirname, file.pathslug),
@@ -644,42 +663,66 @@ function FileEditor({
       ? [{ from: problem.from, to: problem.to ?? problem.from, message: problem.message }]
       : [];
   }, [checked]);
-  const { title } = describeChordsFile(file.pathslug);
   const path = `${file.dirname}/${file.pathslug}`;
+  const contents = fileQuery.data;
+  const dirty = edit !== null && contents !== undefined && edit.draft !== edit.base;
+  const changedOnDisk = edit !== null && contents !== undefined && contents !== edit.base;
+  const pending = save.isPending || remove.isPending;
 
-  if (fileQuery.data === undefined) {
+  const actions = contents !== undefined && (
+    <div className="mac-editor-actions">
+      <DeleteFileButton path={path} disabled={pending} onDelete={() => remove.mutate()} />
+      {dirty && (
+        <button
+          type="button"
+          className="mac-button"
+          onClick={() => {
+            onEdit(() => null);
+            save.reset();
+            void fileQuery.refetch();
+          }}
+          disabled={pending}
+        >
+          Revert
+        </button>
+      )}
+      <button
+        type="submit"
+        form={formId}
+        className="mac-button"
+        data-default
+        disabled={!dirty || pending}
+      >
+        {save.isPending ? "Saving…" : "Save"}
+      </button>
+    </div>
+  );
+
+  if (contents === undefined) {
     return (
-      <Card size="sm">
-        <CardContent>
+      <section aria-label={`Edit ${path}`} className="mac-editor">
+        <div>
           {fileQuery.isError ? (
             <div role="alert" className="space-y-2">
               <ErrorMessage error={fileQuery.error} />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void fileQuery.refetch()}
-              >
+              <button type="button" className="mac-button" onClick={() => void fileQuery.refetch()}>
                 Retry
-              </Button>
+              </button>
             </div>
           ) : (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className="mac-row-subtitle">
               Loading {path}…
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
-  const contents = fileQuery.data;
-  const dirty = edit !== null && edit.draft !== edit.base;
-  const changedOnDisk = edit !== null && contents !== edit.base;
-  const pending = save.isPending || remove.isPending;
   return (
-    <Card size="sm">
+    <section aria-label={`Edit ${path}`} className="mac-editor">
       <form
+        id={formId}
         ref={formRef}
         aria-label={`Edit ${path}`}
         className="contents"
@@ -688,61 +731,14 @@ function FileEditor({
           if (edit && dirty && !pending) save.mutate(edit);
         }}
       >
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-1">
-              <CardTitle>{title}</CardTitle>
-              <CardDescription className="truncate font-mono text-xs">{path}</CardDescription>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {dirty && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onEdit(() => null);
-                    save.reset();
-                    void fileQuery.refetch();
-                  }}
-                  disabled={pending}
-                >
-                  Revert
-                </Button>
-              )}
-              <Button type="submit" size="sm" disabled={!dirty || pending}>
-                {save.isPending ? "Saving…" : "Save"}
-              </Button>
-              <DeleteFileButton path={path} disabled={pending} onDelete={() => remove.mutate()} />
-              <Button
-                type="button"
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Close editor"
-                onClick={onClose}
-                disabled={pending}
-              >
-                <X />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2 pt-0">
-          {changedOnDisk && (
-            <p role="alert" className="text-xs text-destructive">
-              This file changed on disk after you started editing, so saving won't overwrite it.
-              Revert to load the new version.
-            </p>
-          )}
-          <Suspense
-            fallback={
-              <div
-                role="status"
-                aria-label="Loading editor"
-                className="h-[26rem] rounded-lg border bg-default/30"
-              />
-            }
-          >
+        {changedOnDisk && (
+          <p role="alert" className="mac-editor-alert">
+            This file changed on disk after you started editing, so saving won't overwrite it.
+            Revert to load the new version.
+          </p>
+        )}
+        <div className="mac-editor-surface">
+          <Suspense fallback={<div role="status" aria-label="Loading editor" className="h-full" />}>
             <CodeEditor
               aria-label={`Contents of ${path}`}
               language="toml"
@@ -756,35 +752,36 @@ function FileEditor({
               onSave={() => formRef.current?.requestSubmit()}
               diagnostics={diagnostics}
               readOnly={remove.isPending}
-              className="h-[26rem]"
+              className="h-full"
             />
           </Suspense>
-          <p aria-live="polite" className="min-h-4 text-xs">
-            {checked?.problem ? (
-              <span className="text-destructive">
-                {checked.problem.from !== null && (
-                  <>Line {lineOf(checked.contents, checked.problem.from)}: </>
-                )}
-                {checked.problem.message}
-              </span>
-            ) : (
-              <span className="text-muted-foreground">
-                <kbd>
-                  <KeyLabel label="⌘" />S
-                </kbd>{" "}
-                saves and reloads Chord.{" "}
-                <kbd>
-                  <KeyLabel label="⌘" />F
-                </kbd>{" "}
-                finds and replaces.
-              </span>
-            )}
-          </p>
-          {save.isError && <ErrorMessage error={save.error} />}
-          {remove.isError && <ErrorMessage error={remove.error} />}
-        </CardContent>
+        </div>
+        <div aria-live="polite" className="mac-editor-status">
+          {checked?.problem ? (
+            <span className="text-destructive">
+              {checked.problem.from !== null && (
+                <>Line {lineOf(checked.contents, checked.problem.from)}: </>
+              )}
+              {checked.problem.message}
+            </span>
+          ) : (
+            <span>
+              <kbd>
+                <KeyLabel label="⌘" />S
+              </kbd>{" "}
+              saves and reloads Chord.{" "}
+              <kbd>
+                <KeyLabel label="⌘" />F
+              </kbd>{" "}
+              finds and replaces.
+            </span>
+          )}
+          {actions}
+        </div>
+        {save.isError && <ErrorMessage error={save.error} />}
+        {remove.isError && <ErrorMessage error={remove.error} />}
       </form>
-    </Card>
+    </section>
   );
 }
 
@@ -805,13 +802,12 @@ function DeleteFileButton({
     <AlertDialog>
       <Button
         type="button"
-        size="icon-sm"
-        variant="ghost"
+        variant="outline"
         aria-label={`Delete ${path}`}
         disabled={disabled}
-        className="text-muted-foreground hover:text-destructive"
+        className="mac-button"
       >
-        <Trash2 />
+        Delete…
       </Button>
 
       <AlertDialogContent size="sm">

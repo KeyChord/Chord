@@ -1,1 +1,1 @@
-export * from '#reset-chords-card';
+export * from "#reset-chords-card";

@@ -31,6 +31,7 @@
         "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dropdown-menu": "workspace:*",
         "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.label": "workspace:*",
@@ -113,6 +114,7 @@
         "@chord/com.npmjs.utils-cn": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+        "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes": "workspace:*",
         "@chord/dev.improve.chord.routes.chords.index": "workspace:*",
         "@chord/dev.improve.chord.routes.settings": "workspace:*",
@@ -384,6 +386,16 @@
         "@types/react-dom": "^19.3.0",
       },
     },
+    "packages/dev/improve/chord/components/ui/group-card": {
+      "name": "@chord/dev.improve.chord.components.ui.group-card",
+      "dependencies": {
+        "lucide-react": "^1.57.0",
+        "react": "^19.3.1",
+      },
+      "devDependencies": {
+        "@types/react": "^19.3.0",
+      },
+    },
     "packages/dev/improve/chord/components/ui/input": {
       "name": "@chord/dev.improve.chord.components.ui.input",
       "dependencies": {
@@ -434,7 +446,7 @@
     "packages/dev/improve/chord/components/ui/select": {
       "name": "@chord/dev.improve.chord.components.ui.select",
       "dependencies": {
-        "@heroui/react": "^3.2.7",
+        "@chord/com.npmjs.utils-cn": "workspace:*",
         "react": "^19.3.1",
       },
       "devDependencies": {
@@ -580,6 +592,12 @@
     "packages/dev/improve/chord/lib/github": {
       "name": "@chord/dev.improve.chord.lib.github",
     },
+    "packages/dev/improve/chord/lib/native-menu": {
+      "name": "@chord/dev.improve.chord.lib.native-menu",
+      "dependencies": {
+        "@tauri-apps/api": "^2.12.4",
+      },
+    },
     "packages/dev/improve/chord/lib/permissions": {
       "name": "@chord/dev.improve.chord.lib.permissions",
       "dependencies": {
@@ -645,10 +663,8 @@
       "name": "@chord/dev.improve.chord.routes.settings",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-devtools": "workspace:*",
-        "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router": "workspace:*",
         "@chord/com.npmjs.tanstack__react-router-devtools": "workspace:*",
-        "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.log-stream": "workspace:*",
@@ -811,10 +827,9 @@
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.label": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.popover": "workspace:*",
         "@chord/dev.improve.chord.components.ui.switch": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
-        "lucide-react": "^1.57.0",
+        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "react": "^19.3.1",
       },
       "devDependencies": {
@@ -869,9 +884,6 @@
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "react": "^19.3.1",
@@ -920,10 +932,9 @@
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
         "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
         "@chord/dev.improve.chord.components.ui.select": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
@@ -971,8 +982,9 @@
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.toast": "workspace:*",
+        "lucide-react": "^1.57.0",
         "react": "^19.3.1",
       },
       "devDependencies": {
@@ -1055,16 +1067,11 @@
       "name": "@chord/dev.improve.chord.routes.settings.chords.index",
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
-        "@chord/com.npmjs.tanstack__react-table": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
         "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
         "@chord/dev.improve.chord.components.ui.button": "workspace:*",
         "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.empty": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.tabs": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
@@ -1138,13 +1145,8 @@
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
-        "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-        "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
         "@chord/dev.improve.chord.routes.settings._components.shortcut-keys": "workspace:*",
         "lucide-react": "^1.57.0",
         "react": "^19.3.1",
@@ -1175,12 +1177,8 @@
       "dependencies": {
         "@chord/com.npmjs.tanstack__react-query": "workspace:*",
         "@chord/dev.improve.chord.api.taurpc": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.card": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+        "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
         "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
-        "@chord/dev.improve.chord.components.ui.textarea": "workspace:*",
         "@chord/dev.improve.chord.lib.state": "workspace:*",
         "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
         "lucide-react": "^1.57.0",
@@ -1331,6 +1329,8 @@
 
     "@chord/dev.improve.chord.components.ui.empty": ["@chord/dev.improve.chord.components.ui.empty@workspace:packages/dev/improve/chord/components/ui/empty"],
 
+    "@chord/dev.improve.chord.components.ui.group-card": ["@chord/dev.improve.chord.components.ui.group-card@workspace:packages/dev/improve/chord/components/ui/group-card"],
+
     "@chord/dev.improve.chord.components.ui.input": ["@chord/dev.improve.chord.components.ui.input@workspace:packages/dev/improve/chord/components/ui/input"],
 
     "@chord/dev.improve.chord.components.ui.kbd": ["@chord/dev.improve.chord.components.ui.kbd@workspace:packages/dev/improve/chord/components/ui/kbd"],
@@ -1366,6 +1366,8 @@
     "@chord/dev.improve.chord.lib.chord-files": ["@chord/dev.improve.chord.lib.chord-files@workspace:packages/dev/improve/chord/lib/chord-files"],
 
     "@chord/dev.improve.chord.lib.github": ["@chord/dev.improve.chord.lib.github@workspace:packages/dev/improve/chord/lib/github"],
+
+    "@chord/dev.improve.chord.lib.native-menu": ["@chord/dev.improve.chord.lib.native-menu@workspace:packages/dev/improve/chord/lib/native-menu"],
 
     "@chord/dev.improve.chord.lib.permissions": ["@chord/dev.improve.chord.lib.permissions@workspace:packages/dev/improve/chord/lib/permissions"],
 

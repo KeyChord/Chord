@@ -1,0 +1,1 @@
+export { getCollapseEarlierKeys, setCollapseEarlierKeys, getPanelTextFont, setPanelTextFont, getPanelKeyFont, setPanelKeyFont, panelFontStyles, PANEL_TEXT_FONTS, PANEL_KEY_FONTS, type PanelTextFont, type PanelKeyFont } from '#panel-preferences';

@@ -16,9 +16,7 @@ export function ActivationTriggerCard() {
     <Card size="sm">
       <CardHeader>
         <CardTitle>Keyboard Shortcuts</CardTitle>
-        <CardDescription>
-          Start a chord from anywhere on your Mac.
-        </CardDescription>
+        <CardDescription>Start a chord from anywhere on your Mac.</CardDescription>
       </CardHeader>
       <CardContent className="preference-group">
         <div className="preference-row">

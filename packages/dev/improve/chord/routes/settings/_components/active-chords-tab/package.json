@@ -1,24 +1,24 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tab",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#active-chords-tab": "./active-chords-tab.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"@chord/dev.improve.chord.lib.state": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.active-chords-tree": "workspace:*",
-		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-		"react": "^19.3.1"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.active-chords-tab",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#active-chords-tab": "./active-chords-tab.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.input": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.active-chords-tree": "workspace:*",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

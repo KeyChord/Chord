@@ -79,7 +79,11 @@ function capEntries(entries: AppLogEntry[]) {
   const retained: AppLogEntry[] = [];
   let retainedBytes = 0;
 
-  for (let index = entries.length - 1; index >= 0 && retained.length < MAX_LOG_ENTRIES; index -= 1) {
+  for (
+    let index = entries.length - 1;
+    index >= 0 && retained.length < MAX_LOG_ENTRIES;
+    index -= 1
+  ) {
     const entry = normalizeEntry(entries[index]);
     const entryBytes = logMessageBytes(entry.message) + logMessageBytes(entry.level);
     if (retained.length > 0 && retainedBytes + entryBytes > MAX_LOG_TEXT_BYTES) {

@@ -1,1 +1,1 @@
-export * from '#relaunch-app-button';
+export * from "#relaunch-app-button";

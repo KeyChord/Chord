@@ -1,1 +1,1 @@
-export { ChordMonoreposCard } from '#chord-monorepos-card';
+export { ChordMonoreposCard } from "#chord-monorepos-card";

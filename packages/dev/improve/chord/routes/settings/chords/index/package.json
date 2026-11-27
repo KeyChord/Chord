@@ -1,40 +1,35 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings.chords.index",
-	"private": true,
-	"type": "module",
-	"imports": {
-		"#settings-chords-page": "./settings-chords-page.tsx",
-		"#chord-library": "./chord-library.tsx",
-		"#package-approvals": "./package-approvals.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/dev.improve.chord.api.taurpc": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
-		"@chord/com.npmjs.tanstack__react-table": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.button": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.collapsible": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.empty": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.tabs": "workspace:*",
-		"@chord/dev.improve.chord.lib.state": "workspace:*",
-		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.personal-chords": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
-		"lucide-react": "^1.57.0",
-		"react": "^19.3.1",
-		"react-dom": "^19.3.1",
-		"@chord/dev.improve.chord.components.ui.input": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
-		"@chord/com.npmjs.tanstack__react-query": "workspace:*"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings.chords.index",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#settings-chords-page": "./settings-chords-page.tsx",
+    "#chord-library": "./chord-library.tsx",
+    "#package-approvals": "./package-approvals.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/com.npmjs.tanstack__react-query": "workspace:*",
+    "@chord/dev.improve.chord.api.taurpc": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.button": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.checkbox": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.group-card": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.package-placeholders": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.chord-monorepos-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.chord-repos-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.local-folders-card": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.personal-chords": "workspace:*",
+    "lucide-react": "^1.57.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

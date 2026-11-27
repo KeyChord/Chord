@@ -12,6 +12,7 @@ pub const SHOW_SETTINGS_WINDOW_MENU_ID: &str = "show-settings-window";
 pub const RELOAD_CONFIGS_MENU_ID: &str = "reload-configs";
 pub const OPEN_INSPECTOR_MENU_ID: &str = "open-inspector";
 pub const QUIT_MENU_ID: &str = "quit";
+pub const CLOSE_SETTINGS_MENU_ID: &str = "close-settings";
 
 pub static GLOBAL_HOTKEYS_POOL: LazyLock<Vec<KeyCombination>> =
     LazyLock::new(|| load_hotkeys().expect("failed to load GLOBAL_HOTKEYS_POOL"));

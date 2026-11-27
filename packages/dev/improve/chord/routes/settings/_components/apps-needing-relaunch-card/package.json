@@ -1,23 +1,23 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#apps-needing-relaunch-card": "./apps-needing-relaunch-card.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/dev.improve.chord.components.ui.badge": "workspace:*",
-		"@chord/dev.improve.chord.components.ui.card": "workspace:*",
-		"@chord/dev.improve.chord.lib.state": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
-		"@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": "workspace:*",
-		"react": "^19.3.1"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.apps-needing-relaunch-card",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#apps-needing-relaunch-card": "./apps-needing-relaunch-card.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.components.ui.badge": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
+    "@chord/dev.improve.chord.lib.state": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.app-icon": "workspace:*",
+    "@chord/dev.improve.chord.routes.settings._components.relaunch-app-button": "workspace:*",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

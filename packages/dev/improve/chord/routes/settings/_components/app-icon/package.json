@@ -1,20 +1,20 @@
 {
-	"name": "@chord/dev.improve.chord.routes.settings._components.app-icon",
-	"type": "module",
-	"private": true,
-	"imports": {
-		"#app-icon": "./app-icon.tsx"
-	},
-	"exports": {
-		".": "./+.ts"
-	},
-	"dependencies": {
-		"@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
-		"@chord/dev.improve.chord.lib.typeshare": "workspace:*",
-		"react": "^19.3.1"
-	},
-	"devDependencies": {
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0"
-	}
+  "name": "@chord/dev.improve.chord.routes.settings._components.app-icon",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#app-icon": "./app-icon.tsx"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@chord/dev.improve.chord.components.ui.tooltip": "workspace:*",
+    "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  }
 }

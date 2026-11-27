@@ -5,16 +5,18 @@ use crate::state::{ChordPanelObservable, ChordPanelState, Observable};
 use anyhow::{Result, ensure};
 use arc_swap::ArcSwap;
 use nject::injectable;
+use objc2::rc::Retained;
 use objc2_app_kit::{
-    NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
+    NSScreen, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState,
     NSWindowAnimationBehavior, NSWindowOrderingMode, NSWindowStyleMask,
 };
 use objc2_foundation::{MainThreadMarker, NSInteger, NSPoint, NSRect, NSSize};
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use serde::Deserialize;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
+use tauri::utils::config::BackgroundThrottlingPolicy;
 use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindow, Wry};
 use tauri_nspanel::{CollectionBehavior, PanelBuilder, PanelHandle, PanelLevel, StyleMask};
 use tauri_plugin_store::StoreExt;
@@ -24,8 +26,13 @@ const INDICATOR_WIDTH: f64 = 640.0;
 const FLOATING_BOTTOM_MARGIN: f64 = 24.0;
 const LAYOUT_STORE_KEY: &str = "chordLayout";
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
+/// How long a show waits for the page to draw the current state before revealing anyway.
+const SURFACE_READY_TIMEOUT: Duration = Duration::from_millis(160);
+/// Shows in a row the page has not answered before Chord reloads it. A page that misses
+/// one is usually just slow to wake; one that misses several is stuck.
+const UNANSWERED_SHOWS_BEFORE_RELOAD: u32 = 3;
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeSurfaceRect {
     pub x: f64,
@@ -55,6 +62,20 @@ pub struct ChordModePanel {
     /// keeps pixels for the whole window, including its transparent parts.
     #[inject(parking_lot::Mutex::new(None))]
     extent: parking_lot::Mutex<Option<PanelExtent>>,
+
+    /// What the page last said its card needs, which `extent` catches up to once the panel
+    /// hides (see `fit_to_card`).
+    #[inject(parking_lot::Mutex::new(None))]
+    latest_extent: parking_lot::Mutex<Option<PanelExtent>>,
+
+    /// The panel is ordered in for a chord.
+    #[inject(AtomicBool::new(false))]
+    shown: AtomicBool,
+
+    /// Shows in a row whose page did not report back in time (see
+    /// `UNANSWERED_SHOWS_BEFORE_RELOAD`).
+    #[inject(AtomicU32::new(0))]
+    unanswered_shows: AtomicU32,
 
     handle: AppHandle,
     observable: ChordPanelObservable,
@@ -141,6 +162,9 @@ impl ChordModePanel {
         panel
             .as_panel()
             .setAnimationBehavior(NSWindowAnimationBehavior::None);
+        // Hiding Chord (⌘H, or handing focus back when Settings closes) hides every one of
+        // its windows that can hide, and a hidden panel stays hidden when ordered front.
+        panel.as_panel().setCanHide(false);
         panel.set_collection_behavior(
             CollectionBehavior::new()
                 .can_join_all_spaces()
@@ -215,14 +239,37 @@ impl ChordModePanel {
     }
 
     /// Sizes the window to what the page says its card needs.
+    ///
+    /// While the panel shows, the window only grows. Each resize lands a frame or two after
+    /// the card changed, so following every change in height (a description of one line or
+    /// two, say) made the panel step visibly as keys were typed; a window that is already
+    /// big enough needs no resize. It shrinks to the card once the panel hides.
     pub fn fit_to_card(&self, extent: PanelExtent) -> Result<()> {
-        {
+        *self.latest_extent.lock() = Some(extent);
+        let applied = {
             let mut current = self.extent.lock();
-            if *current == Some(extent) {
+            let next = match *current {
+                Some(current)
+                    if self.shown.load(Ordering::SeqCst) && current.layout == extent.layout =>
+                {
+                    PanelExtent {
+                        layout: extent.layout,
+                        width: current.width.max(extent.width),
+                        height: current.height.max(extent.height),
+                    }
+                }
+                _ => extent,
+            };
+            if *current == Some(next) {
                 return Ok(());
             }
-            *current = Some(extent);
-        }
+            *current = Some(next);
+            next
+        };
+        self.apply_extent(applied)
+    }
+
+    fn apply_extent(&self, extent: PanelExtent) -> Result<()> {
         let layout = self.observable.get_state()?.layout;
         let panel = self.panel.load_full();
         self.handle.run_on_main_thread(move || {
@@ -233,16 +280,31 @@ impl ChordModePanel {
         Ok(())
     }
 
+    /// The display the panel shows on: the one it was last on, as before. When that
+    /// display is gone, `NSWindow.screen` is nil, which left the panel off screen while
+    /// chords still ran, so the main display takes its place.
+    fn target_screen(panel: &PanelHandle<Wry>) -> Option<Retained<NSScreen>> {
+        let mtm = MainThreadMarker::new()?;
+        panel
+            .as_panel()
+            .screen()
+            .or_else(|| NSScreen::mainScreen(mtm))
+            .or_else(|| NSScreen::screens(mtm).firstObject())
+    }
+
     fn position_panel(panel: &PanelHandle<Wry>, layout: ChordLayout, extent: Option<PanelExtent>) {
         let native_panel = panel.as_panel();
         // Keep the native window out of mouse hit testing after layout changes
         // and before every show, including its transparent webview and vibrancy.
         native_panel.setIgnoresMouseEvents(true);
         native_panel.setAcceptsMouseMovedEvents(false);
-        if let Some(screen) = native_panel.screen() {
-            let frame = Self::frame_for_layout(layout, screen.visibleFrame(), extent);
-            native_panel.setContentSize(frame.size);
-            native_panel.setFrameOrigin(frame.origin);
+        match Self::target_screen(panel) {
+            Some(screen) => {
+                let frame = Self::frame_for_layout(layout, screen.visibleFrame(), extent);
+                native_panel.setContentSize(frame.size);
+                native_panel.setFrameOrigin(frame.origin);
+            }
+            None => log::warn!("No display to show the Hint Panel on"),
         }
     }
 
@@ -252,23 +314,56 @@ impl ChordModePanel {
         Ok(())
     }
 
+    /// Asks the page to draw the current state and waits briefly for it to say it has.
+    /// Must not run on the main thread, which delivers the page's answer.
     pub fn prepare_surface_before_reveal(&self) -> Result<()> {
         let window = self.get_or_create_window()?;
+        if MainThreadMarker::new().is_some() {
+            // Waiting here would block the answer it waits for.
+            return self.emit_will_show();
+        }
         let (tx, rx) = mpsc::sync_channel(1);
-        window.once("chorder-surface-ready", move |_| {
+        let listener = window.once("chorder-surface-ready", move |_| {
             let _ = tx.send(());
         });
         self.emit_will_show()?;
-        rx.recv_timeout(Duration::from_millis(160))?;
-        Ok(())
+        match rx.recv_timeout(SURFACE_READY_TIMEOUT) {
+            Ok(()) => {
+                self.unanswered_shows.store(0, Ordering::SeqCst);
+                Ok(())
+            }
+            Err(error) => {
+                window.unlisten(listener);
+                self.on_show_unanswered(&window);
+                Err(error.into())
+            }
+        }
+    }
+
+    /// The page did not answer a show. WebKit can leave a page that was hidden for a long
+    /// while unable to draw, so after a few misses in a row it is reloaded; the page
+    /// reads every state again when it starts.
+    fn on_show_unanswered(&self, window: &WebviewWindow) {
+        let misses = self.unanswered_shows.fetch_add(1, Ordering::SeqCst) + 1;
+        log::warn!("The Hint Panel did not draw in time ({misses} in a row)");
+        if misses < UNANSWERED_SHOWS_BEFORE_RELOAD {
+            return;
+        }
+        self.unanswered_shows.store(0, Ordering::SeqCst);
+        log::warn!("Reloading the Hint Panel's page");
+        if let Err(error) = window.reload() {
+            log::error!("Failed to reload the Hint Panel: {error:#}");
+        }
     }
 
     pub fn preload(&self) -> Result<()> {
         log::info!("Preloading chorder panel");
 
         if self.ensure_visible(true)? {
-            self.prepare_surface_before_reveal()?;
+            // Whatever happens while it draws, the panel must not stay ordered in.
+            let prepared = self.prepare_surface_before_reveal();
             self.ensure_hidden()?;
+            prepared?;
         }
 
         Ok(())
@@ -311,6 +406,11 @@ impl ChordModePanel {
                     .visible_on_all_workspaces(true)
                     .shadow(false)
                     .accept_first_mouse(false)
+                    // Since macOS 14, WebKit suspends a hidden web view's page. The panel
+                    // is hidden between chords, so every show had to wake it first, and a
+                    // page that woke late (or not at all) left the panel blank while the
+                    // chord still ran.
+                    .background_throttling(BackgroundThrottlingPolicy::Disabled)
             })
             .build()?;
 
@@ -352,20 +452,35 @@ impl ChordModePanel {
         handle: AppHandle,
         rect: NativeSurfaceRect,
     ) -> Result<()> {
+        // The page reports its card after every change, often several times over.
+        static LAST_RECT: parking_lot::Mutex<Option<NativeSurfaceRect>> =
+            parking_lot::Mutex::new(None);
+        let previous = LAST_RECT.lock().replace(rect);
+        if previous == Some(rect) {
+            return Ok(());
+        }
+        // Only a new shape needs a new view; a new size moves the one there.
+        let same_shape = previous.is_some_and(|previous| {
+            previous.radius == rect.radius && previous.flush_left == rect.flush_left
+        });
         let ns_view = Self::webview_ns_view(window)?;
 
         handle.run_on_main_thread(move || unsafe {
             let view: &NSView = &*(ns_view as *mut NSView);
-            if let Some(existing_view) = view.viewWithTag(NATIVE_SURFACE_TAG) {
-                existing_view.removeFromSuperview();
-            }
-
             // Only the edge-attached sidebar extends past its left corners.
             let left_extension = if rect.flush_left { rect.radius } else { 0.0 };
             let frame = NSRect::new(
                 NSPoint::new(rect.x - left_extension, rect.y),
                 NSSize::new(rect.width + left_extension, rect.height),
             );
+            if let Some(existing_view) = view.viewWithTag(NATIVE_SURFACE_TAG) {
+                // Rebuilding the view on every change left the glass a step behind the card.
+                if same_shape {
+                    existing_view.setFrame(frame);
+                    return;
+                }
+                existing_view.removeFromSuperview();
+            }
             let vibrancy_view = NSVisualEffectViewTagged::initWithFrame(
                 // Guaranteed by `run_on_main_thread`.
                 MainThreadMarker::new()
@@ -390,6 +505,7 @@ impl ChordModePanel {
     }
 
     fn show(&self) -> Result<()> {
+        self.shown.store(true, Ordering::SeqCst);
         let panel = self.panel.load_full();
         let layout = self.observable.get_state()?.layout;
         let extent = *self.extent.lock();
@@ -400,7 +516,12 @@ impl ChordModePanel {
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("chord-mode panel was not initialized"))?;
             Self::position_panel(panel, layout, extent);
-            Self::ensure_nonactivating(panel)?;
+            // The panel is only drawn: it takes no clicks and no keys. A broken invariant
+            // is put right and logged rather than leaving chord mode without its panel.
+            if let Err(error) = Self::ensure_nonactivating(panel) {
+                log::warn!("Repairing the Hint Panel before showing it: {error:#}");
+                panel.set_style_mask(Self::nonactivating_style_mask().into());
+            }
 
             panel.set_alpha_value(0.0);
             let _ = panel.make_first_responder(None);
@@ -414,7 +535,10 @@ impl ChordModePanel {
             let _ = panel.make_first_responder(None);
             panel.resign_key_window();
             panel.resign_main_window();
-            Self::ensure_nonactivating(panel)
+            if let Err(error) = Self::ensure_nonactivating(panel) {
+                log::error!("The Hint Panel is showing in a state it should not be in: {error:#}");
+            }
+            Ok(())
         })
     }
 
@@ -446,7 +570,21 @@ impl ChordModePanel {
             is_visible: false,
             ..prev
         })?;
+        self.shown.store(false, Ordering::SeqCst);
         self.hide()?;
+        // Now that no one sees it, the window shrinks to what the card needs.
+        let latest = *self.latest_extent.lock();
+        if let Some(latest) = latest {
+            let changed = {
+                let mut current = self.extent.lock();
+                let changed = *current != Some(latest);
+                *current = Some(latest);
+                changed
+            };
+            if changed {
+                self.apply_extent(latest)?;
+            }
+        }
         Ok(true)
     }
 

@@ -1,1 +1,1 @@
-export * from '#shortcut-keys';
+export * from "#shortcut-keys";

@@ -1,1 +1,1 @@
-export * from '#permissions-dialog';
+export * from "#permissions-dialog";

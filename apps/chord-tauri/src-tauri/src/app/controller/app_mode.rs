@@ -90,16 +90,24 @@ impl AppController {
         Ok(())
     }
 
+    /// Enters chord mode. Nothing here may keep it from starting: with no focused window,
+    /// a display change or a panel that fails to draw, Caps+Space still starts a chord.
     pub fn set_chord_mode(&self) -> Result<()> {
         let state = self.handle.app_state();
-        state.frontmost().refresh_chord_context()?;
+        if let Err(error) = state.frontmost().refresh_chord_context() {
+            log::warn!("Starting the chord without refreshing its context: {error:#}");
+        }
         self.mode.store(AppMode::Chord, Ordering::SeqCst);
-        self.observable.set_state(|_| AppModeState::Chord)?;
+        if let Err(error) = self.observable.set_state(|_| AppModeState::Chord) {
+            log::error!("Failed to publish chord mode: {error:#}");
+        }
         // Package workers exit while unused; this starts them while the chord is typed.
         state
             .chord_package_manager()
             .start_workers_for_frontmost_app();
-        state.chord_mode_manager().ensure_active()?;
+        if let Err(error) = state.chord_mode_manager().ensure_active() {
+            log::error!("Failed to show chord mode: {error:#}");
+        }
         Ok(())
     }
 }

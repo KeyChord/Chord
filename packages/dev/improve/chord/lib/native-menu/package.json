@@ -1,0 +1,14 @@
+{
+  "name": "@chord/dev.improve.chord.lib.native-menu",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#native-menu": "./native-menu.ts"
+  },
+  "exports": {
+    ".": "./+.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.12.4"
+  }
+}

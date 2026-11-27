@@ -1,1 +1,1 @@
-export { SettingsConfigurePage } from '#settings-configure-page';
+export { SettingsConfigurePage } from "#settings-configure-page";

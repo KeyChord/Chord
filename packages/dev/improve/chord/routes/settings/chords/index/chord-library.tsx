@@ -1,44 +1,20 @@
-import { Input } from "@chord/dev.improve.chord.components.ui.input";
 import type {
   Chord,
   ChordPackage,
   DesktopAppMetadata,
 } from "@chord/dev.improve.chord.lib.typeshare";
-import type { ColumnDef, Row } from "@chord/com.npmjs.tanstack__react-table";
-import {
-  columnFilteringFeature,
-  createExpandedRowModel,
-  createFilteredRowModel,
-  globalFilteringFeature,
-  rowExpandingFeature,
-  Subscribe,
-  tableFeatures,
-  useTable,
-} from "@chord/com.npmjs.tanstack__react-table";
-import { Button } from "@chord/dev.improve.chord.components.ui.button";
+import { GroupCard } from "@chord/dev.improve.chord.components.ui.group-card";
 import {
   listPlaceholders,
   PackagePlaceholders,
   placeholderNeedsKeys,
   type PlaceholderEntry,
 } from "@chord/dev.improve.chord.routes.settings._components.package-placeholders";
-import { usePersonalChordsEditor } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
+import { GripVertical, Keyboard, Package } from "lucide-react";
 import {
-  Braces,
-  ChevronDown,
-  Command,
-  GripVertical,
-  Keyboard,
-  Pencil,
-  Package,
-  Search,
-  Terminal,
-  X,
-} from "lucide-react";
-import {
-  Fragment,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -152,6 +128,11 @@ const rankOrder: PackageRank[] = ["core", "personal", "installed", "builtin"];
 
 const rankable = (rank: PackageRank) => rank === "installed" || rank === "builtin";
 
+/** Whether Edit Order has anything to reorder: installed or built-in packages, unfiltered. */
+export function canReorderPackages(packages: LibraryPackage[], search = ""): boolean {
+  return !search.trim() && packages.some((pkg) => rankable(pkg.rank));
+}
+
 export type DropPlace = "before" | "after";
 
 /**
@@ -219,6 +200,8 @@ interface DragState {
   rank: PackageRank;
   /** The pointer's latest viewport y. */
   y: number;
+  /** How far below the card's top edge the pointer grabbed it, so the card follows the pointer. */
+  grab: number;
   scroller: HTMLElement;
   drop?: Drop;
   /** The pending auto-scroll frame, while the pointer rests near the scroller's edge. */
@@ -256,353 +239,275 @@ function autoScrollStep({ scroller, y }: DragState): number {
   return Math.max(-24, Math.min(24, Math.round(past / 3)));
 }
 
-type PersonalEditor = ReturnType<typeof usePersonalChordsEditor>;
-
-const chordFeatures = tableFeatures({});
-const packageFeatures = tableFeatures({
-  columnFilteringFeature,
-  globalFilteringFeature,
-  filteredRowModel: createFilteredRowModel(),
-  rowExpandingFeature,
-  expandedRowModel: createExpandedRowModel(),
-});
-
 const actionKinds = {
-  shortcut: { label: "Shortcut", icon: Command },
-  shell: { label: "Shell command", icon: Terminal },
-  emit: { label: "Script", icon: Braces },
-  builtin: { label: "Chord action", icon: Keyboard },
+  shortcut: { label: "Shortcut" },
+  shell: { label: "Shell command" },
+  emit: { label: "Script" },
+  builtin: { label: "Chord action" },
 } as const;
 
-function ChordName({
-  entry,
-  dirname,
-  editor,
+/** Splits `AccessibilityInspector` into `Accessibility Inspector`. */
+function spaceWords(text: string) {
+  return text.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+/**
+ * A readable title for a package: the app's own name for an app package, otherwise the part
+ * after `chords-`, so `@keychord/chords-spotify` reads as "Spotify".
+ */
+export function packageTitle(entry: LibraryPackage, app?: DesktopAppMetadata): string {
+  const appName = app?.displayName?.trim();
+  if (appName) return appName;
+  const base = entry.name.replace(/^@[^/]+\//, "").replace(/^chords-/, "");
+  // Reverse-DNS names (com.apple.Safari) read best as their last part.
+  const last = /^[a-z]+\.[a-z0-9-]+\./i.test(base) ? base.split(".").at(-1)! : base;
+  const words = spaceWords(last).replace(/[-_]+/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function plural(count: number, noun: string) {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/** A package's icon for its card header: the app's own icon, else a glyph for its kind. */
+function PackageIcon({ entry, app }: { entry: LibraryPackage; app?: DesktopAppMetadata }) {
+  if (app?.iconDataUrl) return <img src={app.iconDataUrl} alt="" />;
+  const Icon = entry.rank === "core" ? Keyboard : Package;
+  return <Icon size={17} strokeWidth={1.6} />;
+}
+
+/** The keys each placeholder stands for in one chords file: the user's keys, else the default. */
+export type PlaceholderKeys = (pathslug: string, name: string) => string | undefined;
+
+export function placeholderKeys(entries: PlaceholderEntry[]): PlaceholderKeys {
+  return (pathslug, name) => {
+    const match =
+      entries.find((e) => e.pathslug === pathslug && e.placeholder.name === name) ??
+      entries.find((e) => e.placeholder.name === name);
+    return match ? (match.placeholder.assigned ?? match.placeholder.default) : undefined;
+  };
+}
+
+/**
+ * A chord sequence on one keycap. Placeholders such as `<>` show the
+ * keys they stand for, so the cap reads as what you press; one without keys stays dimmed.
+ */
+export function ChordKeys({
+  sequence,
+  resolve,
 }: {
-  entry: LibraryChord;
-  dirname?: string;
-  editor: PersonalEditor;
+  sequence: string;
+  resolve?: (name: string) => string | undefined;
 }) {
-  const file = dirname ? { dirname, pathslug: entry.pathslug } : undefined;
+  const tokens = (sequence.match(/<[^<>]*>|[\s\S]/gu) ?? []).map((token) => {
+    if (token.length === 1) return { text: token === " " ? "␣" : token };
+    const keys = resolve?.(token);
+    return keys ? { text: keys, prefix: true } : { text: token, unresolved: true };
+  });
+  const pressed = tokens.map((token) => token.text).join("");
   return (
-    <div className="flex items-center gap-3">
-      <span
-        className="min-w-0 flex-1 truncate text-[15px] tracking-[-0.015em]"
-        title={entry.chord.name}
-      >
-        {entry.chord.name}
-      </span>
-      {entry.personal && file && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="chord-library-edit"
-          aria-label={`Edit ${entry.chord.name} in ${dirname}/${entry.pathslug}`}
-          aria-expanded={editor.rowId === entry.id}
-          onClick={() => editor.open(entry.id, file)}
+    <kbd className="mac-keycap" title={pressed} aria-label={pressed}>
+      {tokens.map((token, index) => (
+        <span
+          key={index}
+          data-prefix={token.prefix || undefined}
+          data-placeholder={token.unresolved || undefined}
+          aria-hidden="true"
         >
-          <Pencil className="size-3.5" />
-          <span className="chord-library-edit-label">Edit</span>
-          {editor.hasDraft(file) && (
-            <span className="size-1.5 rounded-full bg-primary" aria-label="Unsaved changes" />
-          )}
-        </Button>
-      )}
+          {token.text}
+        </span>
+      ))}
+    </kbd>
+  );
+}
+
+/** A chord: its name and action type lead, and its keys trail on one keycap. */
+function ChordRow({ entry, resolve }: { entry: LibraryChord; resolve?: PlaceholderKeys }) {
+  const kind = entry.chord.actions[0] ? actionKinds[entry.chord.actions[0].type] : undefined;
+  return (
+    <div className="mac-row" data-chord>
+      <span className="mac-row-text">
+        <span className="mac-row-title" title={entry.chord.name}>
+          {entry.chord.name}
+        </span>
+        <span className="mac-row-subtitle">{kind?.label ?? "No actions"}</span>
+      </span>
+      <ChordKeys
+        sequence={entry.chord.rawTrigger}
+        resolve={resolve && ((name) => resolve(entry.pathslug, name))}
+      />
     </div>
   );
 }
 
-function ChordType({ chord }: { chord: Chord }) {
-  const kind = chord.actions[0] ? actionKinds[chord.actions[0].type] : undefined;
-  const Icon = kind?.icon ?? Keyboard;
-  return (
-    <span className="chord-library-type" title={kind?.label ?? "No actions"}>
-      <Icon size={17} strokeWidth={1.6} />
-      <span className="sr-only">{kind?.label ?? "No actions"}</span>
-    </span>
-  );
-}
-
-function PackageChords({
-  rows,
-  personalDirnames,
-  editor,
+/**
+ * What a package shows when its row is disclosed: its placeholders, then its chords under a
+ * small heading per app.
+ */
+export function PackageContents({
+  entry,
+  apps,
 }: {
-  rows: LibraryChord[];
-  personalDirnames: Record<string, string>;
-  editor: PersonalEditor;
+  entry: LibraryPackage;
+  apps: Record<string, DesktopAppMetadata>;
 }) {
   const groups = useMemo(() => {
     const byApp = new Map<string | undefined, LibraryChord[]>();
-    for (const entry of rows) {
-      const group = byApp.get(entry.appId);
-      if (group) group.push(entry);
-      else byApp.set(entry.appId, [entry]);
+    for (const row of entry.chords) {
+      const group = byApp.get(row.appId);
+      if (group) group.push(row);
+      else byApp.set(row.appId, [row]);
     }
     return [...byApp];
-  }, [rows]);
-
+  }, [entry.chords]);
+  const resolve = useMemo(() => placeholderKeys(entry.placeholders), [entry.placeholders]);
   return (
-    <section aria-label="Package chords" className="space-y-6">
+    <>
+      {/* Inside the package's card, small headings mark each part. */}
+      {entry.placeholders.length > 0 && (
+        <>
+          <div className="mac-row mac-subheader">Placeholders</div>
+          <PackagePlaceholders entries={entry.placeholders} apps={apps} inline />
+        </>
+      )}
       {groups.map(([appId, chords]) => (
-        <AppChords
-          key={appId ?? "global"}
-          rows={chords}
-          personalDirnames={personalDirnames}
-          editor={editor}
-        />
+        <div key={appId ?? "global"} role="group" aria-label={`${chords[0]!.appLabel} chords`}>
+          {(groups.length > 1 || entry.placeholders.length > 0) && (
+            <div className="mac-row mac-subheader" title={appId}>
+              {chords[0]!.appLabel}
+            </div>
+          )}
+          {chords.map((row) => (
+            <ChordRow key={row.id} entry={row} resolve={resolve} />
+          ))}
+        </div>
       ))}
-      {rows.length === 0 && (
-        <p className="py-6 text-center text-sm text-muted-foreground">
-          No chords loaded in this package.
-        </p>
+      {entry.chords.length === 0 && (
+        <p className="mac-row mac-row-muted">No chords loaded in this package.</p>
       )}
-    </section>
+    </>
   );
 }
 
-function AppChords({
-  rows,
-  personalDirnames,
-  editor,
-}: {
-  rows: LibraryChord[];
-  personalDirnames: Record<string, string>;
-  editor: PersonalEditor;
-}) {
-  const headingId = useId();
-  const appLabel = rows[0]!.appLabel;
-  const columns = useMemo<ColumnDef<typeof chordFeatures, LibraryChord>[]>(
-    () => [
-      {
-        id: "sequence",
-        accessorFn: (entry) => entry.chord.rawTrigger,
-        header: "Sequence",
-        cell: ({ getValue }) => (
-          <code className="chord-library-sequence" title={getValue<string>()}>
-            {getValue<string>()}
-          </code>
-        ),
-      },
-      {
-        id: "name",
-        accessorFn: (entry) => entry.chord.name,
-        header: "Action",
-        cell: ({ row }) => (
-          <ChordName
-            entry={row.original}
-            dirname={personalDirnames[row.original.packageName]}
-            editor={editor}
-          />
-        ),
-      },
-      {
-        id: "type",
-        accessorFn: (entry) => entry.chord.actions[0]?.type,
-        header: "Type",
-        cell: ({ row }) => <ChordType chord={row.original.chord} />,
-      },
-    ],
-    [personalDirnames, editor],
-  );
-  const table = useTable({
-    features: chordFeatures,
-    data: rows,
-    columns,
-    getRowId: (entry) => entry.id,
-  });
-
+function matchesSearch(entry: LibraryPackage, search: string) {
+  const query = search.trim().toLocaleLowerCase();
   return (
-    <section aria-labelledby={headingId}>
-      <h3 id={headingId} className="px-3 pb-2 pt-1 text-sm font-medium" title={rows[0]!.appId}>
-        {appLabel}
-      </h3>
-      <div className="chord-library-scroll">
-        <table className="chord-library-table app-chords-table">
-          <caption className="sr-only">{appLabel} sequences, actions, and action types</caption>
-          <thead>
-            {table.getHeaderGroups().map((group) => (
-              <tr key={group.id}>
-                {group.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    scope="col"
-                    className={header.column.id === "type" ? "text-center" : undefined}
-                  >
-                    {header.isPlaceholder ? null : <table.FlexRender header={header} />}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <Fragment key={row.id}>
-                <tr>
-                  {row.getAllCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={cell.column.id === "type" ? "text-center" : undefined}
-                    >
-                      <table.FlexRender cell={cell} />
-                    </td>
-                  ))}
-                </tr>
-                {editor.rowId === row.id && (
-                  <tr>
-                    <td
-                      colSpan={row.getAllCells().length}
-                      style={{ height: "auto", padding: "8px 0 20px" }}
-                    >
-                      {editor.editor}
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    !query ||
+    [entry.name, ...entry.appLabels].some((label) => label.toLocaleLowerCase().includes(query))
   );
 }
 
-function PackageName({
-  row,
-  app,
-  detailsId,
-}: {
-  row: Row<typeof packageFeatures, LibraryPackage>;
-  app?: DesktopAppMetadata;
-  detailsId: string;
-}) {
-  const entry = row.original;
-  // The core row is stable. Subscribe here so the React Compiler sees expansion changes.
-  return (
-    <Subscribe
-      source={row.table.atoms.expanded}
-      selector={(expanded) => expanded === true || !!expanded[row.id]}
-    >
-      {(expanded) => (
-        <Button
-          variant="ghost"
-          type="button"
-          className="package-library-name h-auto justify-start p-0 font-normal"
-          aria-label={`${expanded ? "Hide" : "Show"} chords in ${entry.name}`}
-          aria-expanded={expanded}
-          aria-controls={detailsId}
-          onClick={row.getToggleExpandedHandler()}
-        >
-          <span
-            className={`chord-library-icon ${entry.personal ? "chord-library-icon-personal" : ""}`}
-            aria-hidden="true"
-          >
-            {app?.iconDataUrl ? (
-              <img src={app.iconDataUrl} alt="" />
-            ) : (
-              <Package size={18} strokeWidth={1.6} />
-            )}
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-2">
-              <span className="truncate text-[15px] tracking-[-0.015em]" title={entry.name}>
-                {entry.name}
-              </span>
-              <ChevronDown
-                className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-            </span>
-            <span className="block text-[11px] text-muted-foreground">
-              {entry.chords.length} chord{entry.chords.length === 1 ? "" : "s"}
-              {" · "}
-              {entry.fileCount} file{entry.fileCount === 1 ? "" : "s"}
-              {entry.placeholders.length > 0 && (
-                <>
-                  {" · "}
-                  {entry.placeholders.length} placeholder
-                  {entry.placeholders.length === 1 ? "" : "s"}
-                </>
-              )}
-              {entry.placeholders.some(placeholderNeedsKeys) && (
-                <>
-                  {" · "}
-                  <span className="text-amber-800 dark:text-amber-300">needs keys</span>
-                </>
-              )}
-            </span>
-          </span>
-        </Button>
-      )}
-    </Subscribe>
-  );
-}
-
+/**
+ * The package library: inset grouped lists for core, installed and built-in packages. A row
+ * opens the package; Edit shows handles to reorder installed and built-in packages.
+ */
 export function ChordLibrary({
   packages,
   apps,
-  personalDirnames,
-  configurePackage,
+  search = "",
+  initiallyExpanded,
+  editing = false,
   onReorder,
 }: {
   packages: LibraryPackage[];
   apps: Record<string, DesktopAppMetadata>;
-  personalDirnames: Record<string, string>;
-  configurePackage?: string;
+  search?: string;
+  /** A package to show disclosed and scrolled into view, such as one opened to configure. */
+  initiallyExpanded?: string;
+  /** Edit Order mode, toggled from the page's toolbar: cards collapse and show drag handles. */
+  editing?: boolean;
   /**
    * Lets the user drag installed and built-in packages within their group, and receives the
    * order to save. Rows stay in the given rank order.
    */
   onReorder?: (order: string[]) => void;
 }) {
-  // Keep drafts outside table rows so search and collapse preserve unsaved changes.
-  const editor = usePersonalChordsEditor();
-  const detailsPrefix = useId();
   const hintId = useId();
-  const tableRef = useRef<HTMLTableElement>(null);
-  const configureRowRef = useRef<HTMLTableRowElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(
+    () => new Set(initiallyExpanded ? [initiallyExpanded] : []),
+  );
+  useEffect(() => {
+    if (!initiallyExpanded) return;
+    listRef.current
+      ?.querySelector(`[data-package="${CSS.escape(initiallyExpanded)}"]`)
+      ?.scrollIntoView({ block: "start" });
+  }, [initiallyExpanded]);
+  function toggle(name: string) {
+    setExpanded((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(name)) next.add(name);
+      return next;
+    });
+  }
   // Pointer moves read and update this without waiting for a render; `dragging` mirrors it.
   const dragRef = useRef<DragState | null>(null);
   const [dragging, setDragging] = useState<{ name: string; drop?: Drop } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const visible = packages.filter((entry) => matchesSearch(entry, search));
+  // Reordering a filtered list would be confusing, so Edit needs the full list.
+  const canReorder = !!onReorder && canReorderPackages(packages, search);
+  const reordering = editing && canReorder;
 
   function save(name: string, { target, place, order }: Drop) {
     onReorder?.(order);
     setAnnouncement(`Moved ${name} ${place === "before" ? "above" : "below"} ${target}.`);
   }
 
-  /** Where the dragged package would land: between the visible packages of its group. */
+  /** Where the dragged package would land: between the packages of its group. */
+  /** The list's cards by package, with their resting tops (ignoring any slide in progress). */
+  function cards() {
+    const list = listRef.current?.querySelector<HTMLElement>(".mac-card-list");
+    const listTop = list?.getBoundingClientRect().top ?? 0;
+    return [...(list?.querySelectorAll<HTMLElement>("[data-package]") ?? [])].map((card) => ({
+      card,
+      name: card.dataset.package!,
+      rank: card.dataset.rank,
+      top: listTop + card.offsetTop,
+    }));
+  }
+
+  /**
+   * Where the lifted package would land, as on macOS: once its centre passes another card's
+   * middle, that card makes room. Only cards of the same group count.
+   */
   function findDrop(drag: DragState): Drop | undefined {
-    const rows = tableRef.current?.querySelectorAll<HTMLTableRowElement>(
-      `tr.package-library-row[data-rank="${drag.rank}"]`,
-    );
-    // An expanded package's chords move with it, so its details row counts toward its middle.
-    const blocks = [...(rows ?? [])].map((row) => {
-      const details = row.nextElementSibling;
-      const last = details instanceof HTMLElement && !details.hidden ? details : row;
-      const { top } = row.getBoundingClientRect();
-      const { bottom } = last.getBoundingClientRect();
-      return { name: row.dataset.package!, middle: (top + bottom) / 2 };
-    });
-    const slot = blocks.filter((block) => block.middle < drag.y).length;
-    const target = blocks[Math.min(slot, blocks.length - 1)];
+    const all = cards();
+    const lifted = all.find((entry) => entry.name === drag.name);
+    if (!lifted) return undefined;
+    const centre = drag.y - drag.grab + lifted.card.offsetHeight / 2;
+    const others = all.filter((entry) => entry.rank === drag.rank && entry.name !== drag.name);
+    const slot = others.filter((entry) => entry.top + entry.card.offsetHeight / 2 < centre).length;
+    const target = others[Math.min(slot, others.length - 1)];
     if (!target) return undefined;
-    const place: DropPlace = slot < blocks.length ? "before" : "after";
+    const place: DropPlace = slot < others.length ? "before" : "after";
     const order = movePackage(packages, drag.name, target.name, place);
     return order && { target: target.name, place, order };
+  }
+
+  /** Keeps the lifted card under the pointer, wherever its slot in the list is now. */
+  function follow() {
+    const drag = dragRef.current;
+    const lifted = drag && cards().find((entry) => entry.name === drag.name);
+    if (!drag || !lifted) return;
+    lifted.card.style.transform = `translateY(${drag.y - drag.grab - lifted.top}px) scale(1.015)`;
   }
 
   function track() {
     const drag = dragRef.current;
     if (!drag) return;
     const drop = findDrop(drag);
-    drag.drop = drop;
-    setDragging((shown) =>
-      shown?.drop?.target === drop?.target && shown?.drop?.place === drop?.place
-        ? shown
-        : { name: drag.name, drop },
-    );
+    if (drop?.order.join() !== drag.drop?.order.join()) {
+      // Note where the other cards are now, so they can slide from there to their new places.
+      slideFrom.current = new Map(
+        cards()
+          .filter((entry) => entry.name !== drag.name)
+          .map((entry) => [entry.name, entry.card.getBoundingClientRect().top]),
+      );
+      drag.drop = drop;
+      setDragging({ name: drag.name, drop });
+    }
+    follow();
   }
 
   function autoScroll() {
@@ -623,6 +528,15 @@ export function ChordLibrary({
     if (!drag) return;
     dragRef.current = null;
     if (drag.frame !== undefined) cancelAnimationFrame(drag.frame);
+    // Settle the lifted card into its slot.
+    const lifted = cards().find((entry) => entry.name === drag.name)?.card;
+    if (lifted) {
+      lifted.style.transition = "transform 180ms ease";
+      lifted.style.transform = "";
+      lifted.addEventListener("transitionend", () => (lifted.style.transition = ""), {
+        once: true,
+      });
+    }
     setDragging(null);
     if (commit && drag.drop) save(drag.name, drag.drop);
   }
@@ -631,20 +545,21 @@ export function ChordLibrary({
     if (event.button !== 0 || dragRef.current) return;
     // Keep the press from selecting text or starting a native drag.
     event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
+    const card = event.currentTarget.closest<HTMLElement>("[data-package]");
     dragRef.current = {
       name: entry.name,
       rank: entry.rank,
       y: event.clientY,
+      grab: event.clientY - (card?.getBoundingClientRect().top ?? event.clientY),
       scroller: scrollParent(event.currentTarget),
     };
     setDragging({ name: entry.name });
   }
 
-  function moveDrag(event: PointerEvent<HTMLButtonElement>) {
+  function moveDrag(y: number) {
     const drag = dragRef.current;
     if (!drag) return;
-    drag.y = event.clientY;
+    drag.y = y;
     track();
     if (drag.frame === undefined) autoScroll();
   }
@@ -654,10 +569,7 @@ export function ChordLibrary({
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     const up = event.key === "ArrowUp";
-    const group = table
-      .getRowModel()
-      .rows.map((row) => row.original)
-      .filter((pkg) => pkg.rank === entry.rank);
+    const group = packages.filter((pkg) => pkg.rank === entry.rank);
     const target = group[group.findIndex((pkg) => pkg.name === entry.name) + (up ? -1 : 1)];
     if (!target) return;
     const place: DropPlace = up ? "before" : "after";
@@ -670,6 +582,27 @@ export function ChordLibrary({
   }
 
   const isDragging = dragging !== null;
+  // Slide the other cards from where they were to their new places, like a macOS list.
+  const slideFrom = useRef<Map<string, number> | null>(null);
+  useLayoutEffect(() => {
+    const from = slideFrom.current;
+    slideFrom.current = null;
+    if (from) {
+      for (const { card, name } of cards()) {
+        const before = from.get(name);
+        if (before === undefined) continue;
+        const delta = before - card.getBoundingClientRect().top;
+        if (!delta) continue;
+        card.style.transition = "none";
+        card.style.transform = `translateY(${delta}px)`;
+        requestAnimationFrame(() => {
+          card.style.transition = "transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+          card.style.transform = "";
+        });
+      }
+    }
+    follow();
+  }, [dragging]);
   useEffect(() => {
     if (!isDragging) return;
     const cancel = (event: globalThis.KeyboardEvent) => {
@@ -678,86 +611,84 @@ export function ChordLibrary({
       event.stopPropagation();
       end(false);
     };
-    // Scrolling moves rows under a resting pointer, so the drop target can change.
+    // The window follows the pointer, not the handle: the list moves the held card as it
+    // reorders, and a moved element loses its pointer capture.
+    const move = (event: globalThis.PointerEvent) => moveDrag(event.clientY);
+    const up = () => end(true);
+    const lost = () => end(false);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", lost);
+    // Scrolling moves cards under a resting pointer, so the drop target can change.
     window.addEventListener("scroll", track, { capture: true, passive: true });
     window.addEventListener("keydown", cancel, true);
     return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", lost);
       window.removeEventListener("scroll", track, { capture: true });
       window.removeEventListener("keydown", cancel, true);
     };
   });
 
-  const columns = useMemo<ColumnDef<typeof packageFeatures, LibraryPackage>[]>(
-    () => [
-      {
-        accessorKey: "name",
-        header: "Package name",
-        cell: ({ row }) => (
-          <PackageName
-            row={row}
-            app={row.original.appId ? apps[row.original.appId] : undefined}
-            detailsId={`${detailsPrefix}-${encodeURIComponent(row.id)}`}
-          />
-        ),
-      },
-    ],
-    [apps, detailsPrefix],
-  );
-  const table = useTable({
-    features: packageFeatures,
-    data: packages,
-    columns,
-    getRowId: (entry) => entry.name,
-    getRowCanExpand: () => true,
-    autoResetExpanded: false,
-    initialState: configurePackage ? { expanded: { [configurePackage]: true } } : undefined,
-    globalFilterFn: (row, _columnId, value: string) =>
-      [row.original.name, ...row.original.appLabels].some((label) =>
-        label.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
-      ),
-  });
-  const visibleRows = table.getRowModel().rows;
-  const search = String(table.state.globalFilter ?? "");
-  const hasConfigurePackage = packages.some((pkg) => pkg.name === configurePackage);
-
-  useEffect(() => {
-    if (!hasConfigurePackage) return;
-    // Let the settings shell reset its scroll position before revealing the selected row.
-    const frame = requestAnimationFrame(() => configureRowRef.current?.scrollIntoView());
-    return () => cancelAnimationFrame(frame);
-  }, [configurePackage, hasConfigurePackage]);
+  function renderCard(entry: LibraryPackage) {
+    const app = entry.appId ? apps[entry.appId] : undefined;
+    const needsKeys = entry.placeholders.some(placeholderNeedsKeys);
+    const rankLabel = rankGroups[entry.rank]?.label ?? "Local";
+    return (
+      <div key={entry.name} role="listitem" className="mac-section">
+        {/* Each package is its own card: its chords sit inside. */}
+        <GroupCard
+          icon={<PackageIcon entry={entry} app={app} />}
+          title={packageTitle(entry, app)}
+          subtitle={
+            <>
+              {rankLabel} · <span title={entry.name}>{entry.name}</span>
+              {needsKeys && (
+                <span className="text-amber-700 dark:text-amber-300"> · needs keys</span>
+              )}
+            </>
+          }
+          count={entry.chords.length}
+          headerLabel={`Show ${entry.name} chords`}
+          listLabel={`${entry.name} details`}
+          open={!reordering && expanded.has(entry.name)}
+          dragging={dragging?.name === entry.name}
+          onOpenChange={() => toggle(entry.name)}
+          rootProps={{
+            "data-package": entry.name,
+            "data-rank": entry.rank,
+          }}
+          actions={
+            reordering &&
+            rankable(entry.rank) && (
+              // The shared Button drops `title` and handles presses itself.
+              <button
+                type="button"
+                className="mac-handle"
+                aria-label={`Reorder ${entry.name}`}
+                aria-describedby={hintId}
+                title="Drag to reorder"
+                onPointerDown={(event) => startDrag(event, entry)}
+                onKeyDown={(event) => stepDrag(event, entry)}
+              >
+                <GripVertical size={15} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            )
+          }
+        >
+          <PackageContents entry={entry} apps={apps} />
+        </GroupCard>
+      </div>
+    );
+  }
 
   return (
-    <section aria-label="Chord packages" className="preference-disclosure">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-(--settings-separator) px-4 py-3">
-        <div>
-          <h3 className="text-[13px] font-semibold">Package library</h3>
-          <p className="text-xs text-(--settings-description)" role="status">
-            {visibleRows.length} package{visibleRows.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <label className="chord-library-search">
-          <Search size={16} aria-hidden="true" />
-          <Input
-            aria-label="Search packages"
-            placeholder="Search packages"
-            value={search}
-            onChange={(event) => table.setGlobalFilter(event.target.value)}
-          />
-          {search && (
-            <Button
-              variant="ghost"
-              type="button"
-              size="icon-xs"
-              aria-label="Clear search"
-              onClick={() => table.setGlobalFilter("")}
-            >
-              <X size={14} />
-            </Button>
-          )}
-        </label>
-      </div>
-      {onReorder && (
+    <section aria-label="Chord packages" ref={listRef}>
+      <p className="sr-only" role="status">
+        {plural(visible.length, "package")}
+      </p>
+      {canReorder && (
         <p id={hintId} className="sr-only">
           Drag to reorder, or press the Up or Down arrow key. When two packages define the same
           chord, the higher one runs.
@@ -766,129 +697,28 @@ export function ChordLibrary({
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
-      <div className="chord-library-scroll">
-        <table
-          ref={tableRef}
-          className="chord-library-table package-library-table"
-          data-dragging={isDragging || undefined}
-        >
-          <caption className="sr-only">
-            Your chord packages, highest rank first; expand a package to view its placeholders and
-            its chords grouped by app
-          </caption>
-          <thead>
-            {table.getHeaderGroups().map((group) => (
-              <tr key={group.id}>
-                <th scope="col">
-                  <span className="sr-only">Order</span>
-                </th>
-                {group.headers.map((header) => (
-                  <th key={header.id} scope="col">
-                    <span className="sr-only">
-                      {header.isPlaceholder ? null : <table.FlexRender header={header} />}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody>
-            {visibleRows.map((row, index) => {
-              const expanded = table.state.expanded === true || !!table.state.expanded[row.id];
-              const rank = row.original.rank;
-              const group = rankGroups[rank];
-              const startsGroup = visibleRows[index - 1]?.original.rank !== rank;
-              const drop = dragging?.drop?.target === row.id ? dragging.drop.place : undefined;
-              return (
-                <Fragment key={row.id}>
-                  {group && startsGroup && (
-                    <tr className="package-library-group">
-                      <th scope="colgroup" colSpan={row.getAllCells().length + 1}>
-                        <span className="block text-xs font-medium">{group.label}</span>
-                        <span className="block text-[11px] font-normal text-muted-foreground">
-                          {group.description}
-                        </span>
-                      </th>
-                    </tr>
-                  )}
-                  <tr
-                    ref={row.id === configurePackage ? configureRowRef : undefined}
-                    className="package-library-row"
-                    data-expanded={expanded}
-                    data-package={row.id}
-                    data-rank={rank}
-                    data-dragging={dragging?.name === row.id || undefined}
-                    // An expanded package's line goes under its chords instead.
-                    data-drop={
-                      drop === "before" || (drop === "after" && !expanded) ? drop : undefined
-                    }
-                  >
-                    <td className="package-library-handle-cell">
-                      {onReorder && rankable(rank) && (
-                        // The shared Button drops `title` and handles presses itself.
-                        <button
-                          type="button"
-                          className="package-library-handle"
-                          aria-label={`Reorder ${row.id}`}
-                          aria-describedby={hintId}
-                          title="Drag to reorder"
-                          onPointerDown={(event) => startDrag(event, row.original)}
-                          onPointerMove={moveDrag}
-                          onPointerUp={() => end(true)}
-                          onPointerCancel={() => end(false)}
-                          onLostPointerCapture={() => end(false)}
-                          onKeyDown={(event) => stepDrag(event, row.original)}
-                        >
-                          <GripVertical size={16} strokeWidth={1.8} aria-hidden="true" />
-                        </button>
-                      )}
-                    </td>
-                    {row.getAllCells().map((cell) => (
-                      <td key={cell.id}>
-                        <table.FlexRender cell={cell} />
-                      </td>
-                    ))}
-                  </tr>
-                  <tr
-                    className="package-library-details"
-                    hidden={!expanded}
-                    data-drop={drop === "after" && expanded ? drop : undefined}
-                  >
-                    <td colSpan={row.getAllCells().length + 1}>
-                      <div
-                        id={`${detailsPrefix}-${encodeURIComponent(row.id)}`}
-                        className="package-library-details-content space-y-6"
-                      >
-                        {expanded && (
-                          <>
-                            <PackagePlaceholders entries={row.original.placeholders} apps={apps} />
-                            <PackageChords
-                              editor={editor}
-                              rows={row.original.chords}
-                              personalDirnames={personalDirnames}
-                            />
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+      <div
+        role="list"
+        aria-label="Packages"
+        className="mac-card-list"
+        data-dragging={isDragging || undefined}
+      >
+        {/* While dragging, the list shows where everything would land. */}
+        {(dragging?.drop ? applyPackageOrder(visible, dragging.drop.order) : visible).map(
+          renderCard,
+        )}
       </div>
-      {visibleRows.length === 0 && (
-        <div className="px-4 py-8 text-center">
-          <Package className="mx-auto mb-3 size-7 text-muted-foreground/50" strokeWidth={1.4} />
-          <p className="text-sm">
-            {packages.length === 0 ? "Your package library is empty" : "No packages found"}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {packages.length === 0
-              ? "Find a package in Browse to get started."
-              : "Try a different package name or app."}
-          </p>
+      {visible.length === 0 && (
+        <div className="mac-list">
+          <div className="px-4 py-8 text-center">
+            <Package className="mx-auto mb-3 size-7 opacity-40" strokeWidth={1.4} />
+            <p>{packages.length === 0 ? "Your package library is empty" : "No packages found"}</p>
+            <p className="mac-row-subtitle mt-1">
+              {packages.length === 0
+                ? "Find a package in Browse to get started."
+                : "Try a different package name or app."}
+            </p>
+          </div>
         </div>
       )}
     </section>

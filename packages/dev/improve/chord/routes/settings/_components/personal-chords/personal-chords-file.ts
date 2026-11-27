@@ -9,7 +9,9 @@ export const ALL_APPS_PATHSLUG = `chords/${filename}`;
  * `com.apple.finder`. Root and bundled (`chords/@scope/…`) files apply to no app.
  */
 export function chordsFileAppId(pathslug: string): string | undefined {
-  const match = /^chords\/(.+)\/(?:macos|linux|windows)\.toml$/.exec(pathslug.replaceAll("\\", "/"));
+  const match = /^chords\/(.+)\/(?:macos|linux|windows)\.toml$/.exec(
+    pathslug.replaceAll("\\", "/"),
+  );
   if (!match?.[1] || match[1].startsWith("@")) return undefined;
   return match[1].replaceAll("/", ".");
 }
@@ -38,7 +40,12 @@ export function describeChordsFile(pathslug: string): { title: string; appId?: s
 
 export function newChordsFileContents(appId: string): string {
   const trimmed = appId.trim();
-  const launch = desktopPlatform === "macos" ? "open -a Notes" : desktopPlatform === "linux" ? "xdg-open ." : "start .";
+  const launch =
+    desktopPlatform === "macos"
+      ? "open -a Notes"
+      : desktopPlatform === "linux"
+        ? "xdg-open ."
+        : "start .";
   const shortcut = desktopPlatform === "macos" ? "cmd+n" : "ctrl+n";
   if (trimmed === "") {
     return `name = "Personal"

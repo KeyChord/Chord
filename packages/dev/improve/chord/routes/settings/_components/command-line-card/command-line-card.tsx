@@ -2,13 +2,7 @@ import { desktopPlatform } from "@chord/dev.improve.chord.lib.state";
 import { useMutation } from "@chord/com.npmjs.tanstack__react-query";
 import { taurpc } from "@chord/dev.improve.chord.api.taurpc";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
+import { Card, CardContent } from "@chord/dev.improve.chord.components.ui.card";
 import { StateQueries, useSettingsState } from "@chord/dev.improve.chord.lib.state";
 import { useEffect } from "react";
 
@@ -39,13 +33,7 @@ function CommandLineCardContent({
 
   return (
     <Card size="sm">
-      <CardHeader>
-        <CardTitle>Command Line</CardTitle>
-        <CardDescription>
-          Add <code>{cliCommand}</code> to your PATH to run chords, shell commands, and scripts from
-          your terminal.
-        </CardDescription>
-      </CardHeader>
+      {/* The page header already names and explains this page. */}
       <CardContent className="preference-group">
         <div className="preference-row">
           <div className="min-w-0 flex-1">
@@ -64,8 +52,20 @@ function CommandLineCardContent({
         </div>
         <div className="preference-note">
           <p>
-            {desktopPlatform === "macos" ? <>Installs <code>/usr/local/bin/{cliCommand}</code>. macOS may ask for your administrator
-            password.</> : desktopPlatform === "linux" ? <>Installs <code>~/.local/bin/{cliCommand}</code>.</> : <>Installs <code>{cliCommand}.cmd</code> in your WindowsApps folder.</>}
+            {desktopPlatform === "macos" ? (
+              <>
+                Installs <code>/usr/local/bin/{cliCommand}</code>. macOS may ask for your
+                administrator password.
+              </>
+            ) : desktopPlatform === "linux" ? (
+              <>
+                Installs <code>~/.local/bin/{cliCommand}</code>.
+              </>
+            ) : (
+              <>
+                Installs <code>{cliCommand}.cmd</code> in your WindowsApps folder.
+              </>
+            )}
           </p>
           {isCliInstalled && (
             <p role="status" className="mt-1">

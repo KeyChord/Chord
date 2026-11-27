@@ -12,50 +12,40 @@ import {
   AlertDialogTitle,
 } from "@chord/dev.improve.chord.components.ui.alert-dialog";
 import { Button } from "@chord/dev.improve.chord.components.ui.button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@chord/dev.improve.chord.components.ui.card";
+import { GroupCard } from "@chord/dev.improve.chord.components.ui.group-card";
+import { RotateCcw } from "lucide-react";
 
 export function ResetChordsCard() {
   const resetDefaultChordsMutation = useMutation({
     mutationFn: taurpc.resetDefaultChords,
     onSuccess: () => {
-      toast.success("Reset managed chord repos to the default packages.");
+      toast.success("Reset your packages to the defaults.");
     },
   });
 
+  // One card, like the rest of Settings: what the reset does, and the button that does it.
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>Reset Chords</CardTitle>
-        <CardDescription>
-          Replaces the managed git repo set with the bundled default packages. Local chord folders
-          stay configured.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground">
-          Use this to get back to the pinned default repos from{" "}
-          <code>data/default-packages.toml</code>.
-        </p>
-      </CardContent>
-      <CardFooter className="justify-end">
+    <GroupCard
+      icon={<RotateCcw size={17} strokeWidth={1.6} />}
+      title="Reset packages to defaults"
+      subtitle="Replaces your installed packages with Chord's default set. Your local chords stay."
+      actions={
         <AlertDialog>
-          <Button variant="destructive" disabled={resetDefaultChordsMutation.isPending}>
-            {resetDefaultChordsMutation.isPending ? "Resetting..." : "Reset Chords"}
+          <Button
+            variant="outline"
+            className="mac-button"
+            data-destructive
+            disabled={resetDefaultChordsMutation.isPending}
+          >
+            {resetDefaultChordsMutation.isPending ? "Resetting…" : "Reset…"}
           </Button>
 
           <AlertDialogContent size="sm">
             <AlertDialogHeader>
-              <AlertDialogTitle>Reset managed chord repos?</AlertDialogTitle>
+              <AlertDialogTitle>Reset packages to defaults?</AlertDialogTitle>
               <AlertDialogDescription>
-                This replaces the active managed repo set with the pinned default packages. Cached
-                revisions are retained for reuse.
+                Chord replaces your installed packages with its default set. Your local chords
+                aren&apos;t changed, and downloaded versions are kept for reuse.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -69,12 +59,12 @@ export function ResetChordsCard() {
                   resetDefaultChordsMutation.mutate();
                 }}
               >
-                Reset Chords
+                Reset
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </CardFooter>
-    </Card>
+      }
+    />
   );
 }

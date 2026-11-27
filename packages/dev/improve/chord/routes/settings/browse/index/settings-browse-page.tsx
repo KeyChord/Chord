@@ -85,16 +85,26 @@ export function SettingsBrowsePageContent({
 }: BrowsePageProps & { state: GitReposState }) {
   const { repos } = state;
   const data = useMemo(() => {
-    const installedRepos = new Map(Object.values(repos).map((repo) => [repo.slug.toLowerCase(), repo]));
+    const installedRepos = new Map(
+      Object.values(repos).map((repo) => [repo.slug.toLowerCase(), repo]),
+    );
     return officialChordRepos.map((repo): BrowseRepo => {
       const slug = getGitHubSlug(repo.url) ?? repo.url;
       return { ...repo, slug, installedRepo: installedRepos.get(slug.toLowerCase()) };
     });
   }, [repos]);
-  const { mutate: install, isPending: installing, variables: installingUrl } = useMutation({
+  const {
+    mutate: install,
+    isPending: installing,
+    variables: installingUrl,
+  } = useMutation({
     mutationFn: taurpc.addGitRepo,
   });
-  const { mutate: uninstall, isPending: uninstalling, variables: uninstallingSlug } = useMutation({
+  const {
+    mutate: uninstall,
+    isPending: uninstalling,
+    variables: uninstallingSlug,
+  } = useMutation({
     mutationFn: (slug: string) => taurpc.removeGitRepo(slug),
   });
   const isPending = installing || uninstalling;
@@ -182,7 +192,16 @@ export function SettingsBrowsePageContent({
         },
       },
     ],
-    [install, installing, installingUrl, isPending, onConfigure, uninstall, uninstalling, uninstallingSlug],
+    [
+      install,
+      installing,
+      installingUrl,
+      isPending,
+      onConfigure,
+      uninstall,
+      uninstalling,
+      uninstallingSlug,
+    ],
   );
   const table = useTable({
     features: browseFeatures,
@@ -212,7 +231,9 @@ export function SettingsBrowsePageContent({
         </div>
         <FilterMenu
           install={(actionsColumn?.getFilterValue() as InstallFilter | undefined) ?? "all"}
-          onInstallChange={(value) => actionsColumn?.setFilterValue(value === "all" ? undefined : value)}
+          onInstallChange={(value) =>
+            actionsColumn?.setFilterValue(value === "all" ? undefined : value)
+          }
           categories={categoryOptions}
           category={String(categoryColumn?.getFilterValue() ?? "all")}
           onCategoryChange={(value) =>

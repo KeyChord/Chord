@@ -112,6 +112,7 @@ pub trait Api {
         sequence: String,
     ) -> AppResult<()>;
     async fn set_default_global_prefix_for_placeholders(symbol: String) -> AppResult<()>;
+    async fn set_hint_panel_layout(layout: String) -> AppResult<()>;
     async fn remove_placeholder_chord_binding(
         package_name: String,
         pathslug: String,

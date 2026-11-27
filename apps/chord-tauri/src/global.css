@@ -38,6 +38,12 @@
 @import "@fontsource-variable/inter";
 @import "./theme.css";
 
+/*
+ * `dark:` follows the Appearance choice that every Chord window applies as the `dark` class,
+ * not just the system setting, so the Hint Panel switches with Settings.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../../packages/dev/improve/chord';
 
 /*
@@ -184,10 +190,20 @@
   margin: 0 16px;
   padding-bottom: 9px;
 }
+/* The window header: a clear page title over one line on what the page is for */
 .settings-page-title {
-  font: var(--settings-title-font);
-  letter-spacing: var(--settings-title-tracking);
-  color: var(--settings-label);
+  font:
+    650 17px/22px "Inter Variable",
+    sans-serif;
+  letter-spacing: -0.015em;
+  color: var(--mac-label, var(--settings-label));
+}
+.settings-page-description {
+  margin-top: 1px;
+  font:
+    400 12px/16px "Inter Variable",
+    sans-serif;
+  color: var(--mac-secondary, var(--settings-description));
 }
 .preference-info {
   display: inline-flex;
@@ -622,4 +638,1237 @@
 
 .dark .package-library-details-content {
   background: rgb(255 255 255 / 3%);
+}
+.dark .chord-library-icon {
+  background: #3b3b3b;
+  color: #b0b0b0;
+}
+.dark .chord-library-icon-personal {
+  background: #404040;
+  color: #c4c4c4;
+}
+.dark .chord-library-filter {
+  color: #a8a8a8;
+}
+.dark .chord-library-table th {
+  color: #9a9a9a;
+}
+.dark .chord-library-search input {
+  color: var(--foreground);
+}
+.dark .preference-info {
+  color: #8a8a8a;
+}
+.dark .preferences-page [data-variant="outline"] {
+  box-shadow: none;
+}
+.dark .preferences-page .preference-group,
+.dark .preference-disclosure {
+  box-shadow:
+    inset 0 0 0 1px var(--settings-group-edge),
+    0 1px 0 rgb(0 0 0 / 20%);
+}
+
+/*
+ * macOS building blocks for the Chords page: a segmented control, inset grouped lists like System
+ * Settings, a pop-up button, a warning callout, and the toolbar of a pushed detail view. They use
+ * the system font, so on a Mac they render in SF Pro at the sizes AppKit uses.
+ */
+:root {
+  --mac-font: "Inter Variable", sans-serif;
+  --mac-list: #fff;
+  --mac-list-edge: rgb(0 0 0 / 7%);
+  --mac-row-hover: rgb(0 0 0 / 3.5%);
+  --mac-row-active: rgb(0 0 0 / 6%);
+  --mac-separator: rgb(0 0 0 / 9%);
+  --mac-label: rgb(0 0 0 / 85%);
+  --mac-secondary: rgb(0 0 0 / 50%);
+  --mac-tertiary: rgb(0 0 0 / 26%);
+  --mac-control: rgb(0 0 0 / 6%);
+  --mac-control-selected: #fff;
+  --mac-keycap: rgb(0 0 0 / 6%);
+  --mac-keycap-edge: rgb(0 0 0 / 10%);
+  --mac-warning-bg: #fff6d6;
+  --mac-warning-edge: #f0d47a;
+  --mac-warning-fg: #6b4b00;
+  --mac-warning-icon: #c98a00;
+  --mac-nested: rgb(0 0 0 / 3.5%);
+  --mac-card-edge: rgb(0 0 0 / 9%);
+  --mac-circle-on: rgb(0 0 0 / 15%);
+  --mac-box: rgb(0 0 0 / 2%);
+  --mac-keycap-fill: rgb(0 0 0 / 4%);
+  --mac-keycap-border: rgb(0 0 0 / 11%);
+}
+.dark {
+  --mac-list: rgb(255 255 255 / 5%);
+  --mac-list-edge: rgb(255 255 255 / 7%);
+  --mac-row-hover: rgb(255 255 255 / 4%);
+  --mac-row-active: rgb(255 255 255 / 7%);
+  --mac-separator: rgb(255 255 255 / 8%);
+  --mac-label: rgb(255 255 255 / 88%);
+  --mac-secondary: rgb(255 255 255 / 52%);
+  --mac-tertiary: rgb(255 255 255 / 25%);
+  --mac-control: rgb(255 255 255 / 8%);
+  --mac-control-selected: rgb(255 255 255 / 20%);
+  --mac-keycap: rgb(255 255 255 / 8%);
+  --mac-keycap-edge: rgb(255 255 255 / 10%);
+  --mac-warning-bg: rgb(255 196 0 / 12%);
+  --mac-warning-edge: rgb(255 196 0 / 32%);
+  --mac-warning-fg: #f5dc93;
+  --mac-warning-icon: #ffc93d;
+  --mac-nested: rgb(255 255 255 / 4.5%);
+  --mac-card-edge: rgb(255 255 255 / 10%);
+  --mac-circle-on: rgb(255 255 255 / 22%);
+  --mac-box: rgb(255 255 255 / 3%);
+  --mac-keycap-fill: rgb(255 255 255 / 8%);
+  --mac-keycap-border: rgb(255 255 255 / 12%);
+}
+
+/* The scrollbar's space is always reserved, so switching tabs never changes the content width. */
+.settings-page-scroll {
+  scrollbar-gutter: stable;
+}
+
+.mac-page {
+  container-type: inline-size;
+  font-family: var(--mac-font);
+  font-size: 13px;
+  color: var(--mac-label);
+}
+
+/* Toolbar above the page: the segmented control leads, search sits at the trailing edge. */
+.mac-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.mac-toolbar > .mac-toolbar-end {
+  margin-left: auto;
+  width: 100%;
+  max-width: 200px;
+}
+
+/*
+ * A capsule segmented control like macOS 26 and iOS: equal segments, so the control never
+ * resizes, and a raised thumb that slides to the selected segment.
+ */
+.mac-segmented {
+  --count: 3;
+  --index: 0;
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--mac-control);
+}
+.mac-segmented::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / var(--count));
+  border-radius: 999px;
+  background: var(--mac-control-selected);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 4%),
+    0 1px 3px rgb(0 0 0 / 12%);
+  transform: translateX(calc(100% * var(--index)));
+  transition: transform 220ms cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mac-segmented::before {
+    transition: none;
+  }
+}
+.mac-segment {
+  position: relative;
+  display: inline-flex;
+  min-width: 104px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--mac-secondary);
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+  transition: color 120ms ease;
+}
+.mac-segment:hover {
+  color: var(--mac-label);
+}
+.mac-segment[aria-selected="true"] {
+  font-weight: 560;
+  color: var(--mac-label);
+}
+.mac-segment:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-segment-badge {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--mac-warning-icon);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.mac-search {
+  display: flex;
+  width: 200px;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--mac-control);
+  color: var(--mac-secondary);
+}
+.mac-search:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 40%, transparent);
+}
+.mac-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+}
+.mac-search input::placeholder {
+  color: var(--mac-secondary);
+}
+.mac-search button {
+  display: inline-flex;
+  color: var(--mac-secondary);
+}
+
+/* A section: bold header, then an inset grouped list, then an optional footnote. */
+/* Cards stand apart with space, not lines. */
+.mac-section + .mac-section,
+.mac-section + section > .mac-section:first-of-type,
+section + .mac-section,
+.mac-list-tools + .mac-section,
+.mac-callout-warning + .mac-section {
+  margin-top: 20px;
+}
+.mac-section-header {
+  display: flex;
+  min-height: 22px;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.mac-section-title {
+  font: var(--settings-header-font);
+  letter-spacing: var(--settings-header-tracking);
+  color: var(--settings-label);
+}
+/* "Other sources" on the Chords page: a disclosure that folds the rarely used sources. */
+.other-sources-summary {
+  cursor: default;
+  align-items: center;
+  list-style: none;
+}
+.other-sources-summary::-webkit-details-marker {
+  display: none;
+}
+.other-sources-chevron {
+  flex-shrink: 0;
+  color: var(--settings-description);
+}
+.other-sources[open] .other-sources-chevron {
+  transform: rotate(90deg);
+}
+.mac-section-subtitle {
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+.mac-section-footer {
+  margin: 8px 16px 0;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+.mac-list {
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 5px 0;
+  background: var(--settings-group);
+  box-shadow:
+    inset 0 0 0 1px var(--settings-group-edge),
+    0 1px 0 rgb(0 0 0 / 4%);
+}
+.mac-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 52px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  text-align: left;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-label);
+  outline: none;
+}
+.mac-row[data-compact] {
+  min-height: 38px;
+  padding-block: 7px;
+}
+/*
+ * A row's disclosed contents sit in a rounded rectangle nested inside the group.
+ * Its text lines up with the row's title above it.
+ */
+.mac-disclosure {
+  margin: 0 12px 10px 36px;
+  position: relative;
+  border-radius: 12px;
+  padding: 4px 0;
+  background: var(--mac-nested);
+}
+.mac-disclosure .mac-row {
+  min-height: 40px;
+  padding: 6px 12px;
+}
+button.mac-row,
+a.mac-row {
+  cursor: default;
+}
+.mac-row:focus-visible {
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+.mac-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mac-row-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+.mac-row-detail {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--mac-secondary);
+}
+.mac-row-chevron {
+  flex-shrink: 0;
+  color: var(--mac-tertiary);
+}
+.mac-intro {
+  margin: 0 0 20px;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-description);
+}
+.mac-row-empty {
+  padding: 14px 12px;
+  text-align: center;
+  font: 13px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+.mac-icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  color: var(--mac-secondary);
+}
+.mac-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* A chord sequence drawn as keycaps. */
+.mac-keys {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.mac-key {
+  display: inline-flex;
+  min-width: 22px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--settings-key);
+  font:
+    510 11px/1 "Geist Mono Variable",
+    ui-monospace,
+    monospace;
+  color: var(--settings-key-foreground);
+}
+.mac-key[data-placeholder] {
+  background: transparent;
+  box-shadow: none;
+  outline: 1px dashed var(--mac-tertiary);
+  outline-offset: -1px;
+  color: var(--mac-secondary);
+}
+
+/* Buttons in the AppKit "push button" style. */
+.mac-button {
+  display: inline-flex;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--mac-list);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 0.5px 1px rgb(0 0 0 / 10%);
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--mac-label);
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+}
+.dark .mac-button {
+  background: rgb(255 255 255 / 14%);
+  box-shadow:
+    0 0 0 0.5px rgb(255 255 255 / 8%),
+    0 0.5px 1px rgb(0 0 0 / 30%);
+}
+.mac-button:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+.mac-button:disabled {
+  opacity: 0.45;
+}
+.mac-button[data-default] {
+  background: linear-gradient(#3b95ff, #0a7aff);
+  box-shadow:
+    0 0 0 0.5px rgb(0 80 200 / 40%),
+    0 0.5px 1px rgb(0 0 0 / 15%);
+  color: #fff;
+}
+.mac-button[data-default]:disabled {
+  background: var(--mac-control);
+  box-shadow: none;
+  color: var(--mac-secondary);
+  opacity: 1;
+}
+.mac-button[data-destructive] {
+  color: #e5302b;
+}
+.mac-button[data-icon] {
+  width: 24px;
+  padding: 0;
+}
+.mac-button[data-borderless] {
+  background: transparent;
+  box-shadow: none;
+}
+.mac-button[data-borderless]:hover:not(:disabled) {
+  background: var(--mac-row-hover);
+}
+.mac-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A pop-up button around a native <select>, which opens the system menu. */
+.mac-popup {
+  height: 22px;
+  min-width: 96px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 24px 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230a7aff'/%3E%3Cpath d='M5 6.5 8 3.8l3 2.7M5 9.5l3 2.7 3-2.7' fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      no-repeat right 3px center / 16px 16px,
+    var(--mac-list);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 0.5px 1px rgb(0 0 0 / 10%);
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+  outline: none;
+}
+.dark .mac-popup {
+  background-color: rgb(255 255 255 / 14%);
+}
+.mac-popup:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+.mac-field {
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 7px;
+  background: var(--mac-list);
+  box-shadow:
+    inset 0 0 0 0.5px rgb(0 0 0 / 22%),
+    inset 0 0.5px 1px rgb(0 0 0 / 8%);
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+  outline: none;
+}
+.dark .mac-field {
+  background: rgb(255 255 255 / 6%);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 18%);
+}
+.mac-field:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-field[aria-invalid="true"] {
+  box-shadow: 0 0 0 2px #e5302b;
+}
+
+/* Third-party packages: the whole notice is tinted so the trust warning can't be missed. */
+.mac-callout-warning {
+  display: flex;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--mac-warning-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-warning-edge);
+  color: var(--mac-warning-fg);
+}
+.mac-callout-warning > svg {
+  flex-shrink: 0;
+  color: var(--mac-warning-icon);
+}
+.mac-callout-title {
+  font: 600 13px/16px var(--mac-font);
+}
+.mac-callout-body {
+  margin-top: 3px;
+  font: 12px/16px var(--mac-font);
+}
+
+/* Actions for the whole list, under it, like the buttons below a macOS table. */
+.mac-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+/* Reordering: handles appear only while the list is in Edit mode. */
+.mac-handle {
+  display: inline-flex;
+  width: 22px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--mac-secondary);
+  cursor: grab;
+  touch-action: none;
+}
+.mac-handle:hover {
+  background: var(--mac-row-hover);
+  color: var(--mac-label);
+}
+.mac-handle:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-list[data-dragging],
+.mac-list[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.mac-row[data-dragging] {
+  background: var(--mac-row-active);
+}
+.mac-row[data-dragging] > * {
+  opacity: 0.55;
+}
+.mac-row[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--focus);
+  pointer-events: none;
+}
+.mac-row[data-drop="before"]::after {
+  top: -1px;
+}
+.mac-row[data-drop="after"]::after {
+  bottom: -1px;
+}
+
+/* The chords file editor fills the pane below its bar. */
+.mac-editor {
+  display: flex;
+  flex-direction: column;
+}
+/* Inside a white group, the editor is set off by a hairline rather than its own card. */
+.mac-editor-surface {
+  height: 380px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--settings-group);
+  box-shadow: 0 0 0 0.5px var(--settings-separator);
+}
+.mac-editor-surface:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 40%, transparent);
+}
+.mac-editor-status {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 0;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+
+/* Unchecked boxes need an edge to stand out on the grey page and white groups. */
+.mac-page .checkbox:not([data-selected="true"]) .checkbox__control {
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 24%);
+}
+.dark .mac-page .checkbox:not([data-selected="true"]) .checkbox__control {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 30%);
+}
+
+/* Every key of a chord on one cap. */
+.mac-keycap {
+  display: inline-flex;
+  min-width: 48px;
+  height: 24px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--mac-keycap-fill);
+  box-shadow: inset 0 0 0 1px var(--mac-keycap-border);
+  font: 650 12px/1 var(--mac-font);
+  letter-spacing: 0.03em;
+  color: var(--mac-label);
+}
+/* A placeholder's keys sit a little apart from the chord's own keys. */
+.mac-keycap [data-prefix] {
+  margin-right: 4px;
+}
+.mac-keycap [data-placeholder] {
+  margin-right: 4px;
+  font-weight: 500;
+  color: var(--mac-secondary);
+}
+
+/* A disclosure chevron: points right, and turns down while its row is open. */
+.mac-disclosure-chevron {
+  flex-shrink: 0;
+  color: var(--mac-tertiary);
+  transition: transform 160ms ease;
+}
+[aria-expanded="true"] > .mac-disclosure-chevron {
+  transform: rotate(90deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mac-disclosure-chevron {
+    transition: none;
+  }
+}
+
+.mac-row[data-chord] {
+  min-height: 44px;
+}
+/* A small heading inside disclosed contents, such as the app a group of chords is for. */
+.mac-disclosure .mac-subheader {
+  min-height: 0;
+  padding-top: 10px;
+  padding-bottom: 2px;
+  font: var(--settings-header-font);
+  letter-spacing: var(--settings-header-tracking);
+  color: var(--settings-description);
+}
+.mac-row-muted {
+  color: var(--settings-description);
+}
+.mac-section-subtitle {
+  min-width: 0;
+  font: var(--settings-description-font);
+  letter-spacing: var(--settings-description-tracking);
+  color: var(--settings-description);
+}
+/* A text button in a section header, like Edit in a settings list. */
+.mac-link-button {
+  margin-left: auto;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--accent);
+  cursor: default;
+  outline: none;
+}
+.mac-link-button:focus-visible {
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A file's editor, disclosed under its row. */
+.mac-disclosure > .mac-editor {
+  padding: 8px;
+}
+.mac-editor-alert {
+  margin-bottom: 8px;
+  font: var(--settings-description-font);
+  color: var(--destructive);
+}
+.mac-editor-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/*
+ * A card whose header sits inside it. The hairline under the header
+ * is the card's only divider; rows below it are set apart by spacing.
+ */
+.mac-group {
+  padding: 0;
+}
+/* The header shares the card's fill; the inset box below sets the contents apart. */
+.mac-group-bar {
+  display: flex;
+  align-items: center;
+}
+.mac-group-bar .mac-icon {
+  color: var(--settings-label);
+}
+.mac-group-header {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  text-align: left;
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-label);
+  cursor: default;
+  outline: none;
+}
+.mac-group-header:focus-visible {
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-group-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 14px/18px var(--mac-font);
+  letter-spacing: -0.005em;
+  color: var(--mac-label);
+}
+.mac-group-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+}
+.mac-group-list {
+  padding: 6px 0;
+}
+/* Rows above or around a list, such as Select all and search. */
+.mac-list-tools {
+  display: flex;
+  min-height: 28px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 20px;
+  padding: 0 16px;
+}
+.mac-list-tools label {
+  font: var(--settings-label-font);
+  letter-spacing: var(--settings-label-tracking);
+  color: var(--settings-label);
+}
+
+/*
+ * Cards: a fill a step off the window with a thin visible border, and a
+ * hairline under the header as the only divider.
+ */
+/* Groups like the General page's: no border, and hairlines inset on both sides between rows. */
+.mac-group {
+  background: var(--settings-group);
+  box-shadow:
+    inset 0 0 0 1px var(--settings-group-edge),
+    0 1px 0 rgb(0 0 0 / 4%);
+}
+.mac-group-bar {
+  position: relative;
+}
+.mac-group[data-open] > .mac-group-bar::after,
+.mac-group-list > li + li > .mac-row:first-child::before,
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  content: "";
+  position: absolute;
+  right: 16px;
+  left: 16px;
+  height: 0.5px;
+  background: var(--settings-separator);
+  pointer-events: none;
+}
+.mac-group[data-open] > .mac-group-bar::after {
+  bottom: 0;
+}
+.mac-group-list > li + li > .mac-row:first-child::before {
+  top: 0;
+}
+.mac-group-list > [role="listitem"] {
+  position: relative;
+}
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  top: 0;
+}
+
+/*
+ * An expanded package keeps its row in line with its siblings. Below it, each part of the
+ * package (its placeholders, then each app's chords) is a box of its own, starting at the
+ * row's title, with its heading inside like a small card.
+ */
+.mac-group-list .mac-disclosure {
+  margin: 0;
+  border-radius: 0;
+  padding: 0 16px 12px 48px;
+  background: none;
+}
+.mac-box {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--mac-box);
+  box-shadow: inset 0 0 0 0.5px var(--mac-card-edge);
+}
+.mac-box + .mac-box {
+  margin-top: 8px;
+}
+.mac-box-header {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  box-shadow: inset 0 -0.5px 0 var(--mac-card-edge);
+  font: 600 11px/14px var(--mac-font);
+  letter-spacing: 0.02em;
+  color: var(--mac-secondary);
+}
+.mac-box-count {
+  font-weight: 400;
+}
+.mac-box .mac-row {
+  min-height: 46px;
+  padding: 6px 12px;
+}
+.mac-box > :nth-child(2) {
+  padding-top: 2px;
+}
+.mac-box > :last-child {
+  padding-bottom: 2px;
+}
+.mac-group-list .mac-disclosure > .mac-editor {
+  padding: 0;
+}
+
+/* Type: bright 13px titles over 11px secondary lines. */
+.mac-page .mac-row-title {
+  font: 400 13px/17px var(--mac-font);
+  letter-spacing: -0.003em;
+  color: var(--mac-label);
+}
+.mac-page .mac-row-subtitle {
+  font: 400 11px/14px var(--mac-font);
+  letter-spacing: 0.005em;
+  color: var(--mac-secondary);
+}
+.mac-page .mac-row-detail {
+  font: 400 12.5px/16px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+/* Small headings inside a card, such as Placeholders or the app a group of chords is for. */
+.mac-group-list .mac-subheader {
+  min-height: 0;
+  padding: 12px 16px 2px;
+  font: 600 11px/14px var(--mac-font);
+  letter-spacing: 0.02em;
+  color: var(--mac-secondary);
+}
+/* Rows in a package's card: title and kind, keys at the end. */
+.mac-group-list .mac-row[data-chord] {
+  min-height: 46px;
+  padding-block: 6px;
+}
+/* While reordering: the card you hold lifts above the others and follows the pointer. */
+.mac-card-list {
+  position: relative;
+}
+.mac-group[data-dragging] {
+  position: relative;
+  z-index: 2;
+  box-shadow:
+    0 0 0 0.5px var(--mac-card-edge),
+    0 12px 28px rgb(0 0 0 / 18%),
+    0 2px 6px rgb(0 0 0 / 10%);
+}
+/* A stack of cards, one per package, closer together than separate sections. */
+.mac-card-list > .mac-section + .mac-section {
+  margin-top: 10px;
+}
+.mac-card-list[data-dragging],
+.mac-card-list[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+/* A control before a card's header, such as a checkbox, in the icon column. */
+.mac-group-leading {
+  display: flex;
+  width: 20px;
+  flex-shrink: 0;
+  justify-content: center;
+  margin-left: 16px;
+  margin-right: -4px;
+}
+
+/* The toolbar's trailing items: Edit Order, then search. */
+.mac-toolbar > .mac-search {
+  width: 100%;
+  max-width: 200px;
+}
+.mac-toolbar > .mac-segmented + .mac-search {
+  margin-left: auto;
+}
+/* A chords file's editor, inside its card. */
+.mac-card-editor {
+  padding: 6px 16px 10px;
+}
+/* Spacing around stacks of cards. */
+.mac-list-tools + .mac-card-list,
+.mac-callout-warning + .mac-card-list,
+.mac-card-list + .mac-card-list {
+  margin-top: 20px;
+}
+.mac-card-list + .mac-section {
+  margin-top: 10px;
+}
+.mac-card-list + .mac-list-actions {
+  margin-top: 20px;
+}
+.mac-card-list:empty {
+  display: none;
+}
+
+/* A round icon button, like the toolbar buttons in macOS 26. */
+.mac-circle-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--mac-control);
+  color: var(--mac-label);
+  cursor: default;
+  outline: none;
+}
+.mac-circle-button[aria-pressed="true"] {
+  background: var(--mac-circle-on);
+}
+.mac-circle-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A shortcut you click and then press keys to change, like macOS's shortcut recorders. */
+.mac-shortcut-field {
+  display: inline-flex;
+  min-width: 120px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: var(--mac-keycap-fill);
+  box-shadow: inset 0 0 0 1px var(--mac-keycap-border);
+  font: 12px var(--mac-font);
+  color: var(--mac-secondary);
+  cursor: default;
+  outline: none;
+}
+.mac-shortcut-field[data-recording] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+  color: var(--mac-label);
+}
+.mac-shortcut-field:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* Macros: a form row to add or edit a macro, and the buffer rows below. */
+.mac-form-row {
+  display: block;
+}
+.mac-macro-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mac-macro-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+.mac-macro-actions {
+  display: flex;
+  height: 26px;
+  align-items: center;
+  gap: 8px;
+}
+.mac-page .mac-field {
+  min-height: 26px;
+  font: 12.5px/16px var(--mac-font);
+}
+.mac-textarea {
+  display: block;
+  width: 100%;
+  resize: none;
+  padding-block: 5px;
+  font-family: ui-monospace, "SF Mono", "Geist Mono Variable", monospace !important;
+  field-sizing: content;
+}
+.mac-buffer-row {
+  align-items: flex-start;
+}
+.mac-buffer-row > .mac-button {
+  margin-top: 1px;
+}
+.mac-buffer-label {
+  width: 24px;
+  flex-shrink: 0;
+  font:
+    500 12.5px/26px ui-monospace,
+    "SF Mono",
+    "Geist Mono Variable",
+    monospace;
+  color: var(--mac-secondary);
+}
+.mac-card-note {
+  min-height: 0;
+  padding-top: 8px;
+  font-size: 11px;
+}
+.mac-row-text code {
+  font-size: inherit;
+}
+
+/* A short explanation at the top of a preference group, such as what the Hint Panel is. */
+.preference-intro {
+  margin: 0 16px;
+  padding: 9px 0;
+  font: var(--settings-description-font);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--settings-description);
+}
+.preference-intro + .preference-row {
+  border-top: 0.5px solid var(--settings-separator);
+  padding-top: 9.5px;
+}
+
+/*
+ * A folder's files sit indented under its name, like a Finder outline, so they read as
+ * inside it. Their dividers start at the same edge.
+ */
+ul.mac-group-list > li > .mac-row {
+  padding-left: 48px;
+}
+ul.mac-group-list > li + li > .mac-row:first-child::before {
+  left: 48px;
+}
+ul.mac-group-list > li > .mac-card-editor {
+  padding-left: 48px;
+}
+.mac-group:has(> ul.mac-group-list)[data-open] > .mac-group-bar::after {
+  left: 48px;
+}
+
+/* Third-party packages on the Packages tab: set apart from the cards above or below them. */
+.mac-third-party:first-child {
+  margin-bottom: 20px;
+}
+.mac-third-party:not(:first-child) {
+  margin-top: 20px;
+}
+.mac-third-party .mac-list-tools:first-child,
+.mac-third-party .mac-card-list:first-child {
+  margin-top: 0;
+}
+
+/*
+ * A card's contents sit in a tinted box inset under its header, so they read as inside it,
+ * like nested sections. The box replaces the line under the header.
+ */
+.mac-group[data-open] > .mac-group-bar::after {
+  display: none;
+}
+.mac-group > .mac-group-list {
+  margin: 0 10px 10px;
+  overflow: hidden;
+  border-radius: 12px;
+  padding: 4px 0;
+  background: var(--mac-nest);
+}
+.mac-group > .mac-group-list:empty {
+  display: none;
+}
+ul.mac-group-list > li > .mac-row {
+  padding-left: 14px;
+}
+ul.mac-group-list > li + li > .mac-row:first-child::before {
+  left: 14px;
+}
+ul.mac-group-list > li > .mac-card-editor {
+  padding-left: 14px;
+}
+.mac-group-list .mac-row,
+.mac-group-list .mac-card-editor {
+  padding-inline: 14px;
+}
+.mac-group-list > li + li > .mac-row:first-child::before,
+.mac-group-list > [role="listitem"] + [role="listitem"]::before {
+  right: 14px;
+  left: 14px;
+}
+:root {
+  --mac-nest: rgb(0 0 0 / 3.5%);
+}
+.dark {
+  --mac-nest: rgb(255 255 255 / 4.5%);
+}
+
+/* A card's inset box sets its contents apart on its own: no line under the header. */
+.mac-group[data-open] > .mac-group-bar::after {
+  display: none;
+}
+.mac-group > .mac-group-list {
+  margin-top: 2px;
+}
+
+/* The third-party card: Select all in its header, then bulk actions and the install note. */
+.mac-group-actions .checkbox,
+.mac-group-actions label:not(.mac-search) {
+  font: var(--settings-label-font);
+  color: var(--mac-secondary);
+}
+.mac-bulk-row {
+  min-height: 44px;
+  gap: 8px;
+}
+.mac-install-row {
+  align-items: flex-start;
+  font-size: 11.5px;
+  line-height: 16px;
+}
+
+/* Appearance in the Application group: a compact segmented control, like System Settings. */
+.appearance-segmented .mac-segment {
+  min-width: 64px;
+  height: 22px;
+  padding: 0 12px;
+}
+.mac-segment[aria-checked="true"] {
+  font-weight: 560;
+  color: var(--mac-label);
+}
+
+/*
+ * The Hint Panel window behaves like a native panel: the window itself never scrolls, and
+ * columns that scroll do so without a visible scrollbar.
+ */
+.hint-panel-window,
+.hint-panel-window body {
+  overflow: hidden;
+}
+.hint-panel-window * {
+  scrollbar-width: none;
+}
+.hint-panel-window *::-webkit-scrollbar {
+  display: none;
+}
+
+/* The third-party card is yellow throughout, header and rows, as a standing trust warning. */
+.mac-group.mac-group-warning {
+  background: var(--mac-warning-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-warning-edge);
+}
+.mac-group-warning .mac-group-bar .mac-icon {
+  color: var(--mac-warning-icon);
+}
+.mac-group-warning .mac-group-title {
+  color: var(--mac-warning-fg);
+}
+.mac-group-warning > .mac-group-list {
+  background: rgb(255 255 255 / 55%);
+}
+.dark .mac-group-warning > .mac-group-list {
+  background: rgb(0 0 0 / 18%);
+}
+
+/* Select all in a card's header, at the header's text size. */
+.mac-group-actions .label,
+.mac-group-actions [data-slot="label"] {
+  font: 400 12.5px/16px var(--mac-font) !important;
+  color: var(--mac-secondary) !important;
 }

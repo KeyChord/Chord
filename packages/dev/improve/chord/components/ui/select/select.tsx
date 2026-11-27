@@ -1,40 +1,36 @@
-import { Select as HeroSelect } from "@heroui/react/select";
-import { ListBox } from "@heroui/react/list-box";
-import type { ComponentProps } from "react";
+import { cn } from "@chord/com.npmjs.utils-cn";
+import type { SelectHTMLAttributes } from "react";
 
 type SelectProps = Omit<
-  ComponentProps<typeof HeroSelect>,
-  "children" | "value" | "onChange" | "items"
+  SelectHTMLAttributes<HTMLSelectElement>,
+  "value" | "onChange" | "children" | "disabled"
 > & {
   value: string;
   onValueChange: (value: string) => void;
   disabled?: boolean;
   options: readonly { value: string; label: string }[];
 };
-function Select({ value, onValueChange, disabled, options, ...props }: SelectProps) {
+
+/**
+ * A pop-up button. It is a native `<select>`, so macOS opens its own menu (with the checkmark,
+ * type-to-select and keyboard handling) instead of a web imitation.
+ */
+function Select({ value, onValueChange, disabled, options, className, ...props }: SelectProps) {
   return (
-    <HeroSelect
+    <select
       {...props}
+      data-slot="select"
+      className={cn("mac-popup", className)}
       value={value}
-      onChange={(key) => {
-        if (key !== null) onValueChange(String(key));
-      }}
-      isDisabled={disabled}
+      disabled={disabled}
+      onChange={(event) => onValueChange(event.target.value)}
     >
-      <HeroSelect.Trigger className="h-8 min-h-8 min-w-28 rounded-lg px-2.5 py-1 text-sm">
-        <HeroSelect.Value />
-        <HeroSelect.Indicator />
-      </HeroSelect.Trigger>
-      <HeroSelect.Popover>
-        <ListBox aria-label={props["aria-label"]}>
-          {options.map((option) => (
-            <ListBox.Item key={option.value} id={option.value} textValue={option.label}>
-              {option.label}
-            </ListBox.Item>
-          ))}
-        </ListBox>
-      </HeroSelect.Popover>
-    </HeroSelect>
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }
 export { Select };

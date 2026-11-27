@@ -38,43 +38,52 @@ const languages = {
 /** Marks document replacements that come from the `value` prop rather than from typing. */
 const fromProp = Annotation.define<boolean>();
 
+// Colours come from the window's surface tokens, so the editor reads like a Mac text view: a
+// light gutter with readable line numbers and a faint highlight on the current line.
 const theme = EditorView.theme({
 	'&': {
 		height: '100%',
-		fontSize: '12px',
+		fontSize: '12.5px',
 		color: 'var(--foreground)',
-		backgroundColor: 'var(--background)',
-		border: '1px solid var(--input)',
-		borderRadius: 'var(--radius)',
+		backgroundColor: 'var(--mac-list, var(--surface, var(--background)))',
 		overflow: 'hidden',
 	},
-	'&.cm-focused': {
-		outline: 'none',
-		borderColor: 'var(--ring)',
-		boxShadow: '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
-	},
+	'&.cm-focused': { outline: 'none' },
 	'.cm-scroller': {
-		fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-		lineHeight: '1.6',
+		fontFamily: 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace',
+		lineHeight: '1.65',
 	},
-	'.cm-content': { padding: '8px 0', caretColor: 'var(--foreground)' },
+	'.cm-content': { padding: '10px 0', caretColor: 'var(--foreground)' },
+	'.cm-line': { padding: '0 14px 0 10px' },
 	'.cm-gutters': {
-		backgroundColor: 'var(--muted)',
-		color: 'var(--muted-foreground)',
-		borderRight: '1px solid var(--border)',
+		backgroundColor: 'transparent',
+		color: 'var(--mac-tertiary, color-mix(in oklab, var(--foreground) 35%, transparent))',
+		border: 'none',
+		borderRight: '0.5px solid var(--mac-separator, var(--border))',
 	},
-	'.cm-activeLine': { backgroundColor: 'color-mix(in oklab, var(--muted) 70%, transparent)' },
-	'.cm-activeLineGutter': { backgroundColor: 'var(--border)', color: 'var(--foreground)' },
+	'.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 14px', minWidth: '36px' },
+	'.cm-activeLine': {
+		backgroundColor: 'color-mix(in oklab, var(--accent, #0a7aff) 6%, transparent)',
+	},
+	'.cm-activeLineGutter': {
+		backgroundColor: 'transparent',
+		color: 'var(--mac-label, var(--foreground))',
+	},
 	'.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-		backgroundColor: 'oklch(0.88 0.06 250)',
+		backgroundColor: 'color-mix(in oklab, var(--accent, #0a7aff) 22%, transparent)',
 	},
 	'.cm-tooltip': {
-		border: '1px solid var(--border)',
-		borderRadius: 'calc(var(--radius) - 2px)',
-		backgroundColor: 'var(--popover)',
-		color: 'var(--popover-foreground)',
+		border: '0.5px solid var(--border)',
+		borderRadius: '8px',
+		backgroundColor: 'var(--surface, var(--background))',
+		color: 'var(--foreground)',
+		boxShadow: '0 6px 20px rgb(0 0 0 / 15%)',
 	},
-	'.cm-panels': { backgroundColor: 'var(--muted)', color: 'var(--foreground)' },
+	'.cm-panels': {
+		backgroundColor: 'var(--background)',
+		color: 'var(--foreground)',
+		borderColor: 'var(--mac-separator, var(--border))',
+	},
 });
 
 const highlightStyle = HighlightStyle.define([

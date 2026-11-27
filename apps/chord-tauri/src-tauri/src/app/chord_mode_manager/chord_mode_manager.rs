@@ -118,10 +118,15 @@ impl ChordModeManager {
             .app_state()
             .settings()
             .is_hint_panel_hidden_by_default();
-        if self.panel.ensure_visible(!is_hint_panel_hidden)? {
-            let _ = self.panel.prepare_surface_before_reveal();
-            self.panel.reveal()?;
+        // The panel only shows the chord. Whatever goes wrong with it, chord mode stays
+        // active and the panel is revealed with what it has drawn.
+        if let Err(error) = self.panel.ensure_visible(!is_hint_panel_hidden) {
+            log::error!("Failed to show the Hint Panel: {error:#}");
         }
+        if let Err(error) = self.panel.prepare_surface_before_reveal() {
+            log::debug!("Revealing the Hint Panel before it drew: {error:#}");
+        }
+        self.panel.reveal()?;
         Ok(())
     }
 

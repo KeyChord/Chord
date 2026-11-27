@@ -25,11 +25,11 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const levelStyles: Record<AppLogLevel, string> = {
-  trace: "text-zinc-400",
-  debug: "text-zinc-400",
-  info: "text-zinc-900",
-  warn: "bg-zinc-100 text-zinc-900",
-  error: "bg-zinc-200 text-zinc-900 font-medium",
+  trace: "text-zinc-400 dark:text-zinc-500",
+  debug: "text-zinc-400 dark:text-zinc-500",
+  info: "text-zinc-900 dark:text-zinc-100",
+  warn: "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100",
+  error: "bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-50",
 };
 
 const DIVIDER_TEXT = "-".repeat(120);
@@ -155,7 +155,7 @@ function highlightedMessage(message: string, query: string) {
   while (index !== -1 && highlighted < MAX_HIGHLIGHTS_PER_MESSAGE) {
     parts.push(message.slice(start, index));
     parts.push(
-      <mark key={index} className="rounded-[2px] bg-zinc-300 text-inherit">
+      <mark key={index} className="rounded-[2px] bg-zinc-300 text-inherit dark:bg-zinc-600">
         {message.slice(index, index + query.length)}
       </mark>,
     );
@@ -333,8 +333,6 @@ export function SettingsLogPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-3">
-      <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em]">Application Log</h2>
-
       <div className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
           <Button
@@ -347,7 +345,7 @@ export function SettingsLogPage() {
             }}
           >
             {copied ? <Check /> : <Copy />}
-            {copied ? "Copied" : "Copy to pasteboard"}
+            {copied ? "Copied" : "Copy"}
           </Button>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
@@ -364,9 +362,9 @@ export function SettingsLogPage() {
         </div>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border bg-white shadow-sm">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden border bg-white shadow-sm dark:bg-zinc-900">
         <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-default/20 px-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border bg-white px-2 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md border bg-white px-2 dark:bg-zinc-800 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/20">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <Input
               type="search"
@@ -416,7 +414,7 @@ export function SettingsLogPage() {
           </Button>
         </div>
 
-        <div className="relative min-h-0 flex-1 overflow-hidden bg-white">
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-white dark:bg-zinc-900">
           <pre
             ref={backdropRef}
             aria-hidden="true"
@@ -429,7 +427,7 @@ export function SettingsLogPage() {
               row.kind === "local" && row.row.kind === "divider" ? (
                 <span
                   key={row.key}
-                  className="block min-h-[1lh] overflow-hidden bg-zinc-900 text-white"
+                  className="block min-h-[1lh] overflow-hidden bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 >
                   {row.row.message}
                 </span>
@@ -438,10 +436,10 @@ export function SettingsLogPage() {
                   key={row.key}
                   className={
                     row.row.kind === "error"
-                      ? "block min-h-[1lh] bg-zinc-200 text-zinc-900 font-medium"
+                      ? "block min-h-[1lh] bg-zinc-200 text-zinc-900 font-medium dark:bg-zinc-700 dark:text-zinc-50"
                       : row.row.kind === "command"
-                        ? "block min-h-[1lh] bg-zinc-100 font-semibold text-zinc-700"
-                        : "block min-h-[1lh] text-zinc-900"
+                        ? "block min-h-[1lh] bg-zinc-100 font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
+                        : "block min-h-[1lh] text-zinc-900 dark:text-zinc-100"
                   }
                 >
                   {highlightedMessage(row.row.message, query)}
@@ -455,7 +453,7 @@ export function SettingsLogPage() {
           </pre>
           <textarea
             ref={scrollRef}
-            className="absolute inset-0 z-10 size-full resize-none overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-3.5 py-3 text-[11.5px] leading-[1.55] text-transparent caret-zinc-900 outline-none placeholder:text-zinc-400 selection:bg-zinc-300/60 selection:text-transparent"
+            className="absolute inset-0 z-10 size-full resize-none overflow-auto whitespace-pre-wrap break-words border-0 bg-transparent px-3.5 py-3 text-[11.5px] leading-[1.55] text-transparent caret-zinc-900 dark:caret-zinc-100 outline-none placeholder:text-zinc-400 selection:bg-zinc-300/60 selection:text-transparent"
             style={{
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
             }}
@@ -470,11 +468,11 @@ export function SettingsLogPage() {
         </div>
 
         <form
-          className="flex shrink-0 items-center gap-2 border-t bg-zinc-50 px-2.5 py-2"
+          className="flex shrink-0 items-center gap-2 border-t bg-zinc-50 px-2.5 py-2 dark:bg-zinc-800/60"
           onSubmit={(event) => void runCommand(event)}
         >
           <span
-            className="shrink-0 select-none text-xs font-semibold text-zinc-500"
+            className="shrink-0 select-none text-xs font-semibold text-zinc-500 dark:text-zinc-400"
             style={{
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
             }}
@@ -483,7 +481,7 @@ export function SettingsLogPage() {
           </span>
           <Input
             type="text"
-            className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2.5 text-xs outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="h-8 min-w-0 flex-1 rounded-md border bg-white px-2.5 text-xs outline-none dark:bg-zinc-800 placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
             value={command}
             disabled={isRunningCommand}
             placeholder="help"
@@ -528,7 +526,7 @@ export function SettingsLogPage() {
             <span
               className={
                 status === "live"
-                  ? "size-1.5 rounded-full bg-zinc-900"
+                  ? "size-1.5 rounded-full bg-zinc-900 dark:bg-zinc-100"
                   : "size-1.5 rounded-full bg-zinc-400"
               }
             />

@@ -1,1 +1,1 @@
-export { SettingsDangerPage } from '#settings-danger-page';
+export { SettingsDangerPage } from "#settings-danger-page";
