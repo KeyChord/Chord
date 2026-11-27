@@ -15,7 +15,7 @@ import {
 } from "@chord/dev.improve.chord.lib.state";
 import { PersonalChords } from "@chord/dev.improve.chord.routes.settings._components.personal-chords";
 import { Search, X } from "lucide-react";
-import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 export function SettingsChordsPage({ configurePackage }: { configurePackage?: string }) {
   return (
@@ -40,8 +40,8 @@ const views: { value: View; label: string }[] = [
 ];
 
 /**
- * A macOS segmented control. Segments share one width, so the control never resizes, and the
- * arrow keys move between them like an AppKit tab view.
+ * A capsule segmented control. Segments share one width, so the control never resizes, a thumb
+ * slides to the selected one, and the arrow keys move between them like an AppKit tab view.
  */
 function SegmentedControl({
   value,
@@ -65,7 +65,18 @@ function SegmentedControl({
     refs.current[next]?.focus();
   }
   return (
-    <div role="tablist" aria-label="Chords views" className="mac-segmented" onKeyDown={onKeyDown}>
+    <div
+      role="tablist"
+      aria-label="Chords views"
+      className="mac-segmented"
+      style={
+        {
+          "--count": views.length,
+          "--index": views.findIndex((view) => view.value === value),
+        } as CSSProperties
+      }
+      onKeyDown={onKeyDown}
+    >
       {views.map((view) => {
         const selected = view.value === value;
         const badge = badges[view.value];

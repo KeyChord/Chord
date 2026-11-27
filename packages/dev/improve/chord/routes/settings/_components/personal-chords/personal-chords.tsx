@@ -38,17 +38,7 @@ import {
   useChordPackageManagerState,
   useDesktopAppManagerState,
 } from "@chord/dev.improve.chord.lib.state";
-import {
-  AppWindow,
-  ChevronLeft,
-  ChevronRight,
-  Ellipsis,
-  FileText,
-  FolderOpen,
-  Globe,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { AppWindow, ChevronLeft, ChevronRight, Ellipsis, FileText, Globe } from "lucide-react";
 import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ALL_APPS_PATHSLUG,
@@ -164,26 +154,7 @@ export function PersonalChordsContent({
 
   return (
     <section aria-label="Local Chords">
-      <div className="mb-5 flex items-center gap-2">
-        <p className="mac-intro min-w-0 flex-1">
-          Your own chords. They take priority over every installed package.
-        </p>
-        <OpenInFinderButton label="Open in Finder" />
-        <NewPackageButton existing={existing} />
-        {listing.packages.length > 0 && (
-          <AddFileButton
-            packages={listing.packages}
-            defaultDirname={addingTo ?? DEFAULT_PACKAGE}
-            appIds={appIds}
-            open={addingTo !== null}
-            onOpenChange={(open) => setAddingTo(open ? (addingTo ?? DEFAULT_PACKAGE) : null)}
-            onOpen={(file) => {
-              setAddingTo(null);
-              setSelected(file);
-            }}
-          />
-        )}
-      </div>
+      <p className="mac-intro">Your own chords. They take priority over every installed package.</p>
       {listing.packages.length === 0 ? (
         <div className="mac-list">
           <p className="mac-row-empty">No packages yet. Create one to start writing chords.</p>
@@ -206,6 +177,24 @@ export function PersonalChordsContent({
           );
         })
       )}
+      <div className="mac-list-actions">
+        <OpenInFinderButton label="Open in Finder" />
+        <span className="flex-1" />
+        <NewPackageButton existing={existing} />
+        {listing.packages.length > 0 && (
+          <AddFileButton
+            packages={listing.packages}
+            defaultDirname={addingTo ?? DEFAULT_PACKAGE}
+            appIds={appIds}
+            open={addingTo !== null}
+            onOpenChange={(open) => setAddingTo(open ? (addingTo ?? DEFAULT_PACKAGE) : null)}
+            onOpen={(file) => {
+              setAddingTo(null);
+              setSelected(file);
+            }}
+          />
+        )}
+      </div>
     </section>
   );
 }
@@ -309,7 +298,6 @@ function OpenInFinderButton({ dirname, label }: { dirname?: string; label: strin
       onClick={() => open.mutate()}
       disabled={open.isPending}
     >
-      <FolderOpen size={14} aria-hidden="true" />
       {label}
     </button>
   );
@@ -339,8 +327,7 @@ function NewPackageButton({ existing }: { existing: string[] }) {
       }}
     >
       <Button type="button" variant="outline" size="sm" className="mac-button">
-        <Plus />
-        New Package
+        New Package…
       </Button>
 
       <DialogContent>
@@ -427,7 +414,7 @@ function FileIcon({
   const icon = appId ? apps[appId]?.iconDataUrl : undefined;
   if (icon) {
     return (
-      <span className="mac-icon" data-image aria-hidden="true">
+      <span className="mac-icon" aria-hidden="true">
         <img src={icon} alt="" />
       </span>
     );
@@ -435,12 +422,8 @@ function FileIcon({
   const everyApp = pathslug === ALL_APPS_PATHSLUG;
   const Icon = appId ? AppWindow : everyApp ? Globe : FileText;
   return (
-    <span
-      className="mac-icon"
-      data-tint={everyApp ? "blue" : appId ? "orange" : undefined}
-      aria-hidden="true"
-    >
-      <Icon size={16} strokeWidth={2} />
+    <span className="mac-icon" aria-hidden="true">
+      <Icon size={17} strokeWidth={1.6} />
     </span>
   );
 }
@@ -529,8 +512,7 @@ function AddFileButton({
       }}
     >
       <Button type="button" variant="outline" size="sm" className="mac-button">
-        <Plus />
-        Add File
+        Add File…
       </Button>
       <DialogContent>
         <form
@@ -704,18 +686,8 @@ function FileEditor({
         <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
         Local Chords
       </button>
-      <FileIcon pathslug={file.pathslug} apps={apps} />
-      <div className="min-w-0 flex-1">
-        <h2 className="mac-row-title text-[13px] font-semibold">
-          {displayTitle}
-          {dirty && <span className="mac-row-subtitle"> — Edited</span>}
-        </h2>
-        <p className="mac-row-subtitle font-mono" title={path}>
-          {path}
-        </p>
-      </div>
       {contents !== undefined && (
-        <>
+        <div className="mac-detail-actions">
           <DeleteFileButton path={path} disabled={pending} onDelete={() => remove.mutate()} />
           {dirty && (
             <button
@@ -740,8 +712,21 @@ function FileEditor({
           >
             {save.isPending ? "Saving…" : "Save"}
           </button>
-        </>
+        </div>
       )}
+    </div>
+  );
+  const header = (
+    <div className="mac-detail-header">
+      <div className="min-w-0">
+        <h2 className="mac-detail-title truncate">
+          {displayTitle}
+          {dirty && <span className="mac-detail-subtitle font-normal"> — Edited</span>}
+        </h2>
+        <p className="mac-detail-subtitle truncate font-mono" title={path}>
+          {path}
+        </p>
+      </div>
     </div>
   );
 
@@ -749,6 +734,7 @@ function FileEditor({
     return (
       <section aria-label={`Edit ${path}`}>
         {bar}
+        {header}
         <div className="mac-list p-4">
           {fileQuery.isError ? (
             <div role="alert" className="space-y-2">
@@ -770,6 +756,7 @@ function FileEditor({
   return (
     <section aria-label={`Edit ${path}`} className="mac-editor">
       {bar}
+      {header}
       <form
         id={formId}
         ref={formRef}
@@ -850,15 +837,12 @@ function DeleteFileButton({
     <AlertDialog>
       <Button
         type="button"
-        size="icon-sm"
-        variant="ghost"
+        variant="outline"
         aria-label={`Delete ${path}`}
         disabled={disabled}
-        className="mac-button text-muted-foreground hover:text-destructive"
-        data-icon
-        data-borderless
+        className="mac-button"
       >
-        <Trash2 />
+        Delete…
       </Button>
 
       <AlertDialogContent size="sm">

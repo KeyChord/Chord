@@ -10,14 +10,11 @@ import {
   type PlaceholderEntry,
 } from "@chord/dev.improve.chord.routes.settings._components.package-placeholders";
 import {
-  Braces,
   ChevronLeft,
   ChevronRight,
-  Command,
   GripVertical,
   Keyboard,
   Package,
-  Terminal,
   TriangleAlert,
 } from "lucide-react";
 import {
@@ -241,10 +238,10 @@ function autoScrollStep({ scroller, y }: DragState): number {
 }
 
 const actionKinds = {
-  shortcut: { label: "Shortcut", icon: Command },
-  shell: { label: "Shell command", icon: Terminal },
-  emit: { label: "Script", icon: Braces },
-  builtin: { label: "Chord action", icon: Keyboard },
+  shortcut: { label: "Shortcut" },
+  shell: { label: "Shell command" },
+  emit: { label: "Script" },
+  builtin: { label: "Chord action" },
 } as const;
 
 /** Splits `AccessibilityInspector` into `Accessibility Inspector`. */
@@ -273,15 +270,15 @@ function plural(count: number, noun: string) {
 function PackageIcon({ entry, app }: { entry: LibraryPackage; app?: DesktopAppMetadata }) {
   if (app?.iconDataUrl) {
     return (
-      <span className="mac-icon" data-image aria-hidden="true">
+      <span className="mac-icon" aria-hidden="true">
         <img src={app.iconDataUrl} alt="" />
       </span>
     );
   }
-  const core = entry.rank === "core";
+  const Icon = entry.rank === "core" ? Keyboard : Package;
   return (
-    <span className="mac-icon" data-tint={core ? "purple" : "blue"} aria-hidden="true">
-      {core ? <Keyboard size={16} strokeWidth={2} /> : <Package size={16} strokeWidth={2} />}
+    <span className="mac-icon" aria-hidden="true">
+      <Icon size={17} strokeWidth={1.6} />
     </span>
   );
 }
@@ -305,21 +302,18 @@ export function ChordKeys({ sequence }: { sequence: string }) {
   );
 }
 
+/** A chord as a preference row: its name leads and its keys trail, like a shortcut setting. */
 function ChordRow({ entry }: { entry: LibraryChord }) {
   const kind = entry.chord.actions[0] ? actionKinds[entry.chord.actions[0].type] : undefined;
-  const Icon = kind?.icon ?? Keyboard;
   return (
     <div className="mac-row" data-compact>
-      <span className="min-w-28 shrink-0">
-        <ChordKeys sequence={entry.chord.rawTrigger} />
+      <span className="mac-row-text">
+        <span className="mac-row-title" title={entry.chord.name}>
+          {entry.chord.name}
+        </span>
       </span>
-      <span className="mac-row-title flex-1" title={entry.chord.name}>
-        {entry.chord.name}
-      </span>
-      <span className="mac-row-detail inline-flex" title={kind?.label ?? "No actions"}>
-        <Icon size={14} strokeWidth={1.7} aria-hidden="true" />
-        <span className="sr-only">{kind?.label ?? "No actions"}</span>
-      </span>
+      <span className="sr-only">{kind?.label ?? "No actions"}</span>
+      <ChordKeys sequence={entry.chord.rawTrigger} />
     </div>
   );
 }
@@ -354,15 +348,12 @@ export function PackageDetail({
           Packages
         </button>
       </div>
-      <div className="mac-detail-hero">
-        <PackageIcon entry={entry} app={app} />
+      <div className="mac-detail-header">
+        {app?.iconDataUrl && <PackageIcon entry={entry} app={app} />}
         <div className="min-w-0">
           <h2 className="mac-detail-title truncate">{packageTitle(entry, app)}</h2>
           <p className="mac-detail-subtitle truncate" title={entry.name}>
-            {entry.name}
-          </p>
-          <p className="mac-detail-subtitle">
-            {rankLabel} · {plural(entry.chords.length, "chord")} · {plural(entry.fileCount, "file")}
+            {entry.name} · {rankLabel} · {plural(entry.chords.length, "chord")}
           </p>
         </div>
       </div>
@@ -375,7 +366,6 @@ export function PackageDetail({
             <h3 className="mac-section-title" title={appId}>
               {chords[0]!.appLabel}
             </h3>
-            <span className="mac-row-subtitle ml-auto">{plural(chords.length, "chord")}</span>
           </div>
           <div className="mac-list" role="list" aria-label={`${chords[0]!.appLabel} chords`}>
             {chords.map((row) => (
@@ -656,7 +646,7 @@ export function ChordLibrary({
               {showEdit && (
                 <button
                   type="button"
-                  className="mac-button ml-auto"
+                  className="mac-button -mr-2.5 ml-auto"
                   data-borderless
                   aria-pressed={reordering}
                   onClick={() => setEditing(!reordering)}
