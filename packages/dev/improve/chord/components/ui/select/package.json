@@ -9,7 +9,7 @@
 		".": "./+.ts"
 	},
 	"dependencies": {
-		"@heroui/react": "^3.2.7",
+		"@chord/com.npmjs.utils-cn": "workspace:*",
 		"react": "^19.3.1"
 	},
 	"devDependencies": {

@@ -14,16 +14,15 @@
     "@chord/dev.improve.chord.api.taurpc": "workspace:*",
     "@chord/dev.improve.chord.components.ui.alert-dialog": "workspace:*",
     "@chord/dev.improve.chord.components.ui.button": "workspace:*",
-    "@chord/dev.improve.chord.components.ui.card": "workspace:*",
     "@chord/dev.improve.chord.components.ui.code-editor": "workspace:*",
     "@chord/dev.improve.chord.components.ui.dialog": "workspace:*",
-    "@chord/dev.improve.chord.components.ui.input": "workspace:*",
     "@chord/dev.improve.chord.components.ui.kbd": "workspace:*",
+    "@chord/dev.improve.chord.components.ui.select": "workspace:*",
+    "@chord/dev.improve.chord.lib.native-menu": "workspace:*",
     "@chord/dev.improve.chord.lib.state": "workspace:*",
     "@chord/dev.improve.chord.lib.typeshare": "workspace:*",
     "lucide-react": "^1.57.0",
-    "react": "^19.3.1",
-    "@chord/dev.improve.chord.components.ui.select": "workspace:*"
+    "react": "^19.3.1"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

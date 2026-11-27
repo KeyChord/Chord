@@ -10,17 +10,11 @@ import {
 import { Switch } from "@chord/dev.improve.chord.components.ui.switch";
 import { Label } from "@chord/dev.improve.chord.components.ui.label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@chord/dev.improve.chord.components.ui.popover";
-import {
   StateQueries,
   desktopPlatform,
   usePermissionsState,
   useSettingsState,
 } from "@chord/dev.improve.chord.lib.state";
-import { Info } from "lucide-react";
 
 export function LaunchOnLoginCard() {
   return (
@@ -86,16 +80,16 @@ function LaunchOnLoginCardContent({
             }}
           />
           {desktopPlatform === "macos" && (
-          <SettingSwitchRow
-            id="show-dock-icon"
-            label="Show Dock icon"
-            description="Keep Chord visible in the Dock while it is running."
-            checked={settings.showDockIcon}
-            disabled={toggleDockIconMutation.isPending}
-            onCheckedChange={() => {
-              toggleDockIconMutation.mutate();
-            }}
-          />
+            <SettingSwitchRow
+              id="show-dock-icon"
+              label="Show Dock icon"
+              description="Keep Chord visible in the Dock while it is running."
+              checked={settings.showDockIcon}
+              disabled={toggleDockIconMutation.isPending}
+              onCheckedChange={() => {
+                toggleDockIconMutation.mutate();
+              }}
+            />
           )}
           <SettingSwitchRow
             id="hide-hint-panel-by-default"
@@ -130,27 +124,14 @@ function SettingSwitchRow({
 }) {
   return (
     <div className="preference-row">
-      <div className="flex min-w-0 flex-1 items-center gap-[9px]">
+      {/* Like System Settings, the explanation sits under the label instead of behind a button. */}
+      <div className="min-w-0 flex-1">
         <Label htmlFor={id} className="preference-label">
           {label}
         </Label>
-        <Popover>
-          <PopoverTrigger>
-            <button
-              type="button"
-              className="preference-info"
-              aria-label={`About ${label.toLowerCase()}`}
-            >
-              <Info size={12} strokeWidth={1.8} aria-hidden="true" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="start" sideOffset={8} className="preference-help">
-            {description}
-          </PopoverContent>
-        </Popover>
-        <span id={`${id}-description`} className="sr-only">
+        <p id={`${id}-description`} className="preference-description">
           {description}
-        </span>
+        </p>
       </div>
       <Switch
         id={id}

@@ -652,3 +652,618 @@
     inset 0 0 0 1px var(--settings-group-edge),
     0 1px 0 rgb(0 0 0 / 20%);
 }
+
+/*
+ * macOS building blocks for the Chords page: a segmented control, inset grouped lists like System
+ * Settings, a pop-up button, a warning callout, and the toolbar of a pushed detail view. They use
+ * the system font, so on a Mac they render in SF Pro at the sizes AppKit uses.
+ */
+:root {
+  --mac-font: -apple-system, BlinkMacSystemFont, "Inter Variable", sans-serif;
+  --mac-list: #fff;
+  --mac-list-edge: rgb(0 0 0 / 7%);
+  --mac-row-hover: rgb(0 0 0 / 3.5%);
+  --mac-row-active: rgb(0 0 0 / 6%);
+  --mac-separator: rgb(0 0 0 / 9%);
+  --mac-label: rgb(0 0 0 / 85%);
+  --mac-secondary: rgb(0 0 0 / 50%);
+  --mac-tertiary: rgb(0 0 0 / 26%);
+  --mac-control: rgb(0 0 0 / 6%);
+  --mac-control-selected: #fff;
+  --mac-keycap: rgb(0 0 0 / 6%);
+  --mac-keycap-edge: rgb(0 0 0 / 10%);
+  --mac-warning-bg: #fff6d6;
+  --mac-warning-edge: #f0d47a;
+  --mac-warning-fg: #6b4b00;
+  --mac-warning-icon: #c98a00;
+}
+.dark {
+  --mac-list: rgb(255 255 255 / 5%);
+  --mac-list-edge: rgb(255 255 255 / 7%);
+  --mac-row-hover: rgb(255 255 255 / 4%);
+  --mac-row-active: rgb(255 255 255 / 7%);
+  --mac-separator: rgb(255 255 255 / 8%);
+  --mac-label: rgb(255 255 255 / 88%);
+  --mac-secondary: rgb(255 255 255 / 52%);
+  --mac-tertiary: rgb(255 255 255 / 25%);
+  --mac-control: rgb(255 255 255 / 8%);
+  --mac-control-selected: rgb(255 255 255 / 20%);
+  --mac-keycap: rgb(255 255 255 / 8%);
+  --mac-keycap-edge: rgb(255 255 255 / 10%);
+  --mac-warning-bg: rgb(255 196 0 / 12%);
+  --mac-warning-edge: rgb(255 196 0 / 32%);
+  --mac-warning-fg: #f5dc93;
+  --mac-warning-icon: #ffc93d;
+}
+
+/* The scrollbar's space is always reserved, so switching tabs never changes the content width. */
+.settings-page-scroll {
+  scrollbar-gutter: stable;
+}
+
+.mac-page {
+  container-type: inline-size;
+  font-family: var(--mac-font);
+  font-size: 13px;
+  color: var(--mac-label);
+}
+
+/*
+ * Toolbar above the page. The side columns are always equal, so the segmented control stays
+ * centred whatever sits at the end, and the search field shrinks rather than overlapping it.
+ */
+.mac-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mac-toolbar > :first-child {
+  grid-column: 2;
+}
+.mac-toolbar > .mac-toolbar-end {
+  grid-column: 3;
+  justify-self: end;
+  width: 100%;
+  max-width: 200px;
+}
+
+.mac-segmented {
+  display: inline-grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--mac-control);
+}
+.mac-segment {
+  position: relative;
+  display: inline-flex;
+  min-width: 108px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 5px;
+  font: 500 13px/1 var(--mac-font);
+  color: var(--mac-label);
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+}
+.mac-segment + .mac-segment:not([aria-selected="true"])::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 5px;
+  bottom: 5px;
+  width: 1px;
+  background: var(--mac-separator);
+}
+.mac-segment[aria-selected="true"] {
+  background: var(--mac-control-selected);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 6%),
+    0 1px 2px rgb(0 0 0 / 12%);
+}
+.mac-segment[aria-selected="true"] + .mac-segment::before {
+  display: none;
+}
+.mac-segment:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-segment-badge {
+  display: inline-flex;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--mac-warning-icon);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.mac-search {
+  display: flex;
+  width: 200px;
+  min-width: 0;
+  height: 24px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 7px;
+  border-radius: 6px;
+  background: var(--mac-control);
+  color: var(--mac-secondary);
+}
+.mac-search:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 40%, transparent);
+}
+.mac-search input {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+}
+.mac-search input::placeholder {
+  color: var(--mac-secondary);
+}
+.mac-search button {
+  display: inline-flex;
+  color: var(--mac-secondary);
+}
+
+/* A section: bold header, then an inset grouped list, then an optional footnote. */
+.mac-section + .mac-section,
+.mac-section + section > .mac-section:first-of-type,
+section + .mac-section {
+  margin-top: 22px;
+}
+.mac-section-header {
+  display: flex;
+  min-height: 22px;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 0 4px;
+}
+.mac-section-title {
+  font: 600 13px/16px var(--mac-font);
+  color: var(--mac-label);
+}
+.mac-section-footer {
+  margin: 6px 4px 0;
+  font: 11px/14px var(--mac-font);
+  color: var(--mac-secondary);
+}
+.mac-list {
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--mac-list);
+  box-shadow:
+    0 0 0 0.5px var(--mac-list-edge),
+    0 0.5px 1px rgb(0 0 0 / 4%);
+}
+.mac-row {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  text-align: left;
+  font: 13px/16px var(--mac-font);
+  color: var(--mac-label);
+  outline: none;
+}
+.mac-row[data-compact] {
+  min-height: 32px;
+  padding-block: 4px;
+}
+/* Separators start at the text, after the icon, like AppKit's inset list style. */
+.mac-row + .mac-row::before,
+.mac-list > * + .mac-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: var(--mac-row-inset, 12px);
+  height: 0.5px;
+  background: var(--mac-separator);
+}
+.mac-list[data-icons] {
+  --mac-row-inset: 50px;
+}
+button.mac-row,
+a.mac-row {
+  cursor: default;
+}
+button.mac-row:hover,
+a.mac-row:hover {
+  background: var(--mac-row-hover);
+}
+button.mac-row:active,
+a.mac-row:active {
+  background: var(--mac-row-active);
+}
+.mac-row:focus-visible {
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-row-text {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+.mac-row-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mac-row-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--mac-secondary);
+}
+.mac-row-detail {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--mac-secondary);
+}
+.mac-row-chevron {
+  flex-shrink: 0;
+  color: var(--mac-tertiary);
+}
+.mac-intro {
+  font: 12px/16px var(--mac-font);
+  color: var(--mac-secondary);
+}
+.mac-row-empty {
+  padding: 14px 12px;
+  text-align: center;
+  font: 13px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+.mac-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: linear-gradient(#8e8e93, #6c6c70);
+  color: #fff;
+}
+.mac-icon[data-tint="blue"] {
+  background: linear-gradient(#4aa3ff, #0a7aff);
+}
+.mac-icon[data-tint="purple"] {
+  background: linear-gradient(#c17cf2, #9d4fdb);
+}
+.mac-icon[data-tint="orange"] {
+  background: linear-gradient(#ffb340, #ff8a00);
+}
+.mac-icon[data-tint="green"] {
+  background: linear-gradient(#5fd57a, #2fb350);
+}
+.mac-icon[data-image] {
+  background: transparent;
+}
+.mac-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* A chord sequence drawn as keycaps. */
+.mac-keys {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+.mac-key {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--mac-keycap);
+  box-shadow:
+    inset 0 -0.5px 0 var(--mac-keycap-edge),
+    0 0 0 0.5px var(--mac-keycap-edge);
+  font:
+    500 11.5px/1 ui-monospace,
+    "SF Mono",
+    "Geist Mono Variable",
+    monospace;
+  color: var(--mac-label);
+}
+
+.mac-key[data-placeholder] {
+  background: transparent;
+  box-shadow: none;
+  outline: 1px dashed var(--mac-tertiary);
+  outline-offset: -1px;
+  color: var(--mac-secondary);
+}
+
+/* Buttons in the AppKit "push button" style. */
+.mac-button {
+  display: inline-flex;
+  height: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 6px;
+  background: var(--mac-list);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 0.5px 1px rgb(0 0 0 / 10%);
+  font: 13px/1 var(--mac-font);
+  color: var(--mac-label);
+  white-space: nowrap;
+  cursor: default;
+  outline: none;
+}
+.dark .mac-button {
+  background: rgb(255 255 255 / 14%);
+  box-shadow:
+    0 0 0 0.5px rgb(255 255 255 / 8%),
+    0 0.5px 1px rgb(0 0 0 / 30%);
+}
+.mac-button:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+.mac-button:disabled {
+  opacity: 0.45;
+}
+.mac-button[data-default] {
+  background: linear-gradient(#3b95ff, #0a7aff);
+  box-shadow:
+    0 0 0 0.5px rgb(0 80 200 / 40%),
+    0 0.5px 1px rgb(0 0 0 / 15%);
+  color: #fff;
+}
+.mac-button[data-default]:disabled {
+  background: var(--mac-control);
+  box-shadow: none;
+  color: var(--mac-secondary);
+  opacity: 1;
+}
+.mac-button[data-destructive] {
+  color: #e5302b;
+}
+.mac-button[data-icon] {
+  width: 26px;
+  padding: 0;
+}
+.mac-button[data-borderless] {
+  background: transparent;
+  box-shadow: none;
+}
+.mac-button[data-borderless]:hover:not(:disabled) {
+  background: var(--mac-row-hover);
+}
+.mac-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+/* A pop-up button around a native <select>, which opens the system menu. */
+.mac-popup {
+  height: 22px;
+  min-width: 96px;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 24px 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%230a7aff'/%3E%3Cpath d='M5 6.5 8 3.8l3 2.7M5 9.5l3 2.7 3-2.7' fill='none' stroke='%23fff' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      no-repeat right 3px center / 16px 16px,
+    var(--mac-list);
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 14%),
+    0 0.5px 1px rgb(0 0 0 / 10%);
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+  outline: none;
+}
+.dark .mac-popup {
+  background-color: rgb(255 255 255 / 14%);
+}
+.mac-popup:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+
+.mac-field {
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 7px;
+  background: var(--mac-list);
+  box-shadow:
+    inset 0 0 0 0.5px rgb(0 0 0 / 22%),
+    inset 0 0.5px 1px rgb(0 0 0 / 8%);
+  font: 13px var(--mac-font);
+  color: var(--mac-label);
+  outline: none;
+}
+.dark .mac-field {
+  background: rgb(255 255 255 / 6%);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 18%);
+}
+.mac-field:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-field[aria-invalid="true"] {
+  box-shadow: 0 0 0 2px #e5302b;
+}
+
+/* Third-party packages: the whole notice is tinted so the trust warning can't be missed. */
+.mac-callout-warning {
+  display: flex;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--mac-warning-bg);
+  box-shadow: inset 0 0 0 1px var(--mac-warning-edge);
+  color: var(--mac-warning-fg);
+}
+.mac-callout-warning > svg {
+  flex-shrink: 0;
+  color: var(--mac-warning-icon);
+}
+.mac-callout-title {
+  font: 600 13px/16px var(--mac-font);
+}
+.mac-callout-body {
+  margin-top: 3px;
+  font: 12px/16px var(--mac-font);
+}
+
+/* The bar at the top of a pushed detail view: back button, title, actions. */
+.mac-detail-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.mac-back {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px 0 4px;
+  border-radius: 6px;
+  font: 13px var(--mac-font);
+  color: var(--mac-secondary);
+  cursor: default;
+  outline: none;
+}
+.mac-back:hover {
+  background: var(--mac-row-hover);
+  color: var(--mac-label);
+}
+.mac-back:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.mac-detail-hero .mac-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 11px;
+}
+.mac-detail-title {
+  font: 600 17px/22px var(--mac-font);
+  color: var(--mac-label);
+}
+.mac-detail-subtitle {
+  font: 12px/16px var(--mac-font);
+  color: var(--mac-secondary);
+}
+
+/* Reordering: handles appear only while the list is in Edit mode. */
+.mac-handle {
+  display: inline-flex;
+  width: 22px;
+  height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--mac-secondary);
+  cursor: grab;
+  touch-action: none;
+}
+.mac-handle:hover {
+  background: var(--mac-row-hover);
+  color: var(--mac-label);
+}
+.mac-handle:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 45%, transparent);
+}
+.mac-list[data-dragging],
+.mac-list[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+.mac-row[data-dragging] {
+  background: var(--mac-row-active);
+}
+.mac-row[data-dragging] > * {
+  opacity: 0.55;
+}
+.mac-row[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--focus);
+  pointer-events: none;
+}
+.mac-row[data-drop="before"]::after {
+  top: -1px;
+}
+.mac-row[data-drop="after"]::after {
+  bottom: -1px;
+}
+
+/* The chords file editor fills the pane below its bar. */
+.mac-editor {
+  display: flex;
+  flex-direction: column;
+  /* The window header, the page's padding and the Chords toolbar sit above it. */
+  height: calc(100vh - 62px - 16px - 40px - 44px);
+  min-height: 360px;
+}
+.mac-editor-surface {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 0.5px var(--mac-list-edge),
+    0 0.5px 1px rgb(0 0 0 / 4%);
+}
+.mac-editor-surface:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 40%, transparent);
+}
+.mac-editor-status {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 4px 0;
+  font: 11px/14px var(--mac-font);
+  color: var(--mac-secondary);
+}
