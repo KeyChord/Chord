@@ -13,13 +13,3 @@
 @source '../../../packages/dev/improve/chord/routes/chords/index';
 @source '../../../packages/dev/improve/chord/components/ui/kbd';
 @source '../../../packages/dev/improve/chord/lib/state';
-
-/* The panel takes no clicks, so it has nothing to scroll with: long content wraps or fades
-   instead (see chords-page.tsx), and no scroll bar is ever drawn, even with "Show scroll
-   bars: Always" or a mouse connected. */
-* {
-  scrollbar-width: none;
-}
-*::-webkit-scrollbar {
-  display: none;
-}

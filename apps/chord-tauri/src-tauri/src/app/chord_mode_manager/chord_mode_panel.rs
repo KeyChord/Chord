@@ -22,10 +22,7 @@ use tauri_nspanel::{CollectionBehavior, PanelBuilder, PanelHandle, PanelLevel, S
 use tauri_plugin_store::StoreExt;
 use window_vibrancy::NSVisualEffectViewTagged;
 
-/// The widest the sidebar window gets, as `SIDEBAR_MAX_WIDTH` in `chords-page.tsx`. A
-/// long list of options wraps into extra columns instead of scrolling, so it needs more
-/// room than a single column; the window still narrows to whatever the card uses.
-const INDICATOR_WIDTH: f64 = 960.0;
+const INDICATOR_WIDTH: f64 = 640.0;
 const FLOATING_BOTTOM_MARGIN: f64 = 24.0;
 const LAYOUT_STORE_KEY: &str = "chordLayout";
 const NATIVE_SURFACE_TAG: NSInteger = 91376255;
@@ -568,7 +565,7 @@ mod tests {
         let screen = NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(1440.0, 900.0));
         assert_eq!(
             ChordModePanel::frame_for_layout(ChordLayout::SidebarLeft, screen, None),
-            NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(960.0, 900.0))
+            NSRect::new(NSPoint::new(-1600.0, 80.0), NSSize::new(640.0, 900.0))
         );
         assert_eq!(
             ChordModePanel::frame_for_layout(ChordLayout::FloatingBottom, screen, None),

@@ -8,15 +8,13 @@
 		"#state-query": "./state-query.ts",
 		"#state-queries": "./state-queries.tsx",
 		"#hint-panel": "./hint-panel.ts",
-		"#appearance": "./appearance.ts",
-		"#panel-preferences": "./panel-preferences.ts"
+		"#appearance": "./appearance.ts"
 	},
 	"exports": {
 		".": "./+.ts",
 		"./desktop-platform": "./+desktop-platform.ts",
 		"./hint-panel": "./+hint-panel.ts",
-		"./appearance": "./+appearance.ts",
-		"./panel-preferences": "./+panel-preferences.ts"
+		"./appearance": "./+appearance.ts"
 	},
 	"dependencies": {
 		"@chord/dev.improve.chord.api.taurpc": "workspace:*",

@@ -21,10 +21,6 @@ import {
   getAppearance,
   setAppearance,
 } from "@chord/dev.improve.chord.lib.state/appearance";
-import {
-  getCollapseEarlierKeys,
-  setCollapseEarlierKeys,
-} from "@chord/dev.improve.chord.lib.state/panel-preferences";
 import { useState } from "react";
 
 export function LaunchOnLoginCard() {
@@ -55,7 +51,6 @@ function LaunchOnLoginCardContent({
   const toggleDockIconMutation = useMutation({
     mutationFn: taurpc.toggleDockIcon,
   });
-  const [collapseEarlierKeys, setCollapseEarlierKeysState] = useState(getCollapseEarlierKeys);
   const toggleHideHintPanelByDefaultMutation = useMutation({
     mutationFn: taurpc.toggleHideHintPanelByDefault,
   });
@@ -112,16 +107,6 @@ function LaunchOnLoginCardContent({
             disabled={toggleHideHintPanelByDefaultMutation.isPending}
             onCheckedChange={() => {
               toggleHideHintPanelByDefaultMutation.mutate();
-            }}
-          />
-          <SettingSwitchRow
-            id="collapse-earlier-keys"
-            label="Fold earlier keys of long chords"
-            description="When a chord gets long, show its first keys as a compact trail beside the Hint Panel's columns."
-            checked={collapseEarlierKeys}
-            onCheckedChange={() => {
-              setCollapseEarlierKeys(!collapseEarlierKeys);
-              setCollapseEarlierKeysState(!collapseEarlierKeys);
             }}
           />
         </div>
